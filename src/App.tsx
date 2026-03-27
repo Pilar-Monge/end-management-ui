@@ -1,121 +1,98 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import LoginPage from './features/login/pages/LoginPage';
+import MainAppPage from './app/layout/MainAppPage';
+import { CampsPage } from './features/camps';
+import { PersonsPage } from './features/persons';
+import {
+  ResourceTypesPage,
+  OccupationsPage,
+  OccupationCriteriaPage,
+  AchievementsPage,
+} from './features/catalogs';
 
-function App() {
-  const [count, setCount] = useState(0)
+
+function CatalogsLayout() {
+  const navigate = useNavigate();
+  const tab = new URLSearchParams(window.location.search).get('tab') || 'resources';
+  const tabs = {
+    resources: { label: 'Tipos de Recursos', component: ResourceTypesPage },
+    occupations: { label: 'Ocupaciones', component: OccupationsPage },
+    criteria: { label: 'Criterios', component: OccupationCriteriaPage },
+    achievements: { label: 'Logros', component: AchievementsPage },
+  } as const;
+
+  const ActiveComponent = tabs[tab as keyof typeof tabs]?.component || ResourceTypesPage;
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
+    <div style={{ minHeight: '100vh', background: '#060a04', color: '#7ddb50' }}>
+      <div
+        style={{
+          borderBottom: '1px solid rgba(74,138,48,0.2)',
+          background: 'rgba(10,18,8,0.9)',
+          padding: '16px 24px',
+          display: 'flex',
+          gap: '20px',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div style={{ display: 'flex', gap: '16px' }}>
+          {Object.entries(tabs).map(([key, { label }]) => (
+            <button
+              key={key}
+              onClick={() => navigate(`?tab=${key}`)}
+              style={{
+                background: tab === key ? 'rgba(74,138,48,0.2)' : 'transparent',
+                border: `1px solid ${tab === key ? 'rgba(74,138,48,0.5)' : 'rgba(74,138,48,0.2)'}`,
+                borderRadius: '4px',
+                color: tab === key ? '#7ddb50' : '#3a6020',
+                fontFamily: "'Courier New', monospace",
+                fontSize: '11px',
+                letterSpacing: '1px',
+                padding: '8px 14px',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                transition: 'all 0.2s',
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
         <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+          onClick={() => navigate('/app')}
+          style={{
+            background: 'rgba(60,60,80,0.14)',
+            border: '1px solid rgba(100,100,120,0.3)',
+            color: '#8080a0',
+            fontFamily: "'Courier New', monospace",
+            fontSize: '10px',
+            letterSpacing: '1px',
+            padding: '8px 14px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            textTransform: 'uppercase',
+          }}
         >
-          Count is {count}
+          Volver
         </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      </div>
+      <ActiveComponent />
+    </div>
+  );
 }
 
-export default App
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<LoginPage />} />
+      <Route path="/app" element={<MainAppPage />} />
+      <Route path="/camps" element={<CampsPage />} />
+      <Route path="/persons" element={<PersonsPage />} />
+      <Route path="/catalogs" element={<CatalogsLayout />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+export default App;
