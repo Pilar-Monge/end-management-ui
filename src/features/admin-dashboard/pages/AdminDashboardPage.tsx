@@ -2087,16 +2087,33 @@ export default function AdminDashboard() {
           pointer-events: none;
           z-index: 1;
         }
+        .scanlines::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, transparent 0%, rgba(217, 119, 6, 0.14) 48%, transparent 100%);
+          animation: scanSweep 4.2s linear infinite;
+          pointer-events: none;
+          z-index: 1;
+        }
         .noise-bg {
           background-color: #0A0A0B;
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"),
             radial-gradient(ellipse at 50% 0%, #1A1A14 0%, #0A0A0B 70%);
+        }
+        @keyframes scanSweep {
+          0% { transform: translateY(-100%); opacity: 0; }
+          8% { opacity: 0.5; }
+          50% { opacity: 0.9; }
+          92% { opacity: 0.5; }
+          100% { transform: translateY(100%); opacity: 0; }
         }
       `}</style>
 
       <div
         className="admin-dashboard noise-bg flex h-screen overflow-hidden"
         style={{
+          position: "relative",
           display: "flex",
           height: "100vh",
           overflow: "hidden",
@@ -2104,10 +2121,36 @@ export default function AdminDashboard() {
           color: "#F5F0E8",
         }}
       >
+        <div
+          aria-hidden
+          className="absolute"
+          style={{
+            top: -130,
+            left: -90,
+            width: 320,
+            height: 320,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(13,148,136,0.12) 0%, rgba(13,148,136,0) 70%)",
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          aria-hidden
+          className="absolute"
+          style={{
+            bottom: -180,
+            right: -120,
+            width: 420,
+            height: 420,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(217,119,6,0.12) 0%, rgba(217,119,6,0) 72%)",
+            pointerEvents: "none",
+          }}
+        />
 
         {/* SIDEBAR */}
         <aside className="hidden md:flex flex-col flex-shrink-0"
-          style={{ width: 220, background: "#0D0D10", borderRight: "1px solid #2D2A24" }}>
+          style={{ width: 220, background: "#0D0D10", borderRight: "1px solid #2D2A24", zIndex: 1 }}>
           {/* Logo */}
           <div className="px-4 py-5 flex flex-col items-center" style={{ borderBottom: "1px solid #2D2A24" }}>
             <div className="flex items-center gap-2 mb-1">
@@ -2163,7 +2206,7 @@ export default function AdminDashboard() {
         </aside>
 
         {/* MAIN */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden" style={{ position: "relative", zIndex: 1 }}>
           {/* Header */}
           <header className="scanlines relative flex-shrink-0 flex items-center justify-between px-5"
             style={{ height: 52, background: "#0D0D10", borderBottom: "1px solid #2D2A24" }}>
