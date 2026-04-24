@@ -3,6 +3,7 @@ import LoginPage from './features/login/pages/LoginPage';
 import MainAppPage from './app/layout/MainAppPage';
 import { CampsPage } from './features/camps';
 import { PersonsPage } from './features/persons';
+import { AdminDashboardPage } from './features/admin-dashboard';
 import {
   ResourceTypesPage,
   OccupationsPage,
@@ -89,6 +90,8 @@ function App() {
       <Route path="/app" element={<MainAppPage />} />
       <Route path="/camps" element={<CampsPage />} />
       <Route path="/persons" element={<PersonsPage />} />
+      <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
+      <Route path="/dashboard" element={<AdminDashboardPage />} />
       <Route path="/catalogs" element={<CatalogsLayout />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -78,7 +78,7 @@ export const MODULES: ModuleItem[] = [
     icon: '◆',
     description: 'Métricas y alertas',
     roles: ['SYSTEM_ADMIN', 'RESOURCE_MANAGEMENT'],
-    path: '/dashboard',
+    path: '/admin-dashboard',
     color: '#5a9a10',
   },
   {
