@@ -1662,6 +1662,7 @@ function ViewConfiguracion() {
 
 function ViewDashboard() {
   const [countdown, setCountdown] = useState({ h: 3, m: 28, s: 0 });
+  const [threatLevel, setThreatLevel] = useState(72);
   const [automations, setAutomations] = useState([
     { ok: true, name: "Consumo diario de raciones", time: "Ejecutado 06:00", active: true },
     { ok: true, name: "Colecta de recursos", time: "Ejecutado 06:00", active: true },
@@ -1682,6 +1683,16 @@ function ViewDashboard() {
     return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    const t = setInterval(() => {
+      setThreatLevel(prev => {
+        const jitter = Math.floor(Math.random() * 7) - 3;
+        return Math.min(95, Math.max(38, prev + jitter));
+      });
+    }, 4500);
+    return () => clearInterval(t);
+  }, []);
+
   const populationData = [
     { name: "Activos", value: 189, color: "#0D9488" },
     { name: "Heridos", value: 23, color: "#EA580C" },
@@ -1689,18 +1700,57 @@ function ViewDashboard() {
     { name: "Fuera", value: 17, color: "#F59E0B" },
   ];
   const totalPop = populationData.reduce((a, b) => a + b.value, 0);
+  const liveAlerts = INITIAL_NOTIFICATIONS.filter(n => !n.read).slice(0, 5);
+
+  const crisisToday = {
+    title: "CRISIS DEL DÍA: RIESGO DE ABASTECIMIENTO",
+    subtitle: "Si el agua cae por debajo del 6%, habrá penalización de moral y productividad.",
+    impact: ["-12% eficiencia de tareas", "+18% riesgo médico", "IA recomienda expedición de agua en < 2h"],
+    urgency: "VENTANA SEGURA: 01:45:00",
+  };
+  const rowVariants = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0, transition: { staggerChildren: 0.07 } },
+  };
+  const cardVariants = {
+    hidden: { opacity: 0, y: 8, scale: 0.99 },
+    show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.22 } },
+  };
+
+  const levelTone = (level: Notification["level"]) => {
+    if (level === "critical") return { color: "#DC2626", label: "CRÍTICA", bg: "#DC262622" };
+    if (level === "warning") return { color: "#F59E0B", label: "MEDIA", bg: "#F59E0B22" };
+    return { color: "#0D9488", label: "INFO", bg: "#0D948822" };
+  };
+  const isMaxAlert = threatLevel >= 80;
 
   return (
-    <div>
-      {/* KPI row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+    <div style={{ position: "relative" }}>
+      <AnimatePresence>
+        {isMaxAlert && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background: "radial-gradient(circle at 50% 0%, rgba(220,38,38,0.18) 0%, rgba(220,38,38,0) 60%)",
+              border: "1px solid rgba(220,38,38,0.22)",
+              zIndex: 0,
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* KPI row (top priority, as original flow) */}
+      <motion.div variants={rowVariants} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
         {[
           { icon: Users, color: "#0D9488", value: "247", label: "POBLACIÓN TOTAL", sub: "+3 SEMANA", subColor: "#0D9488", subIcon: TrendingUp },
           { icon: Package, color: "#DC2626", value: "3", label: "RECURSOS CRÍTICOS", sub: "CRÍTICO", subColor: "#DC2626", subIcon: TrendingDown, pulse: true },
           { icon: Map, color: "#D97706", value: "2", label: "EXPEDICIONES ACTIVAS", sub: "14 FUERA", subColor: "#F59E0B", subIcon: Activity },
           { icon: Radio, color: "#EA580C", value: "5", label: "SOLICITUDES INTER-CAMP.", sub: "2 URGENTES", subColor: "#EA580C", subIcon: AlertTriangle },
         ].map(({ icon: Icon, color, value, label, sub, subColor, subIcon: SubIcon, pulse }) => (
-          <motion.div key={label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <motion.div key={label} variants={cardVariants}>
             <Card glow={color}>
               <div className="flex items-start justify-between mb-2">
                 <div className={`p-2 rounded-sm ${pulse ? "animate-pulse" : ""}`} style={{ background: `${color}22` }}>
@@ -1716,7 +1766,7 @@ function ViewDashboard() {
             </Card>
           </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       {/* Charts row */}
       <div className="grid grid-cols-12 gap-3 mb-3">
@@ -1769,196 +1819,139 @@ function ViewDashboard() {
         </div>
       </div>
 
-      {/* Admissions + Expeditions */}
-      <div className="grid grid-cols-12 gap-3 mb-3">
-        <div className="col-span-12 lg:col-span-6">
-          <Card glow="#D97706" className="h-full">
-            <SectionHeader title="ADMISIONES PENDIENTES — IA" />
-            <div className="flex flex-col gap-2">
-              {INITIAL_ADMISSIONS.filter(a => a.status === "pending").map((a, idx) => (
-                <div key={a.id} className="grid grid-cols-12 items-center px-2 py-1.5 rounded-sm"
-                  style={{ background: idx % 2 === 0 ? "#0D0D10" : "transparent" }}>
-                  <div className="col-span-4 flex items-center gap-1.5">
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, color: a.score < 50 ? "#DC2626" : "#F5F0E8" }}>{a.name}</span>
-                    {a.badge && <Badge label={a.badge} color="#DC2626" />}
-                  </div>
-                  <div className="col-span-3"><span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070" }}>{a.profession}</span></div>
-                  <div className="col-span-2"><span style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, fontWeight: 700, color: scoreColor(a.score) }}>{a.score}</span></div>
-                  <div className="col-span-3 flex gap-1">
-                    <ActionBtn label="APR" color="#0D9488" small />
-                    <ActionBtn label="REC" color="#DC2626" small />
-                  </div>
+      {/* Crisis row */}
+      <div className="mb-3">
+        <Card glow="#DC2626">
+          <div
+            className="p-3 rounded-sm"
+            style={{
+              background: "radial-gradient(circle at 0% 0%, rgba(220,38,38,0.25) 0%, rgba(220,38,38,0.08) 42%, rgba(13,13,16,1) 100%)",
+              border: "1px solid #7F1D1D",
+            }}
+          >
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-1.5">
+                <AlertTriangle size={12} style={{ color: "#DC2626" }} />
+                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#FCA5A5" }}>{crisisToday.title}</span>
+              </div>
+              <Badge label="MISIÓN PRIORITARIA" color="#DC2626" />
+            </div>
+            <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 14, color: "#F5F0E8", fontWeight: 600, marginBottom: 8 }}>
+              {crisisToday.subtitle}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+              {crisisToday.impact.map(item => (
+                <div key={item} className="p-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#FCA5A5" }}>{item}</span>
                 </div>
               ))}
             </div>
-          </Card>
-        </div>
-        <div className="col-span-12 lg:col-span-6">
-          <Card className="h-full">
-            <SectionHeader title="EXPEDICIONES EN CURSO" />
-            <div className="flex flex-col gap-2">
-              {INITIAL_EXPEDITIONS.map(exp => {
-                const pct = exp.total > 0 ? (exp.day / exp.total) * 100 : 0;
-                const sc = expColor(exp.status);
-                return (
-                  <div key={exp.id} className="p-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#F5F0E8" }}>{exp.name}</span>
-                      <Badge label={exp.status} color={sc} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
-                        <div style={{ width: `${pct}%`, height: "100%", background: sc }} />
-                      </div>
-                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#8B8070" }}>D{exp.day}/{exp.total}</span>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 16, color: "#F59E0B", fontWeight: 900 }}>{crisisToday.urgency}</span>
+              <div className="flex items-center gap-2">
+                <ActionBtn label="PLAN IA" color="#D97706" />
+                <ActionBtn label="DESPLEGAR RESPUESTA" color="#DC2626" />
+              </div>
             </div>
-          </Card>
-        </div>
+          </div>
+        </Card>
       </div>
 
-      {/* Inventory + Intercamp + Logs */}
+      {/* Alertas e inteligencia esencial */}
       <div className="grid grid-cols-12 gap-3 mb-3">
-        <div className="col-span-12 lg:col-span-4">
-          <Card className="h-full">
-            <SectionHeader title="ALERTAS DE INVENTARIO" />
-            <div className="flex flex-col gap-2">
-              {INITIAL_INVENTORY.map(item => (
-                <div key={item.id}>
-                  <div className="flex justify-between mb-0.5">
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, color: "#F5F0E8" }}>{item.name}</span>
-                    <span className={item.status === "CRÍTICO" ? "animate-pulse" : ""} style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: statusColor(item.status) }}>{item.status}</span>
-                  </div>
-                  <div className="h-1.5 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
-                    <div className={item.status === "CRÍTICO" ? "animate-pulse" : ""} style={{ width: `${item.pct}%`, height: "100%", background: invBarColor(item.pct) }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-        <div className="col-span-12 lg:col-span-4">
-          <Card className="h-full">
-            <SectionHeader title="INTER-CAMPAMENTOS" />
-            <div className="flex flex-col gap-2">
-              {INITIAL_INTERCAMP.map(req => {
-                const sc = intercampColor(req.status);
-                return (
-                  <div key={req.id} className="p-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
-                    <div className="flex items-start justify-between gap-1 mb-1">
-                      <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#F5F0E8" }}>{req.text}</span>
-                      {req.urgent && <Badge label="URG" color="#DC2626" />}
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>{req.time}</span>
-                      <Badge label={req.status} color={sc} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        </div>
-        <div className="col-span-12 lg:col-span-4">
-          <Card className="h-full">
-            <SectionHeader title="ACCESO RECIENTE" />
-            <div className="flex flex-col gap-1.5">
-              {INITIAL_LOGS.slice(0, 6).map(log => {
-                const lc = logLevelColor(log.level);
-                return (
-                  <div key={log.id} className="flex items-start gap-2 py-1" style={{ borderBottom: "1px solid #2D2A2444" }}>
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540", flexShrink: 0 }}>[{log.time}]</span>
-                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1" style={{ background: lc }} />
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#F5F0E8" }}>{log.user}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        </div>
-      </div>
-
-      {/* Achievements + Automation */}
-      <div className="grid grid-cols-12 gap-3">
         <div className="col-span-12 lg:col-span-8">
-          <Card>
-            <SectionHeader title="LOGROS DEL CAMPAMENTO" />
-            <div className="flex items-center gap-3 mb-3 p-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
-              <div>
-                <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, color: "#4B4540" }}>LVL </span>
-                <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 22, fontWeight: 900, color: "#F59E0B" }}>7</span>
-              </div>
-              <div className="flex-1">
-                <div className="flex justify-between mb-1">
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#8B8070" }}>2340 / 3000 XP</span>
-                  <Badge label="CAMPAMENTO ALFA — RANGO: CONSOLIDADO" color="#D97706" />
-                </div>
-                <div className="h-2 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
-                  <motion.div initial={{ width: 0 }} animate={{ width: "78%" }} transition={{ duration: 1, delay: 0.5 }}
-                    style={{ height: "100%", background: "linear-gradient(90deg, #D97706, #F59E0B)", borderRadius: 2 }} />
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { name: "PRIMER MES", desc: "Sobrevivimos 30 días", unlocked: true, pct: 100, color: "#0D9488" },
-                { name: "SIN BAJAS", desc: "7 días sin pérdidas", unlocked: true, pct: 100, color: "#F59E0B" },
-                { name: "EQUIPO MÉDICO", desc: "5/5 médicos activos", unlocked: false, pct: 80, color: "#D97706" },
-                { name: "100 EXPLORACIONES", desc: "67/100 completadas", unlocked: false, pct: 67, color: "#0D9488" },
-              ].map(ach => (
-                <div key={ach.name} className="p-2 rounded-sm flex items-start gap-2"
-                  style={{ background: "#0D0D10", border: `1px solid ${ach.unlocked ? ach.color + "44" : "#2D2A24"}`, opacity: ach.unlocked ? 1 : 0.7 }}>
-                  <Trophy size={14} style={{ color: ach.unlocked ? ach.color : "#4B4540", flexShrink: 0, marginTop: 2 }} />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: ach.unlocked ? ach.color : "#8B8070" }}>{ach.name}</span>
-                      {ach.unlocked && <CheckCircle size={9} style={{ color: ach.color }} />}
+          <Card className="h-full" glow="#EA580C">
+            <SectionHeader title="ALERTAS VIVAS — TOP 3" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              {liveAlerts.slice(0, 3).map((alert, index) => {
+                const tone = levelTone(alert.level);
+                return (
+                  <motion.div
+                    key={alert.id}
+                    initial={{ opacity: 0, x: 8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="p-2 rounded-sm"
+                    style={{ background: "#0D0D10", border: `1px solid ${tone.color}44` }}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8", fontWeight: 700 }}>{alert.title}</span>
+                      <span
+                        className={alert.level === "critical" ? "animate-pulse" : ""}
+                        style={{
+                          fontFamily: "'Share Tech Mono', monospace",
+                          fontSize: 8,
+                          color: tone.color,
+                          background: tone.bg,
+                          border: `1px solid ${tone.color}44`,
+                          padding: "1px 4px",
+                          borderRadius: 2,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {tone.label}
+                      </span>
                     </div>
-                    <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#4B4540" }}>{ach.desc}</p>
-                    {!ach.unlocked && (
-                      <div className="h-1 rounded-sm overflow-hidden mt-1" style={{ background: "#2D2A24" }}>
-                        <div style={{ width: `${ach.pct}%`, height: "100%", background: ach.color }} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                    <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070", marginBottom: 4 }}>{alert.body}</p>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>{alert.time}</span>
+                  </motion.div>
+                );
+              })}
             </div>
           </Card>
         </div>
         <div className="col-span-12 lg:col-span-4">
-          <Card className="h-full">
-            <SectionHeader title="AUTOMATIZACIÓN DEL SISTEMA" />
+          <Card className="h-full" glow="#0D9488">
+            <SectionHeader title="ESTADO OPERATIVO" />
             <div className="flex flex-col gap-2">
-              {automations.map((a, i) => (
-                <div key={i} className="flex items-center gap-2 p-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
-                  <span style={{ fontSize: 12, color: a.ok ? "#0D9488" : "#EA580C", flexShrink: 0 }}>{a.ok ? "✓" : "⚠"}</span>
-                  <div className="flex-1 min-w-0">
-                    <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, color: "#F5F0E8" }}>{a.name}</div>
-                    <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>{a.time}</div>
+              {[
+                { name: "ADMISIONES IA", status: "ESTABLE", note: "Cola promedio 02:11", color: "#0D9488" },
+                { name: "INVENTARIO", status: "ALERTA", note: "3 recursos críticos", color: "#EA580C" },
+                { name: "EXPEDICIONES", status: "ALERTA", note: "1 equipo con retraso", color: "#F59E0B" },
+                { name: "SEGURIDAD", status: "BLOQUEADO", note: "IP sospechosa aislada", color: "#DC2626" },
+              ].map(module => (
+                <div key={module.name} className="p-2 rounded-sm" style={{ background: "#0D0D10", border: `1px solid ${module.color}44` }}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#F5F0E8" }}>{module.name}</span>
+                    <span className={module.status === "BLOQUEADO" ? "animate-pulse" : ""} style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: module.color }}>
+                      {module.status}
+                    </span>
                   </div>
-                  <Toggle active={a.active} onChange={() => setAutomations(prev => prev.map((aa, j) => j === i ? { ...aa, active: !aa.active } : aa))} />
+                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070" }}>{module.note}</span>
                 </div>
               ))}
-              <div className="p-2 rounded-sm" style={{ background: "#1A1A20", border: "1px solid #D97706" }}>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Settings size={10} style={{ color: "#D97706" }} />
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#D97706" }}>PRÓXIMO CICLO — HOY 18:00</span>
-                </div>
-                <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 18, fontWeight: 900, color: "#F59E0B" }}>
-                  {String(countdown.h).padStart(2, "0")}:{String(countdown.m).padStart(2, "0")}:{String(countdown.s).padStart(2, "0")}
-                </div>
-              </div>
             </div>
           </Card>
         </div>
+      </div>
+
+      {/* Próximo ciclo automático */}
+      <div className="mb-3">
+        <Card>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <Settings size={14} style={{ color: "#D97706" }} />
+              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#D97706" }}>PRÓXIMO CICLO AUTOMÁTICO — HOY 18:00</span>
+            </div>
+            <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 22, fontWeight: 900, color: "#F59E0B" }}>
+              {String(countdown.h).padStart(2, "0")}:{String(countdown.m).padStart(2, "0")}:{String(countdown.s).padStart(2, "0")}
+            </div>
+            <div className="flex gap-2">
+              {automations.map((a, i) => (
+                <div key={i} className="flex items-center gap-1 px-2 py-1 rounded-sm" style={{ background: "#0D0D10", border: `1px solid ${a.ok ? "#0D948844" : "#EA580C44"}` }}>
+                  <span style={{ fontSize: 10, color: a.ok ? "#0D9488" : "#EA580C" }}>{a.ok ? "✓" : "⚠"}</span>
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#8B8070" }}>{a.name.split(" ").slice(0, 2).join(" ")}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
   );
 }
+
+// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
