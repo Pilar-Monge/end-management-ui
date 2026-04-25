@@ -241,7 +241,7 @@ function notifColor(l: string) {
 function Card({ children, className = "", glow = "" }: { children: React.ReactNode; className?: string; glow?: string }) {
   return (
     <div
-      className={`relative rounded-sm p-4 ${className}`}
+      className={`relative rounded-sm card-soft p-4 ${className}`}
       style={{ background: "#111114", border: `1px solid ${glow || "#2D2A24"}`, boxShadow: glow ? `0 0 12px 1px ${glow}22` : "none" }}
     >
       {children}
@@ -355,8 +355,6 @@ function ViewPoblacion() {
   const [selected, setSelected] = useState<Person | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState<Partial<Person>>({});
-  const [showAdd, setShowAdd] = useState(false);
-  const [newPerson, setNewPerson] = useState<Partial<Person>>({ name: "", role: "", status: "Activo", age: 0, sector: "", joined: `D-47` });
 
   const statuses = ["Todos", "Activo", "Herido", "Enfermo", "Fuera"];
   const filtered = persons.filter(p => {
@@ -382,14 +380,6 @@ function ViewPoblacion() {
   const handleDelete = (id: number) => {
     setPersons(prev => prev.filter(p => p.id !== id));
     setSelected(null);
-  };
-
-  const handleAdd = () => {
-    if (!newPerson.name) return;
-    const id = Math.max(...persons.map(p => p.id)) + 1;
-    setPersons(prev => [...prev, { ...newPerson, id } as Person]);
-    setNewPerson({ name: "", role: "", status: "Activo", age: 0, sector: "", joined: "D-47" });
-    setShowAdd(false);
   };
 
   return (
@@ -418,7 +408,6 @@ function ViewPoblacion() {
               </button>
             ))}
           </div>
-          <ActionBtn label="+ AGREGAR" color="#0D9488" onClick={() => setShowAdd(true)} />
         </div>
         <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginBottom: 12 }} />
 
@@ -532,49 +521,6 @@ function ViewPoblacion() {
             )}
           </div>
         )}
-      </Modal>
-
-      {/* Add person modal */}
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="AGREGAR PERSONA">
-        <div className="flex flex-col gap-3">
-          {[
-            { label: "NOMBRE COMPLETO", key: "name" },
-            { label: "ROL / PROFESIÓN", key: "role" },
-            { label: "SECTOR ASIGNADO", key: "sector" },
-          ].map(({ label, key }) => (
-            <div key={key}>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{label}</label>
-              <input
-                value={(newPerson as any)[key] ?? ""}
-                onChange={e => setNewPerson(prev => ({ ...prev, [key]: e.target.value }))}
-                className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}
-              />
-            </div>
-          ))}
-          <div>
-            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>EDAD</label>
-            <input
-              type="number"
-              value={newPerson.age ?? 0}
-              onChange={e => setNewPerson(prev => ({ ...prev, age: Number(e.target.value) }))}
-              className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-              style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}
-            />
-          </div>
-          <div>
-            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>ESTADO INICIAL</label>
-            <select
-              value={newPerson.status ?? "Activo"}
-              onChange={e => setNewPerson(prev => ({ ...prev, status: e.target.value as Person["status"] }))}
-              className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-              style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}
-            >
-              {["Activo", "Herido", "Enfermo", "Fuera"].map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <ActionBtn label="REGISTRAR PERSONA" color="#0D9488" onClick={handleAdd} />
-        </div>
       </Modal>
     </div>
   );
@@ -2173,7 +2119,14 @@ export default function AdminDashboard() {
               return (
                 <button key={label} onClick={() => setActiveNav(label)}
                   className="w-full flex items-center gap-2.5 px-3 py-2 mb-0.5 rounded-sm transition-all cursor-pointer"
-                  style={{ background: isActive ? "#1A1A20" : "transparent", borderLeft: isActive ? "2px solid #D97706" : "2px solid transparent", color: isActive ? "#F59E0B" : "#8B8070" }}>
+                  style={{
+                    background: isActive ? "#1A1A20" : "transparent",
+                    border: "none",
+                    outline: "none",
+                    boxShadow: "none",
+                    borderLeft: isActive ? "2px solid #D97706" : "2px solid transparent",
+                    color: isActive ? "#F59E0B" : "#8B8070"
+                  }}>
                   <Icon size={14} />
                   <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>{label}</span>
                   {badge ? (

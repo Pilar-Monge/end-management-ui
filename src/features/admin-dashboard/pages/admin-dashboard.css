@@ -65,7 +65,9 @@
 .admin-dashboard .overflow-y-auto { overflow-y: auto; }
 .admin-dashboard .resize-none { resize: none; }
 
-.admin-dashboard .rounded-sm { border-radius: 0.4rem; }
+.admin-dashboard .rounded-sm { border-radius: 0.28rem; }
+.admin-dashboard .card-soft { border-radius: 0.56rem; }
+.admin-dashboard button.rounded-sm { border-radius: 0.5rem; }
 .admin-dashboard .rounded-full { border-radius: 9999px; }
 
 .admin-dashboard .p-1 { padding: 0.25rem; }
