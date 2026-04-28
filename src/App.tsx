@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import HomePage from './pages/HomePage'
 import LoginPage from './features/login/pages/LoginPage'
 import MainAppPage from './app/layout/MainAppPage'
+import { FormularioPage } from './features/formulario'
 import { CampsPage } from './features/camps'
 import { PersonsPage } from './features/persons'
 import {
@@ -87,8 +89,10 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<LoginPage />} />
+      <Route path="/" element={<HomePage />} />
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/app" element={<MainAppPage />} />
+      <Route path="/formulario" element={<FormularioPage />} />
       <Route path="/camps" element={<CampsPage />} />
       <Route path="/persons" element={<PersonsPage />} />
       <Route path="/catalogs" element={<CatalogsLayout />} />
