@@ -9,6 +9,7 @@ import {
   OccupationCriteriaPage,
   AchievementsPage,
 } from './features/catalogs'
+import { useSessionManager } from './shared/hooks'
 
 function CatalogsLayout() {
   const navigate = useNavigate()
@@ -82,6 +83,8 @@ function CatalogsLayout() {
 }
 
 function App() {
+  useSessionManager()
+
   return (
     <Routes>
       <Route path="/" element={<LoginPage />} />

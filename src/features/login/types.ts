@@ -1,8 +1,9 @@
 export interface LoginForm {
   username: string
   password: string
-}
 
+  campId: number
+}
 export interface Camp {
   id: number
   name: string
@@ -24,9 +25,8 @@ export interface LoginApiResponse {
   user: {
     id: number
     username: string
-    role: string
+    rol: string
     campId: number
   }
 }
-
 export type LoginErrors = Partial<LoginForm & { general: string }>

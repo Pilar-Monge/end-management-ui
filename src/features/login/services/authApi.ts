@@ -17,10 +17,12 @@ export async function loginRequest(form: LoginForm): Promise<LoginApiResponse> {
     body: JSON.stringify({
       username: form.username,
       password: form.password,
+      campId: form.campId,
     }),
   })
 
   const data = await res.json()
-  if (!res.ok) throw data
-  return data
+  if (!res.ok) throw new Error(data.message || 'Error al iniciar sesión')
+
+  return data.data
 }

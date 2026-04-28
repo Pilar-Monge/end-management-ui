@@ -4,31 +4,18 @@ import { useNavigate } from 'react-router-dom'
 import { ApocInput } from '../components/ApocInput'
 import { LandingGhosts } from '../components/LandingGhosts'
 import { HudCorners, Scanlines } from '../components/BackgroundEffects'
-import type { LoginErrors, LoginForm, LoginApiResponse } from '../types'
+import { loginRequest } from '../services/authApi'
+import type { LoginErrors, LoginForm } from '../types'
 
 export default function LoginPage() {
   const navigate = useNavigate()
 
-  const [form, setForm] = useState<LoginForm>({ username: '', password: '' })
+  const [form, setForm] = useState<LoginForm>({ username: '', password: '', campId: 1 })
   const [errors, setErrors] = useState<LoginErrors>({})
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showLoginForm, setShowLoginForm] = useState(false)
   const [cinematicPulse, setCinematicPulse] = useState(0)
-
-  function buildMockResponse(username: string): LoginApiResponse {
-    const safeUsername = username.trim() || 'invitado'
-
-    return {
-      token: `mock-token-${Date.now()}`,
-      user: {
-        id: Date.now(),
-        username: safeUsername,
-        role: 'SYSTEM_ADMIN',
-        campId: 1,
-      },
-    }
-  }
 
   function validate(): boolean {
     const nextErrors: LoginErrors = {}
@@ -53,12 +40,16 @@ export default function LoginPage() {
     setErrors({})
 
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 350))
-      const data = buildMockResponse(form.username)
+      const response = await loginRequest(form)
 
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      localStorage.setItem('token', response.token)
+      localStorage.setItem('user', JSON.stringify(response.user))
       navigate('/app')
+    } catch (error) {
+      setErrors({
+        general:
+          error instanceof Error ? error.message : 'No se pudo iniciar sesión contra el backend',
+      })
     } finally {
       setLoading(false)
     }
