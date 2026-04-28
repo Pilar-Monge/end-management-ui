@@ -1,16 +1,20 @@
-import { motion } from 'framer-motion';
-import { MODULES } from '../../../shared/constants/app';
+import { motion } from 'framer-motion'
+import { MODULES } from '../../../shared/constants/app'
 
 interface ModuleMapProps {
-  userRole: string;
-  onNavigate: (path: string) => void;
+  userRole: string
+  onNavigate: (path: string) => void
 }
 
 export function ModuleMap({ userRole, onNavigate }: ModuleMapProps) {
-  const available = MODULES.filter((moduleItem) => moduleItem.roles.includes(userRole));
+  const available = MODULES.filter((moduleItem) => moduleItem.roles.includes(userRole))
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ width: '100%', maxWidth: 680 }}>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      style={{ width: '100%', maxWidth: 680 }}
+    >
       <motion.div
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -136,5 +140,5 @@ export function ModuleMap({ userRole, onNavigate }: ModuleMapProps) {
         {available.length} módulos disponibles para tu rol
       </motion.div>
     </motion.div>
-  );
+  )
 }

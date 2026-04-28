@@ -1,23 +1,23 @@
-import { useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { ApocInput } from '../components/ApocInput';
-import { LandingGhosts } from '../components/LandingGhosts';
-import { HudCorners, Scanlines } from '../components/BackgroundEffects';
-import type { LoginErrors, LoginForm, LoginApiResponse } from '../types';
+import { useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
+import { ApocInput } from '../components/ApocInput'
+import { LandingGhosts } from '../components/LandingGhosts'
+import { HudCorners, Scanlines } from '../components/BackgroundEffects'
+import type { LoginErrors, LoginForm, LoginApiResponse } from '../types'
 
 export default function LoginPage() {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
 
-  const [form, setForm] = useState<LoginForm>({ username: '', password: '' });
-  const [errors, setErrors] = useState<LoginErrors>({});
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showLoginForm, setShowLoginForm] = useState(false);
-  const [cinematicPulse, setCinematicPulse] = useState(0);
+  const [form, setForm] = useState<LoginForm>({ username: '', password: '' })
+  const [errors, setErrors] = useState<LoginErrors>({})
+  const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showLoginForm, setShowLoginForm] = useState(false)
+  const [cinematicPulse, setCinematicPulse] = useState(0)
 
   function buildMockResponse(username: string): LoginApiResponse {
-    const safeUsername = username.trim() || 'invitado';
+    const safeUsername = username.trim() || 'invitado'
 
     return {
       token: `mock-token-${Date.now()}`,
@@ -27,46 +27,48 @@ export default function LoginPage() {
         role: 'SYSTEM_ADMIN',
         campId: 1,
       },
-    };
+    }
   }
 
   function validate(): boolean {
-    const nextErrors: LoginErrors = {};
+    const nextErrors: LoginErrors = {}
 
-    if (!form.username.trim()) nextErrors.username = 'Campo requerido';
-    if (form.username.length > 0 && form.username.length < 3) nextErrors.username = 'Mínimo 3 caracteres';
+    if (!form.username.trim()) nextErrors.username = 'Campo requerido'
+    if (form.username.length > 0 && form.username.length < 3)
+      nextErrors.username = 'Mínimo 3 caracteres'
 
-    if (!form.password) nextErrors.password = 'Campo requerido';
-    if (form.password.length > 0 && form.password.length < 6) nextErrors.password = 'Mínimo 6 caracteres';
+    if (!form.password) nextErrors.password = 'Campo requerido'
+    if (form.password.length > 0 && form.password.length < 6)
+      nextErrors.password = 'Mínimo 6 caracteres'
 
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    setErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
   }
 
   async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    if (!validate()) return;
+    event.preventDefault()
+    if (!validate()) return
 
-    setLoading(true);
-    setErrors({});
+    setLoading(true)
+    setErrors({})
 
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 350));
-      const data = buildMockResponse(form.username);
+      await new Promise((resolve) => window.setTimeout(resolve, 350))
+      const data = buildMockResponse(form.username)
 
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      navigate('/app');
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+      navigate('/app')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
   function handleSetField(field: keyof LoginForm) {
     return (value: string) => {
-      setForm((prev) => ({ ...prev, [field]: value }));
-      if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
-    };
+      setForm((prev) => ({ ...prev, [field]: value }))
+      if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }))
+    }
   }
 
   return (
@@ -89,7 +91,8 @@ export default function LoginPage() {
         style={{
           position: 'absolute',
           inset: 0,
-          background: 'radial-gradient(ellipse at 50% 100%, rgba(20,50,10,0.55) 0%, rgba(6,10,4,0) 65%)',
+          background:
+            'radial-gradient(ellipse at 50% 100%, rgba(20,50,10,0.55) 0%, rgba(6,10,4,0) 65%)',
           pointerEvents: 'none',
         }}
       />
@@ -176,8 +179,8 @@ export default function LoginPage() {
               <motion.button
                 type="button"
                 onClick={() => {
-                  setCinematicPulse((prev) => prev + 1);
-                  setShowLoginForm(true);
+                  setCinematicPulse((prev) => prev + 1)
+                  setShowLoginForm(true)
                 }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -323,12 +326,13 @@ export default function LoginPage() {
                 inset: 0,
                 borderRadius: 12,
                 pointerEvents: 'none',
-                background: 'radial-gradient(circle at 50% 45%, rgba(125,219,80,0.22), rgba(125,219,80,0) 65%)',
+                background:
+                  'radial-gradient(circle at 50% 45%, rgba(125,219,80,0.22), rgba(125,219,80,0) 65%)',
               }}
             />
           )}
         </AnimatePresence>
       </motion.div>
     </div>
-  );
+  )
 }

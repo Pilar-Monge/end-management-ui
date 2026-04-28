@@ -1,14 +1,14 @@
-import { useState, type ReactNode } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useState, type ReactNode } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 
 interface ApocInputProps {
-  label: string;
-  type?: string;
-  value: string;
-  onChange: (v: string) => void;
-  error?: string;
-  placeholder?: string;
-  children?: ReactNode;
+  label: string
+  type?: string
+  value: string
+  onChange: (v: string) => void
+  error?: string
+  placeholder?: string
+  children?: ReactNode
 }
 
 export function ApocInput({
@@ -20,7 +20,7 @@ export function ApocInput({
   placeholder,
   children,
 }: ApocInputProps) {
-  const [focused, setFocused] = useState(false);
+  const [focused, setFocused] = useState(false)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -122,5 +122,5 @@ export function ApocInput({
         )}
       </AnimatePresence>
     </div>
-  );
+  )
 }

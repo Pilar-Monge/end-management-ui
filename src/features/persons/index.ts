@@ -1,5 +1,5 @@
-export * from './types';
-export * from './api/keys';
-export * from './api/queries';
-export * from './api/mutations';
-export { PersonsPage } from './pages/PersonsPage';
+export * from './types'
+export * from './api/keys'
+export * from './api/queries'
+export * from './api/mutations'
+export { PersonsPage } from './pages/PersonsPage'

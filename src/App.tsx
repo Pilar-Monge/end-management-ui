@@ -1,27 +1,26 @@
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import LoginPage from './features/login/pages/LoginPage';
-import MainAppPage from './app/layout/MainAppPage';
-import { CampsPage } from './features/camps';
-import { PersonsPage } from './features/persons';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import LoginPage from './features/login/pages/LoginPage'
+import MainAppPage from './app/layout/MainAppPage'
+import { CampsPage } from './features/camps'
+import { PersonsPage } from './features/persons'
 import {
   ResourceTypesPage,
   OccupationsPage,
   OccupationCriteriaPage,
   AchievementsPage,
-} from './features/catalogs';
-
+} from './features/catalogs'
 
 function CatalogsLayout() {
-  const navigate = useNavigate();
-  const tab = new URLSearchParams(window.location.search).get('tab') || 'resources';
+  const navigate = useNavigate()
+  const tab = new URLSearchParams(window.location.search).get('tab') || 'resources'
   const tabs = {
     resources: { label: 'Tipos de Recursos', component: ResourceTypesPage },
     occupations: { label: 'Ocupaciones', component: OccupationsPage },
     criteria: { label: 'Criterios', component: OccupationCriteriaPage },
     achievements: { label: 'Logros', component: AchievementsPage },
-  } as const;
+  } as const
 
-  const ActiveComponent = tabs[tab as keyof typeof tabs]?.component || ResourceTypesPage;
+  const ActiveComponent = tabs[tab as keyof typeof tabs]?.component || ResourceTypesPage
 
   return (
     <div style={{ minHeight: '100vh', background: '#060a04', color: '#7ddb50' }}>
@@ -79,7 +78,7 @@ function CatalogsLayout() {
       </div>
       <ActiveComponent />
     </div>
-  );
+  )
 }
 
 function App() {
@@ -92,7 +91,7 @@ function App() {
       <Route path="/catalogs" element={<CatalogsLayout />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  );
+  )
 }
 
-export default App;
+export default App

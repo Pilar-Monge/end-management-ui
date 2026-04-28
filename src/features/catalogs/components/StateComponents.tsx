@@ -1,7 +1,6 @@
-
-import { motion } from 'framer-motion';
+import { motion } from 'framer-motion'
 interface SkeletonRowProps {
-  cols: number;
+  cols: number
 }
 
 function SkeletonRow({ cols }: SkeletonRowProps) {
@@ -21,7 +20,7 @@ function SkeletonRow({ cols }: SkeletonRowProps) {
         </td>
       ))}
     </tr>
-  );
+  )
 }
 
 export function LoadingSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
@@ -43,15 +42,15 @@ export function LoadingSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: 
         </tbody>
       </table>
     </div>
-  );
+  )
 }
 interface EmptyStateProps {
-  title: string;
-  description: string;
+  title: string
+  description: string
   action?: {
-    label: string;
-    onClick: () => void;
-  };
+    label: string
+    onClick: () => void
+  }
 }
 
 export function EmptyState({ title, description, action }: EmptyStateProps) {
@@ -120,12 +119,12 @@ export function EmptyState({ title, description, action }: EmptyStateProps) {
         </motion.button>
       )}
     </motion.div>
-  );
+  )
 }
 interface ErrorStateProps {
-  title: string;
-  message: string;
-  onRetry?: () => void;
+  title: string
+  message: string
+  onRetry?: () => void
 }
 
 export function ErrorState({ title, message, onRetry }: ErrorStateProps) {
@@ -194,5 +193,5 @@ export function ErrorState({ title, message, onRetry }: ErrorStateProps) {
         </motion.button>
       )}
     </motion.div>
-  );
+  )
 }

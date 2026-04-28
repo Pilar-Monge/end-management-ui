@@ -1,20 +1,20 @@
-import { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import { EmptyState, ErrorState, LoadingSkeleton } from '../../catalogs/components/StateComponents';
-import { useCreatePerson, useDeletePerson, useUpdatePerson } from '../api/mutations';
-import { usePersons, usePersonsStats } from '../api/queries';
-import type { CreatePersonRequest, Person, PersonStatus, UpdatePersonRequest } from '../types';
+import { useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
+import { EmptyState, ErrorState, LoadingSkeleton } from '../../catalogs/components/StateComponents'
+import { useCreatePerson, useDeletePerson, useUpdatePerson } from '../api/mutations'
+import { usePersons, usePersonsStats } from '../api/queries'
+import type { CreatePersonRequest, Person, PersonStatus, UpdatePersonRequest } from '../types'
 
 interface FormState {
-  id?: number;
-  firstName: string;
-  lastName: string;
-  alias: string;
-  age: number;
-  campId: number;
-  occupationId: number;
-  notes: string;
-  status: PersonStatus;
+  id?: number
+  firstName: string
+  lastName: string
+  alias: string
+  age: number
+  campId: number
+  occupationId: number
+  notes: string
+  status: PersonStatus
 }
 
 const INITIAL_FORM: FormState = {
@@ -26,7 +26,7 @@ const INITIAL_FORM: FormState = {
   occupationId: 1,
   notes: '',
   status: 'ACTIVE',
-};
+}
 
 const STATUS_OPTIONS: Array<PersonStatus | 'ALL'> = [
   'ALL',
@@ -34,57 +34,57 @@ const STATUS_OPTIONS: Array<PersonStatus | 'ALL'> = [
   'INJURED',
   'MISSING',
   'DECEASED',
-];
+]
 
 export function PersonsPage() {
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<PersonStatus | 'ALL'>('ALL');
+  const [showForm, setShowForm] = useState(false)
+  const [formData, setFormData] = useState<FormState>(INITIAL_FORM)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [filterStatus, setFilterStatus] = useState<PersonStatus | 'ALL'>('ALL')
 
-  const { data: persons = [], isLoading, error, refetch } = usePersons();
-  const { data: stats } = usePersonsStats();
+  const { data: persons = [], isLoading, error, refetch } = usePersons()
+  const { data: stats } = usePersonsStats()
 
-  const createMutation = useCreatePerson();
-  const updateMutation = useUpdatePerson();
-  const deleteMutation = useDeletePerson();
+  const createMutation = useCreatePerson()
+  const updateMutation = useUpdatePerson()
+  const deleteMutation = useDeletePerson()
 
   const filteredPersons = useMemo(() => {
     if (filterStatus === 'ALL') {
-      return persons;
+      return persons
     }
 
-    return persons.filter((person: Person) => person.status === filterStatus);
-  }, [persons, filterStatus]);
+    return persons.filter((person: Person) => person.status === filterStatus)
+  }, [persons, filterStatus])
 
   function resetForm() {
-    setFormData(INITIAL_FORM);
-    setFormError(null);
-    setShowForm(false);
+    setFormData(INITIAL_FORM)
+    setFormError(null)
+    setShowForm(false)
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFormError(null);
+    event.preventDefault()
+    setFormError(null)
 
     if (!formData.firstName.trim() || !formData.lastName.trim()) {
-      setFormError('Nombre y apellido son obligatorios.');
-      return;
+      setFormError('Nombre y apellido son obligatorios.')
+      return
     }
 
     if (!Number.isFinite(formData.age) || formData.age < 1) {
-      setFormError('La edad debe ser mayor que cero.');
-      return;
+      setFormError('La edad debe ser mayor que cero.')
+      return
     }
 
     if (!Number.isFinite(formData.campId) || formData.campId < 1) {
-      setFormError('Campamento invalido.');
-      return;
+      setFormError('Campamento invalido.')
+      return
     }
 
     if (!Number.isFinite(formData.occupationId) || formData.occupationId < 1) {
-      setFormError('Ocupacion invalida.');
-      return;
+      setFormError('Ocupacion invalida.')
+      return
     }
 
     try {
@@ -98,9 +98,9 @@ export function PersonsPage() {
           occupationId: formData.occupationId,
           notes: formData.notes || undefined,
           status: formData.status,
-        };
+        }
 
-        await updateMutation.mutateAsync({ id: formData.id, data: payload });
+        await updateMutation.mutateAsync({ id: formData.id, data: payload })
       } else {
         const payload: CreatePersonRequest = {
           firstName: formData.firstName,
@@ -110,17 +110,17 @@ export function PersonsPage() {
           campId: formData.campId,
           occupationId: formData.occupationId,
           notes: formData.notes || undefined,
-        };
+        }
 
-        await createMutation.mutateAsync(payload);
+        await createMutation.mutateAsync(payload)
       }
 
-      resetForm();
+      resetForm()
     } catch (submitError) {
       if (submitError instanceof Error) {
-        setFormError(submitError.message);
+        setFormError(submitError.message)
       } else {
-        setFormError('No fue posible guardar la persona.');
+        setFormError('No fue posible guardar la persona.')
       }
     }
   }
@@ -136,39 +136,40 @@ export function PersonsPage() {
       occupationId: person.occupationId,
       notes: person.notes ?? '',
       status: person.status,
-    });
+    })
 
-    setFormError(null);
-    setShowForm(true);
+    setFormError(null)
+    setShowForm(true)
   }
 
   async function handleDelete(personId: number) {
-    const confirmed = window.confirm('Deseas eliminar esta persona?');
+    const confirmed = window.confirm('Deseas eliminar esta persona?')
 
     if (!confirmed) {
-      return;
+      return
     }
 
     try {
-      await deleteMutation.mutateAsync(personId);
+      await deleteMutation.mutateAsync(personId)
     } catch (deleteError) {
-      const message = deleteError instanceof Error ? deleteError.message : 'No fue posible eliminar.';
-      window.alert(message);
+      const message =
+        deleteError instanceof Error ? deleteError.message : 'No fue posible eliminar.'
+      window.alert(message)
     }
   }
 
   function statusColor(status: PersonStatus) {
     switch (status) {
       case 'ACTIVE':
-        return '#7ddb50';
+        return '#7ddb50'
       case 'INJURED':
-        return '#d9a63f';
+        return '#d9a63f'
       case 'MISSING':
-        return '#8899aa';
+        return '#8899aa'
       case 'DECEASED':
-        return '#c95a5a';
+        return '#c95a5a'
       default:
-        return '#7ddb50';
+        return '#7ddb50'
     }
   }
 
@@ -311,25 +312,45 @@ export function PersonsPage() {
               {formData.id ? 'Editar Persona' : 'Nueva Persona'}
             </h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                marginBottom: '12px',
+              }}
+            >
               <input
                 value={formData.firstName}
-                onChange={(event) => setFormData((prev) => ({ ...prev, firstName: event.target.value }))}
+                onChange={(event) =>
+                  setFormData((prev) => ({ ...prev, firstName: event.target.value }))
+                }
                 placeholder="Nombre"
                 style={inputStyle}
               />
               <input
                 value={formData.lastName}
-                onChange={(event) => setFormData((prev) => ({ ...prev, lastName: event.target.value }))}
+                onChange={(event) =>
+                  setFormData((prev) => ({ ...prev, lastName: event.target.value }))
+                }
                 placeholder="Apellido"
                 style={inputStyle}
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr 1fr',
+                gap: '12px',
+                marginBottom: '12px',
+              }}
+            >
               <input
                 value={formData.alias}
-                onChange={(event) => setFormData((prev) => ({ ...prev, alias: event.target.value }))}
+                onChange={(event) =>
+                  setFormData((prev) => ({ ...prev, alias: event.target.value }))
+                }
                 placeholder="Alias"
                 style={inputStyle}
               />
@@ -338,7 +359,10 @@ export function PersonsPage() {
                 value={formData.age}
                 min={1}
                 onChange={(event) =>
-                  setFormData((prev) => ({ ...prev, age: Number.parseInt(event.target.value, 10) || 0 }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    age: Number.parseInt(event.target.value, 10) || 0,
+                  }))
                 }
                 placeholder="Edad"
                 style={inputStyle}
@@ -357,13 +381,23 @@ export function PersonsPage() {
               </select>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                marginBottom: '12px',
+              }}
+            >
               <input
                 type="number"
                 min={1}
                 value={formData.campId}
                 onChange={(event) =>
-                  setFormData((prev) => ({ ...prev, campId: Number.parseInt(event.target.value, 10) || 0 }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    campId: Number.parseInt(event.target.value, 10) || 0,
+                  }))
                 }
                 placeholder="Camp ID"
                 style={inputStyle}
@@ -373,7 +407,10 @@ export function PersonsPage() {
                 min={1}
                 value={formData.occupationId}
                 onChange={(event) =>
-                  setFormData((prev) => ({ ...prev, occupationId: Number.parseInt(event.target.value, 10) || 0 }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    occupationId: Number.parseInt(event.target.value, 10) || 0,
+                  }))
                 }
                 placeholder="Occupation ID"
                 style={inputStyle}
@@ -404,7 +441,11 @@ export function PersonsPage() {
             )}
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button type="submit" style={primaryButtonStyle} disabled={createMutation.isPending || updateMutation.isPending}>
+              <button
+                type="submit"
+                style={primaryButtonStyle}
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
                 {formData.id ? 'Actualizar' : 'Crear'}
               </button>
               <button type="button" onClick={resetForm} style={secondaryButtonStyle}>
@@ -497,10 +538,18 @@ export function PersonsPage() {
               </div>
 
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="button" onClick={() => handleEdit(person)} style={smallPrimaryButtonStyle}>
+                <button
+                  type="button"
+                  onClick={() => handleEdit(person)}
+                  style={smallPrimaryButtonStyle}
+                >
                   Editar
                 </button>
-                <button type="button" onClick={() => handleDelete(person.id)} style={smallDangerButtonStyle}>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(person.id)}
+                  style={smallDangerButtonStyle}
+                >
                   Eliminar
                 </button>
               </div>
@@ -509,7 +558,7 @@ export function PersonsPage() {
         </div>
       )}
     </div>
-  );
+  )
 }
 
 function InfoBox({ label, value }: { label: string; value: string | number }) {
@@ -542,7 +591,7 @@ function InfoBox({ label, value }: { label: string; value: string | number }) {
         {value}
       </div>
     </div>
-  );
+  )
 }
 
 const inputStyle: React.CSSProperties = {
@@ -552,7 +601,7 @@ const inputStyle: React.CSSProperties = {
   padding: '8px 12px',
   borderRadius: '4px',
   fontFamily: "'Courier New', monospace",
-};
+}
 
 const primaryButtonStyle: React.CSSProperties = {
   background: 'rgba(74,138,48,0.14)',
@@ -564,7 +613,7 @@ const primaryButtonStyle: React.CSSProperties = {
   textTransform: 'uppercase',
   letterSpacing: '1px',
   fontFamily: "'Courier New', monospace",
-};
+}
 
 const secondaryButtonStyle: React.CSSProperties = {
   background: 'rgba(60,60,80,0.14)',
@@ -576,7 +625,7 @@ const secondaryButtonStyle: React.CSSProperties = {
   textTransform: 'uppercase',
   letterSpacing: '1px',
   fontFamily: "'Courier New', monospace",
-};
+}
 
 const smallPrimaryButtonStyle: React.CSSProperties = {
   background: 'rgba(74,138,48,0.14)',
@@ -588,7 +637,7 @@ const smallPrimaryButtonStyle: React.CSSProperties = {
   fontFamily: "'Courier New', monospace",
   fontSize: '12px',
   flex: 1,
-};
+}
 
 const smallDangerButtonStyle: React.CSSProperties = {
   background: 'rgba(224,80,80,0.14)',
@@ -599,4 +648,4 @@ const smallDangerButtonStyle: React.CSSProperties = {
   cursor: 'pointer',
   fontFamily: "'Courier New', monospace",
   fontSize: '12px',
-};
+}

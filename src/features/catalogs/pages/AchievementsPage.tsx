@@ -1,18 +1,17 @@
-
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { useAchievements } from '../api/queries';
-import { useCreateAchievement, useUpdateAchievement, useDeleteAchievement } from '../api/mutations';
-import type { Achievement, CreateAchievementRequest, UpdateAchievementRequest } from '../types';
-import { LoadingSkeleton, EmptyState, ErrorState } from '../components/StateComponents';
+import { useState } from 'react'
+import { motion } from 'framer-motion'
+import { useAchievements } from '../api/queries'
+import { useCreateAchievement, useUpdateAchievement, useDeleteAchievement } from '../api/mutations'
+import type { Achievement, CreateAchievementRequest, UpdateAchievementRequest } from '../types'
+import { LoadingSkeleton, EmptyState, ErrorState } from '../components/StateComponents'
 
 interface FormState {
-  id?: number;
-  name: string;
-  description: string;
-  icon: string;
-  points: number;
-  category: Achievement['category'];
+  id?: number
+  name: string
+  description: string
+  icon: string
+  points: number
+  category: Achievement['category']
 }
 
 const INITIAL_FORM: FormState = {
@@ -21,25 +20,25 @@ const INITIAL_FORM: FormState = {
   icon: '⭐',
   points: 10,
   category: 'SURVIVAL',
-};
+}
 
 export function AchievementsPage() {
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false)
+  const [formData, setFormData] = useState<FormState>(INITIAL_FORM)
+  const [formError, setFormError] = useState<string | null>(null)
 
-  const { data: achievements = [], isLoading, error, refetch } = useAchievements();
-  const createMutation = useCreateAchievement();
-  const updateMutation = useUpdateAchievement();
-  const deleteMutation = useDeleteAchievement();
+  const { data: achievements = [], isLoading, error, refetch } = useAchievements()
+  const createMutation = useCreateAchievement()
+  const updateMutation = useUpdateAchievement()
+  const deleteMutation = useDeleteAchievement()
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
+    e.preventDefault()
+    setFormError(null)
 
     if (!formData.name.trim()) {
-      setFormError('El nombre es requerido');
-      return;
+      setFormError('El nombre es requerido')
+      return
     }
 
     try {
@@ -53,7 +52,7 @@ export function AchievementsPage() {
             points: formData.points,
             category: formData.category,
           } as UpdateAchievementRequest,
-        });
+        })
       } else {
         await createMutation.mutateAsync({
           name: formData.name,
@@ -61,14 +60,14 @@ export function AchievementsPage() {
           icon: formData.icon,
           points: formData.points,
           category: formData.category,
-        } as CreateAchievementRequest);
+        } as CreateAchievementRequest)
       }
-      setFormData(INITIAL_FORM);
-      setShowForm(false);
+      setFormData(INITIAL_FORM)
+      setShowForm(false)
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Error al procesar el logro');
+      setFormError(err instanceof Error ? err.message : 'Error al procesar el logro')
     }
-  };
+  }
 
   const handleEdit = (item: Achievement) => {
     setFormData({
@@ -78,29 +77,36 @@ export function AchievementsPage() {
       icon: item.icon,
       points: item.points,
       category: item.category,
-    });
-    setShowForm(true);
-  };
+    })
+    setShowForm(true)
+  }
 
   const handleDelete = async (id: number) => {
     if (window.confirm('¿Eliminar este logro?')) {
       try {
-        await deleteMutation.mutateAsync(id);
+        await deleteMutation.mutateAsync(id)
       } catch (err) {
-        alert(err instanceof Error ? err.message : 'Error al eliminar');
+        alert(err instanceof Error ? err.message : 'Error al eliminar')
       }
     }
-  };
+  }
 
   const handleCancel = () => {
-    setFormData(INITIAL_FORM);
-    setShowForm(false);
-    setFormError(null);
-  };
+    setFormData(INITIAL_FORM)
+    setShowForm(false)
+    setFormError(null)
+  }
 
   return (
     <div style={{ padding: '24px' }}>
-      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div
+        style={{
+          marginBottom: '24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
         <h1
           style={{
             fontFamily: "'Georgia', serif",
@@ -149,7 +155,14 @@ export function AchievementsPage() {
           }}
         >
           <form onSubmit={handleSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '80px 1fr',
+                gap: '12px',
+                marginBottom: '12px',
+              }}
+            >
               <input
                 type="text"
                 placeholder="Icono"
@@ -200,12 +213,21 @@ export function AchievementsPage() {
               }}
             />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                marginBottom: '12px',
+              }}
+            >
               <input
                 type="number"
                 placeholder="Puntos"
                 value={formData.points}
-                onChange={(e) => setFormData({ ...formData, points: parseInt(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setFormData({ ...formData, points: parseInt(e.target.value) || 0 })
+                }
                 style={{
                   background: 'rgba(10,18,8,0.8)',
                   border: '1px solid rgba(74,138,48,0.3)',
@@ -217,7 +239,9 @@ export function AchievementsPage() {
               />
               <select
                 value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value as Achievement['category'] })}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value as Achievement['category'] })
+                }
                 style={{
                   background: 'rgba(10,18,8,0.8)',
                   border: '1px solid rgba(74,138,48,0.3)',
@@ -408,5 +432,5 @@ export function AchievementsPage() {
         </motion.div>
       )}
     </div>
-  );
+  )
 }
