@@ -103,7 +103,7 @@ export default function MainAppPage() {
         }}
       >
         <button
-          onClick={() => navigate('/formulario')}
+          onClick={() => navigate('/admission')}
           style={{
             flex: 1,
             background: 'rgba(74, 138, 48, 0.2)',

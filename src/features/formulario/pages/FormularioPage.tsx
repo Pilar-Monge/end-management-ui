@@ -1,4 +1,5 @@
-import { ChangeEvent, FormEvent, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
 import type { FormState, CalendarDay } from '../types'
 import {
   initialForm,
@@ -44,9 +45,7 @@ export default function FormularioPage() {
   }
 
   const changeCalendarMonth = (amount: number) => {
-    setCalendarDate(
-      (current) => new Date(current.getFullYear(), current.getMonth() + amount, 1),
-    )
+    setCalendarDate((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1))
   }
 
   const selectCalendarDay = (day: CalendarDay) => {
@@ -79,14 +78,24 @@ export default function FormularioPage() {
         <span className="blood-drip blood-one" aria-hidden="true" />
         <span className="blood-drip blood-two" aria-hidden="true" />
 
-        <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'flex-end', paddingRight: '1rem' }}>
+        <div
+          style={{
+            marginBottom: '1rem',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            paddingRight: '1rem',
+          }}
+        >
           <div className="stamp confidential-stamp">Confidencial</div>
         </div>
 
         <header style={{ marginBottom: '1.25rem', display: 'flex' }}>
           <div className="header-card">
             <p className="header-eyebrow">Registro de sobreviviente</p>
-            <h1 className="stencil" style={{ margin: '0.25rem 0', fontSize: '3rem', lineHeight: 1 }}>
+            <h1
+              className="stencil"
+              style={{ margin: '0.25rem 0', fontSize: '3rem', lineHeight: 1 }}
+            >
               Camp Zero
             </h1>
             <p className="header-subtitle">Formulario de ingreso a zona segura</p>
@@ -97,7 +106,13 @@ export default function FormularioPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <fieldset className="file-section">
               <legend className="section-title">Datos personales</legend>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '1rem',
+                }}
+              >
                 {textFields.map((field) => (
                   <label key={field.name} className="field-label">
                     {field.label}
@@ -168,7 +183,13 @@ export default function FormularioPage() {
 
             <fieldset className="file-section">
               <legend className="section-title">Información de salud</legend>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '1rem',
+                }}
+              >
                 {healthFields.map((field) => (
                   <label key={field.name} className="field-label">
                     {field.label}
@@ -190,14 +211,28 @@ export default function FormularioPage() {
           <aside style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <label className="photo-drop">
               {photoPreview ? (
-                <img
-                  alt="Vista previa del retrato"
-                  src={photoPreview}
-                />
+                <img alt="Vista previa del retrato" src={photoPreview} />
               ) : (
-                <span style={{ fontFamily: 'monospace', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#1a1410' }}>
+                <span
+                  style={{
+                    fontFamily: 'monospace',
+                    textAlign: 'center',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    color: '#1a1410',
+                  }}
+                >
                   Subir retrato
-                  <small style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.65rem', letterSpacing: '0.05em' }}>PNG o JPG</small>
+                  <small
+                    style={{
+                      display: 'block',
+                      marginTop: '0.5rem',
+                      fontSize: '0.65rem',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    PNG o JPG
+                  </small>
                 </span>
               )}
               <input

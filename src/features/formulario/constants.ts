@@ -1,4 +1,4 @@
-import type { FormState } from './types';
+import type { FormState } from './types'
 
 export const initialForm: FormState = {
   nombre: '',
@@ -12,13 +12,13 @@ export const initialForm: FormState = {
   experiencia: '',
   condicion: '',
   habilidades: '',
-};
+}
 
 export const textFields = [
   { name: 'nombre', label: 'Nombre', maxLength: 100, required: true },
   { name: 'primerApellido', label: 'Primer apellido', maxLength: 100, required: true },
   { name: 'segundoApellido', label: 'Segundo apellido', maxLength: 100, required: false },
-] as const;
+] as const
 
 export const healthFields = [
   {
@@ -41,9 +41,9 @@ export const healthFields = [
     label: 'Habilidades',
     placeholder: 'Navegación GPS, primeros auxilios, cocina',
   },
-] as const;
+] as const
 
-export const genderOptions = ['MALE', 'FEMALE', 'OTHER'];
+export const genderOptions = ['MALE', 'FEMALE', 'OTHER']
 
 export const monthNames = [
   'enero',
@@ -58,6 +58,6 @@ export const monthNames = [
   'octubre',
   'noviembre',
   'diciembre',
-];
+]
 
-export const weekDays = ['LU', 'MA', 'MI', 'JU', 'VI', 'SA', 'DO'];
+export const weekDays = ['LU', 'MA', 'MI', 'JU', 'VI', 'SA', 'DO']
