@@ -241,7 +241,7 @@ function notifColor(l: string) {
 function Card({ children, className = "", glow = "" }: { children: React.ReactNode; className?: string; glow?: string }) {
   return (
     <div
-      className={`relative rounded-sm card-soft p-4 ${className}`}
+      className={`admin-card relative rounded-sm card-soft p-4 ${className}`}
       style={{ background: "#111114", border: `1px solid ${glow || "#2D2A24"}`, boxShadow: glow ? `0 0 12px 1px ${glow}22` : "none" }}
     >
       {children}
@@ -251,7 +251,7 @@ function Card({ children, className = "", glow = "" }: { children: React.ReactNo
 
 function SectionHeader({ title, accent = true }: { title: string; accent?: boolean }) {
   return (
-    <div className="mb-3">
+    <div className="admin-section-header mb-3">
       <h3 style={{ fontFamily: "'Share Tech Mono', monospace", color: "#F5F0E8", fontSize: 11, letterSpacing: "0.12em" }} className="uppercase">{title}</h3>
       {accent && <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginTop: 4 }} />}
     </div>
@@ -262,17 +262,17 @@ function Toggle({ active, onChange }: { active: boolean; onChange?: () => void }
   return (
     <button
       onClick={onChange}
-      className="relative inline-flex items-center cursor-pointer"
+      className="admin-toggle relative inline-flex items-center cursor-pointer"
       style={{ width: 32, height: 16, borderRadius: 8, background: active ? "#D97706" : "#2D2A24", border: "1px solid #3D3A34", transition: "background 0.2s" }}
     >
-      <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#F5F0E8", position: "absolute", left: active ? 16 : 2, transition: "left 0.2s" }} />
+      <div className="admin-toggle-knob" style={{ width: 12, height: 12, borderRadius: "50%", background: "#F5F0E8", position: "absolute", left: active ? 16 : 2, transition: "left 0.2s" }} />
     </button>
   );
 }
 
 function Badge({ label, color }: { label: string; color: string }) {
   return (
-    <span className="px-1.5 py-0.5 rounded-sm"
+    <span className="admin-badge px-1.5 py-0.5 rounded-sm"
       style={{ background: `${color}22`, border: `1px solid ${color}`, fontFamily: "'Share Tech Mono', monospace", fontSize: 7, color }}>
       {label}
     </span>
@@ -281,13 +281,13 @@ function Badge({ label, color }: { label: string; color: string }) {
 
 function SearchBar({ value, onChange, placeholder = "BUSCAR..." }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24", flex: 1 }}>
+    <div className="admin-search flex items-center gap-2 px-3 py-1.5 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24", flex: 1 }}>
       <Search size={11} style={{ color: "#4B4540" }} />
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="flex-1 bg-transparent outline-none"
+        className="admin-input flex-1 bg-transparent outline-none"
         style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#F5F0E8" }}
       />
     </div>
@@ -298,7 +298,7 @@ function ActionBtn({ label, color, onClick, small = false }: { label: string; co
   return (
     <button
       onClick={onClick}
-      className="px-2 py-1 rounded-sm hover:opacity-80 transition-opacity cursor-pointer"
+      className={`admin-btn px-2 py-1 rounded-sm hover:opacity-80 transition-opacity cursor-pointer${small ? " admin-btn--small" : ""}`}
       style={{ background: `${color}22`, border: `1px solid ${color}`, fontFamily: "'Share Tech Mono', monospace", fontSize: small ? 7 : 9, color }}
     >
       {label}
@@ -314,7 +314,7 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        className="admin-modal fixed inset-0 z-50 flex items-center justify-center p-4"
         style={{ background: "rgba(0,0,0,0.7)" }}
         onClick={onClose}
       >
@@ -323,7 +323,7 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
           onClick={e => e.stopPropagation()}
-          className="w-full max-w-lg rounded-sm p-5"
+          className="admin-modal-card w-full max-w-lg rounded-sm p-5"
           style={{ background: "#111114", border: "1px solid #D97706", boxShadow: "0 0 30px #D9770622", maxHeight: "90vh", overflowY: "auto" }}
         >
           <div className="flex items-center justify-between mb-4" style={{ borderBottom: "1px solid #2D2A24", paddingBottom: 12 }}>
@@ -412,9 +412,9 @@ function ViewPoblacion() {
         <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginBottom: 12 }} />
 
         {/* Table */}
-        <div className="grid gap-px" style={{ background: "#2D2A24" }}>
+        <div className="admin-table grid gap-px" style={{ background: "#2D2A24" }}>
           {/* Header */}
-          <div className="grid grid-cols-12 px-3 py-2" style={{ background: "#0D0D10" }}>
+          <div className="admin-table-header grid grid-cols-12 px-3 py-2" style={{ background: "#0D0D10" }}>
             {["NOMBRE", "ROL", "ESTADO", "EDAD", "SECTOR", "INGRESO", "ACC."].map((h, i) => (
               <div key={h} className={i === 0 ? "col-span-3" : i === 1 ? "col-span-2" : i === 2 ? "col-span-2" : i === 3 ? "col-span-1" : i === 4 ? "col-span-2" : i === 5 ? "col-span-1" : "col-span-1"}>
                 <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540", letterSpacing: "0.08em" }}>{h}</span>
@@ -426,7 +426,7 @@ function ViewPoblacion() {
               key={p.id}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="grid grid-cols-12 items-center px-3 py-2 cursor-pointer hover:opacity-90 transition-opacity"
+              className="admin-table-row grid grid-cols-12 items-center px-3 py-2 cursor-pointer hover:opacity-90 transition-opacity"
               style={{ background: selected?.id === p.id ? "#1A1A20" : "#111114" }}
               onClick={() => { setSelected(p); setEditMode(false); setEditData({}); }}
             >
@@ -617,9 +617,9 @@ function ViewAdmisiones() {
                 </div>
               </div>
               {/* Score bar */}
-              <div className="h-1.5 rounded-sm overflow-hidden mb-2" style={{ background: "#2D2A24" }}>
+              <div className="admin-bar h-1.5 rounded-sm overflow-hidden mb-2" style={{ background: "#2D2A24" }}>
                 <motion.div initial={{ width: 0 }} animate={{ width: `${a.score}%` }} transition={{ duration: 0.8 }}
-                  style={{ height: "100%", background: scoreColor(a.score), borderRadius: 2 }} />
+                  className="admin-bar-fill" style={{ height: "100%", background: scoreColor(a.score), borderRadius: 2 }} />
               </div>
               <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070", marginBottom: 8 }}>{a.reason}</p>
               {a.skills.length > 0 && (
@@ -682,8 +682,8 @@ function ViewAdmisiones() {
                 <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 36, fontWeight: 900, color: scoreColor(selected.score) }}>{selected.score}</span>
                 <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#8B8070", marginBottom: 6 }}>/100</span>
               </div>
-              <div className="h-2 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
-                <div style={{ width: `${selected.score}%`, height: "100%", background: scoreColor(selected.score) }} />
+              <div className="admin-bar h-2 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
+                <div className="admin-bar-fill" style={{ width: `${selected.score}%`, height: "100%", background: scoreColor(selected.score) }} />
               </div>
             </div>
             <div>
@@ -777,8 +777,8 @@ function ViewInventario() {
             <Card key={cat}>
               <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 18, fontWeight: 900, color: invBarColor(avgPct) }}>{avgPct}%</div>
               <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#8B8070" }}>{cat.toUpperCase()}</div>
-              <div className="h-1 rounded-sm overflow-hidden mt-1" style={{ background: "#2D2A24" }}>
-                <div style={{ width: `${avgPct}%`, height: "100%", background: invBarColor(avgPct) }} />
+              <div className="admin-bar h-1 rounded-sm overflow-hidden mt-1" style={{ background: "#2D2A24" }}>
+                <div className="admin-bar-fill" style={{ width: `${avgPct}%`, height: "100%", background: invBarColor(avgPct) }} />
               </div>
             </Card>
           );
@@ -829,9 +829,9 @@ function ViewInventario() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
-                    <div className="flex-1 h-2 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
+                    <div className="admin-bar flex-1 h-2 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
                       <motion.div initial={{ width: 0 }} animate={{ width: `${item.pct}%` }} transition={{ duration: 0.6 }}
-                        className={item.status === "CRÍTICO" ? "animate-pulse" : ""}
+                        className={`admin-bar-fill ${item.status === "CRÍTICO" ? "animate-pulse" : ""}`}
                         style={{ height: "100%", background: bcolor, borderRadius: 2 }} />
                     </div>
                     <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070", whiteSpace: "nowrap" }}>
@@ -986,9 +986,9 @@ function ViewExpediciones() {
                 <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070", marginBottom: 8 }}>{exp.objective}</p>
                 {exp.total > 0 && (
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="flex-1 h-1.5 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
+                    <div className="admin-bar flex-1 h-1.5 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
                       <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8 }}
-                        style={{ height: "100%", background: sc, borderRadius: 2 }} />
+                        className="admin-bar-fill" style={{ height: "100%", background: sc, borderRadius: 2 }} />
                     </div>
                     <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>{pct}%</span>
                   </div>
@@ -1365,9 +1365,9 @@ function ViewLogros() {
               <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>EXPERIENCIA TOTAL</span>
               <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, color: "#F59E0B" }}>{totalXP} / {nextLevelXP} XP</span>
             </div>
-            <div className="h-3 rounded-sm overflow-hidden mb-1" style={{ background: "#2D2A24" }}>
+            <div className="admin-bar h-3 rounded-sm overflow-hidden mb-1" style={{ background: "#2D2A24" }}>
               <motion.div initial={{ width: 0 }} animate={{ width: `${(totalXP / nextLevelXP) * 100}%` }} transition={{ duration: 1 }}
-                style={{ height: "100%", background: "linear-gradient(90deg, #D97706, #F59E0B)", borderRadius: 2 }} />
+                className="admin-bar-fill" style={{ height: "100%", background: "linear-gradient(90deg, #D97706, #F59E0B)", borderRadius: 2 }} />
             </div>
             <div className="grid grid-cols-4 gap-2 mt-3">
               {[
@@ -1411,9 +1411,9 @@ function ViewLogros() {
                       <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 9, color: ach.unlocked ? "#F59E0B" : "#4B4540" }}>+{ach.xp} XP</span>
                     </div>
                     <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#4B4540", marginBottom: 6 }}>{ach.desc}</p>
-                    <div className="h-1 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
+                    <div className="admin-bar h-1 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
                       <motion.div initial={{ width: 0 }} animate={{ width: `${ach.pct}%` }} transition={{ duration: 0.8 }}
-                        style={{ height: "100%", background: ach.unlocked ? ach.color : `${ach.color}66`, borderRadius: 2 }} />
+                        className="admin-bar-fill" style={{ height: "100%", background: ach.unlocked ? ach.color : `${ach.color}66`, borderRadius: 2 }} />
                     </div>
                     {!ach.unlocked && (
                       <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540", marginTop: 2 }}>{ach.pct}% completado</div>
@@ -2049,49 +2049,20 @@ export default function AdminDashboard() {
         }
       `}</style>
 
-      <div
-        className="admin-dashboard noise-bg flex h-screen overflow-hidden"
-        style={{
-          position: "relative",
-          display: "flex",
-          height: "100vh",
-          overflow: "hidden",
-          fontFamily: "'Rajdhani', sans-serif",
-          color: "#F5F0E8",
-        }}
-      >
-        <div
-          aria-hidden
-          className="absolute"
-          style={{
-            top: -130,
-            left: -90,
-            width: 320,
-            height: 320,
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(13,148,136,0.12) 0%, rgba(13,148,136,0) 70%)",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          aria-hidden
-          className="absolute"
-          style={{
-            bottom: -180,
-            right: -120,
-            width: 420,
-            height: 420,
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(217,119,6,0.12) 0%, rgba(217,119,6,0) 72%)",
-            pointerEvents: "none",
-          }}
-        />
+      <div className="admin-dashboard">
+        <div className="admin-stage">
+          <div className="admin-backdrop" aria-hidden="true" />
+          <div className="admin-grid" aria-hidden="true" />
+          <div className="admin-texture" aria-hidden="true" />
+          <div className="admin-noise" aria-hidden="true" />
+          <div className="admin-hud" aria-hidden="true" />
 
-        {/* SIDEBAR */}
-        <aside className="hidden md:flex flex-col flex-shrink-0"
-          style={{ width: 220, background: "#0D0D10", borderRight: "1px solid #2D2A24", zIndex: 1 }}>
-          {/* Logo */}
-          <div className="px-4 py-5 flex flex-col items-center" style={{ borderBottom: "1px solid #2D2A24" }}>
+          <div className="admin-layout">
+            {/* SIDEBAR */}
+            <aside className="admin-sidebar hidden md:flex flex-col flex-shrink-0"
+              style={{ width: 220, background: "#0D0D10", borderRight: "1px solid #2D2A24", zIndex: 1 }}>
+              {/* Logo */}
+              <div className="admin-logo px-4 py-5 flex flex-col items-center" style={{ borderBottom: "1px solid #2D2A24" }}>
             <div className="flex items-center gap-2 mb-1">
               <Skull size={20} style={{ color: "#D97706" }} />
               <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 13, color: "#D97706", letterSpacing: "0.05em" }}>GESTIÓN DEL FIN</span>
@@ -2100,18 +2071,18 @@ export default function AdminDashboard() {
               <span className="inline-block w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
               <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#8B8070", letterSpacing: "0.08em" }}>CAMPAMENTO ALFA</span>
             </div>
-            <div className="mt-2 px-2 py-1 rounded-sm" style={{ background: "#111114", border: "1px solid #2D2A24" }}>
+                <div className="admin-clock mt-2 px-2 py-1 rounded-sm" style={{ background: "#111114", border: "1px solid #2D2A24" }}>
               <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#F59E0B", letterSpacing: "0.1em" }}>{fmtTime(serverTime)}</span>
             </div>
           </div>
 
           {/* Nav */}
-          <nav className="flex-1 px-2 py-3 overflow-y-auto">
+              <nav className="admin-nav flex-1 px-2 py-3 overflow-y-auto">
             {navItems.map(({ icon: Icon, label, badge }) => {
               const isActive = activeNav === label;
               return (
                 <button key={label} onClick={() => setActiveNav(label)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 mb-0.5 rounded-sm transition-all cursor-pointer"
+                  className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-0.5 rounded-sm transition-all cursor-pointer${isActive ? " admin-nav-button--active" : ""}`}
                   style={{
                     background: isActive ? "#1A1A20" : "transparent",
                     border: "none",
@@ -2151,17 +2122,17 @@ export default function AdminDashboard() {
           </div>
         </aside>
 
-        {/* MAIN */}
-        <div className="flex-1 flex flex-col overflow-hidden" style={{ position: "relative", zIndex: 1 }}>
-          {/* Header */}
-          <header className="scanlines relative flex-shrink-0 flex items-center justify-between px-5"
-            style={{ height: 52, background: "#0D0D10", borderBottom: "1px solid #2D2A24" }}>
-            <div className="flex items-center gap-2 relative z-10">
+            {/* MAIN */}
+            <div className="flex-1 flex flex-col overflow-hidden" style={{ position: "relative", zIndex: 1 }}>
+              {/* Header */}
+              <header className="admin-header scanlines relative flex-shrink-0 flex items-center justify-between px-5"
+                style={{ height: 52, background: "#0D0D10", borderBottom: "1px solid #2D2A24" }}>
+            <div className="admin-breadcrumb flex items-center gap-2 relative z-10">
               <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#8B8070" }}>CAMPAMENTO ALFA</span>
               <ChevronRight size={10} style={{ color: "#4B4540" }} />
               <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#D97706" }}>{sectionTitles[activeNav]}</span>
             </div>
-            <div className="hidden lg:flex items-center gap-3 relative z-10">
+            <div className="admin-status-row hidden lg:flex items-center gap-3 relative z-10">
               {[
                 { label: "SERVIDOR: ONLINE", color: "#0D9488" },
                 { label: "DÍA 47 DEL APOCALIPSIS", color: "#F5F0E8" },
@@ -2174,7 +2145,7 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
-            <div className="flex items-center gap-2 relative z-10">
+            <div className="admin-profile flex items-center gap-2 relative z-10">
               <button onClick={() => setActiveNav("NOTIFICACIONES")} className="relative p-1.5 rounded-sm hover:opacity-80"
                 style={{ background: "#1A1A20", border: "1px solid #2D2A24" }}>
                 <Bell size={14} style={{ color: "#D97706" }} />
@@ -2194,21 +2165,23 @@ export default function AdminDashboard() {
             </div>
           </header>
 
-          {/* Content */}
-          <main className="flex-1 overflow-y-auto p-4">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeNav}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.15 }}
-              >
-                {renderSection()}
-              </motion.div>
-            </AnimatePresence>
-            <div className="h-4" />
-          </main>
+              {/* Content */}
+              <main className="flex-1 overflow-y-auto p-4">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeNav}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    {renderSection()}
+                  </motion.div>
+                </AnimatePresence>
+                <div className="h-4" />
+              </main>
+            </div>
+          </div>
         </div>
       </div>
     </>
