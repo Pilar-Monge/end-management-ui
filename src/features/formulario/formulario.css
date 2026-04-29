@@ -4,7 +4,7 @@
     overflow: hidden;
     animation: dossierArrive 800ms cubic-bezier(0.18, 0.9, 0.24, 1) both;
     background-color: #d8c190;
-    background-image: linear-gradient(rgba(0,0,0,0.15), rgba(0,0,0,0.05));
+    background-image: url('/paper-texture.jpg'), linear-gradient(rgba(0,0,0,0.15), rgba(0,0,0,0.05));
     background-size: cover;
     background-position: center;
     background-blend-mode: multiply;
@@ -17,6 +17,18 @@
     margin: 0 auto;
     padding: 2rem;
     position: relative;
+    
+    @media (min-width: 640px) {
+      padding: 1.75rem;
+    }
+    
+    @media (min-width: 1024px) {
+      padding: 2rem;
+    }
+    
+    @media (min-width: 1280px) {
+      padding: 2rem;
+    }
   }
 
   .dossier::before {
@@ -205,6 +217,41 @@
     margin-bottom: 1.25rem;
   }
 
+  .form-fields {
+    display: grid;
+    grid-auto-rows: auto;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  form > div {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .file-section {
+    border: 2px solid rgba(15, 12, 8, 0.95);
+    background: rgba(248, 232, 195, 0.62);
+    box-shadow: inset 0 0 0 1px rgba(91, 61, 35, 0.2);
+    padding: 1rem;
+    margin-bottom: 0;
+  }
+
+  .file-section:nth-of-type(1) {
+    animation: riseIn 650ms ease both;
+  }
+
+  .file-section:nth-of-type(2) {
+    animation: riseIn 650ms ease both 140ms;
+  }
+
   .section-title {
     padding: 0.15rem 0.65rem;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
@@ -298,12 +345,13 @@
     justify-content: center;
     z-index: 80;
     padding: 1rem;
+    animation: fadeIn 180ms ease both;
   }
 
   .dropdown-panel,
   .calendar-popover {
     background-color: #f0dcae;
-    background-image: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.05));
+    background-image: url('/paper-clean.jpg'), linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.05));
     background-size: cover;
     background-position: center;
     background-blend-mode: multiply;
@@ -314,6 +362,8 @@
     color: #06050a;
     position: relative;
     z-index: 81;
+    animation: popIn 220ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+    transform-origin: center;
   }
 
   .dropdown-panel {
@@ -386,18 +436,19 @@
     font-family: inherit;
     font-weight: 900;
     font-size: 0.85rem;
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background-color 150ms ease, color 150ms ease;
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
   }
 
   .cal-nav:hover {
     background: #5a1414;
     color: #f8e9c2;
     border-color: #5a1414;
+  }
   }
 
   .calendar-footer button {
@@ -415,7 +466,7 @@
   }
 
   .calendar-footer button:hover {
-    color: #3a0a0a;
+    color: #8f1d1d;
     text-shadow: 0 0 6px rgba(90, 20, 20, 0.35);
   }
 
@@ -440,8 +491,8 @@
 
   .calendar-day {
     aspect-ratio: 1;
-    background: rgba(255, 248, 220, 0.55);
-    border: 1px solid transparent;
+    background: rgba(244, 232, 195, 0.65);
+    border: 1px solid rgba(15, 12, 8, 0.25);
     color: #06050a;
     cursor: pointer;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
@@ -453,27 +504,40 @@
   .calendar-day:hover {
     border-color: #0d0b08;
     background: rgba(255, 252, 237, 0.85);
-    transform: scale(1.05);
+    transform: scale(1.04);
   }
 
   .calendar-day.is-muted {
-    opacity: 0.4;
+    background: transparent;
+    border: none;
+    color: rgba(15, 12, 8, 0.3);
     cursor: default;
   }
 
+  .calendar-day.is-muted:hover {
+    background: transparent;
+    border: none;
+    transform: scale(1);
+  }
+
   .calendar-day.is-selected {
-    background: #5a1414;
+    background: rgba(138, 31, 31, 0.85);
     color: #f8e9c2;
-    border-color: #8f1d1d;
+    border-color: #8a1f1f;
   }
 
   .calendar-day.is-today {
     border: 1.5px solid #8f1d1d;
+    color: #8f1d1d;
   }
 
   .photo-drop {
-    border: 2px dashed rgba(15, 12, 8, 0.5);
-    background: rgba(248, 232, 195, 0.35);
+    border: 2px solid rgba(15, 12, 8, 0.5);
+    background-color: #f0dcae;
+    background-image: url('/paper-clean.jpg'), linear-gradient(rgba(0,0,0,0.08), rgba(0,0,0,0.05));
+    background-size: cover;
+    background-position: center;
+    background-blend-mode: multiply;
     border-radius: 4px;
     padding: 2rem;
     cursor: pointer;
@@ -481,14 +545,49 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 280px;
-    transition: background-color 180ms ease, border-color 180ms ease;
+    min-height: 20.8rem;
+    transition: background-color 240ms ease, border-color 240ms ease, transform 240ms ease, box-shadow 240ms ease;
     overflow: hidden;
+    position: relative;
+    animation: slideIn 700ms ease both 180ms;
+    transform: rotate(0.5deg);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .photo-drop::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 30%, rgba(191, 170, 148, 0.15), transparent 25%),
+      radial-gradient(ellipse at 80% 70%, rgba(168, 148, 125, 0.12), transparent 30%);
+    animation: photoGlow 8s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 1;
   }
 
   .photo-drop:hover {
-    background: rgba(248, 232, 195, 0.55);
+    background-color: rgba(248, 232, 195, 0.55);
     border-color: rgba(15, 12, 8, 0.8);
+    transform: rotate(-0.4deg) translateY(-2px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  }
+
+  .photo-drop::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, transparent 50%);
+    opacity: 0;
+    transform: translateX(-70%);
+    transition: opacity 220ms ease, transform 680ms ease;
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  .photo-drop:hover::after {
+    opacity: 1;
+    transform: translateX(70%);
   }
 
   .photo-drop img {
@@ -497,6 +596,8 @@
     object-fit: cover;
     filter: grayscale(1);
     transition: filter 0.5s;
+    position: relative;
+    z-index: 2;
   }
 
   .photo-drop:hover img {
@@ -504,11 +605,12 @@
   }
 
   .submit-stamp {
-    background: rgba(248, 232, 195, 0.88);
-    border: 3px solid #5a1414;
-    color: #5a1414;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    background: #6b1414;
+    border: 4px solid #6b1414;
+    color: #f8e9c2;
+    box-shadow: 0 4px 10px rgba(139, 20, 20, 0.3);
     font-size: 1.05rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     font-weight: 900;
     letter-spacing: 0.16em;
     text-transform: uppercase;
@@ -518,12 +620,14 @@
     cursor: pointer;
     display: block;
     width: 100%;
-    transition: transform 150ms ease, box-shadow 150ms ease;
+    transition: transform 220ms ease, background-color 220ms ease, color 220ms ease, box-shadow 220ms ease;
   }
 
   .submit-stamp:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+    background: transparent;
+    color: #8f1d1d;
+    transform: rotate(-1.2deg) translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
   }
 
   .notice-slip {
@@ -562,25 +666,72 @@
   @keyframes dossierArrive {
     from {
       opacity: 0;
-      transform: translateY(20px) scale(0.95);
+      transform: translateY(24px) rotate(-0.6deg) scale(0.985);
     }
     to {
       opacity: 1;
-      transform: translateY(0) scale(1);
+      transform: translateY(0) rotate(0) scale(1);
     }
   }
 
   @keyframes stampImpact {
     0% {
       opacity: 0;
-      transform: rotate(25deg) scale(1.4);
+      transform: rotate(9deg) scale(1.45) translateY(-22px);
     }
-    50% {
+    70% {
       opacity: 1;
+      transform: rotate(3deg) scale(0.94) translateY(2px);
     }
     100% {
+      opacity: 0.85;
+      transform: rotate(3deg) scale(1) translateY(0);
+    }
+  }
+
+  @keyframes riseIn {
+    from {
+      opacity: 0;
+      transform: translateY(18px) rotate(-0.3deg);
+    }
+    to {
       opacity: 1;
-      transform: rotate(0deg) scale(1);
+      transform: translateY(0) rotate(0);
+    }
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateX(24px) rotate(2deg);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0) rotate(0);
+    }
+  }
+
+  @keyframes confirm {
+    from {
+      opacity: 0;
+      transform: scale(0.96) rotate(-1deg);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) rotate(0);
+    }
+  }
+
+  @keyframes popIn {
+    from {
+      opacity: 0;
+      transform: scale(0.92) translateY(-10px);
+      transform-origin: center;
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+      transform-origin: center;
     }
   }
 
@@ -593,26 +744,171 @@
     }
   }
 
-  @keyframes confirm {
-    0% {
-      transform: scale(0.8);
-      opacity: 0;
+  @keyframes drift {
+    from {
+      transform: translate3d(-4vw, -8vh, 0);
     }
-    50% {
-      transform: scale(1.1);
-    }
-    100% {
-      transform: scale(1);
-      opacity: 1;
+    to {
+      transform: translate3d(10vw, 104vh, 0);
     }
   }
 
-  @media (min-width: 640px) {
-    .header-subtitle {
-      font-size: 1.15rem;
+  @keyframes emberRise {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, 0, 0) scale(0.7);
+    }
+    15% {
+      opacity: 0.95;
+    }
+    100% {
+      opacity: 0;
+      transform: translate3d(20vw, -88vh, 0) scale(0.2);
     }
   }
-}
+
+  @keyframes photoGlow {
+    0% {
+      opacity: 0.4;
+      transform: scale(0.95);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1.05);
+    }
+    100% {
+      opacity: 0.4;
+      transform: scale(0.95);
+    }
+  }
+
+  @media (max-width: 639px) {
+    .dossier {
+      padding: 1.25rem 1rem;
+    }
+
+    .stencil {
+      font-size: 3rem;
+    }
+
+    .header-card {
+      padding: 0.65rem 1.25rem 0.85rem;
+    }
+
+    .header-eyebrow {
+      font-size: 0.65rem;
+      letter-spacing: 0.24em;
+      margin-bottom: 0.35rem;
+    }
+
+    .header-subtitle {
+      font-size: 0.82rem;
+      margin-top: 0.4rem;
+    }
+
+    .form-fields {
+      grid-template-columns: 1fr;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+    }
+
+    form > div {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    aside {
+      order: 3;
+    }
+
+    .file-section {
+      margin-bottom: 0.75rem;
+    }
+  }
+
+  @media (min-width: 640px) and (max-width: 1023px) {
+    .dossier {
+      padding: 1.75rem;
+    }
+
+    .header-subtitle {
+      font-size: 1.05rem;
+    }
+
+    .header-card {
+      padding: 1rem 1.75rem 1.25rem;
+    }
+
+    .stencil {
+      font-size: 4rem;
+    }
+
+    .form-fields {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+    }
+
+    aside {
+      order: 3;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .dossier {
+      padding: 2rem;
+    }
+
+    form {
+      display: grid;
+      grid-template-columns: 1fr 305px;
+      gap: 1.25rem;
+      position: relative;
+    }
+
+    form > div {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+
+    .stencil {
+      font-size: 5rem;
+    }
+
+    .form-fields {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .form-fields .field-label:nth-child(7) {
+      grid-column: span 2;
+    }
+
+    .header-card {
+      padding: 1.25rem 2rem 1.5rem;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .form-fields {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .form-fields .field-label:nth-child(7) {
+      grid-column: span 2;
+    }
+
+    .stencil {
+      font-size: 5.5rem;
+    }
+  }
 
 body {
   margin: 0;
@@ -642,15 +938,56 @@ main::before {
   z-index: 0;
 }
 
-form {
-  display: grid;
-  grid-template-columns: 1fr 305px;
-  gap: 1.25rem;
-  position: relative;
+.ash-particle {
+  position: fixed;
+  pointer-events: none;
+  top: 0;
+  left: 0;
+  z-index: 1;
 }
 
-@media (max-width: 1024px) {
-  form {
-    grid-template-columns: 1fr;
-  }
+.ash-particle.ash-one {
+  width: 180px;
+  height: 180px;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(191, 170, 148, 0.35), transparent 18%),
+    radial-gradient(circle at 85% 75%, rgba(168, 148, 125, 0.28), transparent 22%),
+    radial-gradient(circle at 45% 50%, rgba(180, 160, 140, 0.22), transparent 15%);
+  animation: drift 14s linear infinite;
+}
+
+.ash-particle.ash-two {
+  width: 240px;
+  height: 240px;
+  background:
+    radial-gradient(circle at 25% 30%, rgba(191, 170, 148, 0.3), transparent 20%),
+    radial-gradient(circle at 75% 65%, rgba(168, 148, 125, 0.25), transparent 25%),
+    radial-gradient(circle at 50% 40%, rgba(180, 160, 140, 0.2), transparent 18%),
+    radial-gradient(circle at 35% 75%, rgba(175, 155, 135, 0.22), transparent 16%);
+  animation: drift 19s linear infinite 2s;
+}
+
+.ember-particle {
+  position: fixed;
+  pointer-events: none;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  background: #d94b2b;
+  border-radius: 50%;
+  box-shadow: 0 0 16px rgba(217, 75, 43, 0.72);
+  z-index: 1;
+}
+
+.ember-particle.ember-one {
+  animation: emberRise 5.5s linear infinite;
+}
+
+.ember-particle.ember-two {
+  animation: emberRise 7s linear infinite 1.8s;
+}
+
+.ember-particle.ember-two {
+  animation: emberRise 7s linear infinite 1.8s;
 }
