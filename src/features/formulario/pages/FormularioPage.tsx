@@ -1,4 +1,5 @@
-import { ChangeEvent, FormEvent, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
 import type { FormState, CalendarDay } from '../types'
 import {
   initialForm,
@@ -44,9 +45,7 @@ export default function FormularioPage() {
   }
 
   const changeCalendarMonth = (amount: number) => {
-    setCalendarDate(
-      (current) => new Date(current.getFullYear(), current.getMonth() + amount, 1),
-    )
+    setCalendarDate((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1))
   }
 
   const selectCalendarDay = (day: CalendarDay) => {
@@ -199,14 +198,28 @@ export default function FormularioPage() {
           <aside style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <label className="photo-drop">
               {photoPreview ? (
-                <img
-                  alt="Vista previa del retrato"
-                  src={photoPreview}
-                />
+                <img alt="Vista previa del retrato" src={photoPreview} />
               ) : (
-                <span style={{ fontFamily: 'monospace', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#1a1410' }}>
+                <span
+                  style={{
+                    fontFamily: 'monospace',
+                    textAlign: 'center',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    color: '#1a1410',
+                  }}
+                >
                   Subir retrato
-                  <small style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.65rem', letterSpacing: '0.05em' }}>PNG o JPG</small>
+                  <small
+                    style={{
+                      display: 'block',
+                      marginTop: '0.5rem',
+                      fontSize: '0.65rem',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    PNG o JPG
+                  </small>
                 </span>
               )}
               <input

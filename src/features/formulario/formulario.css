@@ -32,17 +32,13 @@
   }
 
   .dossier::before {
-    content: "";
+    content: '';
     pointer-events: none;
     position: absolute;
     inset: 0;
     z-index: 0;
     background:
-      repeating-linear-gradient(
-        7deg,
-        rgba(20, 14, 10, 0.05) 0 1px,
-        transparent 1px 18px
-      ),
+      repeating-linear-gradient(7deg, rgba(20, 14, 10, 0.05) 0 1px, transparent 1px 18px),
       radial-gradient(circle at 14% 22%, rgba(86, 30, 18, 0.07) 0 4%, transparent 12%),
       radial-gradient(circle at 78% 88%, rgba(120, 18, 12, 0.08) 0 5%, transparent 14%),
       radial-gradient(circle at 34% 78%, rgba(50, 14, 8, 0.06) 0 3%, transparent 10%);
@@ -50,7 +46,7 @@
   }
 
   .dossier::after {
-    content: "";
+    content: '';
     pointer-events: none;
     position: absolute;
     inset: 0;
@@ -58,7 +54,13 @@
     background:
       radial-gradient(ellipse at -2% 30%, rgba(8, 5, 3, 0.6) 0 3%, transparent 11%),
       radial-gradient(ellipse at 102% 88%, rgba(8, 5, 3, 0.62) 0 4%, transparent 13%),
-      linear-gradient(90deg, rgba(0, 0, 0, 0.28), transparent 10%, transparent 90%, rgba(0, 0, 0, 0.3));
+      linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0.28),
+        transparent 10%,
+        transparent 90%,
+        rgba(0, 0, 0, 0.3)
+      );
     mix-blend-mode: multiply;
   }
 
@@ -68,8 +70,10 @@
   }
 
   .stencil {
-    font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
-    text-shadow: 2px 2px 0 rgba(73, 45, 29, 0.35), 4px 4px 8px rgba(0, 0, 0, 0.15);
+    font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+    text-shadow:
+      2px 2px 0 rgba(73, 45, 29, 0.35),
+      4px 4px 8px rgba(0, 0, 0, 0.15);
     color: #0a0806;
   }
 
@@ -101,7 +105,8 @@
   }
 
   .header-eyebrow {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     font-size: 0.82rem;
     font-weight: 900;
     letter-spacing: 0.36em;
@@ -111,7 +116,8 @@
   }
 
   .header-subtitle {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     font-size: 1rem;
     font-weight: 900;
     letter-spacing: 0.05em;
@@ -145,7 +151,12 @@
   }
 
   .burn-mark {
-    background: radial-gradient(circle, rgba(15, 8, 5, 0.55) 0 12%, rgba(71, 25, 12, 0.32) 13% 25%, transparent 60%);
+    background: radial-gradient(
+      circle,
+      rgba(15, 8, 5, 0.55) 0 12%,
+      rgba(71, 25, 12, 0.32) 13% 25%,
+      transparent 60%
+    );
     border-radius: 999px;
     filter: blur(0.5px);
     position: absolute;
@@ -167,7 +178,12 @@
   }
 
   .bullet-hole {
-    background: radial-gradient(circle, #050403 0 18%, rgba(23, 15, 10, 0.78) 19% 35%, transparent 36%);
+    background: radial-gradient(
+      circle,
+      #050403 0 18%,
+      rgba(23, 15, 10, 0.78) 19% 35%,
+      transparent 36%
+    );
     border-radius: 999px;
     box-shadow:
       8px -5px 0 -6px rgba(20, 12, 7, 0.65),
@@ -254,7 +270,8 @@
 
   .section-title {
     padding: 0.15rem 0.65rem;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     font-size: 1.15rem;
     font-weight: 900;
     letter-spacing: 0.2em;
@@ -268,7 +285,8 @@
 
   .field-label {
     display: block;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     font-size: 0.92rem;
     font-weight: 900;
     letter-spacing: 0.14em;
@@ -283,12 +301,16 @@
     border-bottom: 3px solid #0d0b08;
     background: rgba(255, 245, 215, 0.55);
     padding: 0.65rem 0.55rem 0.55rem;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     font-size: 1.02rem;
     font-weight: 700;
     color: #06050a;
     outline: none;
-    transition: background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+    transition:
+      background-color 180ms ease,
+      box-shadow 180ms ease,
+      transform 180ms ease;
     min-height: 2.7rem;
     box-sizing: border-box;
   }
@@ -312,7 +334,8 @@
     color: #06050a;
     cursor: pointer;
     display: flex;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     font-size: 1.02rem;
     font-weight: 800;
     justify-content: space-between;
@@ -320,7 +343,9 @@
     min-height: 2.7rem;
     padding: 0.65rem 0.55rem 0.55rem;
     text-align: left;
-    transition: background-color 180ms ease, transform 180ms ease;
+    transition:
+      background-color 180ms ease,
+      transform 180ms ease;
     width: 100%;
     box-sizing: border-box;
   }
@@ -389,14 +414,18 @@
     color: #06050a;
     cursor: pointer;
     display: block;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     font-weight: 900;
     font-size: 0.98rem;
     letter-spacing: 0.16em;
     padding: 0.75rem 0.85rem;
     text-align: left;
     width: 100%;
-    transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
+    transition:
+      background-color 150ms ease,
+      color 150ms ease,
+      transform 150ms ease;
   }
 
   .dropdown-option:hover,
@@ -415,7 +444,8 @@
   .calendar-footer {
     align-items: center;
     display: flex;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     justify-content: space-between;
     color: #06050a;
   }
@@ -462,7 +492,9 @@
     letter-spacing: 0.12em;
     font-size: 0.88rem;
     padding: 0.4rem 0.6rem;
-    transition: text-shadow 150ms ease, color 150ms ease;
+    transition:
+      text-shadow 150ms ease,
+      color 150ms ease;
   }
 
   .calendar-footer button:hover {
@@ -480,7 +512,8 @@
 
   .calendar-weekday {
     color: #1a1410;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     font-size: 0.82rem;
     font-weight: 900;
     padding: 0.4rem 0;
@@ -495,10 +528,15 @@
     border: 1px solid rgba(15, 12, 8, 0.25);
     color: #06050a;
     cursor: pointer;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     font-weight: 800;
     font-size: 0.95rem;
-    transition: background-color 150ms ease, color 150ms ease, transform 150ms ease, border-color 150ms ease;
+    transition:
+      background-color 150ms ease,
+      color 150ms ease,
+      transform 150ms ease,
+      border-color 150ms ease;
   }
 
   .calendar-day:hover {
@@ -912,7 +950,7 @@
 
 body {
   margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 }
 
 main {
@@ -924,7 +962,7 @@ main {
 }
 
 main::before {
-  content: "";
+  content: '';
   position: absolute;
   top: 0;
   left: 0;
