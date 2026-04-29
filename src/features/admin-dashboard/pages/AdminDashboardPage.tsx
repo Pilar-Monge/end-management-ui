@@ -2166,19 +2166,24 @@ export default function AdminDashboard() {
           </header>
 
               {/* Content */}
-              <main className="flex-1 overflow-y-auto p-4">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={activeNav}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    {renderSection()}
-                  </motion.div>
-                </AnimatePresence>
-                <div className="h-4" />
+              <main className="admin-content flex-1 overflow-y-auto p-4">
+                <div className="admin-panel">
+                  <div className="admin-panel-frame" aria-hidden="true" />
+                  <div className="admin-panel-inner">
+                    <AnimatePresence mode="wait">
+                      <motion.div
+                        key={activeNav}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        {renderSection()}
+                      </motion.div>
+                    </AnimatePresence>
+                    <div className="h-4" />
+                  </div>
+                </div>
               </main>
             </div>
           </div>
