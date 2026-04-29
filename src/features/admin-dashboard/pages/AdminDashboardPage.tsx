@@ -1978,6 +1978,14 @@ export default function AdminDashboard() {
     { icon: Settings, label: "CONFIGURACIÓN" },
   ];
 
+  const quickAccess: { icon: React.ElementType; label: string; target: NavSection }[] = [
+    { icon: Users, label: "Poblacion", target: "POBLACIÓN" },
+    { icon: UserPlus, label: "Admisiones", target: "ADMISIONES IA" },
+    { icon: Package, label: "Inventario", target: "INVENTARIO" },
+    { icon: Map, label: "Expediciones", target: "EXPEDICIONES" },
+    { icon: Radio, label: "Intercamp", target: "INTER-CAMPAMENTOS" },
+  ];
+
   const fmtTime = (d: Date) =>
     d.toLocaleTimeString("es-CR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 
@@ -2123,7 +2131,7 @@ export default function AdminDashboard() {
         </aside>
 
             {/* MAIN */}
-            <div className="flex-1 flex flex-col overflow-hidden" style={{ position: "relative", zIndex: 1 }}>
+            <div className="admin-main flex-1 flex flex-col overflow-hidden" style={{ position: "relative", zIndex: 1 }}>
               {/* Header */}
               <header className="admin-header scanlines relative flex-shrink-0 flex items-center justify-between px-5"
                 style={{ height: 52, background: "#0D0D10", borderBottom: "1px solid #2D2A24" }}>
@@ -2166,7 +2174,7 @@ export default function AdminDashboard() {
           </header>
 
               {/* Content */}
-              <main className="admin-content flex-1 overflow-y-auto p-4">
+              <main className="admin-content flex-1 p-4">
                 <div className="admin-panel">
                   <div className="admin-panel-frame" aria-hidden="true" />
                   <div className="admin-panel-inner">
@@ -2185,6 +2193,24 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </main>
+              <footer className="admin-dock" aria-label="Acceso rapido">
+                {quickAccess.map((item) => {
+                  const isActive = activeNav === item.target;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.target}
+                      type="button"
+                      className={`admin-dock-item${isActive ? " admin-dock-item--active" : ""}`}
+                      onClick={() => setActiveNav(item.target)}
+                      aria-label={item.label}
+                    >
+                      <span className="admin-dock-label">{item.label}</span>
+                      <Icon size={16} />
+                    </button>
+                  );
+                })}
+              </footer>
             </div>
           </div>
         </div>
