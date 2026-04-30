@@ -236,44 +236,67 @@ export default function AdmissionPage() {
           </div>
         </header>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 calc(100% - 240px)', minWidth: '300px' }}>
+        <form className="admission-form-shell" onSubmit={handleSubmit} style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+          <div className="admission-main" style={{ flex: '1 1 calc(100% - 240px)', minWidth: '300px' }}>
             <fieldset className="file-section file-section--spaced">
-              <legend style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace', fontSize: '0.75rem', fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#0a0806', background: 'rgba(248, 232, 195, 0.95)', border: '1.5px solid rgba(15, 12, 8, 0.5)', padding: '8px 12px', marginBottom: '12px' }}>
-                Datos Personales
-              </legend>
-              <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+              <legend className="section-title">Datos personales</legend>
+              <div className="admission-personal-grid">
                 {textFields.map((field) => (
-                  <label key={field.name} style={{ display: 'block', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace', fontSize: '0.92rem', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#0a0806' }}>
+                  <label className="field-label" key={field.name}>
                     {field.label}
-                    <input name={field.name} onChange={handleInput} maxLength={field.maxLength} required={field.required} type="text" value={form[field.name]} style={{ marginTop: '4px', width: '100%', border: 0, borderBottom: '3px solid #0d0b08', background: 'rgba(255, 245, 215, 0.55)', padding: '0.65rem 0.55rem 0.55rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace', fontSize: '1.02rem', fontWeight: 700, color: '#06050a', outline: 'none', transition: 'background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease', minHeight: '2.7rem' }} />
+                    <input
+                      className="classified-input"
+                      maxLength={field.maxLength}
+                      name={field.name}
+                      onChange={handleInput}
+                      required={field.required}
+                      type="text"
+                      value={form[field.name]}
+                    />
                   </label>
                 ))}
-              </div>
-              <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(2, 1fr)', marginTop: '16px' }}>
-                <label style={{ position: 'relative' }}>
-                  <span style={{ display: 'block', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace', fontSize: '0.92rem', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#0a0806', marginBottom: '4px' }}>Email</span>
-                  <input name="email" onChange={handleInput} placeholder="correo@ejemplo.com" required type="email" value={form.email} style={{ width: '100%', border: 0, borderBottom: '3px solid #0d0b08', background: 'rgba(255, 245, 215, 0.55)', padding: '0.65rem 0.55rem 0.55rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace', fontSize: '1.02rem', fontWeight: 700, color: '#06050a', outline: 'none', transition: 'background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease', minHeight: '2.7rem' }} />
+
+                <label className="field-label">
+                  Email
+                  <input
+                    className="classified-input"
+                    name="email"
+                    onChange={handleInput}
+                    placeholder="correo@ejemplo.com"
+                    required
+                    type="email"
+                    value={form.email}
+                  />
                 </label>
-                <label style={{ position: 'relative' }}>
-                  <span style={{ display: 'block', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace', fontSize: '0.92rem', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#0a0806', marginBottom: '4px' }}>Usuario</span>
-                  <input name="usuario" onChange={handleInput} placeholder="sobreviviente-01" required type="text" value={form.usuario} style={{ width: '100%', border: 0, borderBottom: '3px solid #0d0b08', background: 'rgba(255, 245, 215, 0.55)', padding: '0.65rem 0.55rem 0.55rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace', fontSize: '1.02rem', fontWeight: 700, color: '#06050a', outline: 'none', transition: 'background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease', minHeight: '2.7rem' }} />
+
+                <label className="field-label">
+                  Usuario
+                  <input
+                    className="classified-input"
+                    name="usuario"
+                    onChange={handleInput}
+                    placeholder="sobreviviente-01"
+                    required
+                    type="text"
+                    value={form.usuario}
+                  />
                 </label>
-              </div>
-              <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(2, 1fr)', marginTop: '16px' }}>
-                <label style={{ position: 'relative' }}>
-                  <span style={{ display: 'block', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace', fontSize: '0.92rem', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#0a0806', marginBottom: '4px' }}>Género</span>
-                  <button onClick={() => setGenderOpen(!genderOpen)} style={{ alignItems: 'center', background: 'rgba(255, 245, 215, 0.55)', border: 0, borderBottom: '3px solid #0d0b08', color: '#06050a', cursor: 'pointer', display: 'flex', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace', fontSize: '1.02rem', fontWeight: 800, justifyContent: 'space-between', minHeight: '2.7rem', padding: '0.65rem 0.55rem 0.55rem', textAlign: 'left', transition: 'background-color 180ms ease, transform 180ms ease', width: '100%' } as any} type="button">
-                    {form.genero || 'Seleccionar'}
-                    <span style={{ color: '#8f1d1d', fontSize: '1.1rem' }}>▼</span>
+
+                <div className="field-label">
+                  Género
+                  <button className="custom-trigger" onClick={() => setGenderOpen(!genderOpen)} type="button">
+                    <span>{form.genero || 'Seleccionar'}</span>
+                    <span className="trigger-mark">▼</span>
                   </button>
-                </label>
-                <label style={{ position: 'relative' }}>
-                  <span style={{ display: 'block', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace', fontSize: '0.92rem', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#0a0806', marginBottom: '4px' }}>Fecha de nacimiento</span>
-                  <button onClick={() => setCalendarOpen(!calendarOpen)} style={{ background: 'rgba(255, 245, 215, 0.55)', border: 0, borderBottom: '3px solid #0d0b08', color: '#06050a', cursor: 'pointer', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace', fontSize: '1.02rem', fontWeight: 700, minHeight: '2.7rem', padding: '0.65rem 0.55rem 0.55rem', textAlign: 'left', transition: 'background-color 180ms ease, transform 180ms ease', width: '100%' } as any} type="button">
-                    {formatDate(form.nacimiento)}
+                </div>
+
+                <div className="field-label admission-birth-field">
+                  Fecha de nacimiento
+                  <button className="custom-trigger" onClick={() => setCalendarOpen(!calendarOpen)} type="button">
+                    <span>{formatDate(form.nacimiento)}</span>
+                    <span className="calendar-icon" />
                   </button>
-                </label>
+                </div>
               </div>
             </fieldset>
             <fieldset className="file-section">
@@ -290,7 +313,7 @@ export default function AdmissionPage() {
               </div>
             </fieldset>
           </div>
-          <aside style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: '0 1 200px' }}>
+          <aside className="admission-side" style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: '0 1 200px' }}>
             <label className="photo-drop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '20.8rem', cursor: 'pointer', overflow: 'hidden', border: '2px solid rgba(15, 12, 8, 0.95)', backgroundColor: '#f0dcae', backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: 'multiply', boxShadow: '0 10px 22px rgba(30, 18, 10, 0.42), inset 0 0 25px rgba(77, 45, 22, 0.18)', transform: 'rotate(0.5deg)', position: 'relative', color: '#06050a' }}>
               {photoPreview ? (
                 <img alt="Vista previa del retrato" src={photoPreview} style={{ height: '100%', width: '100%', objectFit: 'cover', filter: 'grayscale(1)' }} />
@@ -302,7 +325,7 @@ export default function AdmissionPage() {
               )}
               <input accept="image/png,image/jpeg" style={{ display: 'none' }} name="foto" onChange={handlePhoto} type="file" />
             </label>
-            <button className="submit-stamp" type="submit" style={{ background: '#6b1414', border: '4px solid #6b1414', color: '#f8e9c2', cursor: 'pointer', fontFamily: "ui-monospace, 'Courier New', monospace", fontSize: '1.05rem', fontWeight: 900, letterSpacing: '0.16em', padding: '0.95rem 1rem', textTransform: 'uppercase', width: '100%', boxShadow: '0 4px 12px rgba(60, 10, 10, 0.4)' }}>
+            <button className="submit-stamp" type="submit">
               Procesar Ingreso
             </button>
             <p style={{ background: 'rgba(255, 245, 215, 0.6)', border: '1.5px solid rgba(50, 35, 20, 0.55)', color: '#1a1410', fontFamily: "ui-monospace, 'Courier New', monospace", fontSize: '0.7rem', fontStyle: 'italic', fontWeight: 800, lineHeight: 1.7, padding: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>

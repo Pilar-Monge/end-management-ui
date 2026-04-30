@@ -16,7 +16,7 @@
     isolation: isolate;
     overflow: hidden;
     animation: dossierArrive 800ms cubic-bezier(0.18, 0.9, 0.24, 1) both;
-    background-color: #f0dcae;
+    background-color: #d8c190;
     background-image: url('/images/paper-texture.jpg');
     background-size: cover;
     background-position: center;
@@ -47,7 +47,11 @@
     position: absolute;
     inset: 0;
     z-index: 0;
-    background: none;
+    background:
+      repeating-linear-gradient(7deg, rgba(20, 14, 10, 0.05) 0 1px, transparent 1px 18px),
+      radial-gradient(circle at 14% 22%, rgba(86, 30, 18, 0.07) 0 4%, transparent 12%),
+      radial-gradient(circle at 78% 88%, rgba(120, 18, 12, 0.08) 0 5%, transparent 14%),
+      radial-gradient(circle at 34% 78%, rgba(50, 14, 8, 0.06) 0 3%, transparent 10%);
     mix-blend-mode: multiply;
   }
 
@@ -57,7 +61,10 @@
     position: absolute;
     inset: 0;
     z-index: 2;
-    background: none;
+    background:
+      radial-gradient(ellipse at -2% 30%, rgba(8, 5, 3, 0.6) 0 3%, transparent 11%),
+      radial-gradient(ellipse at 102% 88%, rgba(8, 5, 3, 0.62) 0 4%, transparent 13%),
+      linear-gradient(90deg, rgba(0, 0, 0, 0.28), transparent 10%, transparent 90%, rgba(0, 0, 0, 0.3));
     mix-blend-mode: multiply;
   }
 
@@ -68,6 +75,11 @@
 
   .stencil {
     font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+    font-size: clamp(3.4rem, 7vw, 5.4rem);
+    font-weight: 900;
+    letter-spacing: 0.035em;
+    line-height: 0.9;
+    text-transform: uppercase;
     text-shadow:
       2px 2px 0 rgba(73, 45, 29, 0.35),
       4px 4px 8px rgba(0, 0, 0, 0.15);
@@ -75,10 +87,10 @@
   }
 
   .header-card {
-    background: rgba(248, 232, 195, 0.95);
+    background: rgba(248, 232, 195, 0.88);
     border: 2px solid rgba(15, 12, 8, 0.92);
     border-bottom-width: 4px;
-    padding: 0.85rem 1.6rem 1rem;
+    padding: 1.05rem 1.85rem 1.15rem;
     box-shadow: inset 0 0 0 1px rgba(91, 61, 35, 0.18);
     backdrop-filter: blur(1px);
     width: fit-content;
@@ -103,6 +115,7 @@
     font-size: 0.82rem;
     font-weight: 900;
     letter-spacing: 0.36em;
+    line-height: 1.2;
     text-transform: uppercase;
     color: #1a1410;
   }
@@ -110,16 +123,17 @@
   .header-subtitle {
     font-family:
       ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-    font-size: 1rem;
+    font-size: 1.08rem;
     font-weight: 900;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
+    line-height: 1.25;
     text-transform: uppercase;
     color: #6b1414;
   }
 
   @media (min-width: 640px) {
     .header-subtitle {
-      font-size: 1.15rem;
+      font-size: 1.22rem;
     }
   }
 
@@ -233,7 +247,7 @@
     margin: 0;
     padding: 18px 16px 16px;
     border: 2px solid rgba(15, 12, 8, 0.95);
-    background: rgba(248, 232, 195, 0.28);
+    background: rgba(248, 232, 195, 0.62);
     box-shadow:
       inset 0 0 0 1px rgba(91, 61, 35, 0.2),
       0 8px 18px rgba(0, 0, 0, 0.08);
@@ -251,6 +265,7 @@
     font-size: 1.15rem;
     font-weight: 900;
     letter-spacing: 0.2em;
+    line-height: 1.15;
     text-transform: uppercase;
     color: #0a0806;
     background: rgba(248, 232, 195, 0.92);
@@ -264,6 +279,7 @@
     font-size: 0.92rem;
     font-weight: 900;
     letter-spacing: 0.14em;
+    line-height: 1.2;
     text-transform: uppercase;
     color: #0a0806;
   }
@@ -273,12 +289,13 @@
     width: 100%;
     border: 0;
     border-bottom: 3px solid #0d0b08;
-    background: #ffffff;
+    background: rgba(255, 245, 215, 0.55);
     padding: 0.65rem 0.55rem 0.55rem;
     font-family:
       ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-    font-size: 1.02rem;
+    font-size: 1.12rem;
     font-weight: 700;
+    letter-spacing: 0.08em;
     color: #06050a;
     outline: none;
     transition:
@@ -297,11 +314,12 @@
   .classified-input::placeholder {
     color: rgba(40, 32, 22, 0.55);
     font-weight: 600;
+    letter-spacing: 0.08em;
   }
 
   .custom-trigger {
     align-items: center;
-    background: #ffffff;
+    background: rgba(255, 245, 215, 0.55);
     border: 0;
     border-bottom: 3px solid #0d0b08;
     color: #06050a;
@@ -309,8 +327,9 @@
     display: flex;
     font-family:
       ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-    font-size: 1.02rem;
+    font-size: 1.12rem;
     font-weight: 800;
+    letter-spacing: 0.08em;
     justify-content: space-between;
     margin-top: 0.5rem;
     min-height: 2.7rem;
@@ -323,7 +342,7 @@
   }
 
   .custom-trigger:hover {
-    background: #ffffff;
+    background: rgba(255, 251, 230, 0.85);
     transform: translateY(-1px);
   }
 
@@ -371,7 +390,7 @@
   .dropdown-panel,
   .calendar-popover {
     background-color: #f0dcae;
-    background-image: url('/images/paper-texture.jpg');
+    background-image: url('/images/paper-clean.jpg');
     background-size: cover;
     background-position: center;
     background-blend-mode: multiply;
@@ -576,7 +595,7 @@
     overflow: hidden;
     border: 2px solid rgba(15, 12, 8, 0.95);
     background-color: #f0dcae;
-    background-image: url('/images/paper-texture.jpg');
+    background-image: url('/images/paper-clean.jpg');
     background-size: cover;
     background-position: center;
     background-blend-mode: multiply;
@@ -631,9 +650,9 @@
   }
 
   .submit-stamp {
-    background: #ffffff;
-    border: 4px solid #17140f;
-    color: #17140f;
+    background: #6b1414;
+    border: 4px solid #6b1414;
+    color: #f8e9c2;
     cursor: pointer;
     font-family:
       ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
@@ -645,6 +664,7 @@
     transition:
       transform 220ms ease,
       background-color 220ms ease,
+      border-color 220ms ease,
       color 220ms ease,
       box-shadow 220ms ease;
     width: 100%;
@@ -652,8 +672,9 @@
   }
 
   .submit-stamp:hover {
-    background: #ffffff;
-    color: #17140f;
+    background: transparent;
+    border-color: #6b1414;
+    color: #6b1414;
     transform: rotate(-1.2deg) translateY(-2px);
     box-shadow: 0 8px 18px rgba(60, 10, 10, 0.5);
   }
@@ -689,6 +710,98 @@
 
   .form-warning {
     color: #8f1d1d;
+  }
+
+  .admission-form-shell {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px !important;
+  }
+
+  .admission-main {
+    min-width: 0 !important;
+  }
+
+  .admission-side {
+    align-self: start;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .admission-personal-grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 1fr;
+  }
+
+  .admission-contact-grid,
+  .admission-date-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dossier {
+    background-color: #d8c190 !important;
+  }
+
+  .header-card {
+    background: rgba(248, 232, 195, 0.88) !important;
+    border-bottom-width: 4px !important;
+    box-shadow: inset 0 0 0 1px rgba(91, 61, 35, 0.18) !important;
+  }
+
+  .stencil {
+    font-size: clamp(2.5rem, 8vw, 4rem) !important;
+    letter-spacing: 0.05em !important;
+    line-height: 1 !important;
+    text-shadow:
+      2px 2px 0 rgba(73, 45, 29, 0.35),
+      4px 4px 8px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  .file-section legend {
+    font-size: 1.15rem !important;
+    letter-spacing: 0.2em !important;
+    padding: 0.15rem 0.65rem !important;
+  }
+
+  @media (min-width: 760px) {
+    .admission-personal-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .admission-birth-field {
+      grid-column: span 2;
+    }
+
+    .admission-contact-grid,
+    .admission-date-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+  }
+
+  @media (min-width: 1100px) {
+    .admission-form-shell {
+      grid-template-columns: minmax(0, 1fr) 305px;
+    }
+
+    .admission-side {
+      width: 305px;
+    }
+
+    .admission-personal-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .admission-birth-field {
+      grid-column: span 2;
+    }
+
+    .photo-drop {
+      min-height: 20.8rem;
+    }
   }
 
   .redacted {
