@@ -101,7 +101,7 @@ export default function HomePage() {
           </button>
 
           <button
-            onClick={() => navigate('/app')}
+            onClick={() => navigate('/main-homepage')}
             style={{
               background: 'rgba(74, 138, 48, 0.12)',
               border: '1px solid rgba(125, 219, 80, 0.35)',

@@ -3,6 +3,7 @@ import HomePage from './pages/HomePage'
 import LoginPage from './features/login/pages/LoginPage'
 import MainAppPage from './app/layout/MainAppPage'
 import { AdmissionPage } from './features/admission'
+import { MainHomePage } from './features/main-homepage'
 import { CampsPage } from './features/camps'
 import { PersonsPage } from './features/persons'
 import {
@@ -91,6 +92,7 @@ function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/main-homepage" element={<MainHomePage />} />
       <Route path="/app" element={<MainAppPage />} />
       <Route path="/admission" element={<AdmissionPage />} />
       <Route path="/camps" element={<CampsPage />} />
