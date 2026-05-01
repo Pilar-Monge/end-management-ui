@@ -4,11 +4,11 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import "./admin-dashboard.css";
 import {
-  LayoutDashboard, Users, UserPlus, Package, Map, Radio,
-  Shield, Trophy, Bell, Settings, ChevronRight,
+  Users, UserPlus, Package, Map, Radio,
+  Trophy, Bell, Settings, ChevronRight,
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle,
   XCircle, Activity, ChevronDown,
-  BarChart2, Skull, Search, Edit2, Trash2,
+  BarChart2, Search, Edit2, Trash2, Shield,
   X, Volume2, Database, Cpu, User
 } from "lucide-react";
 import {
@@ -32,6 +32,16 @@ type NavSection =
   | "LOGROS"
   | "NOTIFICACIONES"
   | "CONFIGURACIÓN";
+
+type PopulationViewMode = "stats" | "users";
+type AdmissionsViewMode = "queue" | "history";
+type InventoryViewMode = "summary" | "items";
+type ExpeditionsViewMode = "active" | "planning" | "history";
+type IntercampViewMode = "pending" | "history" | "send";
+type SecurityViewMode = "live" | "errors" | "system";
+type LogrosViewMode = "overview" | "progress";
+type NotifsViewMode = "all" | "unread" | "critical";
+type ConfigViewMode = "camp" | "system";
 
 interface Person {
   id: number;
@@ -348,7 +358,7 @@ function DonutCenter({ cx, cy, total }: { cx?: number; cy?: number; total: numbe
 
 // ─── SECTION VIEWS ───────────────────────────────────────────────────────────
 
-function ViewPoblacion() {
+function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
   const [persons, setPersons] = useState<Person[]>(INITIAL_PERSONS);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("Todos");
@@ -384,72 +394,100 @@ function ViewPoblacion() {
 
   return (
     <div>
-      {/* Stats row */}
-      <div className="grid grid-cols-4 gap-3 mb-4">
-        {Object.entries(counts).map(([k, v]) => (
-          <Card key={k}>
-            <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 24, fontWeight: 900, color: personStatusColor(k) }}>{v}</div>
-            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#8B8070", letterSpacing: "0.1em" }}>{k.toUpperCase()}</div>
-          </Card>
-        ))}
-      </div>
-
-      <Card>
-        <div className="flex items-center gap-3 mb-3 flex-wrap">
-          <SectionHeader title={`REGISTRO DE POBLACIÓN — ${persons.length} PERSONAS`} accent={false} />
-          <div className="flex-1" />
-          <SearchBar value={search} onChange={setSearch} placeholder="BUSCAR PERSONA..." />
-          <div className="flex gap-1">
-            {statuses.map(s => (
-              <button key={s} onClick={() => setFilterStatus(s)}
-                className="px-2 py-1 rounded-sm cursor-pointer transition-opacity hover:opacity-80"
-                style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, background: filterStatus === s ? "#D97706" : "#1A1A20", color: filterStatus === s ? "#0A0A0B" : "#8B8070", border: "1px solid #2D2A24" }}>
-                {s}
-              </button>
+      {mode === "stats" ? (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            {Object.entries(counts).map(([k, v]) => (
+              <Card key={k}>
+                <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 24, fontWeight: 900, color: personStatusColor(k) }}>{v}</div>
+                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#8B8070", letterSpacing: "0.1em" }}>{k.toUpperCase()}</div>
+              </Card>
             ))}
           </div>
-        </div>
-        <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginBottom: 12 }} />
-
-        {/* Table */}
-        <div className="admin-table grid gap-px" style={{ background: "#2D2A24" }}>
-          {/* Header */}
-          <div className="admin-table-header grid grid-cols-12 px-3 py-2" style={{ background: "#0D0D10" }}>
-            {["NOMBRE", "ROL", "ESTADO", "EDAD", "SECTOR", "INGRESO", "ACC."].map((h, i) => (
-              <div key={h} className={i === 0 ? "col-span-3" : i === 1 ? "col-span-2" : i === 2 ? "col-span-2" : i === 3 ? "col-span-1" : i === 4 ? "col-span-2" : i === 5 ? "col-span-1" : "col-span-1"}>
-                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540", letterSpacing: "0.08em" }}>{h}</span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <Card>
+              <SectionHeader title="DISTRIBUCIÓN POR ROL" />
+              <div className="flex flex-col gap-2">
+                {Object.entries(persons.reduce<Record<string, number>>((acc, person) => {
+                  acc[person.role] = (acc[person.role] ?? 0) + 1;
+                  return acc;
+                }, {})).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([role, total]) => (
+                  <div key={role} className="flex items-center justify-between p-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
+                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}>{role}</span>
+                    <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#D97706", fontWeight: 700 }}>{total}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </Card>
+            <Card>
+              <SectionHeader title="OCUPACIÓN POR SECTOR" />
+              <div className="flex flex-col gap-2">
+                {Object.entries(persons.reduce<Record<string, number>>((acc, person) => {
+                  acc[person.sector] = (acc[person.sector] ?? 0) + 1;
+                  return acc;
+                }, {})).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([sector, total]) => (
+                  <div key={sector} className="flex items-center justify-between p-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#8B8070" }}>{sector.toUpperCase()}</span>
+                    <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#0D9488", fontWeight: 700 }}>{total}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
-          {filtered.map(p => (
-            <motion.div
-              key={p.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="admin-table-row grid grid-cols-12 items-center px-3 py-2 cursor-pointer hover:opacity-90 transition-opacity"
-              style={{ background: selected?.id === p.id ? "#1A1A20" : "#111114" }}
-              onClick={() => { setSelected(p); setEditMode(false); setEditData({}); }}
-            >
-              <div className="col-span-3 flex items-center gap-2">
-                <div className="w-6 h-6 rounded-sm flex items-center justify-center flex-shrink-0"
-                  style={{ background: "#1A1A20", fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#8B8070", border: "1px solid #2D2A24" }}>
-                  {p.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+        </>
+      ) : (
+        <Card>
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
+            <SectionHeader title={`REGISTRO DE POBLACIÓN — ${persons.length} PERSONAS`} accent={false} />
+            <div className="flex-1" />
+            <SearchBar value={search} onChange={setSearch} placeholder="BUSCAR PERSONA..." />
+            <div className="flex gap-1">
+              {statuses.map(s => (
+                <button key={s} onClick={() => setFilterStatus(s)} className="px-2 py-1 rounded-sm cursor-pointer transition-opacity hover:opacity-80" style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, background: filterStatus === s ? "#D97706" : "#1A1A20", color: filterStatus === s ? "#0A0A0B" : "#8B8070", border: "1px solid #2D2A24" }}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginBottom: 12 }} />
+
+          <div className="admin-table grid gap-px" style={{ background: "#2D2A24" }}>
+            <div className="admin-table-header grid grid-cols-12 px-3 py-2" style={{ background: "#0D0D10" }}>
+              {["NOMBRE", "ROL", "ESTADO", "EDAD", "SECTOR", "INGRESO", "ACC."].map((h, i) => (
+                <div key={h} className={i === 0 ? "col-span-3" : i === 1 ? "col-span-2" : i === 2 ? "col-span-2" : i === 3 ? "col-span-1" : i === 4 ? "col-span-2" : i === 5 ? "col-span-1" : "col-span-1"}>
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540", letterSpacing: "0.08em" }}>{h}</span>
                 </div>
-                <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, fontWeight: 600, color: "#F5F0E8" }}>{p.name}</span>
-              </div>
-              <div className="col-span-2"><span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070" }}>{p.role}</span></div>
-              <div className="col-span-2"><Badge label={p.status} color={personStatusColor(p.status)} /></div>
-              <div className="col-span-1"><span style={{ fontFamily: "'Orbitron', monospace", fontSize: 10, color: "#F5F0E8" }}>{p.age}</span></div>
-              <div className="col-span-2"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{p.sector}</span></div>
-              <div className="col-span-1"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>{p.joined}</span></div>
-              <div className="col-span-1 flex gap-1">
-                <button onClick={e => { e.stopPropagation(); setSelected(p); setEditMode(true); setEditData(p); }} className="hover:opacity-80"><Edit2 size={11} style={{ color: "#D97706" }} /></button>
-                <button onClick={e => { e.stopPropagation(); handleDelete(p.id); }} className="hover:opacity-80"><Trash2 size={11} style={{ color: "#DC2626" }} /></button>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </Card>
+              ))}
+            </div>
+            {filtered.map(person => (
+              <motion.div
+                key={person.id}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="admin-table-row grid grid-cols-12 items-center px-3 py-2 cursor-pointer hover:opacity-90 transition-opacity"
+                style={{ background: selected?.id === person.id ? "#1A1A20" : "#111114" }}
+                onClick={() => { setSelected(person); setEditMode(false); setEditData({}); }}
+              >
+                <div className="col-span-3 flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-sm flex items-center justify-center flex-shrink-0" style={{ background: "#1A1A20", fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#8B8070", border: "1px solid #2D2A24" }}>
+                    {person.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                  </div>
+                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, fontWeight: 600, color: "#F5F0E8" }}>{person.name}</span>
+                </div>
+                <div className="col-span-2"><span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070" }}>{person.role}</span></div>
+                <div className="col-span-2"><Badge label={person.status} color={personStatusColor(person.status)} /></div>
+                <div className="col-span-1"><span style={{ fontFamily: "'Orbitron', monospace", fontSize: 10, color: "#F5F0E8" }}>{person.age}</span></div>
+                <div className="col-span-2"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{person.sector}</span></div>
+                <div className="col-span-1"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>{person.joined}</span></div>
+                <div className="col-span-1 flex gap-1">
+                  <button onClick={event => { event.stopPropagation(); setSelected(person); setEditMode(true); setEditData(person); }} className="hover:opacity-80"><Edit2 size={11} style={{ color: "#D97706" }} /></button>
+                  <button onClick={event => { event.stopPropagation(); handleDelete(person.id); }} className="hover:opacity-80"><Trash2 size={11} style={{ color: "#DC2626" }} /></button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Detail/Edit panel */}
       <Modal open={!!selected} onClose={() => { setSelected(null); setEditMode(false); }} title={editMode ? "EDITAR PERSONA" : "FICHA INDIVIDUAL"}>
@@ -526,7 +564,7 @@ function ViewPoblacion() {
   );
 }
 
-function ViewAdmisiones() {
+function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
   const [admissions, setAdmissions] = useState<Admission[]>(INITIAL_ADMISSIONS);
   const [selected, setSelected] = useState<Admission | null>(null);
   const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
@@ -568,22 +606,22 @@ function ViewAdmisiones() {
         )}
       </AnimatePresence>
 
-      {/* Header cards */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: "PENDIENTES", value: pending.length, color: "#F59E0B" },
-          { label: "APROBADAS HOY", value: resolved.filter(a => a.status === "approved").length, color: "#0D9488" },
-          { label: "RECHAZADAS HOY", value: resolved.filter(a => a.status === "rejected").length, color: "#DC2626" },
-        ].map(({ label, value, color }) => (
-          <Card key={label}>
-            <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 28, fontWeight: 900, color }}>{value}</div>
-            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#8B8070", letterSpacing: "0.1em" }}>{label}</div>
-          </Card>
-        ))}
-      </div>
+      {(mode === "queue" || mode === "history") && (
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: "PENDIENTES", value: pending.length, color: "#F59E0B" },
+            { label: "APROBADAS HOY", value: resolved.filter(a => a.status === "approved").length, color: "#0D9488" },
+            { label: "RECHAZADAS HOY", value: resolved.filter(a => a.status === "rejected").length, color: "#DC2626" },
+          ].map(({ label, value, color }) => (
+            <Card key={label}>
+              <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 28, fontWeight: 900, color }}>{value}</div>
+              <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#8B8070", letterSpacing: "0.1em" }}>{label}</div>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      {/* Pending */}
-      <Card glow="#D97706">
+      {mode === "queue" && <Card glow="#D97706">
         <div className="flex items-center justify-between mb-3">
           <SectionHeader title="SOLICITUDES PENDIENTES — EVALUACION IA" accent={false} />
           <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>Modelo: admission-v1 | Precisión: 89%</span>
@@ -641,10 +679,9 @@ function ViewAdmisiones() {
             </div>
           )}
         </div>
-      </Card>
+      </Card>}
 
-      {/* Resolved */}
-      {resolved.length > 0 && (
+      {mode === "history" && resolved.length > 0 && (
         <Card>
           <SectionHeader title="PROCESADAS RECIENTEMENTE" />
           <div className="flex flex-col gap-2">
@@ -709,7 +746,7 @@ function ViewAdmisiones() {
   );
 }
 
-function ViewInventario() {
+function ViewInventario({ mode }: { mode: InventoryViewMode }) {
   const [items, setItems] = useState<InventoryItem[]>(INITIAL_INVENTORY);
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<InventoryItem | null>(null);
@@ -768,8 +805,7 @@ function ViewInventario() {
         )}
       </AnimatePresence>
 
-      {/* Category summary */}
-      <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
+      {mode === "summary" && <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
         {categories.map(cat => {
           const catItems = items.filter(i => i.category === cat);
           const avgPct = Math.round(catItems.reduce((a, b) => a + b.pct, 0) / catItems.length);
@@ -783,9 +819,9 @@ function ViewInventario() {
             </Card>
           );
         })}
-      </div>
+      </div>}
 
-      <Card>
+      {(mode === "items" || mode === "summary") && <Card>
         <div className="flex items-center gap-3 mb-3 flex-wrap">
           <SectionHeader title="BODEGA COMPLETA" accent={false} />
           <div className="flex-1" />
@@ -843,7 +879,7 @@ function ViewInventario() {
             );
           })}
         </div>
-      </Card>
+      </Card>}
 
       {/* Add item modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="AGREGAR ÍTEM AL INVENTARIO">
@@ -886,7 +922,7 @@ function ViewInventario() {
   );
 }
 
-function ViewExpediciones() {
+function ViewExpediciones({ mode }: { mode: ExpeditionsViewMode }) {
   const [expeditions, setExpeditions] = useState<Expedition[]>(INITIAL_EXPEDITIONS);
   const [, setSelected] = useState<Expedition | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -958,13 +994,13 @@ function ViewExpediciones() {
         ))}
       </div>
 
-      <div className="flex justify-end">
+      {(mode === "planning" || mode === "active") && <div className="flex justify-end">
         <ActionBtn label="+ NUEVA EXPEDICIÓN" color="#D97706" onClick={() => setShowCreate(true)} />
-      </div>
+      </div>}
 
       {/* Expedition list */}
       <div className="flex flex-col gap-3">
-        {expeditions.map(exp => {
+        {(mode === "active" ? expeditions.filter(e => e.status !== "COMPLETADA") : mode === "history" ? expeditions.filter(e => e.status === "COMPLETADA") : expeditions).map(exp => {
           const pct = exp.total > 0 ? Math.round((exp.day / exp.total) * 100) : 0;
           const sc = expColor(exp.status);
           return (
@@ -1016,8 +1052,7 @@ function ViewExpediciones() {
         })}
       </div>
 
-      {/* Create modal */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="CREAR NUEVA EXPEDICIÓN">
+      <Modal open={showCreate && mode !== "history"} onClose={() => setShowCreate(false)} title="CREAR NUEVA EXPEDICIÓN">
         <div className="flex flex-col gap-3">
           {[
             { label: "NOMBRE DE LA MISIÓN", key: "name" },
@@ -1063,7 +1098,7 @@ function ViewExpediciones() {
   );
 }
 
-function ViewIntercamp() {
+function ViewIntercamp({ mode }: { mode: IntercampViewMode }) {
   const [requests, setRequests] = useState<IntercampRequest[]>(INITIAL_INTERCAMP);
   const [showSend, setShowSend] = useState(false);
   const [newReq, setNewReq] = useState({ to: "", text: "", type: "solicitud" });
@@ -1126,12 +1161,11 @@ function ViewIntercamp() {
         ))}
       </div>
 
-      <div className="flex justify-end">
+      {(mode === "send" || mode === "pending") && <div className="flex justify-end">
         <ActionBtn label="+ ENVIAR MENSAJE" color="#0D9488" onClick={() => setShowSend(true)} />
-      </div>
+      </div>}
 
-      {/* Pending requests */}
-      {pending.length > 0 && (
+      {mode === "pending" && pending.length > 0 && (
         <Card glow="#EA580C">
           <SectionHeader title="SOLICITUDES PENDIENTES — ACCIÓN REQUERIDA" />
           <div className="flex flex-col gap-2">
@@ -1159,8 +1193,7 @@ function ViewIntercamp() {
         </Card>
       )}
 
-      {/* History */}
-      <Card>
+      {(mode === "history" || mode === "send") && <Card>
         <SectionHeader title="HISTORIAL DE COMUNICACIONES" />
         <div className="flex flex-col gap-2">
           {others.map(req => {
@@ -1185,10 +1218,9 @@ function ViewIntercamp() {
             );
           })}
         </div>
-      </Card>
+      </Card>}
 
-      {/* Send message modal */}
-      <Modal open={showSend} onClose={() => setShowSend(false)} title="ENVIAR MENSAJE INTER-CAMPAMENTO">
+      <Modal open={showSend || mode === "send"} onClose={() => setShowSend(false)} title="ENVIAR MENSAJE INTER-CAMPAMENTO">
         <div className="flex flex-col gap-3">
           <div>
             <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>DESTINATARIO</label>
@@ -1222,7 +1254,7 @@ function ViewIntercamp() {
   );
 }
 
-function ViewSeguridad() {
+function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
   const [logs, setLogs] = useState<LogEntry[]>(INITIAL_LOGS);
   const [filterLevel, setFilterLevel] = useState("todos");
   const [search, setSearch] = useState("");
@@ -1250,10 +1282,15 @@ function ViewSeguridad() {
   }, [autoRefresh]);
 
   const levels = ["todos", "info", "warn", "error", "system"];
-  const filtered = logs.filter(l => {
+  const baseFiltered = logs.filter(l => {
     const matchLevel = filterLevel === "todos" || l.level === filterLevel;
     const matchSearch = l.user.toLowerCase().includes(search.toLowerCase()) || l.action.toLowerCase().includes(search.toLowerCase());
     return matchLevel && matchSearch;
+  });
+  const filtered = baseFiltered.filter(l => {
+    if (mode === "errors") return l.level === "error" || l.level === "warn";
+    if (mode === "system") return l.level === "system";
+    return true;
   });
 
   const counts = {
@@ -1276,7 +1313,7 @@ function ViewSeguridad() {
 
       <Card>
         <div className="flex items-center gap-3 mb-3 flex-wrap">
-          <SectionHeader title="REGISTRO DE ACCESO Y ACTIVIDAD" accent={false} />
+          <SectionHeader title={mode === "errors" ? "ALERTAS Y ERRORES" : mode === "system" ? "EVENTOS DEL SISTEMA" : "REGISTRO DE ACCESO Y ACTIVIDAD"} accent={false} />
           <div className="flex-1" />
           <SearchBar value={search} onChange={setSearch} placeholder="BUSCAR EN LOGS..." />
           <div className="flex gap-1">
@@ -1334,7 +1371,7 @@ function ViewSeguridad() {
   );
 }
 
-function ViewLogros() {
+function ViewLogros({ mode }: { mode: LogrosViewMode }) {
   const achievements = [
     { name: "PRIMER MES", desc: "Sobrevivimos 30 días", unlocked: true, pct: 100, color: "#0D9488", xp: 500, category: "Supervivencia" },
     { name: "SIN BAJAS", desc: "7 días sin pérdidas de vida", unlocked: true, pct: 100, color: "#F59E0B", xp: 300, category: "Bienestar" },
@@ -1352,8 +1389,8 @@ function ViewLogros() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Level bar */}
-      <Card glow="#D97706">
+      {mode === "overview" && (
+        <Card glow="#D97706">
         <div className="flex items-center gap-4">
           <div className="text-center">
             <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#4B4540" }}>NIVEL</div>
@@ -1384,7 +1421,8 @@ function ViewLogros() {
             </div>
           </div>
         </div>
-      </Card>
+        </Card>
+      )}
 
       {/* Achievements by category */}
       {categories.map(cat => (
@@ -1429,7 +1467,7 @@ function ViewLogros() {
   );
 }
 
-function ViewNotificaciones() {
+function ViewNotificaciones({ mode }: { mode: NotifsViewMode }) {
   const [notifs, setNotifs] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
   const [filter, setFilter] = useState("todas");
 
@@ -1438,7 +1476,12 @@ function ViewNotificaciones() {
   const dismiss = (id: number) => setNotifs(prev => prev.filter(n => n.id !== id));
 
   const levels = ["todas", "critical", "warning", "info"];
-  const filtered = notifs.filter(n => filter === "todas" || n.level === filter);
+  const filteredByLevel = notifs.filter(n => filter === "todas" || n.level === filter);
+  const filtered = filteredByLevel.filter(n => {
+    if (mode === "unread") return !n.read;
+    if (mode === "critical") return n.level === "critical";
+    return true;
+  });
   const unread = notifs.filter(n => !n.read).length;
 
   return (
@@ -1512,7 +1555,7 @@ function ViewNotificaciones() {
   );
 }
 
-function ViewConfiguracion() {
+function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
   const [settings, setSettings] = useState({
     campName: "CAMPAMENTO ALFA",
     adminName: "Edicson Vargas",
@@ -1546,8 +1589,8 @@ function ViewConfiguracion() {
       </AnimatePresence>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Camp settings */}
-        <Card>
+        {mode === "camp" && (
+          <Card>
           <SectionHeader title="CONFIGURACIÓN DEL CAMPAMENTO" />
           <div className="flex flex-col gap-3">
             {[
@@ -1574,10 +1617,11 @@ function ViewConfiguracion() {
                 style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }} />
             </div>
           </div>
-        </Card>
+          </Card>
+        )}
 
-        {/* Automations */}
-        <Card>
+        {mode === "camp" && (
+          <Card>
           <SectionHeader title="AUTOMATIZACIONES" />
           <div className="flex flex-col gap-3">
             {[
@@ -1595,10 +1639,11 @@ function ViewConfiguracion() {
               </div>
             ))}
           </div>
-        </Card>
+          </Card>
+        )}
 
-        {/* System settings */}
-        <Card>
+        {mode === "system" && (
+          <Card>
           <SectionHeader title="SISTEMA" />
           <div className="flex flex-col gap-3">
             <div>
@@ -1627,10 +1672,11 @@ function ViewConfiguracion() {
                 style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }} />
             </div>
           </div>
-        </Card>
+          </Card>
+        )}
 
-        {/* Info */}
-        <Card>
+        {mode === "system" && (
+          <Card>
           <SectionHeader title="INFORMACIÓN DEL SISTEMA" />
           <div className="flex flex-col gap-2">
             {[
@@ -1647,7 +1693,8 @@ function ViewConfiguracion() {
               </div>
             ))}
           </div>
-        </Card>
+          </Card>
+        )}
       </div>
 
       <div className="flex gap-3">
@@ -1957,6 +2004,15 @@ function ViewDashboard() {
 
 export default function AdminDashboard() {
   const [activeNav, setActiveNav] = useState<NavSection>("CENTRO DE MANDO");
+  const [populationViewMode, setPopulationViewMode] = useState<PopulationViewMode>("stats");
+  const [admissionsViewMode, setAdmissionsViewMode] = useState<AdmissionsViewMode>("queue");
+  const [inventoryViewMode, setInventoryViewMode] = useState<InventoryViewMode>("summary");
+  const [expeditionsViewMode, setExpeditionsViewMode] = useState<ExpeditionsViewMode>("active");
+  const [intercampViewMode, setIntercampViewMode] = useState<IntercampViewMode>("pending");
+  const [securityViewMode, setSecurityViewMode] = useState<SecurityViewMode>("live");
+  const [logrosViewMode, setLogrosViewMode] = useState<LogrosViewMode>("overview");
+  const [notifsViewMode, setNotifsViewMode] = useState<NotifsViewMode>("all");
+  const [configViewMode, setConfigViewMode] = useState<ConfigViewMode>("camp");
   const [serverTime, setServerTime] = useState(new Date());
   const [unreadNotifs] = useState(4);
 
@@ -1964,19 +2020,6 @@ export default function AdminDashboard() {
     const t = setInterval(() => setServerTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-
-  const navItems: { icon: React.ElementType; label: NavSection; badge?: number }[] = [
-    { icon: LayoutDashboard, label: "CENTRO DE MANDO" },
-    { icon: Users, label: "POBLACIÓN" },
-    { icon: UserPlus, label: "ADMISIONES IA" },
-    { icon: Package, label: "INVENTARIO" },
-    { icon: Map, label: "EXPEDICIONES" },
-    { icon: Radio, label: "INTER-CAMPAMENTOS" },
-    { icon: Shield, label: "SEGURIDAD / LOGS" },
-    { icon: Trophy, label: "LOGROS" },
-    { icon: Bell, label: "NOTIFICACIONES", badge: unreadNotifs },
-    { icon: Settings, label: "CONFIGURACIÓN" },
-  ];
 
   const quickAccess: { icon: React.ElementType; label: string; target: NavSection }[] = [
     { icon: Users, label: "Poblacion", target: "POBLACIÓN" },
@@ -2004,17 +2047,84 @@ export default function AdminDashboard() {
 
   const renderSection = () => {
     switch (activeNav) {
-      case "POBLACIÓN": return <ViewPoblacion />;
-      case "ADMISIONES IA": return <ViewAdmisiones />;
-      case "INVENTARIO": return <ViewInventario />;
-      case "EXPEDICIONES": return <ViewExpediciones />;
-      case "INTER-CAMPAMENTOS": return <ViewIntercamp />;
-      case "SEGURIDAD / LOGS": return <ViewSeguridad />;
-      case "LOGROS": return <ViewLogros />;
-      case "NOTIFICACIONES": return <ViewNotificaciones />;
-      case "CONFIGURACIÓN": return <ViewConfiguracion />;
+      case "POBLACIÓN": return <ViewPoblacion mode={populationViewMode} />;
+      case "ADMISIONES IA": return <ViewAdmisiones mode={admissionsViewMode} />;
+      case "INVENTARIO": return <ViewInventario mode={inventoryViewMode} />;
+      case "EXPEDICIONES": return <ViewExpediciones mode={expeditionsViewMode} />;
+      case "INTER-CAMPAMENTOS": return <ViewIntercamp mode={intercampViewMode} />;
+      case "SEGURIDAD / LOGS": return <ViewSeguridad mode={securityViewMode} />;
+      case "LOGROS": return <ViewLogros mode={logrosViewMode} />;
+      case "NOTIFICACIONES": return <ViewNotificaciones mode={notifsViewMode} />;
+      case "CONFIGURACIÓN": return <ViewConfiguracion mode={configViewMode} />;
       default: return <ViewDashboard />;
     }
+  };
+
+  const handleDockNav = (target: NavSection) => {
+    if (activeNav === target) {
+      if (target === "POBLACIÓN") {
+        setActiveNav("CENTRO DE MANDO");
+        return;
+      }
+      setActiveNav("CENTRO DE MANDO");
+      return;
+    }
+
+    if (target === "POBLACIÓN") {
+      setPopulationViewMode("stats");
+      setActiveNav("POBLACIÓN");
+      return;
+    }
+
+    if (target === "ADMISIONES IA") {
+      setAdmissionsViewMode("queue");
+      setActiveNav(target);
+      return;
+    }
+
+    if (target === "INVENTARIO") {
+      setInventoryViewMode("summary");
+      setActiveNav(target);
+      return;
+    }
+
+    if (target === "EXPEDICIONES") {
+      setExpeditionsViewMode("active");
+      setActiveNav(target);
+      return;
+    }
+
+    if (target === "INTER-CAMPAMENTOS") {
+      setIntercampViewMode("pending");
+      setActiveNav(target);
+      return;
+    }
+
+    if (target === "SEGURIDAD / LOGS") {
+      setSecurityViewMode("live");
+      setActiveNav(target);
+      return;
+    }
+
+    if (target === "LOGROS") {
+      setLogrosViewMode("overview");
+      setActiveNav(target);
+      return;
+    }
+
+    if (target === "NOTIFICACIONES") {
+      setNotifsViewMode("all");
+      setActiveNav(target);
+      return;
+    }
+
+    if (target === "CONFIGURACIÓN") {
+      setConfigViewMode("camp");
+      setActiveNav(target);
+      return;
+    }
+
+    setActiveNav(target);
   };
 
   return (
@@ -2069,69 +2179,179 @@ export default function AdminDashboard() {
           <div className="admin-hud" aria-hidden="true" />
 
           <div className="admin-layout">
-            {/* SIDEBAR */}
-            <aside className="admin-sidebar hidden md:flex flex-col flex-shrink-0"
-              style={{ width: 220, background: "transparent", borderRight: "1px solid #2D2A24", zIndex: 1 }}>
-              {/* Logo */}
-              <div className="admin-logo px-4 py-5 flex flex-col items-center" style={{ borderBottom: "1px solid #2D2A24" }}>
-            <div className="flex items-center gap-2 mb-1">
-              <Skull size={20} style={{ color: "#D97706" }} />
-              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 13, color: "#D97706", letterSpacing: "0.05em" }}>GESTIÓN DEL FIN</span>
-            </div>
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className="inline-block w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
-              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#8B8070", letterSpacing: "0.08em" }}>CAMPAMENTO ALFA</span>
-            </div>
-                <div className="admin-clock mt-2 px-2 py-1 rounded-sm" style={{ background: "#111114", border: "1px solid #2D2A24" }}>
-              <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#F59E0B", letterSpacing: "0.1em" }}>{fmtTime(serverTime)}</span>
-            </div>
-          </div>
+            {[
+              "POBLACIÓN",
+              "ADMISIONES IA",
+              "INVENTARIO",
+              "EXPEDICIONES",
+              "INTER-CAMPAMENTOS",
+              "SEGURIDAD / LOGS",
+              "LOGROS",
+              "NOTIFICACIONES",
+              "CONFIGURACIÓN",
+            ].includes(activeNav) && (
+              <aside className="admin-sidebar hidden md:flex flex-col flex-shrink-0" style={{ width: 250, background: "transparent", borderRight: "1px solid #2D2A24", zIndex: 1 }}>
+                <div className="admin-logo px-4 py-5 flex flex-col" style={{ borderBottom: "1px solid #2D2A24" }}>
+                  <div className="flex items-center gap-2 mb-1">
+                    {activeNav === "POBLACIÓN" && <Users size={18} style={{ color: "#D97706" }} />}
+                    {activeNav === "ADMISIONES IA" && <UserPlus size={18} style={{ color: "#D97706" }} />}
+                    {activeNav === "INVENTARIO" && <Package size={18} style={{ color: "#D97706" }} />}
+                    {activeNav === "EXPEDICIONES" && <Map size={18} style={{ color: "#D97706" }} />}
+                    {activeNav === "INTER-CAMPAMENTOS" && <Radio size={18} style={{ color: "#D97706" }} />}
+                    {activeNav === "SEGURIDAD / LOGS" && <Shield size={18} style={{ color: "#D97706" }} />}
+                    {activeNav === "LOGROS" && <Trophy size={18} style={{ color: "#D97706" }} />}
+                    {activeNav === "NOTIFICACIONES" && <Bell size={18} style={{ color: "#D97706" }} />}
+                    {activeNav === "CONFIGURACIÓN" && <Settings size={18} style={{ color: "#D97706" }} />}
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 13, color: "#D97706", letterSpacing: "0.06em" }}>{activeNav}</span>
+                  </div>
+                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#8B8070" }}>Acceso rápido del módulo</span>
+                </div>
 
-          {/* Nav */}
-              <nav className="admin-nav flex-1 px-2 py-3 overflow-y-auto">
-            {navItems.map(({ icon: Icon, label, badge }) => {
-              const isActive = activeNav === label;
-              return (
-                <button key={label} onClick={() => setActiveNav(label)}
-                  className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-0.5 rounded-sm transition-all cursor-pointer${isActive ? " admin-nav-button--active" : ""}`}
-                  style={{
-                    background: isActive ? "#1A1A20" : "transparent",
-                    border: "none",
-                    outline: "none",
-                    boxShadow: "none",
-                    borderLeft: isActive ? "2px solid #D97706" : "2px solid transparent",
-                    color: isActive ? "#F59E0B" : "#8B8070"
-                  }}>
-                  <Icon size={14} />
-                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>{label}</span>
-                  {badge ? (
-                    <span className="flex items-center justify-center w-4 h-4 rounded-sm"
-                      style={{ background: "#DC2626", color: "#F5F0E8", fontSize: 9, fontFamily: "'Share Tech Mono', monospace", fontWeight: 700 }}>
-                      {badge}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </nav>
+                <nav className="admin-nav flex-1 px-3 py-3 overflow-y-auto">
+                  {activeNav === "POBLACIÓN" && (
+                    <>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${populationViewMode === "stats" ? " admin-nav-button--active" : ""}`} onClick={() => setPopulationViewMode("stats")} style={{ color: populationViewMode === "stats" ? "#1A0B04" : "#8B8070" }}>
+                        <BarChart2 size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Ver estadísticas</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${populationViewMode === "users" ? " admin-nav-button--active" : ""}`} onClick={() => setPopulationViewMode("users")} style={{ color: populationViewMode === "users" ? "#1A0B04" : "#8B8070" }}>
+                        <Users size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Ver usuarios y filtros</span>
+                      </button>
+                    </>
+                  )}
 
-          {/* User */}
-          <div className="px-3 py-3" style={{ borderTop: "1px solid #2D2A24" }}>
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-sm flex items-center justify-center"
-                style={{ background: "#D97706", fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: "#0A0A0B", fontWeight: 700 }}>
-                EV
-              </div>
-              <div>
-                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, fontWeight: 700, color: "#F5F0E8" }}>Edicson V.</div>
-                <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#D97706" }}>ADMIN SISTEMA</div>
-              </div>
-            </div>
-            <div className="mt-2">
-              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>v1.0.0 | DÍA 47</span>
-            </div>
-          </div>
-        </aside>
+                  {activeNav === "ADMISIONES IA" && (
+                    <>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${admissionsViewMode === "queue" ? " admin-nav-button--active" : ""}`} onClick={() => setAdmissionsViewMode("queue")} style={{ color: admissionsViewMode === "queue" ? "#1A0B04" : "#8B8070" }}>
+                        <AlertTriangle size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Cola pendiente</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${admissionsViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setAdmissionsViewMode("history")} style={{ color: admissionsViewMode === "history" ? "#1A0B04" : "#8B8070" }}>
+                        <CheckCircle size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Historial procesado</span>
+                      </button>
+                    </>
+                  )}
+
+                  {activeNav === "INVENTARIO" && (
+                    <>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "summary" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("summary")} style={{ color: inventoryViewMode === "summary" ? "#1A0B04" : "#8B8070" }}>
+                        <BarChart2 size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Resumen por categoría</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "items" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("items")} style={{ color: inventoryViewMode === "items" ? "#1A0B04" : "#8B8070" }}>
+                        <Package size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Gestión de ítems</span>
+                      </button>
+                    </>
+                  )}
+
+                  {activeNav === "EXPEDICIONES" && (
+                    <>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "active" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("active")} style={{ color: expeditionsViewMode === "active" ? "#1A0B04" : "#8B8070" }}>
+                        <Activity size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Activas y en curso</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "planning" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("planning")} style={{ color: expeditionsViewMode === "planning" ? "#1A0B04" : "#8B8070" }}>
+                        <Map size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Planificación</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("history")} style={{ color: expeditionsViewMode === "history" ? "#1A0B04" : "#8B8070" }}>
+                        <Trophy size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Completadas</span>
+                      </button>
+                    </>
+                  )}
+
+                  {activeNav === "INTER-CAMPAMENTOS" && (
+                    <>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "pending" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("pending")} style={{ color: intercampViewMode === "pending" ? "#1A0B04" : "#8B8070" }}>
+                        <AlertTriangle size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Pendientes</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("history")} style={{ color: intercampViewMode === "history" ? "#1A0B04" : "#8B8070" }}>
+                        <Radio size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Historial</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "send" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("send")} style={{ color: intercampViewMode === "send" ? "#1A0B04" : "#8B8070" }}>
+                        <Bell size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Enviar mensaje</span>
+                      </button>
+                    </>
+                  )}
+
+                  {activeNav === "SEGURIDAD / LOGS" && (
+                    <>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "live" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("live")} style={{ color: securityViewMode === "live" ? "#1A0B04" : "#8B8070" }}>
+                        <Activity size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Monitoreo en vivo</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "errors" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("errors")} style={{ color: securityViewMode === "errors" ? "#1A0B04" : "#8B8070" }}>
+                        <AlertTriangle size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Errores y alertas</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "system" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("system")} style={{ color: securityViewMode === "system" ? "#1A0B04" : "#8B8070" }}>
+                        <Cpu size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Eventos del sistema</span>
+                      </button>
+                    </>
+                  )}
+
+                  {activeNav === "LOGROS" && (
+                    <>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${logrosViewMode === "overview" ? " admin-nav-button--active" : ""}`} onClick={() => setLogrosViewMode("overview")} style={{ color: logrosViewMode === "overview" ? "#1A0B04" : "#8B8070" }}>
+                        <Trophy size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Resumen de nivel</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${logrosViewMode === "progress" ? " admin-nav-button--active" : ""}`} onClick={() => setLogrosViewMode("progress")} style={{ color: logrosViewMode === "progress" ? "#1A0B04" : "#8B8070" }}>
+                        <BarChart2 size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Progreso por categorías</span>
+                      </button>
+                    </>
+                  )}
+
+                  {activeNav === "NOTIFICACIONES" && (
+                    <>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "all" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("all")} style={{ color: notifsViewMode === "all" ? "#1A0B04" : "#8B8070" }}>
+                        <Bell size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Todas</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "unread" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("unread")} style={{ color: notifsViewMode === "unread" ? "#1A0B04" : "#8B8070" }}>
+                        <CheckCircle size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Sin leer</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "critical" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("critical")} style={{ color: notifsViewMode === "critical" ? "#1A0B04" : "#8B8070" }}>
+                        <AlertTriangle size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Críticas</span>
+                      </button>
+                    </>
+                  )}
+
+                  {activeNav === "CONFIGURACIÓN" && (
+                    <>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${configViewMode === "camp" ? " admin-nav-button--active" : ""}`} onClick={() => setConfigViewMode("camp")} style={{ color: configViewMode === "camp" ? "#1A0B04" : "#8B8070" }}>
+                        <Users size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Campamento</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${configViewMode === "system" ? " admin-nav-button--active" : ""}`} onClick={() => setConfigViewMode("system")} style={{ color: configViewMode === "system" ? "#1A0B04" : "#8B8070" }}>
+                        <Settings size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Sistema</span>
+                      </button>
+                    </>
+                  )}
+                </nav>
+
+                <div className="px-3 py-3" style={{ borderTop: "1px solid #2D2A24" }}>
+                  <div className="admin-clock px-2 py-1 rounded-sm" style={{ background: "#111114", border: "1px solid #2D2A24" }}>
+                    <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#F59E0B", letterSpacing: "0.1em" }}>{fmtTime(serverTime)}</span>
+                  </div>
+                  <div className="mt-2">
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>Si tocas este módulo otra vez vuelves al Centro de Mando</span>
+                  </div>
+                </div>
+              </aside>
+            )}
 
             {/* MAIN */}
             <div className="admin-main flex-1 flex flex-col overflow-hidden" style={{ position: "relative", zIndex: 1 }}>
@@ -2205,7 +2425,7 @@ export default function AdminDashboard() {
                       key={item.target}
                       type="button"
                       className={`admin-dock-item${isActive ? " admin-dock-item--active" : ""}`}
-                      onClick={() => setActiveNav(item.target)}
+                      onClick={() => handleDockNav(item.target)}
                       aria-label={item.label}
                     >
                       <span className="admin-dock-label">{item.label}</span>
