@@ -17,7 +17,7 @@
 .main-homepage__background {
   position: absolute;
   inset: 0;
-  background-image: url('./assets/main-homepage-bg.jpg');
+  background-image: url('./assets/homePageImage.jpeg');
   background-position: center;
   background-size: cover;
   filter: contrast(1.15) brightness(0.8) saturate(0.95);
