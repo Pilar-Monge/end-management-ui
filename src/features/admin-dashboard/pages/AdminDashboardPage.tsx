@@ -17,7 +17,7 @@ import {
 } from "recharts";
 
 // ─── FONTS ──────────────────────────────────────────────────────────────────
-const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');`;
+const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Permanent+Marker&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');`;
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -252,7 +252,7 @@ function Card({ children, className = "", glow = "" }: { children: React.ReactNo
 function SectionHeader({ title, accent = true }: { title: string; accent?: boolean }) {
   return (
     <div className="admin-section-header mb-3">
-      <h3 style={{ fontFamily: "'Share Tech Mono', monospace", color: "#F5F0E8", fontSize: 11, letterSpacing: "0.12em" }} className="uppercase">{title}</h3>
+      <h3 style={{ fontFamily: "'Share Tech Mono', monospace", color: "#F5F0E8", fontSize: 11, letterSpacing: "0.12em" }} className="admin-title-brush uppercase">{title}</h3>
       {accent && <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginTop: 4 }} />}
     </div>
   );
@@ -1663,7 +1663,7 @@ function ViewConfiguracion() {
 function ViewDashboard() {
   const [countdown, setCountdown] = useState({ h: 3, m: 28, s: 0 });
   const [threatLevel, setThreatLevel] = useState(72);
-  const [automations, setAutomations] = useState([
+  const [automations] = useState([
     { ok: true, name: "Consumo diario de raciones", time: "Ejecutado 06:00", active: true },
     { ok: true, name: "Colecta de recursos", time: "Ejecutado 06:00", active: true },
     { ok: false, name: "Alerta de inventario", time: "3 alertas activas", active: true },
@@ -2060,6 +2060,9 @@ export default function AdminDashboard() {
       <div className="admin-dashboard">
         <div className="admin-stage">
           <div className="admin-backdrop" aria-hidden="true" />
+          <div className="admin-brush" aria-hidden="true" />
+          <div className="admin-specks" aria-hidden="true" />
+          <div className="admin-brush-image" aria-hidden="true" />
           <div className="admin-grid" aria-hidden="true" />
           <div className="admin-texture" aria-hidden="true" />
           <div className="admin-noise" aria-hidden="true" />
@@ -2068,7 +2071,7 @@ export default function AdminDashboard() {
           <div className="admin-layout">
             {/* SIDEBAR */}
             <aside className="admin-sidebar hidden md:flex flex-col flex-shrink-0"
-              style={{ width: 220, background: "#0D0D10", borderRight: "1px solid #2D2A24", zIndex: 1 }}>
+              style={{ width: 220, background: "transparent", borderRight: "1px solid #2D2A24", zIndex: 1 }}>
               {/* Logo */}
               <div className="admin-logo px-4 py-5 flex flex-col items-center" style={{ borderBottom: "1px solid #2D2A24" }}>
             <div className="flex items-center gap-2 mb-1">
