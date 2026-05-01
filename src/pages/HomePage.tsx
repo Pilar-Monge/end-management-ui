@@ -97,7 +97,34 @@ export default function HomePage() {
               e.currentTarget.style.boxShadow = 'none'
             }}
           >
-            Iniciar Sesión
+            Ir a Inicio de Sesión
+          </button>
+
+          <button
+            onClick={() => navigate('/app')}
+            style={{
+              background: 'rgba(74, 138, 48, 0.12)',
+              border: '1px solid rgba(125, 219, 80, 0.35)',
+              color: '#6fbf48',
+              fontFamily: "'Courier New', monospace",
+              fontSize: 12,
+              letterSpacing: '2px',
+              padding: '14px 32px',
+              borderRadius: 4,
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(125, 219, 80, 0.12)'
+              e.currentTarget.style.boxShadow = '0 0 10px rgba(125, 219, 80, 0.18)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(74, 138, 48, 0.12)'
+              e.currentTarget.style.boxShadow = 'none'
+            }}
+          >
+            Ir a Pagina Principal
           </button>
         </div>
       </div>
