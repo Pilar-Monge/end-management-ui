@@ -42,7 +42,7 @@
     padding: 20px;
     animation: dossierArrive 800ms cubic-bezier(0.18, 0.9, 0.24, 1) both;
     background-color: #88867a;
-    background-image: url('/images/paper-texture.jpg');
+    background-image: url('./assets/paper-texture.jpg');
     background-size: cover;
     background-position: center;
     background-blend-mode: multiply;
@@ -444,7 +444,7 @@
   .dropdown-panel,
   .calendar-popover {
     background-color: #070a10;
-    background-image: url('/images/paper-clean.jpg');
+    background-image: url('./assets/paper-clean.jpg');
     background-size: cover;
     background-position: center;
     background-blend-mode: overlay;
@@ -648,7 +648,7 @@
     overflow: hidden;
     border: 1px solid rgba(127, 184, 255, 0.22);
     background-color: #070a10;
-    background-image: url('/images/paper-clean.jpg');
+    background-image: url('./assets/paper-clean.jpg');
     background-size: cover;
     background-position: center;
     background-blend-mode: overlay;
