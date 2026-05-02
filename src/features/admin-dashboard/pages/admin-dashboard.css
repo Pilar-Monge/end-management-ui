@@ -7,10 +7,42 @@
   --admin-cream: #f4ecd4;
   --admin-teal: #62d6cd;
   --admin-black: #040807;
+  --admin-text-primary: #f3efe7;
+  --admin-text-muted: #c1b7a5;
+  --admin-text-faint: #8a8275;
+  --admin-border: #343844;
+  --admin-border-soft: #262933;
+  --admin-surface: #131418;
+  --admin-surface-alt: #101116;
+  --admin-space-1: 8px;
+  --admin-space-2: 12px;
+  --admin-space-3: 16px;
+  --admin-space-4: 24px;
+  --admin-fs-micro: 9px;
+  --admin-fs-label: 10px;
+  --admin-fs-body: 12px;
+  --admin-fs-title: 14px;
+  --admin-fs-kpi: 28px;
   min-height: 100vh;
-  color: #f5f0e8;
+  color: var(--admin-text-primary);
   font-family: "Rajdhani", sans-serif;
   background: #000;
+}
+
+.admin-text-micro { font-size: var(--admin-fs-micro); }
+.admin-text-label { font-size: var(--admin-fs-label); }
+.admin-text-body { font-size: var(--admin-fs-body); }
+.admin-text-title { font-size: var(--admin-fs-title); }
+.admin-kpi-value { font-size: var(--admin-fs-kpi); line-height: 1; }
+.admin-stack-sm { display: flex; flex-direction: column; gap: var(--admin-space-1); }
+.admin-stack-md { display: flex; flex-direction: column; gap: var(--admin-space-2); }
+.admin-stack-lg { display: flex; flex-direction: column; gap: var(--admin-space-3); }
+
+.admin-dashboard input,
+.admin-dashboard select,
+.admin-dashboard textarea,
+.admin-dashboard button {
+  font-size: max(10px, 0.7rem);
 }
 
 .admin-title-brush {
@@ -230,6 +262,7 @@
   border-radius: 2px;
   border: 1px solid rgba(244, 236, 212, 0.12);
   clip-path: polygon(0 12%, 95% 0, 100% 45%, 95% 100%, 2% 86%);
+  transition: transform 0.14s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .admin-nav-button > * {
@@ -369,6 +402,7 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   overflow: hidden;
+  transition: transform 0.14s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .admin-btn::after {
@@ -382,6 +416,42 @@
 
 .admin-btn:hover::after {
   opacity: 1;
+}
+
+.admin-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px rgba(244, 236, 212, 0.12), 0 8px 14px rgba(0, 0, 0, 0.25);
+}
+
+.admin-btn:active {
+  transform: translateY(0);
+}
+
+.admin-icon-btn {
+  transition: opacity 0.16s ease, transform 0.12s ease;
+}
+
+.admin-icon-btn:hover {
+  opacity: 0.82;
+  transform: translateY(-1px);
+}
+
+.admin-icon-btn:active {
+  transform: translateY(0);
+}
+
+.admin-chip-btn {
+  transition: opacity 0.16s ease, transform 0.12s ease, border-color 0.2s ease;
+}
+
+.admin-chip-btn:hover {
+  opacity: 0.86;
+  transform: translateY(-1px);
+  border-color: rgba(217, 119, 6, 0.4) !important;
+}
+
+.admin-chip-btn:active {
+  transform: translateY(0);
 }
 
 .admin-btn--small {
@@ -720,6 +790,10 @@
   background: linear-gradient(180deg, rgba(240, 94, 23, 0.95), rgba(188, 74, 18, 0.9));
 }
 
+.admin-dock-item:active {
+  transform: translateY(0);
+}
+
 .admin-dock-item--active {
   border-color: rgba(240, 94, 23, 1);
   background: linear-gradient(180deg, rgba(240, 94, 23, 0.98), rgba(188, 74, 18, 0.92));
@@ -998,6 +1072,10 @@
   transform: translateX(3px);
 }
 
+.admin-nav-button:active {
+  transform: translateX(1px);
+}
+
 .admin-panel-frame {
   border-color: rgba(239, 98, 28, 0.98);
   box-shadow:
@@ -1019,7 +1097,7 @@
 
 .admin-panel-inner .admin-card {
   border-radius: 2px;
-  box-shadow: inset 0 0 0 1px rgba(244, 236, 212, 0.07), 0 0 12px rgba(0, 0, 0, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(138, 130, 117, 0.11), 0 0 12px rgba(0, 0, 0, 0.32);
 }
 
 .admin-panel-inner .admin-card::before {
@@ -1175,6 +1253,19 @@
   opacity: 0.95;
 }
 
+.admin-priority-card {
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.2), 0 0 24px rgba(220, 38, 38, 0.14);
+}
+
+.admin-density-card .admin-section-header {
+  margin-bottom: 10px;
+}
+
+.admin-density-card p,
+.admin-density-card span {
+  line-height: 1.28;
+}
+
 @media (max-width: 1023px) {
   .admin-panel {
     padding: 8px;
@@ -1186,5 +1277,25 @@
 
   .admin-panel-inner {
     padding: 10px 12px 18px;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-content {
+    padding: 10px;
+  }
+
+  .admin-dock {
+    gap: 4px;
+    padding: 10px 8px;
+  }
+
+  .admin-dock-label {
+    font-size: 8px;
+    letter-spacing: 0.08em;
+  }
+
+  .admin-priority-card {
+    box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.14), 0 0 16px rgba(220, 38, 38, 0.1);
   }
 }

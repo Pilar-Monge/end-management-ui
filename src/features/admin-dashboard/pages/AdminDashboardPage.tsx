@@ -43,6 +43,33 @@ type LogrosViewMode = "overview" | "progress";
 type NotifsViewMode = "all" | "unread" | "critical";
 type ConfigViewMode = "camp" | "system";
 
+const UI_COLORS = {
+  bg: "#0B0B0D",
+  panel: "#131418",
+  panelAlt: "#101116",
+  panelRaised: "#1A1C22",
+  border: "#343844",
+  borderSoft: "#262933",
+  textPrimary: "#F3EFE7",
+  textMuted: "#C1B7A5",
+  textFaint: "#8A8275",
+  accent: "#D97706",
+  state: {
+    critical: "#DC2626",
+    warning: "#F59E0B",
+    info: "#0D9488",
+    system: "#8A8275",
+  },
+} as const;
+
+const MOTION = {
+  fast: { duration: 0.16, ease: "easeOut" as const },
+  base: { duration: 0.24, ease: "easeOut" as const },
+  alert: { duration: 0.2, ease: "easeInOut" as const },
+  progress: { duration: 0.7, ease: "easeOut" as const },
+  page: { duration: 0.18, ease: "easeOut" as const },
+} as const;
+
 interface Person {
   id: number;
   name: string;
@@ -229,10 +256,10 @@ function intercampColor(s: string) {
   return "#8B8070";
 }
 function logLevelColor(l: string) {
-  if (l === "error") return "#DC2626";
-  if (l === "warn") return "#F59E0B";
-  if (l === "system") return "#8B8070";
-  return "#0D9488";
+  if (l === "error") return UI_COLORS.state.critical;
+  if (l === "warn") return UI_COLORS.state.warning;
+  if (l === "system") return UI_COLORS.state.system;
+  return UI_COLORS.state.info;
 }
 function personStatusColor(s: string) {
   if (s === "Activo") return "#0D9488";
@@ -241,9 +268,9 @@ function personStatusColor(s: string) {
   return "#F59E0B";
 }
 function notifColor(l: string) {
-  if (l === "critical") return "#DC2626";
-  if (l === "warning") return "#F59E0B";
-  return "#0D9488";
+  if (l === "critical") return UI_COLORS.state.critical;
+  if (l === "warning") return UI_COLORS.state.warning;
+  return UI_COLORS.state.info;
 }
 
 // ─── SHARED UI ───────────────────────────────────────────────────────────────
@@ -252,7 +279,7 @@ function Card({ children, className = "", glow = "" }: { children: React.ReactNo
   return (
     <div
       className={`admin-card relative rounded-sm card-soft p-4 ${className}`}
-      style={{ background: "#111114", border: `1px solid ${glow || "#2D2A24"}`, boxShadow: glow ? `0 0 12px 1px ${glow}22` : "none" }}
+      style={{ background: UI_COLORS.panel, border: `1px solid ${glow || UI_COLORS.border}`, boxShadow: glow ? `0 0 12px 1px ${glow}22` : `inset 0 0 0 1px ${UI_COLORS.borderSoft}` }}
     >
       {children}
     </div>
@@ -262,8 +289,8 @@ function Card({ children, className = "", glow = "" }: { children: React.ReactNo
 function SectionHeader({ title, accent = true }: { title: string; accent?: boolean }) {
   return (
     <div className="admin-section-header mb-3">
-      <h3 style={{ fontFamily: "'Share Tech Mono', monospace", color: "#F5F0E8", fontSize: 11, letterSpacing: "0.12em" }} className="admin-title-brush uppercase">{title}</h3>
-      {accent && <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginTop: 4 }} />}
+      <h3 style={{ fontFamily: "'Share Tech Mono', monospace", color: UI_COLORS.textPrimary, fontSize: 12, letterSpacing: "0.12em" }} className="admin-title-brush uppercase">{title}</h3>
+      {accent && <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginTop: 4 }} />}
     </div>
   );
 }
@@ -283,33 +310,45 @@ function Toggle({ active, onChange }: { active: boolean; onChange?: () => void }
 function Badge({ label, color }: { label: string; color: string }) {
   return (
     <span className="admin-badge px-1.5 py-0.5 rounded-sm"
-      style={{ background: `${color}22`, border: `1px solid ${color}`, fontFamily: "'Share Tech Mono', monospace", fontSize: 7, color }}>
+      style={{ background: `${color}22`, border: `1px solid ${color}`, fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color }}>
       {label}
     </span>
   );
 }
 
+function EmptyState({ title, hint, icon: Icon }: { title: string; hint: string; icon: React.ElementType }) {
+  return (
+    <div className="text-center py-8">
+      <Icon size={30} style={{ color: UI_COLORS.border, margin: "0 auto 8px" }} />
+      <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: UI_COLORS.textMuted }}>{title}</div>
+      <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textFaint }}>{hint}</div>
+    </div>
+  );
+}
+
 function SearchBar({ value, onChange, placeholder = "BUSCAR..." }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
-    <div className="admin-search flex items-center gap-2 px-3 py-1.5 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24", flex: 1 }}>
-      <Search size={11} style={{ color: "#4B4540" }} />
+    <div className="admin-search flex items-center gap-2 px-3 py-1.5 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, flex: 1 }}>
+      <Search size={11} style={{ color: UI_COLORS.textFaint }} />
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         className="admin-input flex-1 bg-transparent outline-none"
-        style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#F5F0E8" }}
+        style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textPrimary }}
       />
     </div>
   );
 }
 
 function ActionBtn({ label, color, onClick, small = false }: { label: string; color: string; onClick?: () => void; small?: boolean }) {
+  const isCritical = color === UI_COLORS.state.critical;
+  const toneBg = isCritical ? `${color}2A` : `${color}20`;
   return (
     <button
       onClick={onClick}
-      className={`admin-btn px-2 py-1 rounded-sm hover:opacity-80 transition-opacity cursor-pointer${small ? " admin-btn--small" : ""}`}
-      style={{ background: `${color}22`, border: `1px solid ${color}`, fontFamily: "'Share Tech Mono', monospace", fontSize: small ? 7 : 9, color }}
+      className={`admin-btn px-2 py-1 rounded-sm cursor-pointer${small ? " admin-btn--small" : ""}`}
+      style={{ background: toneBg, border: `1px solid ${color}`, fontFamily: "'Share Tech Mono', monospace", fontSize: small ? 9 : 10, color: isCritical ? "#FFD8D8" : color }}
     >
       {label}
     </button>
@@ -324,6 +363,7 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        transition={MOTION.base}
         className="admin-modal fixed inset-0 z-50 flex items-center justify-center p-4"
         style={{ background: "rgba(0,0,0,0.7)" }}
         onClick={onClose}
@@ -332,13 +372,14 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
+          transition={MOTION.base}
           onClick={e => e.stopPropagation()}
           className="admin-modal-card w-full max-w-lg rounded-sm p-5"
           style={{ background: "#111114", border: "1px solid #D97706", boxShadow: "0 0 30px #D9770622", maxHeight: "90vh", overflowY: "auto" }}
         >
           <div className="flex items-center justify-between mb-4" style={{ borderBottom: "1px solid #2D2A24", paddingBottom: 12 }}>
             <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: "#F59E0B", letterSpacing: "0.1em" }}>{title}</span>
-            <button onClick={onClose} className="hover:opacity-60 transition-opacity"><X size={14} style={{ color: "#8B8070" }} /></button>
+            <button onClick={onClose} className="admin-icon-btn"><X size={14} style={{ color: "#8B8070" }} /></button>
           </div>
           {children}
         </motion.div>
@@ -396,7 +437,7 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
     <div>
       {mode === "stats" ? (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             {Object.entries(counts).map(([k, v]) => (
               <Card key={k}>
                 <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 24, fontWeight: 900, color: personStatusColor(k) }}>{v}</div>
@@ -407,7 +448,7 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <Card>
               <SectionHeader title="DISTRIBUCIÓN POR ROL" />
-              <div className="flex flex-col gap-2">
+              <div className="admin-stack-sm">
                 {Object.entries(persons.reduce<Record<string, number>>((acc, person) => {
                   acc[person.role] = (acc[person.role] ?? 0) + 1;
                   return acc;
@@ -421,7 +462,7 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
             </Card>
             <Card>
               <SectionHeader title="OCUPACIÓN POR SECTOR" />
-              <div className="flex flex-col gap-2">
+              <div className="admin-stack-sm">
                 {Object.entries(persons.reduce<Record<string, number>>((acc, person) => {
                   acc[person.sector] = (acc[person.sector] ?? 0) + 1;
                   return acc;
@@ -443,7 +484,7 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
             <SearchBar value={search} onChange={setSearch} placeholder="BUSCAR PERSONA..." />
             <div className="flex gap-1">
               {statuses.map(s => (
-                <button key={s} onClick={() => setFilterStatus(s)} className="px-2 py-1 rounded-sm cursor-pointer transition-opacity hover:opacity-80" style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, background: filterStatus === s ? "#D97706" : "#1A1A20", color: filterStatus === s ? "#0A0A0B" : "#8B8070", border: "1px solid #2D2A24" }}>
+                <button key={s} onClick={() => setFilterStatus(s)} className="admin-chip-btn px-2 py-1 rounded-sm cursor-pointer" style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, background: filterStatus === s ? "#D97706" : "#1A1A20", color: filterStatus === s ? "#0A0A0B" : "#8B8070", border: "1px solid #2D2A24" }}>
                   {s}
                 </button>
               ))}
@@ -455,7 +496,7 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
             <div className="admin-table-header grid grid-cols-12 px-3 py-2" style={{ background: "#0D0D10" }}>
               {["NOMBRE", "ROL", "ESTADO", "EDAD", "SECTOR", "INGRESO", "ACC."].map((h, i) => (
                 <div key={h} className={i === 0 ? "col-span-3" : i === 1 ? "col-span-2" : i === 2 ? "col-span-2" : i === 3 ? "col-span-1" : i === 4 ? "col-span-2" : i === 5 ? "col-span-1" : "col-span-1"}>
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540", letterSpacing: "0.08em" }}>{h}</span>
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, letterSpacing: "0.08em" }}>{h}</span>
                 </div>
               ))}
             </div>
@@ -469,7 +510,7 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
                 onClick={() => { setSelected(person); setEditMode(false); setEditData({}); }}
               >
                 <div className="col-span-3 flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-sm flex items-center justify-center flex-shrink-0" style={{ background: "#1A1A20", fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#8B8070", border: "1px solid #2D2A24" }}>
+                  <div className="w-6 h-6 rounded-sm flex items-center justify-center flex-shrink-0" style={{ background: "#1A1A20", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070", border: "1px solid #2D2A24" }}>
                     {person.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
                   </div>
                   <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, fontWeight: 600, color: "#F5F0E8" }}>{person.name}</span>
@@ -478,10 +519,10 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
                 <div className="col-span-2"><Badge label={person.status} color={personStatusColor(person.status)} /></div>
                 <div className="col-span-1"><span style={{ fontFamily: "'Orbitron', monospace", fontSize: 10, color: "#F5F0E8" }}>{person.age}</span></div>
                 <div className="col-span-2"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{person.sector}</span></div>
-                <div className="col-span-1"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>{person.joined}</span></div>
+                <div className="col-span-1"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{person.joined}</span></div>
                 <div className="col-span-1 flex gap-1">
-                  <button onClick={event => { event.stopPropagation(); setSelected(person); setEditMode(true); setEditData(person); }} className="hover:opacity-80"><Edit2 size={11} style={{ color: "#D97706" }} /></button>
-                  <button onClick={event => { event.stopPropagation(); handleDelete(person.id); }} className="hover:opacity-80"><Trash2 size={11} style={{ color: "#DC2626" }} /></button>
+                  <button onClick={event => { event.stopPropagation(); setSelected(person); setEditMode(true); setEditData(person); }} className="admin-icon-btn"><Edit2 size={11} style={{ color: "#D97706" }} /></button>
+                  <button onClick={event => { event.stopPropagation(); handleDelete(person.id); }} className="admin-icon-btn"><Trash2 size={11} style={{ color: "#DC2626" }} /></button>
                 </div>
               </motion.div>
             ))}
@@ -492,7 +533,7 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
       {/* Detail/Edit panel */}
       <Modal open={!!selected} onClose={() => { setSelected(null); setEditMode(false); }} title={editMode ? "EDITAR PERSONA" : "FICHA INDIVIDUAL"}>
         {selected && (
-          <div className="flex flex-col gap-3">
+          <div className="admin-stack-md">
             {editMode ? (
               <>
                 {[
@@ -546,7 +587,7 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
                     { label: "ESTADO", value: selected.status },
                   ].map(({ label, value }) => (
                     <div key={label} className="p-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
-                      <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>{label}</div>
+                      <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{label}</div>
                       <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 13, color: "#F5F0E8", fontWeight: 600 }}>{value}</div>
                     </div>
                   ))}
@@ -590,7 +631,7 @@ function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
   const resolved = admissions.filter(a => a.status !== "pending");
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="admin-stack-lg">
       {/* Toast */}
       <AnimatePresence>
         {toast && (
@@ -607,15 +648,15 @@ function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
       </AnimatePresence>
 
       {(mode === "queue" || mode === "history") && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
             { label: "PENDIENTES", value: pending.length, color: "#F59E0B" },
             { label: "APROBADAS HOY", value: resolved.filter(a => a.status === "approved").length, color: "#0D9488" },
             { label: "RECHAZADAS HOY", value: resolved.filter(a => a.status === "rejected").length, color: "#DC2626" },
           ].map(({ label, value, color }) => (
             <Card key={label}>
-              <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 28, fontWeight: 900, color }}>{value}</div>
-              <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#8B8070", letterSpacing: "0.1em" }}>{label}</div>
+              <div className="admin-kpi-value" style={{ fontFamily: "'Orbitron', monospace", fontWeight: 900, color }}>{value}</div>
+              <div className="admin-text-label" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#8B8070", letterSpacing: "0.1em" }}>{label}</div>
             </Card>
           ))}
         </div>
@@ -624,10 +665,10 @@ function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
       {mode === "queue" && <Card glow="#D97706">
         <div className="flex items-center justify-between mb-3">
           <SectionHeader title="SOLICITUDES PENDIENTES — EVALUACION IA" accent={false} />
-          <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>Modelo: admission-v1 | Precisión: 89%</span>
+          <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>Modelo: admission-v1 | Precisión: 89%</span>
         </div>
         <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginBottom: 12 }} />
-        <div className="flex flex-col gap-3">
+        <div className="admin-stack-md">
           {pending.map((a) => (
             <motion.div
               key={a.id}
@@ -651,12 +692,12 @@ function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
                 </div>
                 <div className="text-right">
                   <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 20, fontWeight: 900, color: scoreColor(a.score) }}>{a.score}</div>
-                  <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 7, color: "#4B4540" }}>SCORE IA /100</div>
+                  <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>SCORE IA /100</div>
                 </div>
               </div>
               {/* Score bar */}
               <div className="admin-bar h-1.5 rounded-sm overflow-hidden mb-2" style={{ background: "#2D2A24" }}>
-                <motion.div initial={{ width: 0 }} animate={{ width: `${a.score}%` }} transition={{ duration: 0.8 }}
+                <motion.div initial={{ width: 0 }} animate={{ width: `${a.score}%` }} transition={MOTION.progress}
                   className="admin-bar-fill" style={{ height: "100%", background: scoreColor(a.score), borderRadius: 2 }} />
               </div>
               <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070", marginBottom: 8 }}>{a.reason}</p>
@@ -684,14 +725,14 @@ function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
       {mode === "history" && resolved.length > 0 && (
         <Card>
           <SectionHeader title="PROCESADAS RECIENTEMENTE" />
-          <div className="flex flex-col gap-2">
+          <div className="admin-stack-sm">
             {resolved.map(a => (
               <div key={a.id} className="flex items-center justify-between px-3 py-2 rounded-sm"
                 style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
                 <div className="flex items-center gap-2">
                   {a.status === "approved" ? <CheckCircle size={12} style={{ color: "#0D9488" }} /> : <XCircle size={12} style={{ color: "#DC2626" }} />}
                   <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}>{a.name}</span>
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#8B8070" }}>{a.profession}</span>
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{a.profession}</span>
                 </div>
                 <Badge label={a.status === "approved" ? "APROBADO" : "RECHAZADO"} color={a.status === "approved" ? "#0D9488" : "#DC2626"} />
               </div>
@@ -703,7 +744,7 @@ function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
       {/* Detail modal */}
       <Modal open={!!selected} onClose={() => setSelected(null)} title="REPORTE DETALLADO — IA">
         {selected && (
-          <div className="flex flex-col gap-4">
+          <div className="admin-stack-lg">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-sm flex items-center justify-center" style={{ background: "#1A1A20", border: "1px solid #2D2A24" }}>
                 <User size={24} style={{ color: "#D97706" }} />
@@ -724,12 +765,12 @@ function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
               </div>
             </div>
             <div>
-              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#4B4540", marginBottom: 6 }}>RAZÓN DE LLEGADA</div>
+              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textFaint, marginBottom: 6 }}>RAZÓN DE LLEGADA</div>
               <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}>{selected.reason}</p>
             </div>
             {selected.skills.length > 0 && (
               <div>
-                <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#4B4540", marginBottom: 6 }}>HABILIDADES VERIFICADAS</div>
+                <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textFaint, marginBottom: 6 }}>HABILIDADES VERIFICADAS</div>
                 <div className="flex gap-1 flex-wrap">
                   {selected.skills.map(s => <Badge key={s} label={s} color="#D97706" />)}
                 </div>
@@ -794,7 +835,7 @@ function ViewInventario({ mode }: { mode: InventoryViewMode }) {
   const categories = [...new Set(items.map(i => i.category))];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="admin-stack-lg">
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -812,7 +853,7 @@ function ViewInventario({ mode }: { mode: InventoryViewMode }) {
           return (
             <Card key={cat}>
               <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 18, fontWeight: 900, color: invBarColor(avgPct) }}>{avgPct}%</div>
-              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#8B8070" }}>{cat.toUpperCase()}</div>
+              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{cat.toUpperCase()}</div>
               <div className="admin-bar h-1 rounded-sm overflow-hidden mt-1" style={{ background: "#2D2A24" }}>
                 <div className="admin-bar-fill" style={{ width: `${avgPct}%`, height: "100%", background: invBarColor(avgPct) }} />
               </div>
@@ -830,7 +871,7 @@ function ViewInventario({ mode }: { mode: InventoryViewMode }) {
         </div>
         <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginBottom: 12 }} />
 
-        <div className="flex flex-col gap-2">
+        <div className="admin-stack-sm">
           {filtered.map(item => {
             const isEditing = editing?.id === item.id;
             const bcolor = invBarColor(item.pct);
@@ -845,13 +886,13 @@ function ViewInventario({ mode }: { mode: InventoryViewMode }) {
                   </div>
                   <div className="flex items-center gap-2">
                     <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 16, fontWeight: 900, color: bcolor }}>{item.pct}%</span>
-                    <button onClick={() => { setEditing(item); setEditUnits(item.units); }} className="hover:opacity-80"><Edit2 size={11} style={{ color: "#D97706" }} /></button>
-                    <button onClick={() => handleDelete(item.id)} className="hover:opacity-80"><Trash2 size={11} style={{ color: "#DC2626" }} /></button>
+                    <button onClick={() => { setEditing(item); setEditUnits(item.units); }} className="admin-icon-btn"><Edit2 size={11} style={{ color: "#D97706" }} /></button>
+                    <button onClick={() => handleDelete(item.id)} className="admin-icon-btn"><Trash2 size={11} style={{ color: "#DC2626" }} /></button>
                   </div>
                 </div>
                 {isEditing ? (
                   <div className="flex items-center gap-2 mt-1">
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#8B8070" }}>UNIDADES:</span>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>UNIDADES:</span>
                     <input
                       type="number"
                       value={editUnits}
@@ -859,14 +900,14 @@ function ViewInventario({ mode }: { mode: InventoryViewMode }) {
                       className="px-2 py-1 rounded-sm outline-none w-24"
                       style={{ background: "#1A1A20", border: "1px solid #D97706", fontFamily: "'Orbitron', monospace", fontSize: 11, color: "#F5F0E8" }}
                     />
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>/ {item.max} max</span>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>/ {item.max} max</span>
                     <ActionBtn label="GUARDAR" color="#0D9488" small onClick={handleSaveEdit} />
                     <ActionBtn label="CANCELAR" color="#8B8070" small onClick={() => setEditing(null)} />
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
                     <div className="admin-bar flex-1 h-2 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
-                      <motion.div initial={{ width: 0 }} animate={{ width: `${item.pct}%` }} transition={{ duration: 0.6 }}
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${item.pct}%` }} transition={MOTION.progress}
                         className={`admin-bar-fill ${item.status === "CRÍTICO" ? "animate-pulse" : ""}`}
                         style={{ height: "100%", background: bcolor, borderRadius: 2 }} />
                     </div>
@@ -883,7 +924,7 @@ function ViewInventario({ mode }: { mode: InventoryViewMode }) {
 
       {/* Add item modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="AGREGAR ÍTEM AL INVENTARIO">
-        <div className="flex flex-col gap-3">
+        <div className="admin-stack-md">
           {[
             { label: "NOMBRE DEL RECURSO", key: "name" },
           ].map(({ label, key }) => (
@@ -970,7 +1011,7 @@ function ViewExpediciones({ mode }: { mode: ExpeditionsViewMode }) {
   const completed = expeditions.filter(e => e.status === "COMPLETADA");
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="admin-stack-lg">
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -981,15 +1022,15 @@ function ViewExpediciones({ mode }: { mode: ExpeditionsViewMode }) {
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: "EN CURSO", value: active.length, color: "#F59E0B" },
           { label: "PROGRAMADAS", value: scheduled.length, color: "#0D9488" },
           { label: "COMPLETADAS", value: completed.length, color: "#4B5563" },
         ].map(({ label, value, color }) => (
           <Card key={label}>
-            <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 28, fontWeight: 900, color }}>{value}</div>
-            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#8B8070", letterSpacing: "0.1em" }}>{label}</div>
+            <div className="admin-kpi-value" style={{ fontFamily: "'Orbitron', monospace", fontWeight: 900, color }}>{value}</div>
+            <div className="admin-text-label" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#8B8070", letterSpacing: "0.1em" }}>{label}</div>
           </Card>
         ))}
       </div>
@@ -999,7 +1040,7 @@ function ViewExpediciones({ mode }: { mode: ExpeditionsViewMode }) {
       </div>}
 
       {/* Expedition list */}
-      <div className="flex flex-col gap-3">
+      <div className="admin-stack-md">
         {(mode === "active" ? expeditions.filter(e => e.status !== "COMPLETADA") : mode === "history" ? expeditions.filter(e => e.status === "COMPLETADA") : expeditions).map(exp => {
           const pct = exp.total > 0 ? Math.round((exp.day / exp.total) * 100) : 0;
           const sc = expColor(exp.status);
@@ -1023,21 +1064,21 @@ function ViewExpediciones({ mode }: { mode: ExpeditionsViewMode }) {
                 {exp.total > 0 && (
                   <div className="flex items-center gap-2 mb-3">
                     <div className="admin-bar flex-1 h-1.5 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
-                      <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8 }}
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={MOTION.progress}
                         className="admin-bar-fill" style={{ height: "100%", background: sc, borderRadius: 2 }} />
                     </div>
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>{pct}%</span>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{pct}%</span>
                   </div>
                 )}
                 <div className="flex items-center gap-1">
                   {exp.participants.slice(0, 6).map((p, i) => (
                     <div key={i} className="w-6 h-6 rounded-sm flex items-center justify-center flex-shrink-0"
-                      style={{ background: "#1A1A20", border: "1px solid #2D2A24", fontFamily: "'Share Tech Mono', monospace", fontSize: 7, color: "#8B8070" }}>
+                      style={{ background: "#1A1A20", border: "1px solid #2D2A24", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>
                       {p}
                     </div>
                   ))}
                   {exp.participants.length > 6 && (
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>+{exp.participants.length - 6}</span>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>+{exp.participants.length - 6}</span>
                   )}
                 </div>
               </div>
@@ -1053,7 +1094,7 @@ function ViewExpediciones({ mode }: { mode: ExpeditionsViewMode }) {
       </div>
 
       <Modal open={showCreate && mode !== "history"} onClose={() => setShowCreate(false)} title="CREAR NUEVA EXPEDICIÓN">
-        <div className="flex flex-col gap-3">
+        <div className="admin-stack-md">
           {[
             { label: "NOMBRE DE LA MISIÓN", key: "name" },
             { label: "OBJETIVO", key: "objective" },
@@ -1084,8 +1125,8 @@ function ViewExpediciones({ mode }: { mode: ExpeditionsViewMode }) {
             <div className="flex gap-1 flex-wrap mt-2">
               {(newExp.participants ?? []).map((p, i) => (
                 <button key={i} onClick={() => setNewExp(prev => ({ ...prev, participants: prev.participants?.filter((_, j) => j !== i) }))}
-                  className="px-1.5 py-0.5 rounded-sm hover:opacity-60"
-                  style={{ background: "#1A1A20", border: "1px solid #2D2A24", fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#8B8070" }}>
+                  className="admin-chip-btn px-1.5 py-0.5 rounded-sm"
+                  style={{ background: "#1A1A20", border: "1px solid #2D2A24", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>
                   {p} x
                 </button>
               ))}
@@ -1137,7 +1178,7 @@ function ViewIntercamp({ mode }: { mode: IntercampViewMode }) {
   const campsList = ["CAMPAMENTO BETA", "CAMPAMENTO GAMMA", "CAMPAMENTO DELTA", "CAMPAMENTO ÉPSILON"];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="admin-stack-lg">
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -1148,15 +1189,15 @@ function ViewIntercamp({ mode }: { mode: IntercampViewMode }) {
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: "PENDIENTES", value: pending.length, color: "#F59E0B" },
           { label: "APROBADAS", value: requests.filter(r => r.status === "APROBADO").length, color: "#0D9488" },
           { label: "CAMPAMENTOS", value: campsList.length, color: "#8B8070" },
         ].map(({ label, value, color }) => (
           <Card key={label}>
-            <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 28, fontWeight: 900, color }}>{value}</div>
-            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#8B8070", letterSpacing: "0.1em" }}>{label}</div>
+            <div className="admin-kpi-value" style={{ fontFamily: "'Orbitron', monospace", fontWeight: 900, color }}>{value}</div>
+            <div className="admin-text-label" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#8B8070", letterSpacing: "0.1em" }}>{label}</div>
           </Card>
         ))}
       </div>
@@ -1168,7 +1209,7 @@ function ViewIntercamp({ mode }: { mode: IntercampViewMode }) {
       {mode === "pending" && pending.length > 0 && (
         <Card glow="#EA580C">
           <SectionHeader title="SOLICITUDES PENDIENTES — ACCIÓN REQUERIDA" />
-          <div className="flex flex-col gap-2">
+          <div className="admin-stack-sm">
             {pending.map(req => (
               <motion.div key={req.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                 className="p-3 rounded-sm" style={{ background: "#0D0D10", border: `1px solid ${req.urgent ? "#DC262655" : "#2D2A24"}` }}>
@@ -1181,7 +1222,7 @@ function ViewIntercamp({ mode }: { mode: IntercampViewMode }) {
                     </div>
                     <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}>{req.text}</span>
                   </div>
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540", whiteSpace: "nowrap" }}>{req.time}</span>
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, whiteSpace: "nowrap" }}>{req.time}</span>
                 </div>
                 <div className="flex gap-2">
                   <ActionBtn label="APROBAR" color="#0D9488" small onClick={() => handleApprove(req.id)} />
@@ -1195,7 +1236,7 @@ function ViewIntercamp({ mode }: { mode: IntercampViewMode }) {
 
       {(mode === "history" || mode === "send") && <Card>
         <SectionHeader title="HISTORIAL DE COMUNICACIONES" />
-        <div className="flex flex-col gap-2">
+        <div className="admin-stack-sm">
           {others.map(req => {
             const sc = intercampColor(req.status);
             return (
@@ -1203,15 +1244,15 @@ function ViewIntercamp({ mode }: { mode: IntercampViewMode }) {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <Radio size={10} style={{ color: "#4B4540" }} />
+                      <Radio size={10} style={{ color: UI_COLORS.textFaint }} />
                       <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{req.from}</span>
-                      <Badge label={req.type.toUpperCase()} color="#4B4540" />
+                      <Badge label={req.type.toUpperCase()} color={UI_COLORS.textFaint} />
                     </div>
                     <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#F5F0E8" }}>{req.text}</span>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <Badge label={req.status} color={sc} />
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 7, color: "#4B4540" }}>{req.time}</span>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{req.time}</span>
                   </div>
                 </div>
               </div>
@@ -1221,7 +1262,7 @@ function ViewIntercamp({ mode }: { mode: IntercampViewMode }) {
       </Card>}
 
       <Modal open={showSend || mode === "send"} onClose={() => setShowSend(false)} title="ENVIAR MENSAJE INTER-CAMPAMENTO">
-        <div className="flex flex-col gap-3">
+        <div className="admin-stack-md">
           <div>
             <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>DESTINATARIO</label>
             <select value={newReq.to} onChange={e => setNewReq(prev => ({ ...prev, to: e.target.value }))}
@@ -1301,12 +1342,12 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-4 gap-3">
+    <div className="admin-stack-lg">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {Object.entries(counts).map(([k, v]) => (
           <Card key={k}>
             <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 24, fontWeight: 900, color: logLevelColor(k) }}>{v}</div>
-            <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#8B8070" }}>{k.toUpperCase()}</div>
+            <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{k.toUpperCase()}</div>
           </Card>
         ))}
       </div>
@@ -1318,15 +1359,15 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
           <SearchBar value={search} onChange={setSearch} placeholder="BUSCAR EN LOGS..." />
           <div className="flex gap-1">
             {levels.map(l => (
-              <button key={l} onClick={() => setFilterLevel(l)}
-                className="px-2 py-1 rounded-sm cursor-pointer transition-opacity hover:opacity-80"
-                style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, background: filterLevel === l ? logLevelColor(l) : "#1A1A20", color: filterLevel === l ? "#0A0A0B" : "#8B8070", border: "1px solid #2D2A24" }}>
+                <button key={l} onClick={() => setFilterLevel(l)}
+                className="admin-chip-btn px-2 py-1 rounded-sm cursor-pointer"
+                style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, background: filterLevel === l ? logLevelColor(l) : "#1A1A20", color: filterLevel === l ? "#0A0A0B" : "#8B8070", border: "1px solid #2D2A24" }}>
                 {l}
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
-            <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>AUTO-REFRESH</span>
+            <div className="flex items-center gap-2">
+            <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>AUTO-REFRESH</span>
             <Toggle active={autoRefresh} onChange={() => setAutoRefresh(prev => !prev)} />
           </div>
         </div>
@@ -1339,7 +1380,7 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
           </div>
         )}
 
-        <div className="flex flex-col gap-1">
+        <div className="admin-stack-sm">
           <AnimatePresence initial={false}>
             {filtered.map(log => {
               const lc = logLevelColor(log.level);
@@ -1349,12 +1390,13 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
                   initial={{ opacity: 0, x: -10, height: 0 }}
                   animate={{ opacity: 1, x: 0, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
+                  transition={MOTION.base}
                   className="flex items-start gap-3 px-3 py-2 rounded-sm"
                   style={{ background: "#0D0D10", borderLeft: `2px solid ${lc}` }}
                 >
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540", flexShrink: 0, paddingTop: 2 }}>[{log.time}]</span>
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, flexShrink: 0, paddingTop: 2 }}>[{log.time}]</span>
                   <span className="px-1.5 py-0.5 rounded-sm flex-shrink-0"
-                    style={{ background: `${lc}22`, fontFamily: "'Share Tech Mono', monospace", fontSize: 7, color: lc }}>
+                    style={{ background: `${lc}22`, fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: lc }}>
                     {log.level.toUpperCase()}
                   </span>
                   <div className="flex-1 min-w-0">
@@ -1365,6 +1407,7 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
               );
             })}
           </AnimatePresence>
+          {filtered.length === 0 && <EmptyState title="SIN REGISTROS" hint="Ajusta los filtros o espera nuevos eventos" icon={Shield} />}
         </div>
       </Card>
     </div>
@@ -1388,12 +1431,12 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
   const nextLevelXP = 3000;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="admin-stack-lg">
       {mode === "overview" && (
         <Card glow="#D97706">
         <div className="flex items-center gap-4">
           <div className="text-center">
-            <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#4B4540" }}>NIVEL</div>
+            <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textFaint }}>NIVEL</div>
             <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 48, fontWeight: 900, color: "#F59E0B", lineHeight: 1 }}>7</div>
             <Badge label="CONSOLIDADO" color="#D97706" />
           </div>
@@ -1403,7 +1446,7 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
               <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, color: "#F59E0B" }}>{totalXP} / {nextLevelXP} XP</span>
             </div>
             <div className="admin-bar h-3 rounded-sm overflow-hidden mb-1" style={{ background: "#2D2A24" }}>
-              <motion.div initial={{ width: 0 }} animate={{ width: `${(totalXP / nextLevelXP) * 100}%` }} transition={{ duration: 1 }}
+              <motion.div initial={{ width: 0 }} animate={{ width: `${(totalXP / nextLevelXP) * 100}%` }} transition={MOTION.progress}
                 className="admin-bar-fill" style={{ height: "100%", background: "linear-gradient(90deg, #D97706, #F59E0B)", borderRadius: 2 }} />
             </div>
             <div className="grid grid-cols-4 gap-2 mt-3">
@@ -1415,7 +1458,7 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
               ].map(({ label, value }) => (
                 <div key={label} className="p-2 rounded-sm text-center" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
                   <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 13, fontWeight: 900, color: "#F5F0E8" }}>{value}</div>
-                  <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 7, color: "#4B4540" }}>{label}</div>
+                  <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{label}</div>
                 </div>
               ))}
             </div>
@@ -1429,7 +1472,7 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
         <div key={cat}>
           <div className="mb-2 flex items-center gap-2">
             <div style={{ height: 1, flex: 1, background: "#2D2A24" }} />
-            <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#4B4540" }}>{cat.toUpperCase()}</span>
+            <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textFaint }}>{cat.toUpperCase()}</span>
             <div style={{ height: 1, flex: 1, background: "#2D2A24" }} />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
@@ -1438,7 +1481,7 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 rounded-sm flex items-center justify-center flex-shrink-0"
                     style={{ background: ach.unlocked ? `${ach.color}22` : "#1A1A20", border: `1px solid ${ach.unlocked ? ach.color : "#2D2A24"}`, opacity: ach.unlocked ? 1 : 0.5 }}>
-                    <Trophy size={18} style={{ color: ach.unlocked ? ach.color : "#4B4540" }} />
+                    <Trophy size={18} style={{ color: ach.unlocked ? ach.color : UI_COLORS.textFaint }} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
@@ -1446,15 +1489,15 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
                         <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: ach.unlocked ? ach.color : "#8B8070" }}>{ach.name}</span>
                         {ach.unlocked && <CheckCircle size={10} style={{ color: ach.color }} />}
                       </div>
-                      <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 9, color: ach.unlocked ? "#F59E0B" : "#4B4540" }}>+{ach.xp} XP</span>
+                      <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 9, color: ach.unlocked ? "#F59E0B" : UI_COLORS.textFaint }}>+{ach.xp} XP</span>
                     </div>
-                    <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#4B4540", marginBottom: 6 }}>{ach.desc}</p>
+                    <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: UI_COLORS.textMuted, marginBottom: 6 }}>{ach.desc}</p>
                     <div className="admin-bar h-1 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
-                      <motion.div initial={{ width: 0 }} animate={{ width: `${ach.pct}%` }} transition={{ duration: 0.8 }}
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${ach.pct}%` }} transition={MOTION.progress}
                         className="admin-bar-fill" style={{ height: "100%", background: ach.unlocked ? ach.color : `${ach.color}66`, borderRadius: 2 }} />
                     </div>
                     {!ach.unlocked && (
-                      <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540", marginTop: 2 }}>{ach.pct}% completado</div>
+                      <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, marginTop: 2 }}>{ach.pct}% completado</div>
                     )}
                   </div>
                 </div>
@@ -1485,8 +1528,8 @@ function ViewNotificaciones({ mode }: { mode: NotifsViewMode }) {
   const unread = notifs.filter(n => !n.read).length;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-3 gap-3">
+    <div className="admin-stack-lg">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: "SIN LEER", value: unread, color: "#DC2626" },
           { label: "CRÍTICAS", value: notifs.filter(n => n.level === "critical").length, color: "#DC2626" },
@@ -1505,9 +1548,9 @@ function ViewNotificaciones({ mode }: { mode: NotifsViewMode }) {
           <div className="flex-1" />
           <div className="flex gap-1">
             {levels.map(l => (
-              <button key={l} onClick={() => setFilter(l)}
-                className="px-2 py-1 rounded-sm cursor-pointer hover:opacity-80"
-                style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, background: filter === l ? notifColor(l) : "#1A1A20", color: filter === l ? "#0A0A0B" : "#8B8070", border: "1px solid #2D2A24" }}>
+                <button key={l} onClick={() => setFilter(l)}
+                className="admin-chip-btn px-2 py-1 rounded-sm cursor-pointer"
+                style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, background: filter === l ? notifColor(l) : "#1A1A20", color: filter === l ? "#0A0A0B" : "#8B8070", border: "1px solid #2D2A24" }}>
                 {l.toUpperCase()}
               </button>
             ))}
@@ -1516,12 +1559,12 @@ function ViewNotificaciones({ mode }: { mode: NotifsViewMode }) {
         </div>
         <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginBottom: 12 }} />
 
-        <div className="flex flex-col gap-2">
+        <div className="admin-stack-sm">
           <AnimatePresence>
             {filtered.map(n => {
               const nc = notifColor(n.level);
               return (
-                <motion.div key={n.id} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10, height: 0 }}
+                <motion.div key={n.id} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10, height: 0 }} transition={MOTION.base}
                   className="p-3 rounded-sm"
                   style={{ background: n.read ? "#0D0D10" : "#111114", border: `1px solid ${n.read ? "#2D2A24" : nc + "55"}`, borderLeft: `3px solid ${n.read ? "#2D2A24" : nc}` }}>
                   <div className="flex items-start justify-between gap-2">
@@ -1532,23 +1575,18 @@ function ViewNotificaciones({ mode }: { mode: NotifsViewMode }) {
                         <Badge label={n.level.toUpperCase()} color={nc} />
                       </div>
                       <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070" }}>{n.body}</p>
-                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>{n.time}</span>
+                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{n.time}</span>
                     </div>
                     <div className="flex gap-1">
-                      {!n.read && <button onClick={() => markRead(n.id)} className="hover:opacity-80"><CheckCircle size={12} style={{ color: "#0D9488" }} /></button>}
-                      <button onClick={() => dismiss(n.id)} className="hover:opacity-80"><X size={12} style={{ color: "#4B4540" }} /></button>
+                      {!n.read && <button onClick={() => markRead(n.id)} className="admin-icon-btn"><CheckCircle size={12} style={{ color: "#0D9488" }} /></button>}
+                      <button onClick={() => dismiss(n.id)} className="admin-icon-btn"><X size={12} style={{ color: UI_COLORS.textFaint }} /></button>
                     </div>
                   </div>
                 </motion.div>
               );
             })}
           </AnimatePresence>
-          {filtered.length === 0 && (
-            <div className="text-center py-8">
-              <Bell size={32} style={{ color: "#2D2A24", margin: "0 auto 8px" }} />
-              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#4B4540" }}>SIN NOTIFICACIONES</div>
-            </div>
-          )}
+          {filtered.length === 0 && <EmptyState title="SIN NOTIFICACIONES" hint="No hay eventos para este filtro" icon={Bell} />}
         </div>
       </Card>
     </div>
@@ -1577,7 +1615,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="admin-stack-lg">
       <AnimatePresence>
         {saved && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -1592,7 +1630,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
         {mode === "camp" && (
           <Card>
           <SectionHeader title="CONFIGURACIÓN DEL CAMPAMENTO" />
-          <div className="flex flex-col gap-3">
+          <div className="admin-stack-md">
             {[
               { label: "NOMBRE DEL CAMPAMENTO", key: "campName" },
               { label: "NOMBRE DEL ADMINISTRADOR", key: "adminName" },
@@ -1623,7 +1661,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
         {mode === "camp" && (
           <Card>
           <SectionHeader title="AUTOMATIZACIONES" />
-          <div className="flex flex-col gap-3">
+          <div className="admin-stack-md">
             {[
               { label: "BACKUP AUTOMÁTICO DIARIO", key: "autoBackup", icon: Database },
               { label: "ALERTAS DE SONIDO", key: "soundAlerts", icon: Volume2 },
@@ -1645,7 +1683,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
         {mode === "system" && (
           <Card>
           <SectionHeader title="SISTEMA" />
-          <div className="flex flex-col gap-3">
+          <div className="admin-stack-md">
             <div>
               <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>IDIOMA</label>
               <select value={settings.language} onChange={e => setSettings(prev => ({ ...prev, language: e.target.value }))}
@@ -1678,7 +1716,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
         {mode === "system" && (
           <Card>
           <SectionHeader title="INFORMACIÓN DEL SISTEMA" />
-          <div className="flex flex-col gap-2">
+          <div className="admin-stack-sm">
             {[
               { label: "VERSIÓN", value: "1.0.0" },
               { label: "BASE DE DATOS", value: "NEON DB (PostgreSQL)" },
@@ -1688,7 +1726,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
               { label: "UPTIME", value: "47 DÍAS" },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between items-center px-3 py-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
-                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>{label}</span>
+                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{label}</span>
                 <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{value}</span>
               </div>
             ))}
@@ -1757,11 +1795,11 @@ function ViewDashboard() {
   };
   const rowVariants = {
     hidden: { opacity: 0, y: 10 },
-    show: { opacity: 1, y: 0, transition: { staggerChildren: 0.07 } },
+    show: { opacity: 1, y: 0, transition: { ...MOTION.base, staggerChildren: 0.07 } },
   };
   const cardVariants = {
     hidden: { opacity: 0, y: 8, scale: 0.99 },
-    show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.22 } },
+    show: { opacity: 1, y: 0, scale: 1, transition: MOTION.base },
   };
 
   const levelTone = (level: Notification["level"]) => {
@@ -1779,6 +1817,7 @@ function ViewDashboard() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={MOTION.alert}
             className="pointer-events-none absolute inset-0"
             style={{
               background: "radial-gradient(circle at 50% 0%, rgba(220,38,38,0.18) 0%, rgba(220,38,38,0) 60%)",
@@ -1790,7 +1829,7 @@ function ViewDashboard() {
       </AnimatePresence>
 
       {/* KPI row (top priority, as original flow) */}
-      <motion.div variants={rowVariants} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+      <motion.div variants={rowVariants} initial="hidden" animate="show" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
         {[
           { icon: Users, color: "#0D9488", value: "247", label: "POBLACIÓN TOTAL", sub: "+3 SEMANA", subColor: "#0D9488", subIcon: TrendingUp },
           { icon: Package, color: "#DC2626", value: "3", label: "RECURSOS CRÍTICOS", sub: "CRÍTICO", subColor: "#DC2626", subIcon: TrendingDown, pulse: true },
@@ -1805,15 +1844,53 @@ function ViewDashboard() {
                 </div>
                 <div className="flex items-center gap-1">
                   <SubIcon size={10} style={{ color: subColor }} />
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: subColor }}>{sub}</span>
+                  <span className="admin-text-micro" style={{ fontFamily: "'Share Tech Mono', monospace", color: subColor }}>{sub}</span>
                 </div>
               </div>
-              <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 28, fontWeight: 900, color: "#F5F0E8", lineHeight: 1 }}>{value}</div>
-              <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070", letterSpacing: "0.1em", marginTop: 4 }}>{label}</div>
+              <div className="admin-kpi-value" style={{ fontFamily: "'Orbitron', monospace", fontWeight: 900, color: "#F5F0E8" }}>{value}</div>
+              <div className="admin-text-label" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#8B8070", letterSpacing: "0.1em", marginTop: 4 }}>{label}</div>
             </Card>
           </motion.div>
         ))}
       </motion.div>
+
+      {/* Crisis row (urgent first for glanceability) */}
+      <div className="mb-3">
+        <Card glow="#DC2626" className="admin-priority-card">
+          <div
+            className="p-3 rounded-sm admin-stack-md"
+            style={{
+              background: "radial-gradient(circle at 0% 0%, rgba(220,38,38,0.25) 0%, rgba(220,38,38,0.08) 42%, rgba(13,13,16,1) 100%)",
+              border: "1px solid #7F1D1D",
+            }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <AlertTriangle size={12} style={{ color: "#DC2626" }} />
+                <span className="admin-text-micro" style={{ fontFamily: "'Share Tech Mono', monospace", color: "#FCA5A5" }}>{crisisToday.title}</span>
+              </div>
+              <Badge label="MISIÓN PRIORITARIA" color="#DC2626" />
+            </div>
+            <p className="admin-text-title" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#F5F0E8", fontWeight: 600 }}>
+              {crisisToday.subtitle}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              {crisisToday.impact.map(item => (
+                <div key={item} className="p-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
+                  <span className="admin-text-micro" style={{ fontFamily: "'Share Tech Mono', monospace", color: "#FCA5A5" }}>{item}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 16, color: "#F59E0B", fontWeight: 900 }}>{crisisToday.urgency}</span>
+              <div className="flex items-center gap-2">
+                <ActionBtn label="PLAN IA" color="#D97706" />
+                <ActionBtn label="DESPLEGAR RESPUESTA" color="#DC2626" />
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
 
       {/* Charts row */}
       <div className="grid grid-cols-12 gap-3 mb-3">
@@ -1866,48 +1943,10 @@ function ViewDashboard() {
         </div>
       </div>
 
-      {/* Crisis row */}
-      <div className="mb-3">
-        <Card glow="#DC2626">
-          <div
-            className="p-3 rounded-sm"
-            style={{
-              background: "radial-gradient(circle at 0% 0%, rgba(220,38,38,0.25) 0%, rgba(220,38,38,0.08) 42%, rgba(13,13,16,1) 100%)",
-              border: "1px solid #7F1D1D",
-            }}
-          >
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-1.5">
-                <AlertTriangle size={12} style={{ color: "#DC2626" }} />
-                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#FCA5A5" }}>{crisisToday.title}</span>
-              </div>
-              <Badge label="MISIÓN PRIORITARIA" color="#DC2626" />
-            </div>
-            <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 14, color: "#F5F0E8", fontWeight: 600, marginBottom: 8 }}>
-              {crisisToday.subtitle}
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
-              {crisisToday.impact.map(item => (
-                <div key={item} className="p-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#FCA5A5" }}>{item}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 16, color: "#F59E0B", fontWeight: 900 }}>{crisisToday.urgency}</span>
-              <div className="flex items-center gap-2">
-                <ActionBtn label="PLAN IA" color="#D97706" />
-                <ActionBtn label="DESPLEGAR RESPUESTA" color="#DC2626" />
-              </div>
-            </div>
-          </div>
-        </Card>
-      </div>
-
       {/* Alertas e inteligencia esencial */}
       <div className="grid grid-cols-12 gap-3 mb-3">
         <div className="col-span-12 lg:col-span-8">
-          <Card className="h-full" glow="#EA580C">
+          <Card className="h-full admin-density-card" glow="#EA580C">
             <SectionHeader title="ALERTAS VIVAS — TOP 3" />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {liveAlerts.slice(0, 3).map((alert, index) => {
@@ -1927,7 +1966,7 @@ function ViewDashboard() {
                         className={alert.level === "critical" ? "animate-pulse" : ""}
                         style={{
                           fontFamily: "'Share Tech Mono', monospace",
-                          fontSize: 8,
+                          fontSize: 9,
                           color: tone.color,
                           background: tone.bg,
                           border: `1px solid ${tone.color}44`,
@@ -1940,7 +1979,7 @@ function ViewDashboard() {
                       </span>
                     </div>
                     <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070", marginBottom: 4 }}>{alert.body}</p>
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>{alert.time}</span>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{alert.time}</span>
                   </motion.div>
                 );
               })}
@@ -1948,23 +1987,26 @@ function ViewDashboard() {
           </Card>
         </div>
         <div className="col-span-12 lg:col-span-4">
-          <Card className="h-full" glow="#0D9488">
+          <Card className="h-full admin-density-card" glow="#0D9488">
             <SectionHeader title="ESTADO OPERATIVO" />
-            <div className="flex flex-col gap-2">
+            <div className="admin-stack-sm">
               {[
-                { name: "ADMISIONES IA", status: "ESTABLE", note: "Cola promedio 02:11", color: "#0D9488" },
-                { name: "INVENTARIO", status: "ALERTA", note: "3 recursos críticos", color: "#EA580C" },
-                { name: "EXPEDICIONES", status: "ALERTA", note: "1 equipo con retraso", color: "#F59E0B" },
-                { name: "SEGURIDAD", status: "BLOQUEADO", note: "IP sospechosa aislada", color: "#DC2626" },
+                { name: "ADMISIONES IA", status: "ESTABLE", note: "Cola promedio 02:11", color: "#0D9488", icon: UserPlus },
+                { name: "INVENTARIO", status: "ALERTA", note: "3 recursos críticos", color: "#EA580C", icon: Package },
+                { name: "EXPEDICIONES", status: "ALERTA", note: "1 equipo con retraso", color: "#F59E0B", icon: Map },
+                { name: "SEGURIDAD", status: "BLOQUEADO", note: "IP sospechosa aislada", color: "#DC2626", icon: Shield },
               ].map(module => (
                 <div key={module.name} className="p-2 rounded-sm" style={{ background: "#0D0D10", border: `1px solid ${module.color}44` }}>
                   <div className="flex items-center justify-between mb-1">
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#F5F0E8" }}>{module.name}</span>
-                    <span className={module.status === "BLOQUEADO" ? "animate-pulse" : ""} style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: module.color }}>
+                    <div className="flex items-center gap-1.5">
+                      <module.icon size={11} style={{ color: module.color }} />
+                      <span className="admin-text-micro" style={{ fontFamily: "'Share Tech Mono', monospace", color: "#F5F0E8" }}>{module.name}</span>
+                    </div>
+                    <span className={`admin-text-micro ${module.status === "BLOQUEADO" ? "animate-pulse" : ""}`} style={{ fontFamily: "'Share Tech Mono', monospace", color: module.color }}>
                       {module.status}
                     </span>
                   </div>
-                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070" }}>{module.note}</span>
+                  <span className="admin-text-body" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#8B8070" }}>{module.note}</span>
                 </div>
               ))}
             </div>
@@ -1987,7 +2029,7 @@ function ViewDashboard() {
               {automations.map((a, i) => (
                 <div key={i} className="flex items-center gap-1 px-2 py-1 rounded-sm" style={{ background: "#0D0D10", border: `1px solid ${a.ok ? "#0D948844" : "#EA580C44"}` }}>
                   <span style={{ fontSize: 10, color: a.ok ? "#0D9488" : "#EA580C" }}>{a.ok ? "✓" : "⚠"}</span>
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#8B8070" }}>{a.name.split(" ").slice(0, 2).join(" ")}</span>
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{a.name.split(" ").slice(0, 2).join(" ")}</span>
                 </div>
               ))}
             </div>
@@ -2347,7 +2389,7 @@ export default function AdminDashboard() {
                     <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#F59E0B", letterSpacing: "0.1em" }}>{fmtTime(serverTime)}</span>
                   </div>
                   <div className="mt-2">
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#4B4540" }}>Si tocas este módulo otra vez vuelves al Centro de Mando</span>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>Si tocas este módulo otra vez vuelves al Centro de Mando</span>
                   </div>
                 </div>
               </aside>
@@ -2360,7 +2402,7 @@ export default function AdminDashboard() {
                 style={{ height: 52, background: "#0D0D10", borderBottom: "1px solid #2D2A24" }}>
             <div className="admin-breadcrumb flex items-center gap-2 relative z-10">
               <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#8B8070" }}>CAMPAMENTO ALFA</span>
-              <ChevronRight size={10} style={{ color: "#4B4540" }} />
+              <ChevronRight size={10} style={{ color: UI_COLORS.textFaint }} />
               <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#D97706" }}>{sectionTitles[activeNav]}</span>
             </div>
             <div className="admin-status-row hidden lg:flex items-center gap-3 relative z-10">
@@ -2377,15 +2419,15 @@ export default function AdminDashboard() {
               ))}
             </div>
             <div className="admin-profile flex items-center gap-2 relative z-10">
-              <button onClick={() => setActiveNav("NOTIFICACIONES")} className="relative p-1.5 rounded-sm hover:opacity-80"
+              <button onClick={() => setActiveNav("NOTIFICACIONES")} className="admin-icon-btn relative p-1.5 rounded-sm"
                 style={{ background: "#1A1A20", border: "1px solid #2D2A24" }}>
                 <Bell size={14} style={{ color: "#D97706" }} />
                 {unreadNotifs > 0 && (
                   <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-sm"
-                    style={{ background: "#DC2626", fontFamily: "'Share Tech Mono', monospace", fontSize: 8, color: "#F5F0E8" }}>{unreadNotifs}</span>
+                    style={{ background: "#DC2626", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#F5F0E8" }}>{unreadNotifs}</span>
                 )}
               </button>
-              <button onClick={() => setActiveNav("CONFIGURACIÓN")} className="flex items-center gap-1.5 px-2 py-1 rounded-sm hover:opacity-80"
+              <button onClick={() => setActiveNav("CONFIGURACIÓN")} className="admin-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
                 style={{ background: "#1A1A20", border: "1px solid #2D2A24" }}>
                 <div className="w-5 h-5 rounded-sm flex items-center justify-center"
                   style={{ background: "#D97706", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#0A0A0B", fontWeight: 700 }}>
@@ -2407,7 +2449,7 @@ export default function AdminDashboard() {
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
-                        transition={{ duration: 0.15 }}
+                        transition={MOTION.page}
                       >
                         {renderSection()}
                       </motion.div>
