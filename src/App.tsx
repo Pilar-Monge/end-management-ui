@@ -1,28 +1,32 @@
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import LoginPage from './features/login/pages/LoginPage';
-import MainAppPage from './app/layout/MainAppPage';
-import { CampsPage } from './features/camps';
-import { PersonsPage } from './features/persons';
-import { AdminDashboardPage } from './features/admin-dashboard';
+
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import HomePage from './pages/HomePage'
+import LoginPage from './features/login/pages/LoginPage'
+import MainAppPage from './app/layout/MainAppPage'
+import { AdmissionPage } from './features/admission'
+import { MainHomePage } from './features/main-homepage'
+import { CampsPage } from './features/camps'
+import { PersonsPage } from './features/persons'
+import { AdminDashboardPage } from './features/admin-dashboard'
 import {
   ResourceTypesPage,
   OccupationsPage,
   OccupationCriteriaPage,
   AchievementsPage,
-} from './features/catalogs';
-
+} from './features/catalogs'
+import { useSessionManager } from './shared/hooks'
 
 function CatalogsLayout() {
-  const navigate = useNavigate();
-  const tab = new URLSearchParams(window.location.search).get('tab') || 'resources';
+  const navigate = useNavigate()
+  const tab = new URLSearchParams(window.location.search).get('tab') || 'resources'
   const tabs = {
     resources: { label: 'Tipos de Recursos', component: ResourceTypesPage },
     occupations: { label: 'Ocupaciones', component: OccupationsPage },
     criteria: { label: 'Criterios', component: OccupationCriteriaPage },
     achievements: { label: 'Logros', component: AchievementsPage },
-  } as const;
+  } as const
 
-  const ActiveComponent = tabs[tab as keyof typeof tabs]?.component || ResourceTypesPage;
+  const ActiveComponent = tabs[tab as keyof typeof tabs]?.component || ResourceTypesPage
 
   return (
     <div style={{ minHeight: '100vh', background: '#060a04', color: '#7ddb50' }}>
@@ -80,14 +84,19 @@ function CatalogsLayout() {
       </div>
       <ActiveComponent />
     </div>
-  );
+  )
 }
 
 function App() {
+  useSessionManager()
+
   return (
     <Routes>
-      <Route path="/" element={<LoginPage />} />
+      <Route path="/" element={<HomePage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/main-homepage" element={<MainHomePage />} />
       <Route path="/app" element={<MainAppPage />} />
+      <Route path="/admission" element={<AdmissionPage />} />
       <Route path="/camps" element={<CampsPage />} />
       <Route path="/persons" element={<PersonsPage />} />
       <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
@@ -95,7 +104,7 @@ function App() {
       <Route path="/catalogs" element={<CatalogsLayout />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  );
+  )
 }
 
-export default App;
+export default App

@@ -1,11 +1,11 @@
 interface ModuleItem {
-  id: string;
-  label: string;
-  icon: string;
-  description: string;
-  roles: string[];
-  path: string;
-  color: string;
+  id: string
+  label: string
+  icon: string
+  description: string
+  roles: string[]
+  path: string
+  color: string
 }
 
 export const MODULES: ModuleItem[] = [
@@ -90,7 +90,7 @@ export const MODULES: ModuleItem[] = [
     path: '/profile',
     color: '#3a7a30',
   },
-];
+]
 
 export const GHOST_CHARACTERS = [
   { x: '8%', size: 120, delay: 0, opacity: 0.12 },
@@ -100,4 +100,4 @@ export const GHOST_CHARACTERS = [
   { x: '62%', size: 132, delay: 0.3, opacity: 0.09 },
   { x: '74%', size: 120, delay: 2.1, opacity: 0.06 },
   { x: '88%', size: 144, delay: 1.5, opacity: 0.08 },
-] as const;
+] as const

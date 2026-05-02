@@ -1,22 +1,22 @@
-import SurvivorCharacter from './SurvivorCharacter';  
+import SurvivorCharacter from './SurvivorCharacter'
 
 export type SurvivorPlacement = {
-  bottom: string;
-  left: string;
-  width: number;
-  height: number;
-  opacity: number;
-  scale: number;
-  rotationOffset: number;
-};
+  bottom: string
+  left: string
+  width: number
+  height: number
+  opacity: number
+  scale: number
+  rotationOffset: number
+}
 
 interface BackgroundSurvivorsProps {
-  instances: readonly SurvivorPlacement[];
+  instances: readonly SurvivorPlacement[]
 }
 
 export default function BackgroundSurvivors({ instances }: BackgroundSurvivorsProps) {
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-  const visible = isMobile ? instances.slice(0, 2) : instances;
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+  const visible = isMobile ? instances.slice(0, 2) : instances
 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
@@ -43,5 +43,5 @@ export default function BackgroundSurvivors({ instances }: BackgroundSurvivorsPr
         </div>
       ))}
     </div>
-  );
+  )
 }

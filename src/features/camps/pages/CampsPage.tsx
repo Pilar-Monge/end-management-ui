@@ -1,21 +1,20 @@
-
-import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { useCamps, useCampStats } from '../api/queries';
-import { useCreateCamp, useUpdateCamp, useDeleteCamp } from '../api/mutations';
-import type { Camp, CreateCampRequest, UpdateCampRequest } from '../types';
-import { LoadingSkeleton, EmptyState, ErrorState } from '../../catalogs/components/StateComponents';
+import { useState, useMemo } from 'react'
+import { motion } from 'framer-motion'
+import { useCamps, useCampStats } from '../api/queries'
+import { useCreateCamp, useUpdateCamp, useDeleteCamp } from '../api/mutations'
+import type { Camp, CreateCampRequest, UpdateCampRequest } from '../types'
+import { LoadingSkeleton, EmptyState, ErrorState } from '../../catalogs/components/StateComponents'
 
 interface FormState {
-  id?: number;
-  name: string;
-  description: string;
-  capacity: number;
-  latitude: number;
-  longitude: number;
-  zone?: string;
-  defenseLevel: number;
-  watchers: number;
+  id?: number
+  name: string
+  description: string
+  capacity: number
+  latitude: number
+  longitude: number
+  zone?: string
+  defenseLevel: number
+  watchers: number
 }
 
 const INITIAL_FORM: FormState = {
@@ -27,31 +26,31 @@ const INITIAL_FORM: FormState = {
   zone: '',
   defenseLevel: 50,
   watchers: 5,
-};
+}
 
 export function CampsPage() {
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<Camp['status'] | 'ALL'>('ALL');
+  const [showForm, setShowForm] = useState(false)
+  const [formData, setFormData] = useState<FormState>(INITIAL_FORM)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [filterStatus, setFilterStatus] = useState<Camp['status'] | 'ALL'>('ALL')
 
-  const { data: camps = [], isLoading, error, refetch } = useCamps();
-  const { data: stats } = useCampStats();
-  const createMutation = useCreateCamp();
-  const updateMutation = useUpdateCamp();
-  const deleteMutation = useDeleteCamp();
+  const { data: camps = [], isLoading, error, refetch } = useCamps()
+  const { data: stats } = useCampStats()
+  const createMutation = useCreateCamp()
+  const updateMutation = useUpdateCamp()
+  const deleteMutation = useDeleteCamp()
 
   const filteredCamps = useMemo(() => {
-    return filterStatus === 'ALL' ? camps : camps.filter((c: Camp) => c.status === filterStatus);
-  }, [camps, filterStatus]);
+    return filterStatus === 'ALL' ? camps : camps.filter((c: Camp) => c.status === filterStatus)
+  }, [camps, filterStatus])
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
+    e.preventDefault()
+    setFormError(null)
 
     if (!formData.name.trim() || formData.capacity === 0) {
-      setFormError('Nombre y capacidad son requeridos');
-      return;
+      setFormError('Nombre y capacidad son requeridos')
+      return
     }
 
     try {
@@ -70,7 +69,7 @@ export function CampsPage() {
               zone: formData.zone,
             },
           } as UpdateCampRequest,
-        });
+        })
       } else {
         await createMutation.mutateAsync({
           name: formData.name,
@@ -83,14 +82,14 @@ export function CampsPage() {
             longitude: formData.longitude,
             zone: formData.zone,
           },
-        } as CreateCampRequest);
+        } as CreateCampRequest)
       }
-      setFormData(INITIAL_FORM);
-      setShowForm(false);
+      setFormData(INITIAL_FORM)
+      setShowForm(false)
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Error al procesar campamento');
+      setFormError(err instanceof Error ? err.message : 'Error al procesar campamento')
     }
-  };
+  }
 
   const handleEdit = (camp: Camp) => {
     setFormData({
@@ -103,44 +102,51 @@ export function CampsPage() {
       zone: camp.location.zone,
       defenseLevel: camp.defenseLevel,
       watchers: camp.watchers,
-    });
-    setShowForm(true);
-  };
+    })
+    setShowForm(true)
+  }
 
   const handleDelete = async (id: number) => {
     if (window.confirm('¿Eliminar este campamento?')) {
       try {
-        await deleteMutation.mutateAsync(id);
+        await deleteMutation.mutateAsync(id)
       } catch (err) {
-        alert(err instanceof Error ? err.message : 'Error al eliminar');
+        alert(err instanceof Error ? err.message : 'Error al eliminar')
       }
     }
-  };
+  }
 
   const handleCancel = () => {
-    setFormData(INITIAL_FORM);
-    setShowForm(false);
-    setFormError(null);
-  };
+    setFormData(INITIAL_FORM)
+    setShowForm(false)
+    setFormError(null)
+  }
 
   const getStatusColor = (status: Camp['status']) => {
     switch (status) {
       case 'ACTIVE':
-        return '#7ddb50';
+        return '#7ddb50'
       case 'ABANDONED':
-        return '#8080a0';
+        return '#8080a0'
       case 'COMPROMISED':
-        return '#e08080';
+        return '#e08080'
       case 'UNDER_CONSTRUCTION':
-        return '#e0a050';
+        return '#e0a050'
       default:
-        return '#7ddb50';
+        return '#7ddb50'
     }
-  };
+  }
 
   return (
     <div style={{ padding: '24px' }}>
-      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div
+        style={{
+          marginBottom: '24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
         <h1
           style={{
             fontFamily: "'Georgia', serif",
@@ -281,27 +287,29 @@ export function CampsPage() {
       )}
 
       <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        {(['ALL', 'ACTIVE', 'ABANDONED', 'COMPROMISED', 'UNDER_CONSTRUCTION'] as const).map((status) => (
-          <motion.button
-            key={status}
-            onClick={() => setFilterStatus(status)}
-            whileHover={{ scale: 1.02 }}
-            style={{
-              background: filterStatus === status ? 'rgba(74,138,48,0.2)' : 'transparent',
-              border: `1px solid ${filterStatus === status ? 'rgba(74,138,48,0.5)' : 'rgba(74,138,48,0.2)'}`,
-              borderRadius: '4px',
-              color: filterStatus === status ? '#7ddb50' : '#3a6020',
-              fontFamily: "'Courier New', monospace",
-              fontSize: '10px',
-              letterSpacing: '1px',
-              padding: '6px 12px',
-              cursor: 'pointer',
-              textTransform: 'uppercase',
-            }}
-          >
-            {status === 'ALL' ? 'Todos' : status.replace(/_/g, ' ')}
-          </motion.button>
-        ))}
+        {(['ALL', 'ACTIVE', 'ABANDONED', 'COMPROMISED', 'UNDER_CONSTRUCTION'] as const).map(
+          (status) => (
+            <motion.button
+              key={status}
+              onClick={() => setFilterStatus(status)}
+              whileHover={{ scale: 1.02 }}
+              style={{
+                background: filterStatus === status ? 'rgba(74,138,48,0.2)' : 'transparent',
+                border: `1px solid ${filterStatus === status ? 'rgba(74,138,48,0.5)' : 'rgba(74,138,48,0.2)'}`,
+                borderRadius: '4px',
+                color: filterStatus === status ? '#7ddb50' : '#3a6020',
+                fontFamily: "'Courier New', monospace",
+                fontSize: '10px',
+                letterSpacing: '1px',
+                padding: '6px 12px',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+              }}
+            >
+              {status === 'ALL' ? 'Todos' : status.replace(/_/g, ' ')}
+            </motion.button>
+          ),
+        )}
       </div>
 
       {showForm && (
@@ -321,7 +329,14 @@ export function CampsPage() {
               {formData.id ? 'Editar Campamento' : 'Nuevo Campamento'}
             </h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                marginBottom: '12px',
+              }}
+            >
               <input
                 type="text"
                 placeholder="Nombre"
@@ -370,7 +385,14 @@ export function CampsPage() {
               }}
             />
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '12px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '12px',
+                marginBottom: '12px',
+              }}
+            >
               <input
                 type="number"
                 placeholder="Latitud"
@@ -390,7 +412,9 @@ export function CampsPage() {
                 type="number"
                 placeholder="Longitud"
                 value={formData.longitude}
-                onChange={(e) => setFormData({ ...formData, longitude: parseFloat(e.target.value) })}
+                onChange={(e) =>
+                  setFormData({ ...formData, longitude: parseFloat(e.target.value) })
+                }
                 step={0.0001}
                 style={{
                   background: 'rgba(10,18,8,0.8)',
@@ -417,7 +441,14 @@ export function CampsPage() {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                marginBottom: '16px',
+              }}
+            >
               <div>
                 <label
                   style={{
@@ -433,7 +464,9 @@ export function CampsPage() {
                 <input
                   type="range"
                   value={formData.defenseLevel}
-                  onChange={(e) => setFormData({ ...formData, defenseLevel: parseInt(e.target.value) })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, defenseLevel: parseInt(e.target.value) })
+                  }
                   min={0}
                   max={100}
                   style={{ width: '100%' }}
@@ -614,7 +647,9 @@ export function CampsPage() {
                   marginBottom: '12px',
                 }}
               >
-                <div style={{ background: 'rgba(74,138,48,0.1)', padding: '8px', borderRadius: '4px' }}>
+                <div
+                  style={{ background: 'rgba(74,138,48,0.1)', padding: '8px', borderRadius: '4px' }}
+                >
                   <div
                     style={{
                       fontFamily: "'Courier New', monospace",
@@ -635,7 +670,9 @@ export function CampsPage() {
                     {camp.currentPopulation}/{camp.capacity}
                   </div>
                 </div>
-                <div style={{ background: 'rgba(74,138,48,0.1)', padding: '8px', borderRadius: '4px' }}>
+                <div
+                  style={{ background: 'rgba(74,138,48,0.1)', padding: '8px', borderRadius: '4px' }}
+                >
                   <div
                     style={{
                       fontFamily: "'Courier New', monospace",
@@ -698,5 +735,5 @@ export function CampsPage() {
         </motion.div>
       )}
     </div>
-  );
+  )
 }

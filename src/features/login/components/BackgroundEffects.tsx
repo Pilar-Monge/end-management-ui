@@ -1,5 +1,5 @@
-import { motion } from 'framer-motion';
-import { GHOST_CHARACTERS } from '../../../shared/constants/app';
+import { motion } from 'framer-motion'
+import { GHOST_CHARACTERS } from '../../../shared/constants/app'
 
 function GhostCharacter({
   x,
@@ -7,10 +7,10 @@ function GhostCharacter({
   delay,
   opacity,
 }: {
-  x: string;
-  size: number;
-  delay: number;
-  opacity: number;
+  x: string
+  size: number
+  delay: number
+  opacity: number
 }) {
   return (
     <motion.div
@@ -32,18 +32,77 @@ function GhostCharacter({
     >
       <svg width={size} height={size * 1.9} viewBox="0 0 90 170" fill="none">
         <ellipse cx="45" cy="22" rx="17" ry="19" fill="#1c3a10" stroke="#3a6020" strokeWidth="1" />
-        <path d="M18 40 Q45 34 72 40 L70 95 Q45 100 20 95 Z" fill="#1c3a10" stroke="#3a6020" strokeWidth="1" />
-        <rect x="10" y="36" width="14" height="36" rx="3" fill="#1c3a10" stroke="#3a6020" strokeWidth="1" />
-        <rect x="66" y="36" width="14" height="36" rx="3" fill="#1c3a10" stroke="#3a6020" strokeWidth="1" />
-        <rect x="20" y="94" width="22" height="58" rx="4" fill="#162c0c" stroke="#2a5018" strokeWidth="1" />
-        <rect x="48" y="94" width="22" height="58" rx="4" fill="#162c0c" stroke="#2a5018" strokeWidth="1" />
-        <rect x="18" y="144" width="26" height="16" rx="3" fill="#101e08" stroke="#1e3a10" strokeWidth="1" />
-        <rect x="46" y="144" width="26" height="16" rx="3" fill="#101e08" stroke="#1e3a10" strokeWidth="1" />
+        <path
+          d="M18 40 Q45 34 72 40 L70 95 Q45 100 20 95 Z"
+          fill="#1c3a10"
+          stroke="#3a6020"
+          strokeWidth="1"
+        />
+        <rect
+          x="10"
+          y="36"
+          width="14"
+          height="36"
+          rx="3"
+          fill="#1c3a10"
+          stroke="#3a6020"
+          strokeWidth="1"
+        />
+        <rect
+          x="66"
+          y="36"
+          width="14"
+          height="36"
+          rx="3"
+          fill="#1c3a10"
+          stroke="#3a6020"
+          strokeWidth="1"
+        />
+        <rect
+          x="20"
+          y="94"
+          width="22"
+          height="58"
+          rx="4"
+          fill="#162c0c"
+          stroke="#2a5018"
+          strokeWidth="1"
+        />
+        <rect
+          x="48"
+          y="94"
+          width="22"
+          height="58"
+          rx="4"
+          fill="#162c0c"
+          stroke="#2a5018"
+          strokeWidth="1"
+        />
+        <rect
+          x="18"
+          y="144"
+          width="26"
+          height="16"
+          rx="3"
+          fill="#101e08"
+          stroke="#1e3a10"
+          strokeWidth="1"
+        />
+        <rect
+          x="46"
+          y="144"
+          width="26"
+          height="16"
+          rx="3"
+          fill="#101e08"
+          stroke="#1e3a10"
+          strokeWidth="1"
+        />
         <ellipse cx="38" cy="21" rx="3" ry="2" fill="#3a7020" opacity="0.5" />
         <ellipse cx="52" cy="21" rx="3" ry="2" fill="#3a7020" opacity="0.5" />
       </svg>
     </motion.div>
-  );
+  )
 }
 
 export function FloatingParticles() {
@@ -54,7 +113,7 @@ export function FloatingParticles() {
     delay: Math.random() * 6,
     duration: 4 + Math.random() * 5,
     color: `rgba(${60 + Math.random() * 40}, ${130 + Math.random() * 60}, ${20 + Math.random() * 20}, ${0.2 + Math.random() * 0.4})`,
-  }));
+  }))
 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
@@ -75,7 +134,7 @@ export function FloatingParticles() {
         />
       ))}
     </div>
-  );
+  )
 }
 
 export function Scanlines() {
@@ -90,7 +149,7 @@ export function Scanlines() {
         zIndex: 1,
       }}
     />
-  );
+  )
 }
 
 export function HudCorners() {
@@ -99,7 +158,7 @@ export function HudCorners() {
     { top: 16, right: 16, rotate: 90 },
     { bottom: 16, right: 16, rotate: 180 },
     { bottom: 16, left: 16, rotate: 270 },
-  ] as const;
+  ] as const
 
   return (
     <>
@@ -119,7 +178,7 @@ export function HudCorners() {
         </motion.svg>
       ))}
     </>
-  );
+  )
 }
 
 export function GhostCharactersLayer() {
@@ -129,5 +188,5 @@ export function GhostCharactersLayer() {
         <GhostCharacter key={index} {...character} />
       ))}
     </div>
-  );
+  )
 }

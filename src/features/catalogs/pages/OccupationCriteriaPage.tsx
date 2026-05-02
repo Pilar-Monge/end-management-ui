@@ -1,26 +1,25 @@
-
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { useOccupationCriteria, useOccupations } from '../api/queries';
+import { useState } from 'react'
+import { motion } from 'framer-motion'
+import { useOccupationCriteria, useOccupations } from '../api/queries'
 import {
   useCreateOccupationCriteria,
   useUpdateOccupationCriteria,
   useDeleteOccupationCriteria,
-} from '../api/mutations';
+} from '../api/mutations'
 import type {
   OccupationAssignmentCriteria,
   Occupation,
   CreateOccupationCriteriaRequest,
   UpdateOccupationCriteriaRequest,
-} from '../types';
-import { LoadingSkeleton, EmptyState, ErrorState } from '../components/StateComponents';
+} from '../types'
+import { LoadingSkeleton, EmptyState, ErrorState } from '../components/StateComponents'
 
 interface FormState {
-  id?: number;
-  occupationId: number;
-  criteriaName: string;
-  weight: number;
-  evaluationType: OccupationAssignmentCriteria['evaluationType'];
+  id?: number
+  occupationId: number
+  criteriaName: string
+  weight: number
+  evaluationType: OccupationAssignmentCriteria['evaluationType']
 }
 
 const INITIAL_FORM: FormState = {
@@ -28,26 +27,26 @@ const INITIAL_FORM: FormState = {
   criteriaName: '',
   weight: 1,
   evaluationType: 'MANDATORY',
-};
+}
 
 export function OccupationCriteriaPage() {
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false)
+  const [formData, setFormData] = useState<FormState>(INITIAL_FORM)
+  const [formError, setFormError] = useState<string | null>(null)
 
-  const { data: criteria = [], isLoading, error, refetch } = useOccupationCriteria();
-  const { data: occupations = [] } = useOccupations();
-  const createMutation = useCreateOccupationCriteria();
-  const updateMutation = useUpdateOccupationCriteria();
-  const deleteMutation = useDeleteOccupationCriteria();
+  const { data: criteria = [], isLoading, error, refetch } = useOccupationCriteria()
+  const { data: occupations = [] } = useOccupations()
+  const createMutation = useCreateOccupationCriteria()
+  const updateMutation = useUpdateOccupationCriteria()
+  const deleteMutation = useDeleteOccupationCriteria()
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
+    e.preventDefault()
+    setFormError(null)
 
     if (!formData.criteriaName.trim() || formData.occupationId === 0) {
-      setFormError('Ocupación y criterio son requeridos');
-      return;
+      setFormError('Ocupación y criterio son requeridos')
+      return
     }
 
     try {
@@ -60,21 +59,21 @@ export function OccupationCriteriaPage() {
             weight: formData.weight,
             evaluationType: formData.evaluationType,
           } as UpdateOccupationCriteriaRequest,
-        });
+        })
       } else {
         await createMutation.mutateAsync({
           occupationId: formData.occupationId,
           criteriaName: formData.criteriaName,
           weight: formData.weight,
           evaluationType: formData.evaluationType,
-        } as CreateOccupationCriteriaRequest);
+        } as CreateOccupationCriteriaRequest)
       }
-      setFormData(INITIAL_FORM);
-      setShowForm(false);
+      setFormData(INITIAL_FORM)
+      setShowForm(false)
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Error al procesar el criterio');
+      setFormError(err instanceof Error ? err.message : 'Error al procesar el criterio')
     }
-  };
+  }
 
   const handleEdit = (item: OccupationAssignmentCriteria) => {
     setFormData({
@@ -83,33 +82,40 @@ export function OccupationCriteriaPage() {
       criteriaName: item.criteriaName,
       weight: item.weight,
       evaluationType: item.evaluationType,
-    });
-    setShowForm(true);
-  };
+    })
+    setShowForm(true)
+  }
 
   const handleDelete = async (id: number) => {
     if (window.confirm('¿Eliminar este criterio?')) {
       try {
-        await deleteMutation.mutateAsync(id);
+        await deleteMutation.mutateAsync(id)
       } catch (err) {
-        alert(err instanceof Error ? err.message : 'Error al eliminar');
+        alert(err instanceof Error ? err.message : 'Error al eliminar')
       }
     }
-  };
+  }
 
   const handleCancel = () => {
-    setFormData(INITIAL_FORM);
-    setShowForm(false);
-    setFormError(null);
-  };
+    setFormData(INITIAL_FORM)
+    setShowForm(false)
+    setFormError(null)
+  }
 
   const getOccupationName = (occId: number) => {
-    return occupations.find((o: Occupation) => o.id === occId)?.name || 'Desconocida';
-  };
+    return occupations.find((o: Occupation) => o.id === occId)?.name || 'Desconocida'
+  }
 
   return (
     <div style={{ padding: '24px' }}>
-      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div
+        style={{
+          marginBottom: '24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
         <h1
           style={{
             fontFamily: "'Georgia', serif",
@@ -197,12 +203,21 @@ export function OccupationCriteriaPage() {
               }}
             />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                marginBottom: '12px',
+              }}
+            >
               <input
                 type="number"
                 placeholder="Peso (ponderación)"
                 value={formData.weight}
-                onChange={(e) => setFormData({ ...formData, weight: parseFloat(e.target.value) || 1 })}
+                onChange={(e) =>
+                  setFormData({ ...formData, weight: parseFloat(e.target.value) || 1 })
+                }
                 min={0}
                 max={100}
                 step={0.1}
@@ -218,7 +233,11 @@ export function OccupationCriteriaPage() {
               <select
                 value={formData.evaluationType}
                 onChange={(e) =>
-                  setFormData({ ...formData, evaluationType: e.target.value as OccupationAssignmentCriteria['evaluationType'] })
+                  setFormData({
+                    ...formData,
+                    evaluationType: e.target
+                      .value as OccupationAssignmentCriteria['evaluationType'],
+                  })
                 }
                 style={{
                   background: 'rgba(10,18,8,0.8)',
@@ -335,20 +354,60 @@ export function OccupationCriteriaPage() {
             }}
           >
             <thead>
-              <tr style={{ background: 'rgba(74,138,48,0.1)', borderBottom: '1px solid rgba(74,138,48,0.2)' }}>
-                <th style={{ padding: '12px', textAlign: 'left', color: '#7ddb50', fontWeight: 'bold' }}>
+              <tr
+                style={{
+                  background: 'rgba(74,138,48,0.1)',
+                  borderBottom: '1px solid rgba(74,138,48,0.2)',
+                }}
+              >
+                <th
+                  style={{
+                    padding: '12px',
+                    textAlign: 'left',
+                    color: '#7ddb50',
+                    fontWeight: 'bold',
+                  }}
+                >
                   Ocupación
                 </th>
-                <th style={{ padding: '12px', textAlign: 'left', color: '#7ddb50', fontWeight: 'bold' }}>
+                <th
+                  style={{
+                    padding: '12px',
+                    textAlign: 'left',
+                    color: '#7ddb50',
+                    fontWeight: 'bold',
+                  }}
+                >
                   Criterio
                 </th>
-                <th style={{ padding: '12px', textAlign: 'center', color: '#7ddb50', fontWeight: 'bold' }}>
+                <th
+                  style={{
+                    padding: '12px',
+                    textAlign: 'center',
+                    color: '#7ddb50',
+                    fontWeight: 'bold',
+                  }}
+                >
                   Peso
                 </th>
-                <th style={{ padding: '12px', textAlign: 'center', color: '#7ddb50', fontWeight: 'bold' }}>
+                <th
+                  style={{
+                    padding: '12px',
+                    textAlign: 'center',
+                    color: '#7ddb50',
+                    fontWeight: 'bold',
+                  }}
+                >
                   Tipo
                 </th>
-                <th style={{ padding: '12px', textAlign: 'center', color: '#7ddb50', fontWeight: 'bold' }}>
+                <th
+                  style={{
+                    padding: '12px',
+                    textAlign: 'center',
+                    color: '#7ddb50',
+                    fontWeight: 'bold',
+                  }}
+                >
                   Acciones
                 </th>
               </tr>
@@ -366,11 +425,28 @@ export function OccupationCriteriaPage() {
                     {getOccupationName(item.occupationId)}
                   </td>
                   <td style={{ padding: '12px', color: '#3a6020' }}>{item.criteriaName}</td>
-                  <td style={{ padding: '12px', textAlign: 'center', color: '#7ddb50' }}>{item.weight.toFixed(2)}</td>
-                  <td style={{ padding: '12px', textAlign: 'center', color: '#3a6020', fontSize: '11px' }}>
+                  <td style={{ padding: '12px', textAlign: 'center', color: '#7ddb50' }}>
+                    {item.weight.toFixed(2)}
+                  </td>
+                  <td
+                    style={{
+                      padding: '12px',
+                      textAlign: 'center',
+                      color: '#3a6020',
+                      fontSize: '11px',
+                    }}
+                  >
                     {item.evaluationType}
                   </td>
-                  <td style={{ padding: '12px', textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  <td
+                    style={{
+                      padding: '12px',
+                      textAlign: 'center',
+                      display: 'flex',
+                      gap: '8px',
+                      justifyContent: 'center',
+                    }}
+                  >
                     <motion.button
                       onClick={() => handleEdit(item)}
                       whileHover={{ scale: 1.1 }}
@@ -405,5 +481,5 @@ export function OccupationCriteriaPage() {
         </motion.div>
       )}
     </div>
-  );
+  )
 }

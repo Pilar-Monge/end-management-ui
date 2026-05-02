@@ -1,21 +1,20 @@
+import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
+import type { ApiError, Person, PersonWithStats, PersonsStats } from '../types'
+import { ENDPOINTS, personsKeys } from './keys'
 
-import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
-import type { ApiError, Person, PersonWithStats, PersonsStats } from '../types';
-import { ENDPOINTS, personsKeys } from './keys';
-
-const getToken = () => localStorage.getItem('token');
+const getToken = () => localStorage.getItem('token')
 
 function buildHeaders() {
   return {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${getToken()}`,
-  };
+  }
 }
 
 export async function fetchPersons(): Promise<Person[]> {
-  const res = await fetch(ENDPOINTS.persons, { headers: buildHeaders() });
-  if (!res.ok) throw new Error('Failed to fetch persons');
-  return res.json();
+  const res = await fetch(ENDPOINTS.persons, { headers: buildHeaders() })
+  if (!res.ok) throw new Error('Failed to fetch persons')
+  return res.json()
 }
 
 export function usePersons(
@@ -25,13 +24,13 @@ export function usePersons(
     queryKey: personsKeys.list(),
     queryFn: fetchPersons,
     ...options,
-  });
+  })
 }
 
 export async function fetchPersonById(id: number): Promise<PersonWithStats> {
-  const res = await fetch(`${ENDPOINTS.persons}/${id}`, { headers: buildHeaders() });
-  if (!res.ok) throw new Error('Failed to fetch person');
-  return res.json();
+  const res = await fetch(`${ENDPOINTS.persons}/${id}`, { headers: buildHeaders() })
+  if (!res.ok) throw new Error('Failed to fetch person')
+  return res.json()
 }
 
 export function usePersonById(
@@ -43,13 +42,13 @@ export function usePersonById(
     queryFn: () => fetchPersonById(id),
     enabled: !!id,
     ...options,
-  });
+  })
 }
 
 export async function fetchPersonsStats(): Promise<PersonsStats> {
-  const res = await fetch(ENDPOINTS.personsStats, { headers: buildHeaders() });
-  if (!res.ok) throw new Error('Failed to fetch persons stats');
-  return res.json();
+  const res = await fetch(ENDPOINTS.personsStats, { headers: buildHeaders() })
+  if (!res.ok) throw new Error('Failed to fetch persons stats')
+  return res.json()
 }
 
 export function usePersonsStats(
@@ -59,5 +58,5 @@ export function usePersonsStats(
     queryKey: personsKeys.stats(),
     queryFn: fetchPersonsStats,
     ...options,
-  });
+  })
 }

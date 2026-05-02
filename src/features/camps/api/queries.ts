@@ -1,18 +1,17 @@
+import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
+import type { Camp, CampWithStats, ApiError } from '../types'
+import { campsKeys, ENDPOINTS } from './keys'
 
-import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
-import type { Camp, CampWithStats, ApiError } from '../types';
-import { campsKeys, ENDPOINTS } from './keys';
-
-const getToken = () => localStorage.getItem('token');
+const getToken = () => localStorage.getItem('token')
 
 const headers = {
   'Content-Type': 'application/json',
   Authorization: `Bearer ${getToken()}`,
-};
+}
 export async function fetchCamps(): Promise<Camp[]> {
-  const res = await fetch(ENDPOINTS.camps, { headers });
-  if (!res.ok) throw new Error('Failed to fetch camps');
-  return res.json();
+  const res = await fetch(ENDPOINTS.camps, { headers })
+  if (!res.ok) throw new Error('Failed to fetch camps')
+  return res.json()
 }
 
 export function useCamps(
@@ -22,13 +21,13 @@ export function useCamps(
     queryKey: campsKeys.list(),
     queryFn: fetchCamps,
     ...options,
-  });
+  })
 }
 
 export async function fetchCampById(id: number): Promise<CampWithStats> {
-  const res = await fetch(`${ENDPOINTS.camps}/${id}`, { headers });
-  if (!res.ok) throw new Error('Failed to fetch camp');
-  return res.json();
+  const res = await fetch(`${ENDPOINTS.camps}/${id}`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch camp')
+  return res.json()
 }
 
 export function useCampById(
@@ -39,13 +38,13 @@ export function useCampById(
     queryKey: campsKeys.detail(id),
     queryFn: () => fetchCampById(id),
     ...options,
-  });
+  })
 }
 
 export async function fetchCampStats(): Promise<any> {
-  const res = await fetch(ENDPOINTS.campStats, { headers });
-  if (!res.ok) throw new Error('Failed to fetch camp stats');
-  return res.json();
+  const res = await fetch(ENDPOINTS.campStats, { headers })
+  if (!res.ok) throw new Error('Failed to fetch camp stats')
+  return res.json()
 }
 
 export function useCampStats(
@@ -55,13 +54,13 @@ export function useCampStats(
     queryKey: campsKeys.stats(),
     queryFn: fetchCampStats,
     ...options,
-  });
+  })
 }
 
 export async function fetchCampResources(campId: number): Promise<any[]> {
-  const res = await fetch(`${ENDPOINTS.campResources}?campId=${campId}`, { headers });
-  if (!res.ok) throw new Error('Failed to fetch camp resources');
-  return res.json();
+  const res = await fetch(`${ENDPOINTS.campResources}?campId=${campId}`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch camp resources')
+  return res.json()
 }
 
 export function useCampResources(
@@ -73,5 +72,5 @@ export function useCampResources(
     queryFn: () => fetchCampResources(campId),
     enabled: !!campId,
     ...options,
-  });
+  })
 }
