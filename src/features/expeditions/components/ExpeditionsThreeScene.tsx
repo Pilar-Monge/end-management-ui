@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Environment, Center, ContactShadows, Html } from '@react-three/drei';
+import { OrbitControls, useGLTF, Environment, Center, ContactShadows, Html, useProgress } from '@react-three/drei';
 import { Suspense, useRef, useMemo, useState, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 
@@ -72,6 +72,42 @@ const CAMERA_ZOOM_TARGET_MAP = [-5, 5.5, 6] as [number, number, number];
 const CAMERA_LOOK_TARGET_MAP = [-8, 0, 6] as [number, number, number];
 
 const ORBIT_TARGET = [0, 2.5, 0] as [number, number, number];
+
+function ExpeditionLoadingOverlay() {
+  const { active, loaded, total, progress } = useProgress();
+  const [isComplete, setIsComplete] = useState(false);
+  const hasKnownTotal = total > 0;
+  const rawProgress = hasKnownTotal ? (loaded / total) * 100 : progress;
+  const isLoaded = hasKnownTotal && loaded >= total && !active;
+  const displayProgress = isLoaded ? 100 : Math.min(99, Math.max(0, Math.round(rawProgress)));
+
+  useEffect(() => {
+    if (isLoaded) {
+      const timeout = window.setTimeout(() => setIsComplete(true), 500);
+      return () => window.clearTimeout(timeout);
+    }
+
+    if (active) {
+      setIsComplete(false);
+    }
+  }, [active, isLoaded]);
+
+  if (isComplete) return null;
+
+  return (
+    <div className="expedition-loader">
+      <div className="expedition-loading-stack">
+        <div className="expedition-loading-brush">
+          <span>{displayProgress <= 0 ? 'INICIANDO...' : `CARGANDO... ${displayProgress}%`}</span>
+        </div>
+        <div className="expedition-loading-bar-shell">
+          <div className="expedition-loading-bar" style={{ width: `${displayProgress}%` }} />
+        </div>
+        <div className="expedition-loader-spinner" />
+      </div>
+    </div>
+  );
+}
 
 // Componente para manejar la sincronización aisladamente
 function SyncOverlay({ 
@@ -318,19 +354,14 @@ export default function ExpeditionsThreeScene({ onExit }: ExpeditionsThreeSceneP
 
   return (
     <div className="expedition-scene-shell">
+      <ExpeditionLoadingOverlay />
+
       <SyncOverlay 
         isSyncing={isSyncing} 
         onComplete={handleSyncComplete} 
       />
 
-      <Suspense fallback={
-        <div className="expedition-loader">
-          <div className="expedition-loader-spinner" />
-          <div className="expedition-loader-text">
-            CARGANDO HANGAR...
-          </div>
-        </div>
-      }>
+      <Suspense fallback={null}>
         <Canvas 
           shadows={{ type: THREE.PCFShadowMap }} 
           camera={{ position: [12, 12, 12], fov: 45 }} 

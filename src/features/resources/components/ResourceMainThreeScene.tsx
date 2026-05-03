@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, useGLTF, Html } from '@react-three/drei'
+import { OrbitControls, useGLTF, Html, useProgress } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 
@@ -17,7 +17,6 @@ const CHAIR_URL = 'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/pu
 
 const INITIAL_CAMERA = [-66.4, 11.2, -40.9] as [number, number, number]
 const INITIAL_TARGET = [-60, 9, -33] as [number, number, number]
-const TOTAL_LOAD_ITEMS = 10
 
 type ResourceZoomTarget = 'station' | 'meat' | 'beer' | null
 
@@ -125,15 +124,35 @@ function ResourceModel({
   return <primitive object={clonedScene} />
 }
 
-function ResourceLoader({ progress }: { progress: number }) {
+function ResourceLoader() {
+  const { active, loaded, total, progress } = useProgress()
+  const [isComplete, setIsComplete] = useState(false)
+  const hasKnownTotal = total > 0
+  const rawProgress = hasKnownTotal ? (loaded / total) * 100 : progress
+  const isLoaded = hasKnownTotal && loaded >= total && !active
+  const displayProgress = isLoaded ? 100 : Math.min(99, Math.max(0, Math.round(rawProgress)))
+
+  useEffect(() => {
+    if (isLoaded) {
+      const timeout = window.setTimeout(() => setIsComplete(true), 500)
+      return () => window.clearTimeout(timeout)
+    }
+
+    if (active) {
+      setIsComplete(false)
+    }
+  }, [active, isLoaded])
+
+  if (isComplete) return null
+
   return (
     <div className="resource-app-loading">
       <div className="resource-loading-stack">
         <div className="resource-loading-brush">
-          <span>{progress <= 0 ? 'INICIANDO...' : `CARGANDO... ${progress}%`}</span>
+          <span>{displayProgress <= 0 ? 'INICIANDO...' : `CARGANDO... ${displayProgress}%`}</span>
         </div>
         <div className="resource-loading-bar-shell">
-          <div className="resource-loading-bar" style={{ width: `${progress}%` }} />
+          <div className="resource-loading-bar" style={{ width: `${displayProgress}%` }} />
         </div>
         <div className="resource-loading-spinner" />
       </div>
@@ -281,7 +300,6 @@ function TargetedSpotLight({
 }
 
 function ResourceSceneContent({
-  onAssetLoaded,
   zoomedTarget,
   setZoomedTarget,
   setIsSyncing,
@@ -289,7 +307,6 @@ function ResourceSceneContent({
   setHoveredTarget,
   controlsRef,
 }: {
-  onAssetLoaded: () => void
   zoomedTarget: ResourceZoomTarget
   setZoomedTarget: (value: ResourceZoomTarget) => void
   setIsSyncing: (value: boolean) => void
@@ -336,13 +353,12 @@ function ResourceSceneContent({
         <meshBasicMaterial attach="material" color="#22d3ee" transparent opacity={0.4} />
       </gridHelper>
 
-      <ResourceModel url={HANGAR_URL} position={[0, 0, 0]} onLoaded={onAssetLoaded} />
+      <ResourceModel url={HANGAR_URL} position={[0, 0, 0]} />
       <ResourceModel
         url={MONITORING_STATION_URL}
         position={[-60, 1, -60]}
         rotation={[0, -Math.PI / 2, 0]}
         scale={7}
-        onLoaded={onAssetLoaded}
       />
       <pointLight color="#00ffff" intensity={15} distance={15} decay={2} position={[-60, 5, -58]} />
 
@@ -350,18 +366,16 @@ function ResourceSceneContent({
         url={BEER_BREWERY_URL}
         position={[-40, 0.5, 0]}
         rotation={[0, Math.PI, 0]}
-        onLoaded={onAssetLoaded}
       />
-      <ResourceModel url={FORD_URL} position={[50, 0.7, -56]} targetSize={25} onLoaded={onAssetLoaded} />
-      <ResourceModel url={MEAT_URL} position={[-70, 0.5, 1]} scale={2} onLoaded={onAssetLoaded} />
-      <ResourceModel url={SHELF_URL} position={[-74, 1, -60]} scale={0.2} onLoaded={onAssetLoaded} />
+      <ResourceModel url={FORD_URL} position={[50, 0.7, -56]} targetSize={25} />
+      <ResourceModel url={MEAT_URL} position={[-70, 0.5, 1]} scale={2} />
+      <ResourceModel url={SHELF_URL} position={[-74, 1, -60]} scale={0.2} />
       <ResourceModel
         url={FORKLIFT_URL}
         position={[0, 0.9, -15]}
         rotation={[0, -Math.PI / 2, 0]}
         scale={0.05}
         shadows={false}
-        onLoaded={onAssetLoaded}
       />
 
       <ResourceModel
@@ -370,7 +384,6 @@ function ResourceSceneContent({
         rotation={[0, Math.PI * 1.5, 0]}
         targetSize={8}
         emissive
-        onLoaded={onAssetLoaded}
       />
       <pointLight color="#fff8e8" intensity={6.5} distance={75} decay={1} position={[-72, 19, -50]} />
       <TargetedSpotLight position={[-72, 19.2, -50]} targetPosition={[-72, 0, -50]} />
@@ -385,13 +398,12 @@ function ResourceSceneContent({
       <pointLight color="#fff8e8" intensity={6.5} distance={75} decay={1} position={[-72, 19, -20]} />
       <TargetedSpotLight position={[-72, 19.2, -20]} targetPosition={[-72, 0, -20]} />
 
-      <ResourceModel url={FRUIT_URL} position={[-95, 1, -16]} scale={0.04} onLoaded={onAssetLoaded} />
+      <ResourceModel url={FRUIT_URL} position={[-95, 1, -16]} scale={0.04} />
       <ResourceModel
         url={CHAIR_URL}
         position={[-55, 1, -50]}
         rotation={[0, THREE.MathUtils.degToRad(30), 0]}
         targetSize={7}
-        onLoaded={onAssetLoaded}
       />
 
       <mesh
@@ -470,16 +482,9 @@ interface ResourceMainThreeSceneProps {
 
 export default function ResourceMainThreeScene({ onExit }: ResourceMainThreeSceneProps) {
   const controlsRef = useRef(null)
-  const [loadedCount, setLoadedCount] = useState(0)
   const [hoveredTarget, setHoveredTarget] = useState<{ type: Exclude<ResourceZoomTarget, null>, name: string, position: [number, number, number] } | null>(null)
   const [zoomedTarget, setZoomedTarget] = useState<ResourceZoomTarget>(null)
   const [isSyncing, setIsSyncing] = useState(false)
-
-  const progress = Math.min(100, Math.round((loadedCount / TOTAL_LOAD_ITEMS) * 100))
-
-  const handleAssetLoaded = useCallback(() => {
-    setLoadedCount((value) => Math.min(TOTAL_LOAD_ITEMS, value + 1))
-  }, [])
 
   const handleBack = useCallback(() => {
     if (isSyncing) {
@@ -502,7 +507,7 @@ export default function ResourceMainThreeScene({ onExit }: ResourceMainThreeScen
 
   return (
     <div className="resource-scene-shell">
-      {progress < 100 && <ResourceLoader progress={progress} />}
+      <ResourceLoader />
 
       <SyncOverlay isSyncing={isSyncing} onCancel={() => setIsSyncing(false)} />
 
@@ -514,7 +519,6 @@ export default function ResourceMainThreeScene({ onExit }: ResourceMainThreeScen
       >
         <Suspense fallback={null}>
           <ResourceSceneContent
-            onAssetLoaded={handleAssetLoaded}
             zoomedTarget={zoomedTarget}
             setZoomedTarget={setZoomedTarget}
             setIsSyncing={setIsSyncing}
