@@ -1,6 +1,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import "./admin-dashboard.css";
 import {
@@ -33,32 +34,34 @@ type NavSection =
   | "NOTIFICACIONES"
   | "CONFIGURACIÓN";
 
-type PopulationViewMode = "stats" | "users";
+type PopulationViewMode = "stats" | "users" | "tempRoles";
 type AdmissionsViewMode = "queue" | "history";
-type InventoryViewMode = "summary" | "items";
-type ExpeditionsViewMode = "active" | "planning" | "history";
+type InventoryViewMode = "summary" | "items" | "movements" | "alerts" | "collection";
+type ExpeditionsViewMode = "active" | "planning" | "history" | "participants" | "consumed" | "gained";
 type IntercampViewMode = "pending" | "history" | "send";
 type SecurityViewMode = "live" | "errors" | "system";
 type LogrosViewMode = "overview" | "progress";
 type NotifsViewMode = "all" | "unread" | "critical";
 type ConfigViewMode = "camp" | "system";
+type AppRole = "SYSTEM_ADMIN" | "GESTION_RECURSOS" | "TRABAJADOR" | "ENCARGADO_VIAJES";
+type HttpCode = 400 | 401 | 403 | 404;
 
 const UI_COLORS = {
-  bg: "#0B0B0D",
-  panel: "#131418",
-  panelAlt: "#101116",
-  panelRaised: "#1A1C22",
-  border: "#343844",
-  borderSoft: "#262933",
-  textPrimary: "#F3EFE7",
-  textMuted: "#C1B7A5",
-  textFaint: "#8A8275",
-  accent: "#D97706",
+  bg: "#05070A",
+  panel: "#0B1118",
+  panelAlt: "#0A1016",
+  panelRaised: "#121B26",
+  border: "#2A3444",
+  borderSoft: "#1E2835",
+  textPrimary: "#EEF3FB",
+  textMuted: "#B8C7DB",
+  textFaint: "#7F93AC",
+  accent: "#7FB8FF",
   state: {
     critical: "#DC2626",
-    warning: "#F59E0B",
-    info: "#0D9488",
-    system: "#8A8275",
+    warning: "#D4A65A",
+    info: "#4AAED2",
+    system: "#8FA6C0",
   },
 } as const;
 
@@ -69,6 +72,24 @@ const MOTION = {
   progress: { duration: 0.7, ease: "easeOut" as const },
   page: { duration: 0.18, ease: "easeOut" as const },
 } as const;
+
+const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
+  SYSTEM_ADMIN: ["admissions.review", "inventory.adjust", "intercamp.approve", "expeditions.force", "users.edit"],
+  GESTION_RECURSOS: ["inventory.adjust", "intercamp.approve"],
+  TRABAJADOR: [],
+  ENCARGADO_VIAJES: ["expeditions.force", "intercamp.approve"],
+};
+
+function httpMessage(code: HttpCode) {
+  if (code === 400) return "SOLICITUD INVÁLIDA (400): revisa los campos y vuelve a intentar.";
+  if (code === 401) return "SESIÓN EXPIRADA (401): inicia sesión nuevamente.";
+  if (code === 403) return "SIN PERMISOS (403): esta acción no está autorizada para tu rol.";
+  return "RECURSO NO ENCONTRADO (404): verifica el elemento solicitado.";
+}
+
+function confirmAction(message: string, onConfirm: () => void) {
+  if (window.confirm(message)) onConfirm();
+}
 
 interface Person {
   id: number;
@@ -99,6 +120,44 @@ interface InventoryItem {
   units: number;
   max: number;
   status: "CRÍTICO" | "BAJO" | "NORMAL" | "OK";
+}
+
+interface TempOccupationAssignment {
+  id: number;
+  personId: number;
+  personName: string;
+  fromRole: string;
+  occupationId: number;
+  occupationName: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: "ACTIVA" | "FINALIZADA";
+}
+
+interface InventoryMovement {
+  id: number;
+  resource: string;
+  type: "INGRESO" | "EGRESO" | "AJUSTE";
+  amount: number;
+  date: string;
+  reason: string;
+}
+
+interface InventoryAlert {
+  id: number;
+  resource: string;
+  severity: "CRÍTICA" | "MEDIA";
+  status: "ACTIVA" | "ATENDIDA";
+  threshold: number;
+}
+
+interface DailyCollection {
+  id: number;
+  resource: string;
+  amountCollected: number;
+  date: string;
+  notes: string;
 }
 
 interface Expedition {
@@ -174,11 +233,66 @@ const INITIAL_INVENTORY: InventoryItem[] = [
   { id: 8, name: "Semillas", category: "Agricultura", pct: 75, units: 300, max: 400, status: "OK" },
 ];
 
+const INITIAL_TEMP_ASSIGNMENTS: TempOccupationAssignment[] = [
+  {
+    id: 1,
+    personId: 2,
+    personName: "Roberto Soto",
+    fromRole: "Mecánico",
+    occupationId: 101,
+    occupationName: "Guardia",
+    startDate: "2026-05-01",
+    endDate: "2026-05-08",
+    reason: "Cobertura por baja médica",
+    status: "ACTIVA",
+  },
+  {
+    id: 2,
+    personId: 9,
+    personName: "Valeria López",
+    fromRole: "Maestra",
+    occupationId: 205,
+    occupationName: "Logística",
+    startDate: "2026-04-20",
+    endDate: "2026-04-28",
+    reason: "Pico de transferencias inter-camp",
+    status: "FINALIZADA",
+  },
+];
+
+const INITIAL_MOVEMENTS: InventoryMovement[] = [
+  { id: 1, resource: "Agua potable", type: "INGRESO", amount: 120, date: "D-47 08:10", reason: "Retorno expedición sur" },
+  { id: 2, resource: "Medicamentos", type: "EGRESO", amount: 25, date: "D-47 10:30", reason: "Atención clínica" },
+  { id: 3, resource: "Munición", type: "AJUSTE", amount: 40, date: "D-47 11:45", reason: "Conteo físico" },
+];
+
+const INITIAL_INV_ALERTS: InventoryAlert[] = [
+  { id: 1, resource: "Agua potable", severity: "CRÍTICA", status: "ACTIVA", threshold: 20 },
+  { id: 2, resource: "Medicamentos", severity: "CRÍTICA", status: "ACTIVA", threshold: 25 },
+  { id: 3, resource: "Higiene", severity: "MEDIA", status: "ATENDIDA", threshold: 30 },
+];
+
+const INITIAL_COLLECTIONS: DailyCollection[] = [
+  { id: 1, resource: "Agua potable", amountCollected: 65, date: "D-47", notes: "Pozo este" },
+  { id: 2, resource: "Raciones de comida", amountCollected: 90, date: "D-47", notes: "Caza y trueque" },
+  { id: 3, resource: "Semillas", amountCollected: 12, date: "D-47", notes: "Huerto norte" },
+];
+
 const INITIAL_EXPEDITIONS: Expedition[] = [
   { id: 1, name: "EXPEDICIÓN NORTE", day: 3, total: 5, participants: ["JR", "MA", "PC", "LS", "KT"], status: "EN CURSO", objective: "Buscar suministros médicos en hospital abandonado.", sector: "Sector Norte — 12km" },
   { id: 2, name: "EXPLORACIÓN SECTOR 7", day: 0, total: 5, participants: ["DN", "AS", "FG", "JL"], status: "PROGRAMADA", objective: "Reconocimiento de rutas alternativas.", sector: "Sector Este — 8km" },
   { id: 3, name: "RETORNO GRUPO DELTA", day: 4, total: 5, participants: ["CA", "MT", "PB", "RQ", "EV"], status: "REGRESANDO", objective: "Recolección de agua y filtros.", sector: "Sector Sur — 5km" },
   { id: 4, name: "MISIÓN SUMINISTROS", day: 5, total: 5, participants: ["WN", "SK", "LR", "PR", "YU"], status: "COMPLETADA", objective: "Recuperar generadores.", sector: "Sector Oeste — 15km" },
+];
+
+const INITIAL_EXP_CONSUMED: ExpeditionResourceEntry[] = [
+  { id: 1, expeditionId: 1, resource: "Agua potable", amount: 35, date: "D-47 09:00", notes: "Raciones de salida" },
+  { id: 2, expeditionId: 3, resource: "Combustible", amount: 18, date: "D-47 07:30", notes: "Recorrido largo" },
+];
+
+const INITIAL_EXP_GAINED: ExpeditionResourceEntry[] = [
+  { id: 1, expeditionId: 1, resource: "Medicamentos", amount: 42, date: "D-47 14:20", notes: "Hospital norte" },
+  { id: 2, expeditionId: 4, resource: "Baterías", amount: 26, date: "D-46 18:10", notes: "Bodega industrial" },
 ];
 
 const INITIAL_INTERCAMP: IntercampRequest[] = [
@@ -226,7 +340,7 @@ const resourceTrendData = [
 
 function scoreColor(s: number) {
   if (s < 50) return "#DC2626";
-  if (s <= 75) return "#F59E0B";
+  if (s <= 75) return "#4AAED2";
   return "#0D9488";
 }
 function statusColor(s: string) {
@@ -234,26 +348,26 @@ function statusColor(s: string) {
     case "CRÍTICO": return "#DC2626";
     case "BAJO": return "#EA580C";
     case "OK": return "#0D9488";
-    default: return "#F59E0B";
+    default: return "#4AAED2";
   }
 }
 function invBarColor(pct: number) {
   if (pct < 20) return "#DC2626";
   if (pct < 40) return "#EA580C";
-  if (pct < 60) return "#F59E0B";
+  if (pct < 60) return "#4AAED2";
   return "#0D9488";
 }
 function expColor(s: string) {
-  if (s === "EN CURSO") return "#F59E0B";
+  if (s === "EN CURSO") return "#4AAED2";
   if (s === "PROGRAMADA") return "#0D9488";
   if (s === "REGRESANDO") return "#0D9488";
   return "#4B5563";
 }
 function intercampColor(s: string) {
   if (s === "APROBADO" || s === "CONFIRMADO") return "#0D9488";
-  if (s === "PENDIENTE") return "#F59E0B";
+  if (s === "PENDIENTE") return "#4AAED2";
   if (s === "RECHAZADO") return "#DC2626";
-  return "#8B8070";
+  return "#B8C7DB";
 }
 function logLevelColor(l: string) {
   if (l === "error") return UI_COLORS.state.critical;
@@ -265,7 +379,7 @@ function personStatusColor(s: string) {
   if (s === "Activo") return "#0D9488";
   if (s === "Herido") return "#EA580C";
   if (s === "Enfermo") return "#DC2626";
-  return "#F59E0B";
+  return "#4AAED2";
 }
 function notifColor(l: string) {
   if (l === "critical") return UI_COLORS.state.critical;
@@ -300,9 +414,9 @@ function Toggle({ active, onChange }: { active: boolean; onChange?: () => void }
     <button
       onClick={onChange}
       className="admin-toggle relative inline-flex items-center cursor-pointer"
-      style={{ width: 32, height: 16, borderRadius: 8, background: active ? "#D97706" : "#2D2A24", border: "1px solid #3D3A34", transition: "background 0.2s" }}
+      style={{ width: 32, height: 16, borderRadius: 8, background: active ? "#7FB8FF" : "#2A3444", border: "1px solid #324154", transition: "background 0.2s" }}
     >
-      <div className="admin-toggle-knob" style={{ width: 12, height: 12, borderRadius: "50%", background: "#F5F0E8", position: "absolute", left: active ? 16 : 2, transition: "left 0.2s" }} />
+      <div className="admin-toggle-knob" style={{ width: 12, height: 12, borderRadius: "50%", background: "#EEF3FB", position: "absolute", left: active ? 16 : 2, transition: "left 0.2s" }} />
     </button>
   );
 }
@@ -322,6 +436,48 @@ function EmptyState({ title, hint, icon: Icon }: { title: string; hint: string; 
       <Icon size={30} style={{ color: UI_COLORS.border, margin: "0 auto 8px" }} />
       <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: UI_COLORS.textMuted }}>{title}</div>
       <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textFaint }}>{hint}</div>
+    </div>
+  );
+}
+
+interface ExpeditionResourceEntry {
+  id: number;
+  expeditionId: number;
+  resource: string;
+  amount: number;
+  date: string;
+  notes: string;
+}
+
+function ModuleContext({ module }: { module: string }) {
+  return (
+    <div className="flex items-center justify-between px-3 py-2 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
+      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>CAMPAMENTO ACTUAL: CAMPAMENTO ALFA</span>
+      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.accent }}>{module}</span>
+    </div>
+  );
+}
+
+function PaginationBar({
+  page,
+  totalPages,
+  totalItems,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  onPageChange: (next: number) => void;
+}) {
+  const safeTotal = Math.max(1, totalPages);
+  return (
+    <div className="flex items-center justify-between gap-2 mt-3">
+      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>REGISTROS: {totalItems}</span>
+      <div className="flex items-center gap-1">
+        <button className="admin-chip-btn px-2 py-1 rounded-sm" style={{ border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textMuted }} disabled={page <= 1} onClick={() => onPageChange(Math.max(1, page - 1))}>ANT</button>
+        <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textPrimary }}>PÁG {page}/{safeTotal}</span>
+        <button className="admin-chip-btn px-2 py-1 rounded-sm" style={{ border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textMuted }} disabled={page >= safeTotal} onClick={() => onPageChange(Math.min(safeTotal, page + 1))}>SIG</button>
+      </div>
     </div>
   );
 }
@@ -375,11 +531,11 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
           transition={MOTION.base}
           onClick={e => e.stopPropagation()}
           className="admin-modal-card w-full max-w-lg rounded-sm p-5"
-          style={{ background: "#111114", border: "1px solid #D97706", boxShadow: "0 0 30px #D9770622", maxHeight: "90vh", overflowY: "auto" }}
+          style={{ background: "#0B1118", border: "1px solid #7FB8FF", boxShadow: "0 0 30px #7FB8FF22", maxHeight: "90vh", overflowY: "auto" }}
         >
-          <div className="flex items-center justify-between mb-4" style={{ borderBottom: "1px solid #2D2A24", paddingBottom: 12 }}>
-            <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: "#F59E0B", letterSpacing: "0.1em" }}>{title}</span>
-            <button onClick={onClose} className="admin-icon-btn"><X size={14} style={{ color: "#8B8070" }} /></button>
+          <div className="flex items-center justify-between mb-4" style={{ borderBottom: "1px solid #2A3444", paddingBottom: 12 }}>
+            <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: "#4AAED2", letterSpacing: "0.1em" }}>{title}</span>
+            <button onClick={onClose} className="admin-icon-btn"><X size={14} style={{ color: "#B8C7DB" }} /></button>
           </div>
           {children}
         </motion.div>
@@ -391,8 +547,8 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
 function DonutCenter({ cx, cy, total }: { cx?: number; cy?: number; total: number }) {
   return (
     <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
-      <tspan x={cx} dy="-8" style={{ fontFamily: "'Orbitron', monospace", fill: "#F5F0E8", fontSize: 22, fontWeight: 900 }}>{total}</tspan>
-      <tspan x={cx} dy="18" style={{ fontFamily: "'Share Tech Mono', monospace", fill: "#8B8070", fontSize: 9 }}>TOTAL</tspan>
+      <tspan x={cx} dy="-8" style={{ fontFamily: "'Orbitron', monospace", fill: "#EEF3FB", fontSize: 22, fontWeight: 900 }}>{total}</tspan>
+      <tspan x={cx} dy="18" style={{ fontFamily: "'Share Tech Mono', monospace", fill: "#B8C7DB", fontSize: 9 }}>TOTAL</tspan>
     </text>
   );
 }
@@ -401,11 +557,17 @@ function DonutCenter({ cx, cy, total }: { cx?: number; cy?: number; total: numbe
 
 function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
   const [persons, setPersons] = useState<Person[]>(INITIAL_PERSONS);
-  const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("Todos");
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get("pob_q") ?? "");
+  const [filterStatus, setFilterStatus] = useState(() => new URLSearchParams(window.location.search).get("pob_status") ?? "Todos");
   const [selected, setSelected] = useState<Person | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState<Partial<Person>>({});
+  const [assignments, setAssignments] = useState<TempOccupationAssignment[]>(INITIAL_TEMP_ASSIGNMENTS);
+  const [newAssign, setNewAssign] = useState({ personId: 0, occupationName: "", startDate: "", endDate: "", reason: "" });
+  const [isLoading] = useState(false);
+  const [errorCode] = useState<HttpCode | null>(null);
+  const [page, setPage] = useState(() => Number(new URLSearchParams(window.location.search).get("pob_page") ?? "1") || 1);
+  const limit = Number(new URLSearchParams(window.location.search).get("pob_limit") ?? "8") || 8;
 
   const statuses = ["Todos", "Activo", "Herido", "Enfermo", "Fuera"];
   const filtered = persons.filter(p => {
@@ -420,6 +582,22 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
     Enfermo: persons.filter(p => p.status === "Enfermo").length,
     Fuera: persons.filter(p => p.status === "Fuera").length,
   };
+  const totalPages = Math.max(1, Math.ceil(filtered.length / limit));
+  const safePage = Math.min(page, totalPages);
+  const pagedFiltered = filtered.slice((safePage - 1) * limit, safePage * limit);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterStatus, mode]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("pob_q", search);
+    params.set("pob_status", filterStatus);
+    params.set("pob_page", String(safePage));
+    params.set("pob_limit", String(limit));
+    window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
+  }, [search, filterStatus, safePage, limit]);
 
   const handleSaveEdit = () => {
     if (!selected) return;
@@ -433,15 +611,40 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
     setSelected(null);
   };
 
+  const handleCreateAssignment = () => {
+    const person = persons.find(p => p.id === newAssign.personId);
+    if (!person || !newAssign.occupationName || !newAssign.startDate || !newAssign.endDate) return;
+    setAssignments(prev => [{
+      id: Date.now(),
+      personId: person.id,
+      personName: person.name,
+      fromRole: person.role,
+      occupationId: Date.now(),
+      occupationName: newAssign.occupationName,
+      startDate: newAssign.startDate,
+      endDate: newAssign.endDate,
+      reason: newAssign.reason || "Asignación temporal",
+      status: "ACTIVA",
+    }, ...prev]);
+    setNewAssign({ personId: 0, occupationName: "", startDate: "", endDate: "", reason: "" });
+  };
+
+  const handleFinishAssignment = (id: number) => {
+    setAssignments(prev => prev.map(a => a.id === id ? { ...a, status: "FINALIZADA" } : a));
+  };
+
   return (
     <div>
+      <ModuleContext module="POBLACIÓN" />
+      {isLoading && <EmptyState title="CARGANDO POBLACIÓN" hint="Sincronizando personas del campamento" icon={Users} />}
+      {errorCode && <HttpStatusNotice code={errorCode} />}
       {mode === "stats" ? (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             {Object.entries(counts).map(([k, v]) => (
               <Card key={k}>
                 <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 24, fontWeight: 900, color: personStatusColor(k) }}>{v}</div>
-                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#8B8070", letterSpacing: "0.1em" }}>{k.toUpperCase()}</div>
+                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#B8C7DB", letterSpacing: "0.1em" }}>{k.toUpperCase()}</div>
               </Card>
             ))}
           </div>
@@ -453,9 +656,9 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
                   acc[person.role] = (acc[person.role] ?? 0) + 1;
                   return acc;
                 }, {})).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([role, total]) => (
-                  <div key={role} className="flex items-center justify-between p-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}>{role}</span>
-                    <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#D97706", fontWeight: 700 }}>{total}</span>
+                  <div key={role} className="flex items-center justify-between p-2 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
+                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>{role}</span>
+                    <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#7FB8FF", fontWeight: 700 }}>{total}</span>
                   </div>
                 ))}
               </div>
@@ -467,8 +670,8 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
                   acc[person.sector] = (acc[person.sector] ?? 0) + 1;
                   return acc;
                 }, {})).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([sector, total]) => (
-                  <div key={sector} className="flex items-center justify-between p-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#8B8070" }}>{sector.toUpperCase()}</span>
+                  <div key={sector} className="flex items-center justify-between p-2 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#B8C7DB" }}>{sector.toUpperCase()}</span>
                     <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#0D9488", fontWeight: 700 }}>{total}</span>
                   </div>
                 ))}
@@ -476,7 +679,7 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
             </Card>
           </div>
         </>
-      ) : (
+      ) : mode === "users" ? (
         <Card>
           <div className="flex items-center gap-3 mb-3 flex-wrap">
             <SectionHeader title={`REGISTRO DE POBLACIÓN — ${persons.length} PERSONAS`} accent={false} />
@@ -484,100 +687,188 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
             <SearchBar value={search} onChange={setSearch} placeholder="BUSCAR PERSONA..." />
             <div className="flex gap-1">
               {statuses.map(s => (
-                <button key={s} onClick={() => setFilterStatus(s)} className="admin-chip-btn px-2 py-1 rounded-sm cursor-pointer" style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, background: filterStatus === s ? "#D97706" : "#1A1A20", color: filterStatus === s ? "#0A0A0B" : "#8B8070", border: "1px solid #2D2A24" }}>
+                <button key={s} onClick={() => setFilterStatus(s)} className="admin-chip-btn px-2 py-1 rounded-sm cursor-pointer" style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, background: filterStatus === s ? "#7FB8FF" : "#121B26", color: filterStatus === s ? "#05070A" : "#B8C7DB", border: "1px solid #2A3444" }}>
                   {s}
                 </button>
               ))}
             </div>
           </div>
-          <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginBottom: 12 }} />
+          <div style={{ height: 1, background: "linear-gradient(90deg, #7FB8FF 0%, transparent 100%)", marginBottom: 12 }} />
 
-          <div className="admin-table grid gap-px" style={{ background: "#2D2A24" }}>
-            <div className="admin-table-header grid grid-cols-12 px-3 py-2" style={{ background: "#0D0D10" }}>
+          <div className="admin-table grid gap-px" style={{ background: "#2A3444" }}>
+            <div className="admin-table-header grid grid-cols-12 px-3 py-2" style={{ background: "#0B1118" }}>
               {["NOMBRE", "ROL", "ESTADO", "EDAD", "SECTOR", "INGRESO", "ACC."].map((h, i) => (
                 <div key={h} className={i === 0 ? "col-span-3" : i === 1 ? "col-span-2" : i === 2 ? "col-span-2" : i === 3 ? "col-span-1" : i === 4 ? "col-span-2" : i === 5 ? "col-span-1" : "col-span-1"}>
                   <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, letterSpacing: "0.08em" }}>{h}</span>
                 </div>
               ))}
             </div>
-            {filtered.map(person => (
+            {pagedFiltered.map(person => (
               <motion.div
                 key={person.id}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="admin-table-row grid grid-cols-12 items-center px-3 py-2 cursor-pointer hover:opacity-90 transition-opacity"
-                style={{ background: selected?.id === person.id ? "#1A1A20" : "#111114" }}
+                style={{ background: selected?.id === person.id ? "#121B26" : "#0B1118" }}
                 onClick={() => { setSelected(person); setEditMode(false); setEditData({}); }}
               >
                 <div className="col-span-3 flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-sm flex items-center justify-center flex-shrink-0" style={{ background: "#1A1A20", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070", border: "1px solid #2D2A24" }}>
+                  <div className="w-6 h-6 rounded-sm flex items-center justify-center flex-shrink-0" style={{ background: "#121B26", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB", border: "1px solid #2A3444" }}>
                     {person.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
                   </div>
-                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, fontWeight: 600, color: "#F5F0E8" }}>{person.name}</span>
+                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, fontWeight: 600, color: "#EEF3FB" }}>{person.name}</span>
                 </div>
-                <div className="col-span-2"><span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070" }}>{person.role}</span></div>
+                <div className="col-span-2"><span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#B8C7DB" }}>{person.role}</span></div>
                 <div className="col-span-2"><Badge label={person.status} color={personStatusColor(person.status)} /></div>
-                <div className="col-span-1"><span style={{ fontFamily: "'Orbitron', monospace", fontSize: 10, color: "#F5F0E8" }}>{person.age}</span></div>
-                <div className="col-span-2"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{person.sector}</span></div>
+                <div className="col-span-1"><span style={{ fontFamily: "'Orbitron', monospace", fontSize: 10, color: "#EEF3FB" }}>{person.age}</span></div>
+                <div className="col-span-2"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{person.sector}</span></div>
                 <div className="col-span-1"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{person.joined}</span></div>
                 <div className="col-span-1 flex gap-1">
-                  <button onClick={event => { event.stopPropagation(); setSelected(person); setEditMode(true); setEditData(person); }} className="admin-icon-btn"><Edit2 size={11} style={{ color: "#D97706" }} /></button>
-                  <button onClick={event => { event.stopPropagation(); handleDelete(person.id); }} className="admin-icon-btn"><Trash2 size={11} style={{ color: "#DC2626" }} /></button>
+                  <button onClick={event => { event.stopPropagation(); setSelected(person); setEditMode(true); setEditData(person); }} className="admin-icon-btn"><Edit2 size={11} style={{ color: "#7FB8FF" }} /></button>
+                  <button onClick={event => { event.stopPropagation(); confirmAction("¿Eliminar este registro de persona?", () => handleDelete(person.id)); }} className="admin-icon-btn"><Trash2 size={11} style={{ color: "#DC2626" }} /></button>
                 </div>
               </motion.div>
             ))}
           </div>
+          {filtered.length === 0 && <EmptyState title="SIN RESULTADOS" hint="Ajusta filtros o búsqueda" icon={Users} />}
+          <PaginationBar page={safePage} totalPages={totalPages} totalItems={filtered.length} onPageChange={setPage} />
         </Card>
+      ) : (
+        <div className="admin-stack-lg">
+          <Card>
+            <SectionHeader title="ASIGNACIONES TEMPORALES ACTIVAS" />
+            <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginBottom: 10 }} />
+            <div className="admin-stack-sm">
+              {assignments.filter(a => a.status === "ACTIVA").map(a => (
+                <div key={a.id} className="p-3 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textPrimary }}>{a.personName}</span>
+                    <Badge label={a.status} color={UI_COLORS.state.warning} />
+                  </div>
+                  <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>{a.fromRole} → {a.occupationName}</div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{a.startDate} a {a.endDate}</span>
+                    <SecuredActionBtn allowed reason="" label="FINALIZAR" color={UI_COLORS.accent} small onClick={() => confirmAction("¿Finalizar esta asignación temporal?", () => handleFinishAssignment(a.id))} />
+                  </div>
+                </div>
+              ))}
+              {assignments.filter(a => a.status === "ACTIVA").length === 0 && <EmptyState title="SIN ASIGNACIONES ACTIVAS" hint="No hay coberturas temporales en curso" icon={Users} />}
+            </div>
+          </Card>
+
+          <Card>
+            <SectionHeader title="CREAR ASIGNACIÓN TEMPORAL" />
+            <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginBottom: 10 }} />
+            <div className="admin-stack-md">
+              <div>
+                <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>PERSONA</label>
+                <select value={newAssign.personId || ""} onChange={e => setNewAssign(prev => ({ ...prev, personId: Number(e.target.value) }))}
+                  className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
+                  style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }}>
+                  <option value="">-- Seleccionar --</option>
+                  {persons.map(p => <option key={p.id} value={p.id}>{p.name} ({p.role})</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>OFICIO TEMPORAL</label>
+                <input value={newAssign.occupationName} onChange={e => setNewAssign(prev => ({ ...prev, occupationName: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
+                  style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }} />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input type="date" value={newAssign.startDate} onChange={e => setNewAssign(prev => ({ ...prev, startDate: e.target.value }))} className="px-3 py-2 rounded-sm outline-none" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }} />
+                <input type="date" value={newAssign.endDate} onChange={e => setNewAssign(prev => ({ ...prev, endDate: e.target.value }))} className="px-3 py-2 rounded-sm outline-none" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }} />
+              </div>
+              <textarea value={newAssign.reason} onChange={e => setNewAssign(prev => ({ ...prev, reason: e.target.value }))} rows={2}
+                className="w-full px-3 py-2 rounded-sm outline-none resize-none"
+                style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }} />
+              <ActionBtn label="ASIGNAR TEMPORALMENTE" color={UI_COLORS.accent} onClick={handleCreateAssignment} />
+            </div>
+          </Card>
+
+          <Card>
+            <SectionHeader title="HISTÓRICO DE ASIGNACIONES" />
+            <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginBottom: 10 }} />
+            <div className="admin-stack-sm">
+              {assignments.filter(a => a.status === "FINALIZADA").map(a => (
+                <div key={a.id} className="p-3 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
+                  <div className="flex items-center justify-between">
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textPrimary }}>{a.personName}</span>
+                    <Badge label="FINALIZADA" color={UI_COLORS.state.system} />
+                  </div>
+                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>{a.fromRole} → {a.occupationName}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
       )}
 
       {/* Detail/Edit panel */}
       <Modal open={!!selected} onClose={() => { setSelected(null); setEditMode(false); }} title={editMode ? "EDITAR PERSONA" : "FICHA INDIVIDUAL"}>
         {selected && (
           <div className="admin-stack-md">
-            {editMode ? (
+                {editMode ? (
               <>
+                <div className="p-2 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-sm flex items-center justify-center" style={{ background: UI_COLORS.panelRaised, border: `1px solid ${UI_COLORS.border}` }}>
+                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 12, color: UI_COLORS.textMuted }}>{selected.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
+                    </div>
+                    <div>
+                      <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>PREVIEW FOTO DE PERFIL</div>
+                      <button className="admin-chip-btn px-2 py-1 rounded-sm" style={{ border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textFaint }}>ACTUALIZAR FOTO (UI)</button>
+                    </div>
+                  </div>
+                </div>
                 {[
                   { label: "NOMBRE", key: "name" },
                   { label: "ROL", key: "role" },
                   { label: "SECTOR", key: "sector" },
                 ].map(({ label, key }) => (
                   <div key={key}>
-                    <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{label}</label>
+                    <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{label}</label>
                     <input
                       value={(editData as any)[key] ?? ""}
                       onChange={e => setEditData(prev => ({ ...prev, [key]: e.target.value }))}
                       className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                      style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}
+                      style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}
                     />
                   </div>
                 ))}
                 <div>
-                  <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>ESTADO</label>
+                  <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>ESTADO</label>
                   <select
                     value={(editData.status as string) ?? selected.status}
                     onChange={e => setEditData(prev => ({ ...prev, status: e.target.value as Person["status"] }))}
                     className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                    style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}
+                    style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}
                   >
                     {["Activo", "Herido", "Enfermo", "Fuera"].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div className="flex gap-2 mt-2">
                   <ActionBtn label="GUARDAR" color="#0D9488" onClick={handleSaveEdit} />
-                  <ActionBtn label="CANCELAR" color="#8B8070" onClick={() => setEditMode(false)} />
+                  <ActionBtn label="CANCELAR" color="#B8C7DB" onClick={() => setEditMode(false)} />
                 </div>
               </>
             ) : (
               <>
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-sm flex items-center justify-center" style={{ background: "#1A1A20", border: "1px solid #2D2A24" }}>
-                    <User size={24} style={{ color: "#D97706" }} />
+                  <div className="w-12 h-12 rounded-sm flex items-center justify-center" style={{ background: "#121B26", border: "1px solid #2A3444" }}>
+                    <User size={24} style={{ color: "#7FB8FF" }} />
                   </div>
                   <div>
-                    <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 18, fontWeight: 700, color: "#F5F0E8" }}>{selected.name}</div>
-                    <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{selected.role} — {selected.sector}</div>
+                    <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 18, fontWeight: 700, color: "#EEF3FB" }}>{selected.name}</div>
+                    <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{selected.role} — {selected.sector}</div>
                   </div>
                   <Badge label={selected.status} color={personStatusColor(selected.status)} />
+                </div>
+                <div className="p-2 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
+                  <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted, marginBottom: 4 }}>FOTO DE PERFIL</div>
+                  <div className="w-full h-20 rounded-sm flex items-center justify-center" style={{ background: UI_COLORS.panelRaised, border: `1px dashed ${UI_COLORS.border}` }}>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 16, color: UI_COLORS.textFaint }}>{selected.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {[
@@ -586,15 +877,15 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
                     { label: "SECTOR", value: selected.sector },
                     { label: "ESTADO", value: selected.status },
                   ].map(({ label, value }) => (
-                    <div key={label} className="p-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
+                    <div key={label} className="p-2 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
                       <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{label}</div>
-                      <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 13, color: "#F5F0E8", fontWeight: 600 }}>{value}</div>
+                      <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 13, color: "#EEF3FB", fontWeight: 600 }}>{value}</div>
                     </div>
                   ))}
                 </div>
                 <div className="flex gap-2 mt-1">
-                  <ActionBtn label="EDITAR" color="#D97706" onClick={() => { setEditMode(true); setEditData(selected); }} />
-                  <ActionBtn label="ELIMINAR REGISTRO" color="#DC2626" onClick={() => handleDelete(selected.id)} />
+                  <ActionBtn label="EDITAR" color="#7FB8FF" onClick={() => { setEditMode(true); setEditData(selected); }} />
+                  <ActionBtn label="ELIMINAR REGISTRO" color="#DC2626" onClick={() => confirmAction("¿Confirmas eliminar este registro?", () => handleDelete(selected.id))} />
                 </div>
               </>
             )}
@@ -605,10 +896,14 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
   );
 }
 
-function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
+function ViewAdmisiones({ mode, canReview }: { mode: AdmissionsViewMode; canReview: boolean }) {
   const [admissions, setAdmissions] = useState<Admission[]>(INITIAL_ADMISSIONS);
   const [selected, setSelected] = useState<Admission | null>(null);
   const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
+  const [isLoading] = useState(false);
+  const [errorCode] = useState<HttpCode | null>(null);
+  const [page, setPage] = useState(() => Number(new URLSearchParams(window.location.search).get("adm_page") ?? "1") || 1);
+  const limit = Number(new URLSearchParams(window.location.search).get("adm_limit") ?? "6") || 6;
 
   const showToast = (msg: string, color: string) => {
     setToast({ msg, color });
@@ -629,9 +924,28 @@ function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
 
   const pending = admissions.filter(a => a.status === "pending");
   const resolved = admissions.filter(a => a.status !== "pending");
+  const activeList = mode === "history" ? resolved : pending;
+  const totalPages = Math.max(1, Math.ceil(activeList.length / limit));
+  const safePage = Math.min(page, totalPages);
+  const pagedActive = activeList.slice((safePage - 1) * limit, safePage * limit);
+
+  useEffect(() => {
+    setPage(1);
+  }, [mode, admissions.length]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("adm_mode", mode);
+    params.set("adm_page", String(safePage));
+    params.set("adm_limit", String(limit));
+    window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
+  }, [mode, safePage, limit]);
 
   return (
     <div className="admin-stack-lg">
+      <ModuleContext module="ADMISIONES IA" />
+      {isLoading && <EmptyState title="CARGANDO ADMISIONES" hint="Consultando cola y procesadas" icon={UserPlus} />}
+      {errorCode && <HttpStatusNotice code={errorCode} />}
       {/* Toast */}
       <AnimatePresence>
         {toast && (
@@ -640,7 +954,7 @@ function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             className="fixed top-16 right-4 z-50 px-4 py-2 rounded-sm"
-            style={{ background: toast.color, fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#F5F0E8" }}
+            style={{ background: toast.color, fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#EEF3FB" }}
           >
             {toast.msg}
           </motion.div>
@@ -650,44 +964,44 @@ function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
       {(mode === "queue" || mode === "history") && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
-            { label: "PENDIENTES", value: pending.length, color: "#F59E0B" },
+            { label: "PENDIENTES", value: pending.length, color: "#4AAED2" },
             { label: "APROBADAS HOY", value: resolved.filter(a => a.status === "approved").length, color: "#0D9488" },
             { label: "RECHAZADAS HOY", value: resolved.filter(a => a.status === "rejected").length, color: "#DC2626" },
           ].map(({ label, value, color }) => (
             <Card key={label}>
               <div className="admin-kpi-value" style={{ fontFamily: "'Orbitron', monospace", fontWeight: 900, color }}>{value}</div>
-              <div className="admin-text-label" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#8B8070", letterSpacing: "0.1em" }}>{label}</div>
+              <div className="admin-text-label" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#B8C7DB", letterSpacing: "0.1em" }}>{label}</div>
             </Card>
           ))}
         </div>
       )}
 
-      {mode === "queue" && <Card glow="#D97706">
+      {mode === "queue" && <Card glow="#7FB8FF">
         <div className="flex items-center justify-between mb-3">
           <SectionHeader title="SOLICITUDES PENDIENTES — EVALUACION IA" accent={false} />
           <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>Modelo: admission-v1 | Precisión: 89%</span>
         </div>
-        <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginBottom: 12 }} />
+        <div style={{ height: 1, background: "linear-gradient(90deg, #7FB8FF 0%, transparent 100%)", marginBottom: 12 }} />
         <div className="admin-stack-md">
-          {pending.map((a) => (
+          {pagedActive.map((a) => (
             <motion.div
               key={a.id}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               className="p-3 rounded-sm"
-              style={{ background: "#0D0D10", border: `1px solid ${a.score < 50 ? "#DC262655" : "#2D2A24"}` }}
+              style={{ background: "#0B1118", border: `1px solid ${a.score < 50 ? "#DC262655" : "#2A3444"}` }}
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-sm flex items-center justify-center" style={{ background: "#1A1A20", border: "1px solid #2D2A24" }}>
-                    <User size={16} style={{ color: "#D97706" }} />
+                  <div className="w-8 h-8 rounded-sm flex items-center justify-center" style={{ background: "#121B26", border: "1px solid #2A3444" }}>
+                    <User size={16} style={{ color: "#7FB8FF" }} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 14, fontWeight: 700, color: a.score < 50 ? "#DC2626" : "#F5F0E8" }}>{a.name}</span>
+                      <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 14, fontWeight: 700, color: a.score < 50 ? "#DC2626" : "#EEF3FB" }}>{a.name}</span>
                       {a.badge && <Badge label={a.badge} color="#DC2626" />}
                     </div>
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{a.profession}</span>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{a.profession}</span>
                   </div>
                 </div>
                 <div className="text-right">
@@ -696,29 +1010,30 @@ function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
                 </div>
               </div>
               {/* Score bar */}
-              <div className="admin-bar h-1.5 rounded-sm overflow-hidden mb-2" style={{ background: "#2D2A24" }}>
+              <div className="admin-bar h-1.5 rounded-sm overflow-hidden mb-2" style={{ background: "#2A3444" }}>
                 <motion.div initial={{ width: 0 }} animate={{ width: `${a.score}%` }} transition={MOTION.progress}
                   className="admin-bar-fill" style={{ height: "100%", background: scoreColor(a.score), borderRadius: 2 }} />
               </div>
-              <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070", marginBottom: 8 }}>{a.reason}</p>
+              <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#B8C7DB", marginBottom: 8 }}>{a.reason}</p>
               {a.skills.length > 0 && (
                 <div className="flex gap-1 flex-wrap mb-2">
-                  {a.skills.map(s => <Badge key={s} label={s} color="#D97706" />)}
+                  {a.skills.map(s => <Badge key={s} label={s} color="#7FB8FF" />)}
                 </div>
               )}
               <div className="flex gap-2 items-center">
-                <ActionBtn label="VER DETALLE" color="#8B8070" small onClick={() => setSelected(a)} />
-                <ActionBtn label="APROBAR" color="#0D9488" small onClick={() => handleApprove(a.id)} />
-                <ActionBtn label="RECHAZAR" color="#DC2626" small onClick={() => handleReject(a.id)} />
+                <ActionBtn label="VER DETALLE" color="#B8C7DB" small onClick={() => setSelected(a)} />
+                <SecuredActionBtn allowed={canReview} reason="Requiere permiso de revisión de admisiones" label="APROBAR" color="#0D9488" small onClick={() => confirmAction("¿Aprobar esta admisión?", () => handleApprove(a.id))} />
+                <SecuredActionBtn allowed={canReview} reason="Requiere permiso de revisión de admisiones" label="RECHAZAR" color="#DC2626" small onClick={() => confirmAction("¿Rechazar esta admisión?", () => handleReject(a.id))} />
               </div>
             </motion.div>
           ))}
           {pending.length === 0 && (
             <div className="text-center py-8">
               <CheckCircle size={32} style={{ color: "#0D9488", margin: "0 auto 8px" }} />
-              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#8B8070" }}>SIN PENDIENTES — COLA LIMPIA</div>
+              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#B8C7DB" }}>SIN PENDIENTES — COLA LIMPIA</div>
             </div>
           )}
+          {pending.length > 0 && <PaginationBar page={safePage} totalPages={totalPages} totalItems={pending.length} onPageChange={setPage} />}
         </div>
       </Card>}
 
@@ -726,17 +1041,18 @@ function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
         <Card>
           <SectionHeader title="PROCESADAS RECIENTEMENTE" />
           <div className="admin-stack-sm">
-            {resolved.map(a => (
+            {pagedActive.map(a => (
               <div key={a.id} className="flex items-center justify-between px-3 py-2 rounded-sm"
-                style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
+                style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
                 <div className="flex items-center gap-2">
                   {a.status === "approved" ? <CheckCircle size={12} style={{ color: "#0D9488" }} /> : <XCircle size={12} style={{ color: "#DC2626" }} />}
-                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}>{a.name}</span>
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{a.profession}</span>
+                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>{a.name}</span>
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{a.profession}</span>
                 </div>
                 <Badge label={a.status === "approved" ? "APROBADO" : "RECHAZADO"} color={a.status === "approved" ? "#0D9488" : "#DC2626"} />
               </div>
             ))}
+            {resolved.length > 0 && <PaginationBar page={safePage} totalPages={totalPages} totalItems={resolved.length} onPageChange={setPage} />}
           </div>
         </Card>
       )}
@@ -746,39 +1062,39 @@ function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
         {selected && (
           <div className="admin-stack-lg">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-sm flex items-center justify-center" style={{ background: "#1A1A20", border: "1px solid #2D2A24" }}>
-                <User size={24} style={{ color: "#D97706" }} />
+              <div className="w-12 h-12 rounded-sm flex items-center justify-center" style={{ background: "#121B26", border: "1px solid #2A3444" }}>
+                <User size={24} style={{ color: "#7FB8FF" }} />
               </div>
               <div>
-                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 18, fontWeight: 700, color: "#F5F0E8" }}>{selected.name}</div>
-                <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{selected.profession}</div>
+                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 18, fontWeight: 700, color: "#EEF3FB" }}>{selected.name}</div>
+                <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{selected.profession}</div>
               </div>
             </div>
-            <div className="p-3 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
-              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#D97706", marginBottom: 4 }}>EVALUACIÓN IA</div>
+            <div className="p-3 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
+              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#7FB8FF", marginBottom: 4 }}>EVALUACIÓN IA</div>
               <div className="flex items-end gap-2 mb-2">
                 <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 36, fontWeight: 900, color: scoreColor(selected.score) }}>{selected.score}</span>
-                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#8B8070", marginBottom: 6 }}>/100</span>
+                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#B8C7DB", marginBottom: 6 }}>/100</span>
               </div>
-              <div className="admin-bar h-2 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
+              <div className="admin-bar h-2 rounded-sm overflow-hidden" style={{ background: "#2A3444" }}>
                 <div className="admin-bar-fill" style={{ width: `${selected.score}%`, height: "100%", background: scoreColor(selected.score) }} />
               </div>
             </div>
             <div>
               <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textFaint, marginBottom: 6 }}>RAZÓN DE LLEGADA</div>
-              <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}>{selected.reason}</p>
+              <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>{selected.reason}</p>
             </div>
             {selected.skills.length > 0 && (
               <div>
                 <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textFaint, marginBottom: 6 }}>HABILIDADES VERIFICADAS</div>
                 <div className="flex gap-1 flex-wrap">
-                  {selected.skills.map(s => <Badge key={s} label={s} color="#D97706" />)}
+                  {selected.skills.map(s => <Badge key={s} label={s} color="#7FB8FF" />)}
                 </div>
               </div>
             )}
             <div className="flex gap-2">
-              <ActionBtn label="APROBAR ADMISIÓN" color="#0D9488" onClick={() => handleApprove(selected.id)} />
-              <ActionBtn label="RECHAZAR" color="#DC2626" onClick={() => handleReject(selected.id)} />
+              <SecuredActionBtn allowed={canReview} reason="Requiere permiso de revisión de admisiones" label="APROBAR ADMISIÓN" color="#0D9488" onClick={() => confirmAction("¿Aprobar esta admisión?", () => handleApprove(selected.id))} />
+              <SecuredActionBtn allowed={canReview} reason="Requiere permiso de revisión de admisiones" label="RECHAZAR" color="#DC2626" onClick={() => confirmAction("¿Rechazar esta admisión?", () => handleReject(selected.id))} />
             </div>
           </div>
         )}
@@ -787,14 +1103,21 @@ function ViewAdmisiones({ mode }: { mode: AdmissionsViewMode }) {
   );
 }
 
-function ViewInventario({ mode }: { mode: InventoryViewMode }) {
+function ViewInventario({ mode, canAdjust }: { mode: InventoryViewMode; canAdjust: boolean }) {
   const [items, setItems] = useState<InventoryItem[]>(INITIAL_INVENTORY);
-  const [search, setSearch] = useState("");
+  const [movements] = useState<InventoryMovement[]>(INITIAL_MOVEMENTS);
+  const [invAlerts, setInvAlerts] = useState<InventoryAlert[]>(INITIAL_INV_ALERTS);
+  const [collections] = useState<DailyCollection[]>(INITIAL_COLLECTIONS);
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get("inv_q") ?? "");
   const [editing, setEditing] = useState<InventoryItem | null>(null);
   const [editUnits, setEditUnits] = useState(0);
   const [showAdd, setShowAdd] = useState(false);
   const [newItem, setNewItem] = useState<Partial<InventoryItem>>({ name: "", category: "Esencial", units: 0, max: 100 });
   const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
+  const [isLoading] = useState(false);
+  const [errorCode] = useState<HttpCode | null>(null);
+  const [page, setPage] = useState(() => Number(new URLSearchParams(window.location.search).get("inv_page") ?? "1") || 1);
+  const limit = Number(new URLSearchParams(window.location.search).get("inv_limit") ?? "7") || 7;
 
   const showToast = (msg: string, color: string) => {
     setToast({ msg, color });
@@ -833,14 +1156,33 @@ function ViewInventario({ mode }: { mode: InventoryViewMode }) {
 
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()) || i.category.toLowerCase().includes(search.toLowerCase()));
   const categories = [...new Set(items.map(i => i.category))];
+  const totalPages = Math.max(1, Math.ceil(filtered.length / limit));
+  const safePage = Math.min(page, totalPages);
+  const pagedFiltered = filtered.slice((safePage - 1) * limit, safePage * limit);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, mode, items.length]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("inv_q", search);
+    params.set("inv_mode", mode);
+    params.set("inv_page", String(safePage));
+    params.set("inv_limit", String(limit));
+    window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
+  }, [search, mode, safePage, limit]);
 
   return (
     <div className="admin-stack-lg">
+      <ModuleContext module="INVENTARIO" />
+      {isLoading && <EmptyState title="CARGANDO INVENTARIO" hint="Consultando stock del campamento" icon={Package} />}
+      {errorCode && <HttpStatusNotice code={errorCode} />}
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             className="fixed top-16 right-4 z-50 px-4 py-2 rounded-sm"
-            style={{ background: toast.color, fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#F5F0E8" }}>
+            style={{ background: toast.color, fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#EEF3FB" }}>
             {toast.msg}
           </motion.div>
         )}
@@ -853,8 +1195,8 @@ function ViewInventario({ mode }: { mode: InventoryViewMode }) {
           return (
             <Card key={cat}>
               <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 18, fontWeight: 900, color: invBarColor(avgPct) }}>{avgPct}%</div>
-              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{cat.toUpperCase()}</div>
-              <div className="admin-bar h-1 rounded-sm overflow-hidden mt-1" style={{ background: "#2D2A24" }}>
+              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{cat.toUpperCase()}</div>
+              <div className="admin-bar h-1 rounded-sm overflow-hidden mt-1" style={{ background: "#2A3444" }}>
                 <div className="admin-bar-fill" style={{ width: `${avgPct}%`, height: "100%", background: invBarColor(avgPct) }} />
               </div>
             </Card>
@@ -867,51 +1209,53 @@ function ViewInventario({ mode }: { mode: InventoryViewMode }) {
           <SectionHeader title="BODEGA COMPLETA" accent={false} />
           <div className="flex-1" />
           <SearchBar value={search} onChange={setSearch} placeholder="BUSCAR RECURSO..." />
-          <ActionBtn label="+ AGREGAR ÍTEM" color="#0D9488" onClick={() => setShowAdd(true)} />
+          <ActionBtn label="VER MOVIMIENTOS" color="#B8C7DB" onClick={() => {}} />
+          <ActionBtn label="VER ALERTAS" color="#B8C7DB" onClick={() => {}} />
+          <SecuredActionBtn allowed={canAdjust} reason="Requiere permiso de gestión de inventario" label="+ AGREGAR ÍTEM" color="#0D9488" onClick={() => setShowAdd(true)} />
         </div>
-        <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginBottom: 12 }} />
+        <div style={{ height: 1, background: "linear-gradient(90deg, #7FB8FF 0%, transparent 100%)", marginBottom: 12 }} />
 
         <div className="admin-stack-sm">
-          {filtered.map(item => {
+          {pagedFiltered.map(item => {
             const isEditing = editing?.id === item.id;
             const bcolor = invBarColor(item.pct);
             return (
               <motion.div key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                className="p-3 rounded-sm" style={{ background: "#0D0D10", border: `1px solid ${item.status === "CRÍTICO" ? "#DC262644" : "#2D2A24"}` }}>
+                className="p-3 rounded-sm" style={{ background: "#0B1118", border: `1px solid ${item.status === "CRÍTICO" ? "#DC262644" : "#2A3444"}` }}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 13, fontWeight: 600, color: "#F5F0E8" }}>{item.name}</span>
-                    <Badge label={item.category} color="#8B8070" />
+                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 13, fontWeight: 600, color: "#EEF3FB" }}>{item.name}</span>
+                    <Badge label={item.category} color="#B8C7DB" />
                     <Badge label={item.status} color={statusColor(item.status)} />
                   </div>
                   <div className="flex items-center gap-2">
                     <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 16, fontWeight: 900, color: bcolor }}>{item.pct}%</span>
-                    <button onClick={() => { setEditing(item); setEditUnits(item.units); }} className="admin-icon-btn"><Edit2 size={11} style={{ color: "#D97706" }} /></button>
-                    <button onClick={() => handleDelete(item.id)} className="admin-icon-btn"><Trash2 size={11} style={{ color: "#DC2626" }} /></button>
+                    <button onClick={() => { setEditing(item); setEditUnits(item.units); }} className="admin-icon-btn"><Edit2 size={11} style={{ color: "#7FB8FF" }} /></button>
+                    <button onClick={() => confirmAction("¿Eliminar este ítem de inventario?", () => handleDelete(item.id))} className="admin-icon-btn"><Trash2 size={11} style={{ color: "#DC2626" }} /></button>
                   </div>
                 </div>
                 {isEditing ? (
                   <div className="flex items-center gap-2 mt-1">
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>UNIDADES:</span>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>UNIDADES:</span>
                     <input
                       type="number"
                       value={editUnits}
                       onChange={e => setEditUnits(Number(e.target.value))}
                       className="px-2 py-1 rounded-sm outline-none w-24"
-                      style={{ background: "#1A1A20", border: "1px solid #D97706", fontFamily: "'Orbitron', monospace", fontSize: 11, color: "#F5F0E8" }}
+                      style={{ background: "#121B26", border: "1px solid #7FB8FF", fontFamily: "'Orbitron', monospace", fontSize: 11, color: "#EEF3FB" }}
                     />
                     <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>/ {item.max} max</span>
-                    <ActionBtn label="GUARDAR" color="#0D9488" small onClick={handleSaveEdit} />
-                    <ActionBtn label="CANCELAR" color="#8B8070" small onClick={() => setEditing(null)} />
+                    <SecuredActionBtn allowed={canAdjust} reason="Requiere permiso de gestión de inventario" label="GUARDAR" color="#0D9488" small onClick={handleSaveEdit} />
+                    <ActionBtn label="CANCELAR" color="#B8C7DB" small onClick={() => setEditing(null)} />
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
-                    <div className="admin-bar flex-1 h-2 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
+                    <div className="admin-bar flex-1 h-2 rounded-sm overflow-hidden" style={{ background: "#2A3444" }}>
                       <motion.div initial={{ width: 0 }} animate={{ width: `${item.pct}%` }} transition={MOTION.progress}
                         className={`admin-bar-fill ${item.status === "CRÍTICO" ? "animate-pulse" : ""}`}
                         style={{ height: "100%", background: bcolor, borderRadius: 2 }} />
                     </div>
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070", whiteSpace: "nowrap" }}>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB", whiteSpace: "nowrap" }}>
                       {item.units} / {item.max} unidades
                     </span>
                   </div>
@@ -920,7 +1264,80 @@ function ViewInventario({ mode }: { mode: InventoryViewMode }) {
             );
           })}
         </div>
+        {filtered.length === 0 && <EmptyState title="SIN RECURSOS" hint="No hay coincidencias para el filtro actual" icon={Package} />}
+        {filtered.length > 0 && <PaginationBar page={safePage} totalPages={totalPages} totalItems={filtered.length} onPageChange={setPage} />}
       </Card>}
+
+      {mode === "movements" && (
+        <Card>
+          <SectionHeader title="MOVIMIENTOS DE INVENTARIO" />
+          <div className="admin-stack-sm">
+            {movements.map(m => (
+              <div key={m.id} className="p-3 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textPrimary }}>{m.resource}</span>
+                  <Badge label={m.type} color={m.type === "INGRESO" ? UI_COLORS.state.info : m.type === "EGRESO" ? UI_COLORS.state.critical : UI_COLORS.state.warning} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>{m.reason}</span>
+                  <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, color: UI_COLORS.textPrimary }}>{m.amount} u.</span>
+                </div>
+                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{m.date}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {mode === "alerts" && (
+        <Card glow={UI_COLORS.state.warning}>
+          <SectionHeader title="ALERTAS DE INVENTARIO" />
+          <div className="admin-stack-sm">
+            {invAlerts.map(a => (
+              <div key={a.id} className="p-3 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${(a.severity === "CRÍTICA" ? UI_COLORS.state.critical : UI_COLORS.state.warning)}66` }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textPrimary }}>{a.resource}</span>
+                  <div className="flex items-center gap-1">
+                    <Badge label={a.severity} color={a.severity === "CRÍTICA" ? UI_COLORS.state.critical : UI_COLORS.state.warning} />
+                    <Badge label={a.status} color={a.status === "ACTIVA" ? UI_COLORS.state.critical : UI_COLORS.state.info} />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>Umbral mínimo: {a.threshold}%</span>
+                  {a.status === "ACTIVA" && (
+                    <SecuredActionBtn
+                      allowed={canAdjust}
+                      reason="Requiere permiso de gestión de inventario"
+                      label="MARCAR ATENDIDA"
+                      color={UI_COLORS.state.info}
+                      small
+                      onClick={() => setInvAlerts(prev => prev.map(x => x.id === a.id ? { ...x, status: "ATENDIDA" } : x))}
+                    />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {mode === "collection" && (
+        <Card>
+          <SectionHeader title="RECOLECCIÓN DIARIA" />
+          <div className="admin-stack-sm">
+            {collections.map(c => (
+              <div key={c.id} className="p-3 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textPrimary }}>{c.resource}</span>
+                  <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, color: UI_COLORS.state.info }}>+{c.amountCollected}</span>
+                </div>
+                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>{c.notes}</div>
+                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{c.date}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Add item modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="AGREGAR ÍTEM AL INVENTARIO">
@@ -929,17 +1346,17 @@ function ViewInventario({ mode }: { mode: InventoryViewMode }) {
             { label: "NOMBRE DEL RECURSO", key: "name" },
           ].map(({ label, key }) => (
             <div key={key}>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{label}</label>
+              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{label}</label>
               <input value={(newItem as any)[key] ?? ""} onChange={e => setNewItem(prev => ({ ...prev, [key]: e.target.value }))}
                 className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }} />
+                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
             </div>
           ))}
           <div>
-            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>CATEGORÍA</label>
+            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>CATEGORÍA</label>
             <select value={newItem.category ?? "Esencial"} onChange={e => setNewItem(prev => ({ ...prev, category: e.target.value }))}
               className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-              style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}>
+              style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>
               {["Esencial", "Médico", "Defensa", "Energía", "Bienestar", "Agricultura"].map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
@@ -949,27 +1366,31 @@ function ViewInventario({ mode }: { mode: InventoryViewMode }) {
               { label: "CAPACIDAD MÁXIMA", key: "max" },
             ].map(({ label, key }) => (
               <div key={key}>
-                <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{label}</label>
+                <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{label}</label>
                 <input type="number" value={(newItem as any)[key] ?? 0} onChange={e => setNewItem(prev => ({ ...prev, [key]: Number(e.target.value) }))}
                   className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                  style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }} />
+                  style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
               </div>
             ))}
           </div>
-          <ActionBtn label="AGREGAR AL INVENTARIO" color="#0D9488" onClick={handleAdd} />
+          <SecuredActionBtn allowed={canAdjust} reason="Requiere permiso de gestión de inventario" label="AGREGAR AL INVENTARIO" color="#0D9488" onClick={handleAdd} />
         </div>
       </Modal>
     </div>
   );
 }
 
-function ViewExpediciones({ mode }: { mode: ExpeditionsViewMode }) {
+function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canForce: boolean }) {
   const [expeditions, setExpeditions] = useState<Expedition[]>(INITIAL_EXPEDITIONS);
+  const [consumedEntries, setConsumedEntries] = useState<ExpeditionResourceEntry[]>(INITIAL_EXP_CONSUMED);
+  const [gainedEntries, setGainedEntries] = useState<ExpeditionResourceEntry[]>(INITIAL_EXP_GAINED);
   const [, setSelected] = useState<Expedition | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newExp, setNewExp] = useState<Partial<Expedition>>({ name: "", objective: "", sector: "", total: 5, participants: [], status: "PROGRAMADA" });
   const [participantInput, setParticipantInput] = useState("");
   const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
+  const [isLoading] = useState(false);
+  const [errorCode] = useState<HttpCode | null>(null);
 
   const showToast = (msg: string, color: string) => {
     setToast({ msg, color });
@@ -1000,6 +1421,11 @@ function ViewExpediciones({ mode }: { mode: ExpeditionsViewMode }) {
     showToast("EXPEDICIÓN MARCADA COMO COMPLETADA", "#0D9488");
   };
 
+  const handleForceStatus = (id: number, status: Expedition["status"]) => {
+    setExpeditions(prev => prev.map(e => e.id === id ? { ...e, status } : e));
+    showToast(`ESTADO FORZADO: ${status}`, "#7FB8FF");
+  };
+
   const addParticipant = () => {
     if (!participantInput) return;
     setNewExp(prev => ({ ...prev, participants: [...(prev.participants ?? []), participantInput.toUpperCase().slice(0, 2)] }));
@@ -1012,11 +1438,14 @@ function ViewExpediciones({ mode }: { mode: ExpeditionsViewMode }) {
 
   return (
     <div className="admin-stack-lg">
+      <ModuleContext module="EXPEDICIONES" />
+      {isLoading && <EmptyState title="CARGANDO EXPEDICIONES" hint="Actualizando tablero operativo" icon={Map} />}
+      {errorCode && <HttpStatusNotice code={errorCode} />}
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             className="fixed top-16 right-4 z-50 px-4 py-2 rounded-sm"
-            style={{ background: toast.color, fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#F5F0E8" }}>
+            style={{ background: toast.color, fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#EEF3FB" }}>
             {toast.msg}
           </motion.div>
         )}
@@ -1024,46 +1453,47 @@ function ViewExpediciones({ mode }: { mode: ExpeditionsViewMode }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
-          { label: "EN CURSO", value: active.length, color: "#F59E0B" },
+          { label: "EN CURSO", value: active.length, color: "#4AAED2" },
           { label: "PROGRAMADAS", value: scheduled.length, color: "#0D9488" },
           { label: "COMPLETADAS", value: completed.length, color: "#4B5563" },
         ].map(({ label, value, color }) => (
           <Card key={label}>
             <div className="admin-kpi-value" style={{ fontFamily: "'Orbitron', monospace", fontWeight: 900, color }}>{value}</div>
-            <div className="admin-text-label" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#8B8070", letterSpacing: "0.1em" }}>{label}</div>
+            <div className="admin-text-label" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#B8C7DB", letterSpacing: "0.1em" }}>{label}</div>
           </Card>
         ))}
       </div>
 
       {(mode === "planning" || mode === "active") && <div className="flex justify-end">
-        <ActionBtn label="+ NUEVA EXPEDICIÓN" color="#D97706" onClick={() => setShowCreate(true)} />
+        <ActionBtn label="+ NUEVA EXPEDICIÓN" color="#7FB8FF" onClick={() => setShowCreate(true)} />
       </div>}
 
       {/* Expedition list */}
+      {(["active", "planning", "history"] as ExpeditionsViewMode[]).includes(mode) && (
       <div className="admin-stack-md">
         {(mode === "active" ? expeditions.filter(e => e.status !== "COMPLETADA") : mode === "history" ? expeditions.filter(e => e.status === "COMPLETADA") : expeditions).map(exp => {
           const pct = exp.total > 0 ? Math.round((exp.day / exp.total) * 100) : 0;
           const sc = expColor(exp.status);
           return (
-            <Card key={exp.id} className="cursor-pointer hover:opacity-90 transition-opacity" glow={exp.status === "EN CURSO" ? "#D97706" : ""}>
+            <Card key={exp.id} className="cursor-pointer hover:opacity-90 transition-opacity" glow={exp.status === "EN CURSO" ? "#7FB8FF" : ""}>
               <div onClick={() => setSelected(exp)}>
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <Map size={12} style={{ color: sc }} />
-                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: "#F5F0E8" }}>{exp.name}</span>
+                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: "#EEF3FB" }}>{exp.name}</span>
                     </div>
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070" }}>{exp.sector}</span>
+                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#B8C7DB" }}>{exp.sector}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge label={exp.status} color={sc} />
                     <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: sc }}>DÍA {exp.day}/{exp.total}</span>
                   </div>
                 </div>
-                <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070", marginBottom: 8 }}>{exp.objective}</p>
+                <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#B8C7DB", marginBottom: 8 }}>{exp.objective}</p>
                 {exp.total > 0 && (
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="admin-bar flex-1 h-1.5 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
+                    <div className="admin-bar flex-1 h-1.5 rounded-sm overflow-hidden" style={{ background: "#2A3444" }}>
                       <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={MOTION.progress}
                         className="admin-bar-fill" style={{ height: "100%", background: sc, borderRadius: 2 }} />
                     </div>
@@ -1073,7 +1503,7 @@ function ViewExpediciones({ mode }: { mode: ExpeditionsViewMode }) {
                 <div className="flex items-center gap-1">
                   {exp.participants.slice(0, 6).map((p, i) => (
                     <div key={i} className="w-6 h-6 rounded-sm flex items-center justify-center flex-shrink-0"
-                      style={{ background: "#1A1A20", border: "1px solid #2D2A24", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>
+                      style={{ background: "#121B26", border: "1px solid #2A3444", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>
                       {p}
                     </div>
                   ))}
@@ -1083,15 +1513,89 @@ function ViewExpediciones({ mode }: { mode: ExpeditionsViewMode }) {
                 </div>
               </div>
               {exp.status !== "COMPLETADA" && (
-                <div className="flex gap-2 mt-3 pt-3" style={{ borderTop: "1px solid #2D2A24" }}>
-                  <ActionBtn label="+ AVANZAR DÍA" color="#D97706" small onClick={() => handleAdvanceDay(exp.id)} />
-                  <ActionBtn label="MARCAR COMPLETADA" color="#0D9488" small onClick={() => handleComplete(exp.id)} />
+                <div className="flex gap-2 mt-3 pt-3" style={{ borderTop: "1px solid #2A3444" }}>
+                  <ActionBtn label="+ AVANZAR DÍA" color="#7FB8FF" small onClick={() => handleAdvanceDay(exp.id)} />
+                  <ActionBtn label="MARCAR COMPLETADA" color="#0D9488" small onClick={() => confirmAction("¿Marcar esta expedición como completada?", () => handleComplete(exp.id))} />
+                  <SecuredActionBtn allowed={canForce} reason="Requiere permiso de control de expediciones" label="FORZAR EN CURSO" color="#B8C7DB" small onClick={() => confirmAction("¿Forzar estado EN CURSO?", () => handleForceStatus(exp.id, "EN CURSO"))} />
+                  <SecuredActionBtn allowed={canForce} reason="Requiere permiso de control de expediciones" label="FORZAR REGRESO" color="#B8C7DB" small onClick={() => confirmAction("¿Forzar estado REGRESANDO?", () => handleForceStatus(exp.id, "REGRESANDO"))} />
                 </div>
               )}
             </Card>
           );
         })}
       </div>
+      )}
+
+      {mode === "participants" && (
+        <Card>
+          <SectionHeader title="PARTICIPANTES POR EXPEDICIÓN" />
+          <div className="admin-stack-sm">
+            {expeditions.map(exp => (
+              <div key={exp.id} className="p-3 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textPrimary }}>{exp.name}</span>
+                  <Badge label={exp.status} color={expColor(exp.status)} />
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {exp.participants.map((p, i) => (
+                    <span key={`${exp.id}-${i}`} className="px-2 py-1 rounded-sm" style={{ border: `1px solid ${UI_COLORS.border}`, fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>{p}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {mode === "consumed" && (
+        <Card>
+          <SectionHeader title="RECURSOS CONSUMIDOS EN EXPEDICIÓN" />
+          <div className="admin-stack-sm">
+            {consumedEntries.map(r => (
+              <div key={r.id} className="p-3 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
+                <div className="flex items-center justify-between">
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textPrimary }}>{r.resource}</span>
+                  <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, color: UI_COLORS.state.warning }}>-{r.amount}</span>
+                </div>
+                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>{r.notes}</div>
+                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{r.date}</span>
+              </div>
+            ))}
+            <SecuredActionBtn
+              allowed={canForce}
+              reason="Requiere permiso de control de expediciones"
+              label="REGISTRAR CONSUMO (UI)"
+              color={UI_COLORS.state.warning}
+              onClick={() => setConsumedEntries(prev => [{ id: Date.now(), expeditionId: 1, resource: "Raciones", amount: 8, date: "D-47 16:00", notes: "Ajuste manual" }, ...prev])}
+            />
+          </div>
+        </Card>
+      )}
+
+      {mode === "gained" && (
+        <Card>
+          <SectionHeader title="RECURSOS OBTENIDOS EN EXPEDICIÓN" />
+          <div className="admin-stack-sm">
+            {gainedEntries.map(r => (
+              <div key={r.id} className="p-3 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
+                <div className="flex items-center justify-between">
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textPrimary }}>{r.resource}</span>
+                  <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, color: UI_COLORS.state.info }}>+{r.amount}</span>
+                </div>
+                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>{r.notes}</div>
+                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{r.date}</span>
+              </div>
+            ))}
+            <SecuredActionBtn
+              allowed={canForce}
+              reason="Requiere permiso de control de expediciones"
+              label="REGISTRAR RECURSO OBTENIDO (UI)"
+              color={UI_COLORS.state.info}
+              onClick={() => setGainedEntries(prev => [{ id: Date.now(), expeditionId: 1, resource: "Agua", amount: 20, date: "D-47 16:10", notes: "Registro manual" }, ...prev])}
+            />
+          </div>
+        </Card>
+      )}
 
       <Modal open={showCreate && mode !== "history"} onClose={() => setShowCreate(false)} title="CREAR NUEVA EXPEDICIÓN">
         <div className="admin-stack-md">
@@ -1101,49 +1605,53 @@ function ViewExpediciones({ mode }: { mode: ExpeditionsViewMode }) {
             { label: "SECTOR / DISTANCIA", key: "sector" },
           ].map(({ label, key }) => (
             <div key={key}>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{label}</label>
+              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{label}</label>
               <input value={(newExp as any)[key] ?? ""} onChange={e => setNewExp(prev => ({ ...prev, [key]: e.target.value }))}
                 className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }} />
+                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
             </div>
           ))}
           <div>
-            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>DURACIÓN ESTIMADA (DÍAS)</label>
+            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>DURACIÓN ESTIMADA (DÍAS)</label>
             <input type="number" value={newExp.total ?? 5} onChange={e => setNewExp(prev => ({ ...prev, total: Number(e.target.value) }))}
               className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-              style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }} />
+              style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
           </div>
           <div>
-            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>PARTICIPANTES (INICIALES)</label>
+            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>PARTICIPANTES (INICIALES)</label>
             <div className="flex gap-2 mt-1">
               <input value={participantInput} onChange={e => setParticipantInput(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && addParticipant()}
                 placeholder="ej. JR" className="flex-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#F5F0E8" }} />
-              <ActionBtn label="AGREGAR" color="#D97706" onClick={addParticipant} />
+                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#EEF3FB" }} />
+              <ActionBtn label="AGREGAR" color="#7FB8FF" onClick={addParticipant} />
             </div>
             <div className="flex gap-1 flex-wrap mt-2">
               {(newExp.participants ?? []).map((p, i) => (
                 <button key={i} onClick={() => setNewExp(prev => ({ ...prev, participants: prev.participants?.filter((_, j) => j !== i) }))}
                   className="admin-chip-btn px-1.5 py-0.5 rounded-sm"
-                  style={{ background: "#1A1A20", border: "1px solid #2D2A24", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>
+                  style={{ background: "#121B26", border: "1px solid #2A3444", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>
                   {p} x
                 </button>
               ))}
             </div>
           </div>
-          <ActionBtn label="LANZAR EXPEDICIÓN" color="#D97706" onClick={handleCreate} />
+          <ActionBtn label="LANZAR EXPEDICIÓN" color="#7FB8FF" onClick={handleCreate} />
         </div>
       </Modal>
     </div>
   );
 }
 
-function ViewIntercamp({ mode }: { mode: IntercampViewMode }) {
+function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canApprove: boolean }) {
   const [requests, setRequests] = useState<IntercampRequest[]>(INITIAL_INTERCAMP);
   const [showSend, setShowSend] = useState(false);
   const [newReq, setNewReq] = useState({ to: "", text: "", type: "solicitud" });
   const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
+  const [isLoading] = useState(false);
+  const [errorCode] = useState<HttpCode | null>(null);
+  const [page, setPage] = useState(() => Number(new URLSearchParams(window.location.search).get("ic_page") ?? "1") || 1);
+  const limit = Number(new URLSearchParams(window.location.search).get("ic_limit") ?? "6") || 6;
 
   const showToast = (msg: string, color: string) => {
     setToast({ msg, color });
@@ -1174,16 +1682,35 @@ function ViewIntercamp({ mode }: { mode: IntercampViewMode }) {
 
   const pending = requests.filter(r => r.status === "PENDIENTE");
   const others = requests.filter(r => r.status !== "PENDIENTE");
+  const activeList = mode === "pending" ? pending : others;
+  const totalPages = Math.max(1, Math.ceil(activeList.length / limit));
+  const safePage = Math.min(page, totalPages);
+  const pagedActive = activeList.slice((safePage - 1) * limit, safePage * limit);
 
   const campsList = ["CAMPAMENTO BETA", "CAMPAMENTO GAMMA", "CAMPAMENTO DELTA", "CAMPAMENTO ÉPSILON"];
 
+  useEffect(() => {
+    setPage(1);
+  }, [mode, requests.length]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("ic_mode", mode);
+    params.set("ic_page", String(safePage));
+    params.set("ic_limit", String(limit));
+    window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
+  }, [mode, safePage, limit]);
+
   return (
     <div className="admin-stack-lg">
+      <ModuleContext module="INTER-CAMPAMENTOS" />
+      {isLoading && <EmptyState title="CARGANDO INTER-CAMP" hint="Sincronizando solicitudes y transferencias" icon={Radio} />}
+      {errorCode && <HttpStatusNotice code={errorCode} />}
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             className="fixed top-16 right-4 z-50 px-4 py-2 rounded-sm"
-            style={{ background: toast.color, fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#F5F0E8" }}>
+            style={{ background: toast.color, fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#EEF3FB" }}>
             {toast.msg}
           </motion.div>
         )}
@@ -1191,13 +1718,13 @@ function ViewIntercamp({ mode }: { mode: IntercampViewMode }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
-          { label: "PENDIENTES", value: pending.length, color: "#F59E0B" },
+          { label: "PENDIENTES", value: pending.length, color: "#4AAED2" },
           { label: "APROBADAS", value: requests.filter(r => r.status === "APROBADO").length, color: "#0D9488" },
-          { label: "CAMPAMENTOS", value: campsList.length, color: "#8B8070" },
+          { label: "CAMPAMENTOS", value: campsList.length, color: "#B8C7DB" },
         ].map(({ label, value, color }) => (
           <Card key={label}>
             <div className="admin-kpi-value" style={{ fontFamily: "'Orbitron', monospace", fontWeight: 900, color }}>{value}</div>
-            <div className="admin-text-label" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#8B8070", letterSpacing: "0.1em" }}>{label}</div>
+            <div className="admin-text-label" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#B8C7DB", letterSpacing: "0.1em" }}>{label}</div>
           </Card>
         ))}
       </div>
@@ -1210,9 +1737,9 @@ function ViewIntercamp({ mode }: { mode: IntercampViewMode }) {
         <Card glow="#EA580C">
           <SectionHeader title="SOLICITUDES PENDIENTES — ACCIÓN REQUERIDA" />
           <div className="admin-stack-sm">
-            {pending.map(req => (
+            {pagedActive.map(req => (
               <motion.div key={req.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                className="p-3 rounded-sm" style={{ background: "#0D0D10", border: `1px solid ${req.urgent ? "#DC262655" : "#2D2A24"}` }}>
+                className="p-3 rounded-sm" style={{ background: "#0B1118", border: `1px solid ${req.urgent ? "#DC262655" : "#2A3444"}` }}>
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
@@ -1220,35 +1747,42 @@ function ViewIntercamp({ mode }: { mode: IntercampViewMode }) {
                       <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EA580C" }}>{req.from}</span>
                       {req.urgent && <Badge label="URGENTE" color="#DC2626" />}
                     </div>
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}>{req.text}</span>
+                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>{req.text}</span>
                   </div>
                   <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, whiteSpace: "nowrap" }}>{req.time}</span>
                 </div>
                 <div className="flex gap-2">
-                  <ActionBtn label="APROBAR" color="#0D9488" small onClick={() => handleApprove(req.id)} />
-                  <ActionBtn label="RECHAZAR" color="#DC2626" small onClick={() => handleReject(req.id)} />
+                  <SecuredActionBtn allowed={canApprove} reason="Requiere permiso de aprobación inter-campamento" label="APROBAR" color="#0D9488" small onClick={() => confirmAction("¿Aprobar esta solicitud inter-campamento?", () => handleApprove(req.id))} />
+                  <SecuredActionBtn allowed={canApprove} reason="Requiere permiso de aprobación inter-campamento" label="RECHAZAR" color="#DC2626" small onClick={() => confirmAction("¿Rechazar esta solicitud inter-campamento?", () => handleReject(req.id))} />
                 </div>
               </motion.div>
             ))}
+            {pending.length > 0 && <PaginationBar page={safePage} totalPages={totalPages} totalItems={pending.length} onPageChange={setPage} />}
           </div>
+        </Card>
+      )}
+
+      {mode === "pending" && pending.length === 0 && (
+        <Card>
+          <EmptyState title="SIN SOLICITUDES PENDIENTES" hint="No hay acciones urgentes en esta bandeja" icon={Radio} />
         </Card>
       )}
 
       {(mode === "history" || mode === "send") && <Card>
         <SectionHeader title="HISTORIAL DE COMUNICACIONES" />
         <div className="admin-stack-sm">
-          {others.map(req => {
+          {pagedActive.map(req => {
             const sc = intercampColor(req.status);
             return (
-              <div key={req.id} className="p-3 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
+              <div key={req.id} className="p-3 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <Radio size={10} style={{ color: UI_COLORS.textFaint }} />
-                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{req.from}</span>
+                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{req.from}</span>
                       <Badge label={req.type.toUpperCase()} color={UI_COLORS.textFaint} />
                     </div>
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#F5F0E8" }}>{req.text}</span>
+                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#EEF3FB" }}>{req.text}</span>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <Badge label={req.status} color={sc} />
@@ -1258,35 +1792,37 @@ function ViewIntercamp({ mode }: { mode: IntercampViewMode }) {
               </div>
             );
           })}
+          {others.length > 0 && <PaginationBar page={safePage} totalPages={totalPages} totalItems={others.length} onPageChange={setPage} />}
+          {others.length === 0 && <EmptyState title="SIN HISTORIAL" hint="No hay comunicaciones registradas" icon={Radio} />}
         </div>
       </Card>}
 
       <Modal open={showSend || mode === "send"} onClose={() => setShowSend(false)} title="ENVIAR MENSAJE INTER-CAMPAMENTO">
         <div className="admin-stack-md">
           <div>
-            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>DESTINATARIO</label>
+            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>DESTINATARIO</label>
             <select value={newReq.to} onChange={e => setNewReq(prev => ({ ...prev, to: e.target.value }))}
               className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-              style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}>
+              style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>
               <option value="">-- SELECCIONAR --</option>
               {campsList.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div>
-            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>TIPO</label>
+            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>TIPO</label>
             <select value={newReq.type} onChange={e => setNewReq(prev => ({ ...prev, type: e.target.value }))}
               className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-              style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}>
+              style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>
               <option value="solicitud">SOLICITUD</option>
               <option value="oferta">OFERTA</option>
               <option value="traslado">TRASLADO</option>
             </select>
           </div>
           <div>
-            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>MENSAJE</label>
+            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>MENSAJE</label>
             <textarea value={newReq.text} onChange={e => setNewReq(prev => ({ ...prev, text: e.target.value }))} rows={3}
               className="w-full mt-1 px-3 py-2 rounded-sm outline-none resize-none"
-              style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }} />
+              style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
           </div>
           <ActionBtn label="ENVIAR MENSAJE" color="#0D9488" onClick={handleSend} />
         </div>
@@ -1347,7 +1883,7 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
         {Object.entries(counts).map(([k, v]) => (
           <Card key={k}>
             <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 24, fontWeight: 900, color: logLevelColor(k) }}>{v}</div>
-            <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{k.toUpperCase()}</div>
+            <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{k.toUpperCase()}</div>
           </Card>
         ))}
       </div>
@@ -1361,7 +1897,7 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
             {levels.map(l => (
                 <button key={l} onClick={() => setFilterLevel(l)}
                 className="admin-chip-btn px-2 py-1 rounded-sm cursor-pointer"
-                style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, background: filterLevel === l ? logLevelColor(l) : "#1A1A20", color: filterLevel === l ? "#0A0A0B" : "#8B8070", border: "1px solid #2D2A24" }}>
+                style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, background: filterLevel === l ? logLevelColor(l) : "#121B26", color: filterLevel === l ? "#05070A" : "#B8C7DB", border: "1px solid #2A3444" }}>
                 {l}
               </button>
             ))}
@@ -1371,7 +1907,7 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
             <Toggle active={autoRefresh} onChange={() => setAutoRefresh(prev => !prev)} />
           </div>
         </div>
-        <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginBottom: 12 }} />
+        <div style={{ height: 1, background: "linear-gradient(90deg, #7FB8FF 0%, transparent 100%)", marginBottom: 12 }} />
 
         {autoRefresh && (
           <div className="flex items-center gap-1.5 mb-3">
@@ -1392,7 +1928,7 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
                   exit={{ opacity: 0, height: 0 }}
                   transition={MOTION.base}
                   className="flex items-start gap-3 px-3 py-2 rounded-sm"
-                  style={{ background: "#0D0D10", borderLeft: `2px solid ${lc}` }}
+                  style={{ background: "#0B1118", borderLeft: `2px solid ${lc}` }}
                 >
                   <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, flexShrink: 0, paddingTop: 2 }}>[{log.time}]</span>
                   <span className="px-1.5 py-0.5 rounded-sm flex-shrink-0"
@@ -1400,8 +1936,8 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
                     {log.level.toUpperCase()}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#F5F0E8" }}>{log.user}</span>
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070", marginLeft: 8 }}>— {log.action}</span>
+                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#EEF3FB" }}>{log.user}</span>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB", marginLeft: 8 }}>— {log.action}</span>
                   </div>
                 </motion.div>
               );
@@ -1417,13 +1953,13 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
 function ViewLogros({ mode }: { mode: LogrosViewMode }) {
   const achievements = [
     { name: "PRIMER MES", desc: "Sobrevivimos 30 días", unlocked: true, pct: 100, color: "#0D9488", xp: 500, category: "Supervivencia" },
-    { name: "SIN BAJAS", desc: "7 días sin pérdidas de vida", unlocked: true, pct: 100, color: "#F59E0B", xp: 300, category: "Bienestar" },
-    { name: "EQUIPO MÉDICO COMPLETO", desc: "5/5 médicos activos", unlocked: false, pct: 80, color: "#D97706", xp: 400, category: "Salud" },
+    { name: "SIN BAJAS", desc: "7 días sin pérdidas de vida", unlocked: true, pct: 100, color: "#4AAED2", xp: 300, category: "Bienestar" },
+    { name: "EQUIPO MÉDICO COMPLETO", desc: "5/5 médicos activos", unlocked: false, pct: 80, color: "#7FB8FF", xp: 400, category: "Salud" },
     { name: "100 EXPLORACIONES", desc: "67/100 completadas", unlocked: false, pct: 67, color: "#0D9488", xp: 600, category: "Exploración" },
     { name: "AUTOSUFICIENCIA", desc: "Produce el 50% de alimentos propios", unlocked: false, pct: 45, color: "#EA580C", xp: 800, category: "Agricultura" },
     { name: "FORTALEZA", desc: "Resistir 5 ataques sin bajas", unlocked: false, pct: 60, color: "#DC2626", xp: 700, category: "Defensa" },
-    { name: "RED DE ALIANZAS", desc: "3 campamentos aliados", unlocked: false, pct: 33, color: "#8B8070", xp: 500, category: "Diplomacia" },
-    { name: "INVENTARIO SEGURO", desc: "Todos los recursos sobre 50%", unlocked: false, pct: 15, color: "#F59E0B", xp: 400, category: "Logística" },
+    { name: "RED DE ALIANZAS", desc: "3 campamentos aliados", unlocked: false, pct: 33, color: "#B8C7DB", xp: 500, category: "Diplomacia" },
+    { name: "INVENTARIO SEGURO", desc: "Todos los recursos sobre 50%", unlocked: false, pct: 15, color: "#4AAED2", xp: 400, category: "Logística" },
   ];
 
   const categories = [...new Set(achievements.map(a => a.category))];
@@ -1433,21 +1969,21 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
   return (
     <div className="admin-stack-lg">
       {mode === "overview" && (
-        <Card glow="#D97706">
+        <Card glow="#7FB8FF">
         <div className="flex items-center gap-4">
           <div className="text-center">
             <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textFaint }}>NIVEL</div>
-            <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 48, fontWeight: 900, color: "#F59E0B", lineHeight: 1 }}>7</div>
-            <Badge label="CONSOLIDADO" color="#D97706" />
+            <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 48, fontWeight: 900, color: "#4AAED2", lineHeight: 1 }}>7</div>
+            <Badge label="CONSOLIDADO" color="#7FB8FF" />
           </div>
           <div className="flex-1">
             <div className="flex justify-between mb-2">
-              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>EXPERIENCIA TOTAL</span>
-              <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, color: "#F59E0B" }}>{totalXP} / {nextLevelXP} XP</span>
+              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>EXPERIENCIA TOTAL</span>
+              <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, color: "#4AAED2" }}>{totalXP} / {nextLevelXP} XP</span>
             </div>
-            <div className="admin-bar h-3 rounded-sm overflow-hidden mb-1" style={{ background: "#2D2A24" }}>
+            <div className="admin-bar h-3 rounded-sm overflow-hidden mb-1" style={{ background: "#2A3444" }}>
               <motion.div initial={{ width: 0 }} animate={{ width: `${(totalXP / nextLevelXP) * 100}%` }} transition={MOTION.progress}
-                className="admin-bar-fill" style={{ height: "100%", background: "linear-gradient(90deg, #D97706, #F59E0B)", borderRadius: 2 }} />
+                className="admin-bar-fill" style={{ height: "100%", background: "linear-gradient(90deg, #7FB8FF, #4AAED2)", borderRadius: 2 }} />
             </div>
             <div className="grid grid-cols-4 gap-2 mt-3">
               {[
@@ -1456,8 +1992,8 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
                 { label: "EN PROGRESO", value: achievements.filter(a => !a.unlocked).length },
                 { label: "PRÓXIMO NIVEL", value: `${nextLevelXP - totalXP} XP` },
               ].map(({ label, value }) => (
-                <div key={label} className="p-2 rounded-sm text-center" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
-                  <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 13, fontWeight: 900, color: "#F5F0E8" }}>{value}</div>
+                <div key={label} className="p-2 rounded-sm text-center" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
+                  <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 13, fontWeight: 900, color: "#EEF3FB" }}>{value}</div>
                   <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{label}</div>
                 </div>
               ))}
@@ -1471,28 +2007,28 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
       {categories.map(cat => (
         <div key={cat}>
           <div className="mb-2 flex items-center gap-2">
-            <div style={{ height: 1, flex: 1, background: "#2D2A24" }} />
+            <div style={{ height: 1, flex: 1, background: "#2A3444" }} />
             <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textFaint }}>{cat.toUpperCase()}</span>
-            <div style={{ height: 1, flex: 1, background: "#2D2A24" }} />
+            <div style={{ height: 1, flex: 1, background: "#2A3444" }} />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
             {achievements.filter(a => a.category === cat).map(ach => (
               <Card key={ach.name} glow={ach.unlocked ? ach.color : ""}>
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 rounded-sm flex items-center justify-center flex-shrink-0"
-                    style={{ background: ach.unlocked ? `${ach.color}22` : "#1A1A20", border: `1px solid ${ach.unlocked ? ach.color : "#2D2A24"}`, opacity: ach.unlocked ? 1 : 0.5 }}>
+                    style={{ background: ach.unlocked ? `${ach.color}22` : "#121B26", border: `1px solid ${ach.unlocked ? ach.color : "#2A3444"}`, opacity: ach.unlocked ? 1 : 0.5 }}>
                     <Trophy size={18} style={{ color: ach.unlocked ? ach.color : UI_COLORS.textFaint }} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
-                        <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: ach.unlocked ? ach.color : "#8B8070" }}>{ach.name}</span>
+                        <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: ach.unlocked ? ach.color : "#B8C7DB" }}>{ach.name}</span>
                         {ach.unlocked && <CheckCircle size={10} style={{ color: ach.color }} />}
                       </div>
-                      <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 9, color: ach.unlocked ? "#F59E0B" : UI_COLORS.textFaint }}>+{ach.xp} XP</span>
+                      <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 9, color: ach.unlocked ? "#4AAED2" : UI_COLORS.textFaint }}>+{ach.xp} XP</span>
                     </div>
                     <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: UI_COLORS.textMuted, marginBottom: 6 }}>{ach.desc}</p>
-                    <div className="admin-bar h-1 rounded-sm overflow-hidden" style={{ background: "#2D2A24" }}>
+                    <div className="admin-bar h-1 rounded-sm overflow-hidden" style={{ background: "#2A3444" }}>
                       <motion.div initial={{ width: 0 }} animate={{ width: `${ach.pct}%` }} transition={MOTION.progress}
                         className="admin-bar-fill" style={{ height: "100%", background: ach.unlocked ? ach.color : `${ach.color}66`, borderRadius: 2 }} />
                     </div>
@@ -1512,7 +2048,11 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
 
 function ViewNotificaciones({ mode }: { mode: NotifsViewMode }) {
   const [notifs, setNotifs] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
-  const [filter, setFilter] = useState("todas");
+  const [filter, setFilter] = useState(() => new URLSearchParams(window.location.search).get("not_type") ?? "todas");
+  const [page, setPage] = useState(() => Number(new URLSearchParams(window.location.search).get("not_page") ?? "1") || 1);
+  const [limit] = useState(() => Number(new URLSearchParams(window.location.search).get("not_limit") ?? "6") || 6);
+  const [isLoading] = useState(false);
+  const [error] = useState<string | null>(null);
 
   const markRead = (id: number) => setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   const markAllRead = () => setNotifs(prev => prev.map(n => ({ ...n, read: true })));
@@ -1526,18 +2066,35 @@ function ViewNotificaciones({ mode }: { mode: NotifsViewMode }) {
     return true;
   });
   const unread = notifs.filter(n => !n.read).length;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / limit));
+  const safePage = Math.min(page, totalPages);
+  const paged = filtered.slice((safePage - 1) * limit, safePage * limit);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("not_mode", mode);
+    params.set("not_type", filter);
+    params.set("not_page", String(safePage));
+    params.set("not_limit", String(limit));
+    window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
+  }, [mode, filter, safePage, limit]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filter, mode]);
 
   return (
     <div className="admin-stack-lg">
+      <ModuleContext module="NOTIFICACIONES" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: "SIN LEER", value: unread, color: "#DC2626" },
           { label: "CRÍTICAS", value: notifs.filter(n => n.level === "critical").length, color: "#DC2626" },
-          { label: "TOTAL", value: notifs.length, color: "#8B8070" },
+          { label: "TOTAL", value: notifs.length, color: "#B8C7DB" },
         ].map(({ label, value, color }) => (
           <Card key={label}>
             <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 28, fontWeight: 900, color }}>{value}</div>
-            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#8B8070", letterSpacing: "0.1em" }}>{label}</div>
+            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#B8C7DB", letterSpacing: "0.1em" }}>{label}</div>
           </Card>
         ))}
       </div>
@@ -1550,31 +2107,33 @@ function ViewNotificaciones({ mode }: { mode: NotifsViewMode }) {
             {levels.map(l => (
                 <button key={l} onClick={() => setFilter(l)}
                 className="admin-chip-btn px-2 py-1 rounded-sm cursor-pointer"
-                style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, background: filter === l ? notifColor(l) : "#1A1A20", color: filter === l ? "#0A0A0B" : "#8B8070", border: "1px solid #2D2A24" }}>
+                style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, background: filter === l ? notifColor(l) : "#121B26", color: filter === l ? "#05070A" : "#B8C7DB", border: "1px solid #2A3444" }}>
                 {l.toUpperCase()}
               </button>
             ))}
           </div>
-          {unread > 0 && <ActionBtn label="MARCAR TODO LEÍDO" color="#8B8070" onClick={markAllRead} />}
+          {unread > 0 && <ActionBtn label="MARCAR TODO LEÍDO" color="#B8C7DB" onClick={markAllRead} />}
         </div>
-        <div style={{ height: 1, background: "linear-gradient(90deg, #D97706 0%, transparent 100%)", marginBottom: 12 }} />
+        <div style={{ height: 1, background: "linear-gradient(90deg, #7FB8FF 0%, transparent 100%)", marginBottom: 12 }} />
 
         <div className="admin-stack-sm">
+          {isLoading && <EmptyState title="CARGANDO BANDEJA" hint="Consultando notificaciones del campamento" icon={Bell} />}
+          {error && <HttpStatusNotice code={403} />}
           <AnimatePresence>
-            {filtered.map(n => {
+            {paged.map(n => {
               const nc = notifColor(n.level);
               return (
                 <motion.div key={n.id} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10, height: 0 }} transition={MOTION.base}
                   className="p-3 rounded-sm"
-                  style={{ background: n.read ? "#0D0D10" : "#111114", border: `1px solid ${n.read ? "#2D2A24" : nc + "55"}`, borderLeft: `3px solid ${n.read ? "#2D2A24" : nc}` }}>
+                  style={{ background: n.read ? "#0B1118" : "#0B1118", border: `1px solid ${n.read ? "#2A3444" : nc + "55"}`, borderLeft: `3px solid ${n.read ? "#2A3444" : nc}` }}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         {!n.read && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: nc }} />}
-                        <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: n.read ? "#8B8070" : "#F5F0E8" }}>{n.title}</span>
+                        <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: n.read ? "#B8C7DB" : "#EEF3FB" }}>{n.title}</span>
                         <Badge label={n.level.toUpperCase()} color={nc} />
                       </div>
-                      <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070" }}>{n.body}</p>
+                      <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#B8C7DB" }}>{n.body}</p>
                       <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{n.time}</span>
                     </div>
                     <div className="flex gap-1">
@@ -1586,9 +2145,40 @@ function ViewNotificaciones({ mode }: { mode: NotifsViewMode }) {
               );
             })}
           </AnimatePresence>
-          {filtered.length === 0 && <EmptyState title="SIN NOTIFICACIONES" hint="No hay eventos para este filtro" icon={Bell} />}
+          {!isLoading && !error && filtered.length === 0 && <EmptyState title="SIN NOTIFICACIONES" hint="No hay eventos para este filtro" icon={Bell} />}
         </div>
+        <PaginationBar page={safePage} totalPages={totalPages} totalItems={filtered.length} onPageChange={setPage} />
       </Card>
+    </div>
+  );
+}
+
+function HttpStatusNotice({ code }: { code: HttpCode }) {
+  return (
+    <div className="p-2 rounded-sm" style={{ background: `${UI_COLORS.state.critical}14`, border: `1px solid ${UI_COLORS.state.critical}66` }}>
+      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#FCA5A5" }}>{httpMessage(code)}</span>
+    </div>
+  );
+}
+
+function SecuredActionBtn({
+  allowed,
+  reason,
+  label,
+  color,
+  onClick,
+  small = false,
+}: {
+  allowed: boolean;
+  reason: string;
+  label: string;
+  color: string;
+  onClick?: () => void;
+  small?: boolean;
+}) {
+  return (
+    <div title={allowed ? "" : reason} style={{ opacity: allowed ? 1 : 0.55, cursor: allowed ? "pointer" : "not-allowed" }}>
+      <ActionBtn label={label} color={color} onClick={allowed ? onClick : undefined} small={small} />
     </div>
   );
 }
@@ -1620,7 +2210,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
         {saved && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             className="fixed top-16 right-4 z-50 px-4 py-2 rounded-sm"
-            style={{ background: "#0D9488", fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#F5F0E8" }}>
+            style={{ background: "#0D9488", fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#EEF3FB" }}>
             CONFIGURACIÓN GUARDADA
           </motion.div>
         )}
@@ -1636,23 +2226,23 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
               { label: "NOMBRE DEL ADMINISTRADOR", key: "adminName" },
             ].map(({ label, key }) => (
               <div key={key}>
-                <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{label}</label>
+                <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{label}</label>
                 <input value={(settings as any)[key]} onChange={e => setSettings(prev => ({ ...prev, [key]: e.target.value }))}
                   className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                  style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }} />
+                  style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
               </div>
             ))}
             <div>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>DÍA ACTUAL DEL APOCALIPSIS</label>
+              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>DÍA ACTUAL DEL APOCALIPSIS</label>
               <input type="number" value={settings.day} onChange={e => setSettings(prev => ({ ...prev, day: Number(e.target.value) }))}
                 className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#F59E0B" }} />
+                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#4AAED2" }} />
             </div>
             <div>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>UMBRAL DE ALERTA DE INVENTARIO (%)</label>
+              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>UMBRAL DE ALERTA DE INVENTARIO (%)</label>
               <input type="number" min={1} max={100} value={settings.alertThreshold} onChange={e => setSettings(prev => ({ ...prev, alertThreshold: Number(e.target.value) }))}
                 className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }} />
+                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
             </div>
           </div>
           </Card>
@@ -1668,10 +2258,10 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
               { label: "REPORTE NOCTURNO", key: "nightReport", icon: BarChart2 },
               { label: "CONSUMO DIARIO AUTOMÁTICO", key: "dailyConsumption", icon: Cpu },
             ].map(({ label, key, icon: Icon }) => (
-              <div key={key} className="flex items-center justify-between px-3 py-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
+              <div key={key} className="flex items-center justify-between px-3 py-2 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
                 <div className="flex items-center gap-2">
-                  <Icon size={12} style={{ color: "#D97706" }} />
-                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}>{label}</span>
+                  <Icon size={12} style={{ color: "#7FB8FF" }} />
+                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>{label}</span>
                 </div>
                 <Toggle active={(settings as any)[key]} onChange={() => setSettings(prev => ({ ...prev, [key]: !(prev as any)[key] }))} />
               </div>
@@ -1685,29 +2275,29 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
           <SectionHeader title="SISTEMA" />
           <div className="admin-stack-md">
             <div>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>IDIOMA</label>
+              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>IDIOMA</label>
               <select value={settings.language} onChange={e => setSettings(prev => ({ ...prev, language: e.target.value }))}
                 className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}>
+                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>
                 <option value="es">Español</option>
                 <option value="en">English</option>
               </select>
             </div>
             <div>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>ZONA HORARIA</label>
+              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>ZONA HORARIA</label>
               <select value={settings.timezone} onChange={e => setSettings(prev => ({ ...prev, timezone: e.target.value }))}
                 className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }}>
+                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>
                 <option value="America/Costa_Rica">America/Costa_Rica (UTC-6)</option>
                 <option value="America/New_York">America/New_York (UTC-5)</option>
                 <option value="America/Bogota">America/Bogota (UTC-5)</option>
               </select>
             </div>
             <div>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>TIMEOUT DE SESIÓN (MINUTOS)</label>
+              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>TIMEOUT DE SESIÓN (MINUTOS)</label>
               <input type="number" value={settings.sessionTimeout} onChange={e => setSettings(prev => ({ ...prev, sessionTimeout: Number(e.target.value) }))}
                 className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0D0D10", border: "1px solid #2D2A24", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8" }} />
+                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
             </div>
           </div>
           </Card>
@@ -1725,9 +2315,9 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
               { label: "ÚLTIMA SINCRONIZACIÓN", value: "HOY 14:32" },
               { label: "UPTIME", value: "47 DÍAS" },
             ].map(({ label, value }) => (
-              <div key={label} className="flex justify-between items-center px-3 py-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
+              <div key={label} className="flex justify-between items-center px-3 py-2 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
                 <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{label}</span>
-                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{value}</span>
+                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{value}</span>
               </div>
             ))}
           </div>
@@ -1737,7 +2327,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
 
       <div className="flex gap-3">
         <ActionBtn label="GUARDAR CONFIGURACIÓN" color="#0D9488" onClick={handleSave} />
-        <ActionBtn label="RESTABLECER VALORES" color="#8B8070" onClick={() => {}} />
+        <ActionBtn label="RESTABLECER VALORES" color="#B8C7DB" onClick={() => {}} />
       </div>
     </div>
   );
@@ -1745,7 +2335,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
 
 // ─── DASHBOARD (overview) ─────────────────────────────────────────────────────
 
-function ViewDashboard() {
+function ViewDashboard({ onQuickNav }: { onQuickNav?: (target: NavSection) => void }) {
   const [countdown, setCountdown] = useState({ h: 3, m: 28, s: 0 });
   const [threatLevel, setThreatLevel] = useState(72);
   const [automations] = useState([
@@ -1782,7 +2372,7 @@ function ViewDashboard() {
     { name: "Activos", value: 189, color: "#0D9488" },
     { name: "Heridos", value: 23, color: "#EA580C" },
     { name: "Enfermos", value: 18, color: "#DC2626" },
-    { name: "Fuera", value: 17, color: "#F59E0B" },
+    { name: "Fuera", value: 17, color: "#4AAED2" },
   ];
   const totalPop = populationData.reduce((a, b) => a + b.value, 0);
   const liveAlerts = INITIAL_NOTIFICATIONS.filter(n => !n.read).slice(0, 5);
@@ -1804,7 +2394,7 @@ function ViewDashboard() {
 
   const levelTone = (level: Notification["level"]) => {
     if (level === "critical") return { color: "#DC2626", label: "CRÍTICA", bg: "#DC262622" };
-    if (level === "warning") return { color: "#F59E0B", label: "MEDIA", bg: "#F59E0B22" };
+    if (level === "warning") return { color: "#4AAED2", label: "MEDIA", bg: "#4AAED222" };
     return { color: "#0D9488", label: "INFO", bg: "#0D948822" };
   };
   const isMaxAlert = threatLevel >= 80;
@@ -1833,7 +2423,7 @@ function ViewDashboard() {
         {[
           { icon: Users, color: "#0D9488", value: "247", label: "POBLACIÓN TOTAL", sub: "+3 SEMANA", subColor: "#0D9488", subIcon: TrendingUp },
           { icon: Package, color: "#DC2626", value: "3", label: "RECURSOS CRÍTICOS", sub: "CRÍTICO", subColor: "#DC2626", subIcon: TrendingDown, pulse: true },
-          { icon: Map, color: "#D97706", value: "2", label: "EXPEDICIONES ACTIVAS", sub: "14 FUERA", subColor: "#F59E0B", subIcon: Activity },
+          { icon: Map, color: "#7FB8FF", value: "2", label: "EXPEDICIONES ACTIVAS", sub: "14 FUERA", subColor: "#4AAED2", subIcon: Activity },
           { icon: Radio, color: "#EA580C", value: "5", label: "SOLICITUDES INTER-CAMP.", sub: "2 URGENTES", subColor: "#EA580C", subIcon: AlertTriangle },
         ].map(({ icon: Icon, color, value, label, sub, subColor, subIcon: SubIcon, pulse }) => (
           <motion.div key={label} variants={cardVariants}>
@@ -1847,12 +2437,24 @@ function ViewDashboard() {
                   <span className="admin-text-micro" style={{ fontFamily: "'Share Tech Mono', monospace", color: subColor }}>{sub}</span>
                 </div>
               </div>
-              <div className="admin-kpi-value" style={{ fontFamily: "'Orbitron', monospace", fontWeight: 900, color: "#F5F0E8" }}>{value}</div>
-              <div className="admin-text-label" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#8B8070", letterSpacing: "0.1em", marginTop: 4 }}>{label}</div>
+              <div className="admin-kpi-value" style={{ fontFamily: "'Orbitron', monospace", fontWeight: 900, color: "#EEF3FB" }}>{value}</div>
+              <div className="admin-text-label" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#B8C7DB", letterSpacing: "0.1em", marginTop: 4 }}>{label}</div>
             </Card>
           </motion.div>
         ))}
       </motion.div>
+
+      <Card className="mb-3">
+        <div className="flex flex-wrap gap-2 items-center justify-between">
+          <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>ACCESOS RÁPIDOS DEL PANEL GENERAL</span>
+          <div className="flex flex-wrap gap-2">
+            <ActionBtn label="ACTUALIZAR PANEL" color="#0D9488" onClick={() => window.location.reload()} />
+            <ActionBtn label="VER SOLICITUDES PENDIENTES" color="#7FB8FF" onClick={() => onQuickNav?.("ADMISIONES IA")} />
+            <ActionBtn label="VER INVENTARIO" color="#B8C7DB" onClick={() => onQuickNav?.("INVENTARIO")} />
+            <ActionBtn label="IR A EXPEDICIONES" color="#B8C7DB" onClick={() => onQuickNav?.("EXPEDICIONES")} />
+          </div>
+        </div>
+      </Card>
 
       {/* Crisis row (urgent first for glanceability) */}
       <div className="mb-3">
@@ -1871,20 +2473,20 @@ function ViewDashboard() {
               </div>
               <Badge label="MISIÓN PRIORITARIA" color="#DC2626" />
             </div>
-            <p className="admin-text-title" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#F5F0E8", fontWeight: 600 }}>
+            <p className="admin-text-title" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#EEF3FB", fontWeight: 600 }}>
               {crisisToday.subtitle}
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {crisisToday.impact.map(item => (
-                <div key={item} className="p-2 rounded-sm" style={{ background: "#0D0D10", border: "1px solid #2D2A24" }}>
+                <div key={item} className="p-2 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
                   <span className="admin-text-micro" style={{ fontFamily: "'Share Tech Mono', monospace", color: "#FCA5A5" }}>{item}</span>
                 </div>
               ))}
             </div>
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 16, color: "#F59E0B", fontWeight: 900 }}>{crisisToday.urgency}</span>
+              <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 16, color: "#4AAED2", fontWeight: 900 }}>{crisisToday.urgency}</span>
               <div className="flex items-center gap-2">
-                <ActionBtn label="PLAN IA" color="#D97706" />
+                <ActionBtn label="PLAN IA" color="#7FB8FF" />
                 <ActionBtn label="DESPLEGAR RESPUESTA" color="#DC2626" />
               </div>
             </div>
@@ -1900,19 +2502,19 @@ function ViewDashboard() {
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={resourceTrendData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                 <defs>
-                  {[["gFood", "#F59E0B"], ["gWater", "#0D9488"], ["gAmmo", "#DC2626"]].map(([id, color]) => (
+                  {[["gFood", "#4AAED2"], ["gWater", "#0D9488"], ["gAmmo", "#DC2626"]].map(([id, color]) => (
                     <linearGradient key={id} id={id} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={color} stopOpacity={0.3} />
                       <stop offset="95%" stopColor={color} stopOpacity={0} />
                     </linearGradient>
                   ))}
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2D2A24" vertical={false} />
-                <XAxis dataKey="day" tick={{ fill: "#8B8070", fontSize: 9, fontFamily: "'Share Tech Mono', monospace" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#8B8070", fontSize: 9, fontFamily: "'Share Tech Mono', monospace" }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ background: "#111114", border: "1px solid #2D2A24", borderRadius: 2, fontFamily: "'Share Tech Mono', monospace", fontSize: 10 }} labelStyle={{ color: "#F5F0E8" }} itemStyle={{ color: "#8B8070" }} />
-                <Legend wrapperStyle={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }} />
-                <Area type="monotone" dataKey="food" name="Comida" stroke="#F59E0B" fill="url(#gFood)" strokeWidth={1.5} dot={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#2A3444" vertical={false} />
+                <XAxis dataKey="day" tick={{ fill: "#B8C7DB", fontSize: 9, fontFamily: "'Share Tech Mono', monospace" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#B8C7DB", fontSize: 9, fontFamily: "'Share Tech Mono', monospace" }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ background: "#0B1118", border: "1px solid #2A3444", borderRadius: 2, fontFamily: "'Share Tech Mono', monospace", fontSize: 10 }} labelStyle={{ color: "#EEF3FB" }} itemStyle={{ color: "#B8C7DB" }} />
+                <Legend wrapperStyle={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }} />
+                <Area type="monotone" dataKey="food" name="Comida" stroke="#4AAED2" fill="url(#gFood)" strokeWidth={1.5} dot={false} />
                 <Area type="monotone" dataKey="water" name="Agua" stroke="#0D9488" fill="url(#gWater)" strokeWidth={1.5} dot={false} />
                 <Area type="monotone" dataKey="ammo" name="Munición" stroke="#DC2626" fill="url(#gAmmo)" strokeWidth={1.5} dot={false} />
               </AreaChart>
@@ -1934,8 +2536,8 @@ function ViewDashboard() {
               {populationData.map(d => (
                 <div key={d.name} className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: d.color }} />
-                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#8B8070" }}>{d.name}: </span>
-                  <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 9, color: "#F5F0E8" }}>{d.value}</span>
+                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#B8C7DB" }}>{d.name}: </span>
+                  <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 9, color: "#EEF3FB" }}>{d.value}</span>
                 </div>
               ))}
             </div>
@@ -1958,10 +2560,10 @@ function ViewDashboard() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
                     className="p-2 rounded-sm"
-                    style={{ background: "#0D0D10", border: `1px solid ${tone.color}44` }}
+                    style={{ background: "#0B1118", border: `1px solid ${tone.color}44` }}
                   >
                     <div className="flex items-start justify-between gap-2 mb-1">
-                      <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#F5F0E8", fontWeight: 700 }}>{alert.title}</span>
+                      <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB", fontWeight: 700 }}>{alert.title}</span>
                       <span
                         className={alert.level === "critical" ? "animate-pulse" : ""}
                         style={{
@@ -1978,7 +2580,7 @@ function ViewDashboard() {
                         {tone.label}
                       </span>
                     </div>
-                    <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#8B8070", marginBottom: 4 }}>{alert.body}</p>
+                    <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#B8C7DB", marginBottom: 4 }}>{alert.body}</p>
                     <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{alert.time}</span>
                   </motion.div>
                 );
@@ -1993,20 +2595,20 @@ function ViewDashboard() {
               {[
                 { name: "ADMISIONES IA", status: "ESTABLE", note: "Cola promedio 02:11", color: "#0D9488", icon: UserPlus },
                 { name: "INVENTARIO", status: "ALERTA", note: "3 recursos críticos", color: "#EA580C", icon: Package },
-                { name: "EXPEDICIONES", status: "ALERTA", note: "1 equipo con retraso", color: "#F59E0B", icon: Map },
+                { name: "EXPEDICIONES", status: "ALERTA", note: "1 equipo con retraso", color: "#4AAED2", icon: Map },
                 { name: "SEGURIDAD", status: "BLOQUEADO", note: "IP sospechosa aislada", color: "#DC2626", icon: Shield },
               ].map(module => (
-                <div key={module.name} className="p-2 rounded-sm" style={{ background: "#0D0D10", border: `1px solid ${module.color}44` }}>
+                <div key={module.name} className="p-2 rounded-sm" style={{ background: "#0B1118", border: `1px solid ${module.color}44` }}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1.5">
                       <module.icon size={11} style={{ color: module.color }} />
-                      <span className="admin-text-micro" style={{ fontFamily: "'Share Tech Mono', monospace", color: "#F5F0E8" }}>{module.name}</span>
+                      <span className="admin-text-micro" style={{ fontFamily: "'Share Tech Mono', monospace", color: "#EEF3FB" }}>{module.name}</span>
                     </div>
                     <span className={`admin-text-micro ${module.status === "BLOQUEADO" ? "animate-pulse" : ""}`} style={{ fontFamily: "'Share Tech Mono', monospace", color: module.color }}>
                       {module.status}
                     </span>
                   </div>
-                  <span className="admin-text-body" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#8B8070" }}>{module.note}</span>
+                  <span className="admin-text-body" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#B8C7DB" }}>{module.note}</span>
                 </div>
               ))}
             </div>
@@ -2019,17 +2621,17 @@ function ViewDashboard() {
         <Card>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2">
-              <Settings size={14} style={{ color: "#D97706" }} />
-              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#D97706" }}>PRÓXIMO CICLO AUTOMÁTICO — HOY 18:00</span>
+              <Settings size={14} style={{ color: "#7FB8FF" }} />
+              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#7FB8FF" }}>PRÓXIMO CICLO AUTOMÁTICO — HOY 18:00</span>
             </div>
-            <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 22, fontWeight: 900, color: "#F59E0B" }}>
+            <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 22, fontWeight: 900, color: "#4AAED2" }}>
               {String(countdown.h).padStart(2, "0")}:{String(countdown.m).padStart(2, "0")}:{String(countdown.s).padStart(2, "0")}
             </div>
             <div className="flex gap-2">
               {automations.map((a, i) => (
-                <div key={i} className="flex items-center gap-1 px-2 py-1 rounded-sm" style={{ background: "#0D0D10", border: `1px solid ${a.ok ? "#0D948844" : "#EA580C44"}` }}>
+                <div key={i} className="flex items-center gap-1 px-2 py-1 rounded-sm" style={{ background: "#0B1118", border: `1px solid ${a.ok ? "#0D948844" : "#EA580C44"}` }}>
                   <span style={{ fontSize: 10, color: a.ok ? "#0D9488" : "#EA580C" }}>{a.ok ? "✓" : "⚠"}</span>
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#8B8070" }}>{a.name.split(" ").slice(0, 2).join(" ")}</span>
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{a.name.split(" ").slice(0, 2).join(" ")}</span>
                 </div>
               ))}
             </div>
@@ -2046,6 +2648,10 @@ function ViewDashboard() {
 
 export default function AdminDashboard() {
   const [activeNav, setActiveNav] = useState<NavSection>("CENTRO DE MANDO");
+  const currentRole: AppRole = "SYSTEM_ADMIN";
+  const [sessionPanelOpen, setSessionPanelOpen] = useState(false);
+  const [sessionLocked, setSessionLocked] = useState(false);
+  const [globalHttpCode, setGlobalHttpCode] = useState<HttpCode | null>(null);
   const [populationViewMode, setPopulationViewMode] = useState<PopulationViewMode>("stats");
   const [admissionsViewMode, setAdmissionsViewMode] = useState<AdmissionsViewMode>("queue");
   const [inventoryViewMode, setInventoryViewMode] = useState<InventoryViewMode>("summary");
@@ -2057,11 +2663,46 @@ export default function AdminDashboard() {
   const [configViewMode, setConfigViewMode] = useState<ConfigViewMode>("camp");
   const [serverTime, setServerTime] = useState(new Date());
   const [unreadNotifs] = useState(4);
+  const currentUser = {
+    name: "Edicson Vargas",
+    email: "edicson.vargas@camp-alpha.local",
+    role: currentRole,
+    camp: "Campamento Alfa",
+    shift: "Turno Noche",
+  };
+  const can = (permission: string) => ROLE_PERMISSIONS[currentRole].includes(permission);
 
   useEffect(() => {
     const t = setInterval(() => setServerTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    const ttl = 20 * 60 * 1000;
+    let timeout: ReturnType<typeof setTimeout>;
+    const reset = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => setSessionLocked(true), ttl);
+    };
+    const events: Array<keyof WindowEventMap> = ["mousemove", "keydown", "click", "scroll"];
+    events.forEach(evt => window.addEventListener(evt, reset, { passive: true }));
+    reset();
+    return () => {
+      clearTimeout(timeout);
+      events.forEach(evt => window.removeEventListener(evt, reset));
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sessionPanelOpen) return;
+    const onEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSessionPanelOpen(false);
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => {
+      window.removeEventListener("keydown", onEsc);
+    };
+  }, [sessionPanelOpen]);
 
   const quickAccess: { icon: React.ElementType; label: string; target: NavSection }[] = [
     { icon: Users, label: "Poblacion", target: "POBLACIÓN" },
@@ -2090,15 +2731,15 @@ export default function AdminDashboard() {
   const renderSection = () => {
     switch (activeNav) {
       case "POBLACIÓN": return <ViewPoblacion mode={populationViewMode} />;
-      case "ADMISIONES IA": return <ViewAdmisiones mode={admissionsViewMode} />;
-      case "INVENTARIO": return <ViewInventario mode={inventoryViewMode} />;
-      case "EXPEDICIONES": return <ViewExpediciones mode={expeditionsViewMode} />;
-      case "INTER-CAMPAMENTOS": return <ViewIntercamp mode={intercampViewMode} />;
+      case "ADMISIONES IA": return <ViewAdmisiones mode={admissionsViewMode} canReview={can("admissions.review")} />;
+      case "INVENTARIO": return <ViewInventario mode={inventoryViewMode} canAdjust={can("inventory.adjust")} />;
+      case "EXPEDICIONES": return <ViewExpediciones mode={expeditionsViewMode} canForce={can("expeditions.force")} />;
+      case "INTER-CAMPAMENTOS": return <ViewIntercamp mode={intercampViewMode} canApprove={can("intercamp.approve")} />;
       case "SEGURIDAD / LOGS": return <ViewSeguridad mode={securityViewMode} />;
       case "LOGROS": return <ViewLogros mode={logrosViewMode} />;
       case "NOTIFICACIONES": return <ViewNotificaciones mode={notifsViewMode} />;
       case "CONFIGURACIÓN": return <ViewConfiguracion mode={configViewMode} />;
-      default: return <ViewDashboard />;
+      default: return <ViewDashboard onQuickNav={setActiveNav} />;
     }
   };
 
@@ -2175,9 +2816,9 @@ export default function AdminDashboard() {
       <style>{`
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: #0A0A0B; }
-        ::-webkit-scrollbar-thumb { background: #2D2A24; border-radius: 2px; }
-        select option { background: #111114; color: #F5F0E8; }
+        ::-webkit-scrollbar-track { background: #05070A; }
+        ::-webkit-scrollbar-thumb { background: #2A3444; border-radius: 2px; }
+        select option { background: #0B1118; color: #EEF3FB; }
         .scanlines::before {
           content: '';
           position: absolute;
@@ -2190,15 +2831,15 @@ export default function AdminDashboard() {
           content: '';
           position: absolute;
           inset: 0;
-          background: linear-gradient(180deg, transparent 0%, rgba(217, 119, 6, 0.14) 48%, transparent 100%);
+          background: linear-gradient(180deg, transparent 0%, rgba(127, 184, 255, 0.14) 48%, transparent 100%);
           animation: scanSweep 4.2s linear infinite;
           pointer-events: none;
           z-index: 1;
         }
         .noise-bg {
-          background-color: #0A0A0B;
+          background-color: #05070A;
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"),
-            radial-gradient(ellipse at 50% 0%, #1A1A14 0%, #0A0A0B 70%);
+            radial-gradient(ellipse at 50% 0%, #1A1A14 0%, #05070A 70%);
         }
         @keyframes scanSweep {
           0% { transform: translateY(-100%); opacity: 0; }
@@ -2232,44 +2873,48 @@ export default function AdminDashboard() {
               "NOTIFICACIONES",
               "CONFIGURACIÓN",
             ].includes(activeNav) && (
-              <aside className="admin-sidebar hidden md:flex flex-col flex-shrink-0" style={{ width: 250, background: "transparent", borderRight: "1px solid #2D2A24", zIndex: 1 }}>
-                <div className="admin-logo px-4 py-5 flex flex-col" style={{ borderBottom: "1px solid #2D2A24" }}>
+              <aside className="admin-sidebar hidden md:flex flex-col flex-shrink-0" style={{ width: 250, background: "transparent", borderRight: "1px solid #2A3444", zIndex: 1 }}>
+                <div className="admin-logo px-4 py-5 flex flex-col" style={{ borderBottom: "1px solid #2A3444" }}>
                   <div className="flex items-center gap-2 mb-1">
-                    {activeNav === "POBLACIÓN" && <Users size={18} style={{ color: "#D97706" }} />}
-                    {activeNav === "ADMISIONES IA" && <UserPlus size={18} style={{ color: "#D97706" }} />}
-                    {activeNav === "INVENTARIO" && <Package size={18} style={{ color: "#D97706" }} />}
-                    {activeNav === "EXPEDICIONES" && <Map size={18} style={{ color: "#D97706" }} />}
-                    {activeNav === "INTER-CAMPAMENTOS" && <Radio size={18} style={{ color: "#D97706" }} />}
-                    {activeNav === "SEGURIDAD / LOGS" && <Shield size={18} style={{ color: "#D97706" }} />}
-                    {activeNav === "LOGROS" && <Trophy size={18} style={{ color: "#D97706" }} />}
-                    {activeNav === "NOTIFICACIONES" && <Bell size={18} style={{ color: "#D97706" }} />}
-                    {activeNav === "CONFIGURACIÓN" && <Settings size={18} style={{ color: "#D97706" }} />}
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 13, color: "#D97706", letterSpacing: "0.06em" }}>{activeNav}</span>
+                    {activeNav === "POBLACIÓN" && <Users size={18} style={{ color: "#7FB8FF" }} />}
+                    {activeNav === "ADMISIONES IA" && <UserPlus size={18} style={{ color: "#7FB8FF" }} />}
+                    {activeNav === "INVENTARIO" && <Package size={18} style={{ color: "#7FB8FF" }} />}
+                    {activeNav === "EXPEDICIONES" && <Map size={18} style={{ color: "#7FB8FF" }} />}
+                    {activeNav === "INTER-CAMPAMENTOS" && <Radio size={18} style={{ color: "#7FB8FF" }} />}
+                    {activeNav === "SEGURIDAD / LOGS" && <Shield size={18} style={{ color: "#7FB8FF" }} />}
+                    {activeNav === "LOGROS" && <Trophy size={18} style={{ color: "#7FB8FF" }} />}
+                    {activeNav === "NOTIFICACIONES" && <Bell size={18} style={{ color: "#7FB8FF" }} />}
+                    {activeNav === "CONFIGURACIÓN" && <Settings size={18} style={{ color: "#7FB8FF" }} />}
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 13, color: "#7FB8FF", letterSpacing: "0.06em" }}>{activeNav}</span>
                   </div>
-                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#8B8070" }}>Acceso rápido del módulo</span>
+                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#B8C7DB" }}>Acceso rápido del módulo</span>
                 </div>
 
                 <nav className="admin-nav flex-1 px-3 py-3 overflow-y-auto">
                   {activeNav === "POBLACIÓN" && (
                     <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${populationViewMode === "stats" ? " admin-nav-button--active" : ""}`} onClick={() => setPopulationViewMode("stats")} style={{ color: populationViewMode === "stats" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${populationViewMode === "stats" ? " admin-nav-button--active" : ""}`} onClick={() => setPopulationViewMode("stats")} style={{ color: populationViewMode === "stats" ? "#05070A" : "#B8C7DB" }}>
                         <BarChart2 size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Ver estadísticas</span>
                       </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${populationViewMode === "users" ? " admin-nav-button--active" : ""}`} onClick={() => setPopulationViewMode("users")} style={{ color: populationViewMode === "users" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${populationViewMode === "users" ? " admin-nav-button--active" : ""}`} onClick={() => setPopulationViewMode("users")} style={{ color: populationViewMode === "users" ? "#05070A" : "#B8C7DB" }}>
                         <Users size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Ver usuarios y filtros</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${populationViewMode === "tempRoles" ? " admin-nav-button--active" : ""}`} onClick={() => setPopulationViewMode("tempRoles")} style={{ color: populationViewMode === "tempRoles" ? "#05070A" : "#B8C7DB" }}>
+                        <Activity size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Oficios temporales</span>
                       </button>
                     </>
                   )}
 
                   {activeNav === "ADMISIONES IA" && (
                     <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${admissionsViewMode === "queue" ? " admin-nav-button--active" : ""}`} onClick={() => setAdmissionsViewMode("queue")} style={{ color: admissionsViewMode === "queue" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${admissionsViewMode === "queue" ? " admin-nav-button--active" : ""}`} onClick={() => setAdmissionsViewMode("queue")} style={{ color: admissionsViewMode === "queue" ? "#05070A" : "#B8C7DB" }}>
                         <AlertTriangle size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Cola pendiente</span>
                       </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${admissionsViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setAdmissionsViewMode("history")} style={{ color: admissionsViewMode === "history" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${admissionsViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setAdmissionsViewMode("history")} style={{ color: admissionsViewMode === "history" ? "#05070A" : "#B8C7DB" }}>
                         <CheckCircle size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Historial procesado</span>
                       </button>
@@ -2278,45 +2923,69 @@ export default function AdminDashboard() {
 
                   {activeNav === "INVENTARIO" && (
                     <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "summary" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("summary")} style={{ color: inventoryViewMode === "summary" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "summary" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("summary")} style={{ color: inventoryViewMode === "summary" ? "#05070A" : "#B8C7DB" }}>
                         <BarChart2 size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Resumen por categoría</span>
                       </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "items" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("items")} style={{ color: inventoryViewMode === "items" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "items" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("items")} style={{ color: inventoryViewMode === "items" ? "#05070A" : "#B8C7DB" }}>
                         <Package size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Gestión de ítems</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "movements" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("movements")} style={{ color: inventoryViewMode === "movements" ? "#05070A" : "#B8C7DB" }}>
+                        <Activity size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Movimientos</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "alerts" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("alerts")} style={{ color: inventoryViewMode === "alerts" ? "#05070A" : "#B8C7DB" }}>
+                        <AlertTriangle size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Alertas</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "collection" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("collection")} style={{ color: inventoryViewMode === "collection" ? "#05070A" : "#B8C7DB" }}>
+                        <Database size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Recolección diaria</span>
                       </button>
                     </>
                   )}
 
                   {activeNav === "EXPEDICIONES" && (
                     <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "active" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("active")} style={{ color: expeditionsViewMode === "active" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "active" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("active")} style={{ color: expeditionsViewMode === "active" ? "#05070A" : "#B8C7DB" }}>
                         <Activity size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Activas y en curso</span>
                       </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "planning" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("planning")} style={{ color: expeditionsViewMode === "planning" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "planning" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("planning")} style={{ color: expeditionsViewMode === "planning" ? "#05070A" : "#B8C7DB" }}>
                         <Map size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Planificación</span>
                       </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("history")} style={{ color: expeditionsViewMode === "history" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("history")} style={{ color: expeditionsViewMode === "history" ? "#05070A" : "#B8C7DB" }}>
                         <Trophy size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Completadas</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "participants" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("participants")} style={{ color: expeditionsViewMode === "participants" ? "#05070A" : "#B8C7DB" }}>
+                        <Users size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Participantes</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "consumed" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("consumed")} style={{ color: expeditionsViewMode === "consumed" ? "#05070A" : "#B8C7DB" }}>
+                        <TrendingDown size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Recursos consumidos</span>
+                      </button>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "gained" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("gained")} style={{ color: expeditionsViewMode === "gained" ? "#05070A" : "#B8C7DB" }}>
+                        <TrendingUp size={14} />
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Recursos obtenidos</span>
                       </button>
                     </>
                   )}
 
                   {activeNav === "INTER-CAMPAMENTOS" && (
                     <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "pending" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("pending")} style={{ color: intercampViewMode === "pending" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "pending" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("pending")} style={{ color: intercampViewMode === "pending" ? "#05070A" : "#B8C7DB" }}>
                         <AlertTriangle size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Pendientes</span>
                       </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("history")} style={{ color: intercampViewMode === "history" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("history")} style={{ color: intercampViewMode === "history" ? "#05070A" : "#B8C7DB" }}>
                         <Radio size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Historial</span>
                       </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "send" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("send")} style={{ color: intercampViewMode === "send" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "send" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("send")} style={{ color: intercampViewMode === "send" ? "#05070A" : "#B8C7DB" }}>
                         <Bell size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Enviar mensaje</span>
                       </button>
@@ -2325,15 +2994,15 @@ export default function AdminDashboard() {
 
                   {activeNav === "SEGURIDAD / LOGS" && (
                     <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "live" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("live")} style={{ color: securityViewMode === "live" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "live" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("live")} style={{ color: securityViewMode === "live" ? "#05070A" : "#B8C7DB" }}>
                         <Activity size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Monitoreo en vivo</span>
                       </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "errors" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("errors")} style={{ color: securityViewMode === "errors" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "errors" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("errors")} style={{ color: securityViewMode === "errors" ? "#05070A" : "#B8C7DB" }}>
                         <AlertTriangle size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Errores y alertas</span>
                       </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "system" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("system")} style={{ color: securityViewMode === "system" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "system" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("system")} style={{ color: securityViewMode === "system" ? "#05070A" : "#B8C7DB" }}>
                         <Cpu size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Eventos del sistema</span>
                       </button>
@@ -2342,11 +3011,11 @@ export default function AdminDashboard() {
 
                   {activeNav === "LOGROS" && (
                     <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${logrosViewMode === "overview" ? " admin-nav-button--active" : ""}`} onClick={() => setLogrosViewMode("overview")} style={{ color: logrosViewMode === "overview" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${logrosViewMode === "overview" ? " admin-nav-button--active" : ""}`} onClick={() => setLogrosViewMode("overview")} style={{ color: logrosViewMode === "overview" ? "#05070A" : "#B8C7DB" }}>
                         <Trophy size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Resumen de nivel</span>
                       </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${logrosViewMode === "progress" ? " admin-nav-button--active" : ""}`} onClick={() => setLogrosViewMode("progress")} style={{ color: logrosViewMode === "progress" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${logrosViewMode === "progress" ? " admin-nav-button--active" : ""}`} onClick={() => setLogrosViewMode("progress")} style={{ color: logrosViewMode === "progress" ? "#05070A" : "#B8C7DB" }}>
                         <BarChart2 size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Progreso por categorías</span>
                       </button>
@@ -2355,15 +3024,15 @@ export default function AdminDashboard() {
 
                   {activeNav === "NOTIFICACIONES" && (
                     <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "all" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("all")} style={{ color: notifsViewMode === "all" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "all" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("all")} style={{ color: notifsViewMode === "all" ? "#05070A" : "#B8C7DB" }}>
                         <Bell size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Todas</span>
                       </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "unread" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("unread")} style={{ color: notifsViewMode === "unread" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "unread" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("unread")} style={{ color: notifsViewMode === "unread" ? "#05070A" : "#B8C7DB" }}>
                         <CheckCircle size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Sin leer</span>
                       </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "critical" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("critical")} style={{ color: notifsViewMode === "critical" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "critical" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("critical")} style={{ color: notifsViewMode === "critical" ? "#05070A" : "#B8C7DB" }}>
                         <AlertTriangle size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Críticas</span>
                       </button>
@@ -2372,11 +3041,11 @@ export default function AdminDashboard() {
 
                   {activeNav === "CONFIGURACIÓN" && (
                     <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${configViewMode === "camp" ? " admin-nav-button--active" : ""}`} onClick={() => setConfigViewMode("camp")} style={{ color: configViewMode === "camp" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${configViewMode === "camp" ? " admin-nav-button--active" : ""}`} onClick={() => setConfigViewMode("camp")} style={{ color: configViewMode === "camp" ? "#05070A" : "#B8C7DB" }}>
                         <Users size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Campamento</span>
                       </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${configViewMode === "system" ? " admin-nav-button--active" : ""}`} onClick={() => setConfigViewMode("system")} style={{ color: configViewMode === "system" ? "#1A0B04" : "#8B8070" }}>
+                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${configViewMode === "system" ? " admin-nav-button--active" : ""}`} onClick={() => setConfigViewMode("system")} style={{ color: configViewMode === "system" ? "#05070A" : "#B8C7DB" }}>
                         <Settings size={14} />
                         <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Sistema</span>
                       </button>
@@ -2384,9 +3053,9 @@ export default function AdminDashboard() {
                   )}
                 </nav>
 
-                <div className="px-3 py-3" style={{ borderTop: "1px solid #2D2A24" }}>
-                  <div className="admin-clock px-2 py-1 rounded-sm" style={{ background: "#111114", border: "1px solid #2D2A24" }}>
-                    <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#F59E0B", letterSpacing: "0.1em" }}>{fmtTime(serverTime)}</span>
+                <div className="px-3 py-3" style={{ borderTop: "1px solid #2A3444" }}>
+                  <div className="admin-clock px-2 py-1 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
+                    <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#4AAED2", letterSpacing: "0.1em" }}>{fmtTime(serverTime)}</span>
                   </div>
                   <div className="mt-2">
                     <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>Si tocas este módulo otra vez vuelves al Centro de Mando</span>
@@ -2399,44 +3068,150 @@ export default function AdminDashboard() {
             <div className="admin-main flex-1 flex flex-col overflow-hidden" style={{ position: "relative", zIndex: 1 }}>
               {/* Header */}
               <header className="admin-header scanlines relative flex-shrink-0 flex items-center justify-between px-5"
-                style={{ height: 52, background: "#0D0D10", borderBottom: "1px solid #2D2A24" }}>
+                style={{ height: 52, background: "#0B1118", borderBottom: "1px solid #2A3444" }}>
             <div className="admin-breadcrumb flex items-center gap-2 relative z-10">
-              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#8B8070" }}>CAMPAMENTO ALFA</span>
+              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#B8C7DB" }}>CAMPAMENTO ALFA</span>
               <ChevronRight size={10} style={{ color: UI_COLORS.textFaint }} />
-              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#D97706" }}>{sectionTitles[activeNav]}</span>
+              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#7FB8FF" }}>{sectionTitles[activeNav]}</span>
             </div>
             <div className="admin-status-row hidden lg:flex items-center gap-3 relative z-10">
               {[
                 { label: "SERVIDOR: ONLINE", color: "#0D9488" },
-                { label: "DÍA 47 DEL APOCALIPSIS", color: "#F5F0E8" },
-                { label: "247 SUPERVIVIENTES", color: "#F5F0E8" },
+                { label: "DÍA 47 DEL APOCALIPSIS", color: "#EEF3FB" },
+                { label: "247 SUPERVIVIENTES", color: "#EEF3FB" },
                 { label: "3 ALERTAS CRÍTICAS", color: "#DC2626" },
               ].map((item, i) => (
                 <div key={i} className="flex items-center gap-1">
-                  {i > 0 && <span style={{ color: "#2D2A24" }}>|</span>}
+                  {i > 0 && <span style={{ color: "#2A3444" }}>|</span>}
                   <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: item.color }}>{item.label}</span>
                 </div>
               ))}
             </div>
             <div className="admin-profile flex items-center gap-2 relative z-10">
               <button onClick={() => setActiveNav("NOTIFICACIONES")} className="admin-icon-btn relative p-1.5 rounded-sm"
-                style={{ background: "#1A1A20", border: "1px solid #2D2A24" }}>
-                <Bell size={14} style={{ color: "#D97706" }} />
+                style={{ background: "#121B26", border: "1px solid #2A3444" }}>
+                <Bell size={14} style={{ color: "#7FB8FF" }} />
                 {unreadNotifs > 0 && (
                   <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-sm"
-                    style={{ background: "#DC2626", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#F5F0E8" }}>{unreadNotifs}</span>
+                    style={{ background: "#DC2626", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EEF3FB" }}>{unreadNotifs}</span>
                 )}
               </button>
               <button onClick={() => setActiveNav("CONFIGURACIÓN")} className="admin-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
-                style={{ background: "#1A1A20", border: "1px solid #2D2A24" }}>
+                style={{ background: "#121B26", border: "1px solid #2A3444" }}>
+                <Settings size={12} style={{ color: "#7FB8FF" }} />
+                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EEF3FB" }}>CONFIG</span>
+              </button>
+              <button onClick={() => setSessionPanelOpen(prev => !prev)} className="admin-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
+                style={{ background: "#121B26", border: "1px solid #2A3444" }}>
                 <div className="w-5 h-5 rounded-sm flex items-center justify-center"
-                  style={{ background: "#D97706", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#0A0A0B", fontWeight: 700 }}>
-                  EV
+                  style={{ background: "#7FB8FF", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#05070A", fontWeight: 700 }}>
+                  {currentUser.name.split(" ").map(part => part[0]).join("").slice(0, 2)}
                 </div>
-                <ChevronDown size={10} style={{ color: "#8B8070" }} />
+                <ChevronDown size={10} style={{ color: "#B8C7DB", transform: sessionPanelOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />
               </button>
             </div>
           </header>
+
+              {typeof document !== "undefined" && createPortal(
+                <AnimatePresence initial={false} mode="wait">
+                  {sessionPanelOpen && (
+                    <>
+                      <motion.button
+                        type="button"
+                        aria-label="Cerrar panel de sesion"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.22, ease: "easeInOut" }}
+                        onClick={() => setSessionPanelOpen(false)}
+                        style={{
+                          position: "fixed",
+                          inset: 0,
+                          background: "rgba(0,0,0,0.32)",
+                          zIndex: 99998,
+                          border: "none",
+                          padding: 0,
+                          margin: 0,
+                        }}
+                      />
+                      <motion.div
+                        initial={{ opacity: 0, y: -14, scale: 0.96, filter: "blur(6px)" }}
+                        animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+                        exit={{ opacity: 0, y: -10, scale: 0.97, filter: "blur(4px)" }}
+                        transition={{
+                          y: { type: "spring", stiffness: 340, damping: 30, mass: 0.75 },
+                          scale: { type: "spring", stiffness: 360, damping: 28, mass: 0.7 },
+                          opacity: { duration: 0.18, ease: "easeOut" },
+                          filter: { duration: 0.2, ease: "easeOut" },
+                        }}
+                        style={{
+                          position: "fixed",
+                          top: 72,
+                          right: 16,
+                          width: "min(304px, calc(100vw - 24px))",
+                          padding: 12,
+                          borderRadius: 6,
+                          zIndex: 99999,
+                          background: "linear-gradient(160deg, rgba(11,17,24,0.98), rgba(18,27,38,0.96))",
+                          border: "1px solid #2A3444",
+                          boxShadow: "0 14px 36px rgba(0,0,0,0.42), inset 0 0 0 1px rgba(127,184,255,0.12)",
+                          backdropFilter: "blur(8px)",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, padding: 8, borderRadius: 6, background: "rgba(127,184,255,0.08)", border: "1px solid rgba(127,184,255,0.2)" }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", background: "#121B26", border: "1px solid #2A3444" }}>
+                            <User size={18} style={{ color: "#7FB8FF" }} />
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 14, fontWeight: 700, color: "#EEF3FB", lineHeight: 1.1 }}>{currentUser.name}</div>
+                            <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis" }}>{currentUser.email}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12, borderTop: "1px solid #2A3444", paddingTop: 8 }}>
+                          <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#7F93AC" }}>ROL · {currentUser.role}</div>
+                          <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#7F93AC" }}>CAMP · {currentUser.camp}</div>
+                          <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#7F93AC" }}>TURNO · {currentUser.shift}</div>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch("/logout", { method: "POST" });
+                              if (!res.ok) setGlobalHttpCode((res.status as HttpCode) || 400);
+                            } finally {
+                              window.location.reload();
+                            }
+                          }}
+                          className="admin-icon-btn"
+                          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "8px 12px", borderRadius: 6, background: "#1B2734", border: "1px solid #2A3444" }}
+                        >
+                          <XCircle size={13} style={{ color: "#DC2626" }} />
+                          <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#EEF3FB", letterSpacing: "0.06em" }}>CERRAR SESIÓN</span>
+                        </button>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>,
+                document.body
+              )}
+
+              {globalHttpCode && (
+                <div className="px-4 pt-2">
+                  <HttpStatusNotice code={globalHttpCode} />
+                </div>
+              )}
+
+              {sessionLocked && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }}>
+                  <div className="w-full max-w-md p-4 rounded-sm" style={{ background: UI_COLORS.panel, border: `1px solid ${UI_COLORS.state.warning}` }}>
+                    <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: "#4AAED2", marginBottom: 8 }}>SESIÓN BLOQUEADA POR INACTIVIDAD</div>
+                    <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted, marginBottom: 12 }}>Por seguridad, se bloqueó la interfaz tras 20 minutos sin actividad.</div>
+                    <div className="flex gap-2">
+                      <ActionBtn label="REACTIVAR SESIÓN" color="#0D9488" onClick={() => setSessionLocked(false)} />
+                      <ActionBtn label="CERRAR SESIÓN" color="#DC2626" onClick={() => window.location.reload()} />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Content */}
               <main className="admin-content flex-1 p-4">
