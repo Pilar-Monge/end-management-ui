@@ -511,7 +511,19 @@ function ActionBtn({ label, color, onClick, small = false }: { label: string; co
   );
 }
 
-function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
+function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  backgroundVideoSrc,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  backgroundVideoSrc?: string;
+}) {
   if (!open) return null;
   return (
     <AnimatePresence>
@@ -530,14 +542,37 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
           exit={{ scale: 0.95, opacity: 0 }}
           transition={MOTION.base}
           onClick={e => e.stopPropagation()}
-          className="admin-modal-card w-full max-w-lg rounded-sm p-5"
-          style={{ background: "#0B1118", border: "1px solid #7FB8FF", boxShadow: "0 0 30px #7FB8FF22", maxHeight: "90vh", overflowY: "auto" }}
+          className="admin-modal-card relative w-full max-w-lg rounded-sm p-5"
+          style={{ background: backgroundVideoSrc ? "#081018" : "#0B1118", border: "1px solid #7FB8FF", boxShadow: "0 0 30px #7FB8FF22", maxHeight: "90vh", overflowY: "auto", overflowX: "hidden" }}
         >
-          <div className="flex items-center justify-between mb-4" style={{ borderBottom: "1px solid #2A3444", paddingBottom: 12 }}>
-            <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: "#4AAED2", letterSpacing: "0.1em" }}>{title}</span>
-            <button onClick={onClose} className="admin-icon-btn"><X size={14} style={{ color: "#B8C7DB" }} /></button>
+          {backgroundVideoSrc && (
+            <>
+              <video
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="absolute inset-0 w-full h-full"
+                style={{ objectFit: "cover", opacity: 0.34 }}
+              >
+                <source src={backgroundVideoSrc} type="video/mp4" />
+              </video>
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: "linear-gradient(180deg, rgba(5,7,10,0.2) 0%, rgba(5,7,10,0.72) 35%, rgba(5,7,10,0.9) 100%)",
+                  backdropFilter: "blur(1px)",
+                }}
+              />
+            </>
+          )}
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-4" style={{ borderBottom: "1px solid #2A3444", paddingBottom: 12 }}>
+              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: "#4AAED2", letterSpacing: "0.1em" }}>{title}</span>
+              <button onClick={onClose} className="admin-icon-btn"><X size={14} style={{ color: "#B8C7DB" }} /></button>
+            </div>
+            {children}
           </div>
-          {children}
         </motion.div>
       </motion.div>
     </AnimatePresence>
@@ -1597,7 +1632,12 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
         </Card>
       )}
 
-      <Modal open={showCreate && mode !== "history"} onClose={() => setShowCreate(false)} title="CREAR NUEVA EXPEDICIÓN">
+      <Modal
+        open={showCreate && mode !== "history"}
+        onClose={() => setShowCreate(false)}
+        title="CREAR NUEVA EXPEDICIÓN"
+        backgroundVideoSrc="/videos/video_expeditions.mp4"
+      >
         <div className="admin-stack-md">
           {[
             { label: "NOMBRE DE LA MISIÓN", key: "name" },
@@ -2852,13 +2892,9 @@ export default function AdminDashboard() {
 
       <div className="admin-dashboard">
         <div className="admin-stage">
-          <div className="admin-backdrop" aria-hidden="true" />
-          <div className="admin-brush" aria-hidden="true" />
-          <div className="admin-specks" aria-hidden="true" />
-          <div className="admin-brush-image" aria-hidden="true" />
-          <div className="admin-grid" aria-hidden="true" />
-          <div className="admin-texture" aria-hidden="true" />
-          <div className="admin-noise" aria-hidden="true" />
+          <video className="admin-texture" aria-hidden="true" autoPlay muted loop playsInline>
+            <source src="/videos/video_expeditions.mp4" type="video/mp4" />
+          </video>
           <div className="admin-hud" aria-hidden="true" />
 
           <div className="admin-layout">
