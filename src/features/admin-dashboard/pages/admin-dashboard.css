@@ -61,6 +61,37 @@
   box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.86);
 }
 
+.admin-stage::before,
+.admin-stage::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 36px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.admin-stage::before {
+  top: 0;
+  clip-path: polygon(0 42%, 21% 42%, 23.5% 12%, 47% 12%, 49.4% 42%, 100% 42%, 100% 100%, 0 100%);
+  background:
+    linear-gradient(180deg, rgba(212, 233, 255, 0.42) 0%, rgba(128, 195, 255, 0.28) 35%, rgba(8, 15, 25, 0.06) 100%),
+    linear-gradient(90deg, rgba(95, 182, 255, 0.1) 0%, rgba(222, 239, 255, 0.42) 18%, rgba(88, 170, 235, 0.68) 49%, rgba(222, 239, 255, 0.38) 80%, rgba(95, 182, 255, 0.1) 100%);
+  border-bottom: 1px solid rgba(158, 218, 255, 0.38);
+  box-shadow: 0 5px 12px rgba(7, 17, 31, 0.48), inset 0 -4px 8px rgba(10, 32, 54, 0.3);
+}
+
+.admin-stage::after {
+  bottom: 0;
+  clip-path: polygon(0 0, 38% 0, 40.6% 34%, 60.6% 34%, 63.2% 0, 100% 0, 100% 58%, 0 58%);
+  background:
+    linear-gradient(0deg, rgba(212, 233, 255, 0.44) 0%, rgba(133, 202, 255, 0.3) 38%, rgba(8, 15, 25, 0.08) 100%),
+    linear-gradient(90deg, rgba(95, 182, 255, 0.12) 0%, rgba(222, 239, 255, 0.45) 22%, rgba(88, 170, 235, 0.72) 50%, rgba(222, 239, 255, 0.38) 78%, rgba(95, 182, 255, 0.12) 100%);
+  border-top: 1px solid rgba(158, 218, 255, 0.4);
+  box-shadow: 0 -5px 12px rgba(7, 17, 31, 0.5), inset 0 4px 8px rgba(10, 32, 54, 0.3);
+}
+
 .admin-texture {
   position: absolute;
   inset: 0;
@@ -69,7 +100,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.9;
+  opacity: 1;
   filter: none;
 }
 
@@ -77,11 +108,42 @@
   position: absolute;
   inset: 1.6% 0.8% 3.2%;
   z-index: 2;
-  border-top: 2px solid rgba(98, 214, 205, 0.34);
-  border-bottom: 2px solid rgba(98, 214, 205, 0.28);
-  clip-path: polygon(0 0, 20% 0, 21.5% 4.5%, 64% 4.5%, 66% 0, 100% 0, 100% 100%, 0 100%);
-  filter: drop-shadow(0 0 9px rgba(98, 214, 205, 0.35));
+  border: 1px solid rgba(112, 182, 255, 0.2);
+  clip-path: polygon(0 2.7%, 18.8% 2.7%, 21% 0, 45.8% 0, 48.2% 2.7%, 100% 2.7%, 100% 95.6%, 61.4% 95.6%, 59.2% 100%, 40.6% 100%, 38.4% 95.6%, 0 95.6%);
+  filter: drop-shadow(0 0 7px rgba(100, 190, 255, 0.24));
   pointer-events: none;
+}
+
+.admin-hud::before,
+.admin-hud::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 40px;
+  pointer-events: none;
+}
+
+.admin-hud::before {
+  top: 0;
+  clip-path: polygon(0 38%, 18.8% 38%, 21% 0, 45.8% 0, 48.2% 38%, 100% 38%, 100% 100%, 0 100%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(125, 195, 255, 0.14) 58%, rgba(0, 0, 0, 0) 100%),
+    url("/textures/grunge-noise.png");
+  background-size: 100% 100%, 280px 280px;
+  background-repeat: no-repeat, repeat;
+  opacity: 0.55;
+}
+
+.admin-hud::after {
+  bottom: 0;
+  clip-path: polygon(0 0, 38.4% 0, 40.6% 38%, 59.2% 38%, 61.4% 0, 100% 0, 100% 62%, 0 62%);
+  background:
+    linear-gradient(0deg, rgba(255, 255, 255, 0.16) 0%, rgba(125, 195, 255, 0.14) 58%, rgba(0, 0, 0, 0) 100%),
+    url("/textures/grunge-noise.png");
+  background-size: 100% 100%, 280px 280px;
+  background-repeat: no-repeat, repeat;
+  opacity: 0.53;
 }
 
 .admin-layout {
@@ -654,7 +716,10 @@
   justify-content: center;
   gap: 8px;
   padding: 10px 10px 14px;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(7, 10, 10, 0.72));
+  background: linear-gradient(180deg, rgba(190, 228, 255, 0.06), rgba(140, 205, 255, 0.02));
+  border-top: 1px solid rgba(198, 228, 255, 0.22);
+  backdrop-filter: blur(7px) saturate(118%);
+  -webkit-backdrop-filter: blur(7px) saturate(118%);
   flex-shrink: 0;
   z-index: 2;
 }
@@ -664,20 +729,23 @@
   position: absolute;
   inset: 0 22% auto;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(238, 243, 251, 0.5) 20% 80%, transparent);
-  opacity: 0.6;
+  background: linear-gradient(90deg, transparent, rgba(228, 244, 255, 0.6) 22% 78%, transparent);
+  opacity: 0.65;
 }
 
 .admin-dock-item {
   position: relative;
   width: 96px;
   height: 28px;
-  border: 2px solid rgba(127, 184, 255, 0.85);
-  background: linear-gradient(180deg, rgba(8, 12, 12, 0.96), rgba(5, 8, 8, 0.9));
-  color: rgba(238, 243, 251, 0.9);
+  border: 1px solid rgba(198, 228, 255, 0.36);
+  background: linear-gradient(145deg, rgba(193, 230, 255, 0.1), rgba(135, 201, 255, 0.04));
+  color: #eef7ff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 6px 12px rgba(4, 11, 19, 0.2);
+  backdrop-filter: blur(6px) saturate(118%);
+  -webkit-backdrop-filter: blur(6px) saturate(118%);
   clip-path: polygon(0 0, 92% 0, 100% 50%, 92% 100%, 0 100%, 6% 50%);
   cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .admin-dock-item svg {
@@ -688,17 +756,18 @@
   content: "";
   position: absolute;
   inset: 4px 10px;
-  border: 1px solid rgba(238, 243, 251, 0.12);
+  border: 1px solid rgba(238, 247, 255, 0.18);
   clip-path: polygon(0 0, 92% 0, 100% 50%, 92% 100%, 0 100%, 6% 50%);
-  opacity: 0.65;
+  opacity: 0.7;
   pointer-events: none;
 }
 
 .admin-dock-item:hover {
   transform: translateY(-2px);
-  border-color: rgba(127, 184, 255, 1);
-  color: #1b0c06;
-  background: linear-gradient(180deg, rgba(127, 184, 255, 0.95), rgba(74, 174, 210, 0.9));
+  border-color: rgba(210, 236, 255, 0.62);
+  color: #f6fbff;
+  background: linear-gradient(145deg, rgba(210, 236, 255, 0.16), rgba(150, 210, 255, 0.08));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 8px 16px rgba(4, 11, 19, 0.24), 0 0 10px rgba(156, 215, 255, 0.22);
 }
 
 .admin-dock-item:active {
@@ -706,10 +775,10 @@
 }
 
 .admin-dock-item--active {
-  border-color: rgba(127, 184, 255, 1);
-  background: linear-gradient(180deg, rgba(127, 184, 255, 0.98), rgba(74, 174, 210, 0.92));
-  color: #1b0c06;
-  box-shadow: 0 0 12px rgba(127, 184, 255, 0.35);
+  border-color: rgba(217, 240, 255, 0.7);
+  background: linear-gradient(145deg, rgba(218, 240, 255, 0.19), rgba(156, 215, 255, 0.1));
+  color: #f6fbff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 0 12px rgba(156, 215, 255, 0.3);
 }
 
 @keyframes adminBrushDrift {
@@ -727,9 +796,12 @@
   left: 50%;
   transform: translateX(-50%);
   padding: 3px 6px;
-  background: rgba(10, 12, 12, 0.9);
-  border: 1px solid rgba(127, 184, 255, 0.55);
-  color: rgba(238, 243, 251, 0.9);
+  background: linear-gradient(145deg, rgba(193, 230, 255, 0.13), rgba(135, 201, 255, 0.06));
+  border: 1px solid rgba(198, 228, 255, 0.34);
+  color: #eef7ff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  backdrop-filter: blur(6px) saturate(118%);
+  -webkit-backdrop-filter: blur(6px) saturate(118%);
   font-family: "Share Tech Mono", monospace;
   font-size: 9px;
   letter-spacing: 0.08em;
@@ -934,12 +1006,27 @@
   position: absolute;
   left: 1.1%;
   right: 1.1%;
-  top: 1.4%;
-  height: 10px;
-  border-top: 2px solid rgba(124, 231, 225, 0.34);
-  clip-path: polygon(0 100%, 19% 100%, 21% 30%, 63% 30%, 65% 100%, 100% 100%, 100% 0, 0 0);
+  top: 10px;
+  height: 18px;
+  background-image: url("/textures/BLUE-brushstroke.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  clip-path: polygon(0 92%, 17% 92%, 21% 8%, 63% 8%, 67% 92%, 100% 92%, 100% 100%, 0 100%);
   pointer-events: none;
-  opacity: 0.46;
+  opacity: 0.56;
+}
+
+.admin-layout::after {
+  content: "";
+  position: absolute;
+  left: 1.6%;
+  right: 1.6%;
+  top: 8px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(238, 243, 251, 0.88), rgba(127, 184, 255, 0.45) 50%, rgba(238, 243, 251, 0.88));
+  clip-path: polygon(0 100%, 19% 100%, 22% 0, 62% 0, 65% 100%, 100% 100%, 100% 0, 0 0);
+  opacity: 0.52;
+  pointer-events: none;
 }
 
 .admin-nav-button {
@@ -1040,9 +1127,70 @@
 }
 
 .admin-header {
-  background:
-    linear-gradient(90deg, rgba(5, 10, 11, 0.92), rgba(3, 6, 7, 0.8) 52%, rgba(5, 10, 11, 0.92)),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 40px);
+  position: relative;
+  overflow: visible;
+  background: transparent;
+  border-top: 1px solid rgba(195, 228, 255, 0.24);
+  box-shadow: inset 0 -1px 0 rgba(195, 228, 255, 0.1);
+}
+
+.admin-header::before {
+  content: none;
+}
+
+.admin-header::after {
+  content: none;
+}
+
+.admin-top-strip {
+  min-height: 28px;
+}
+
+.admin-top-title-badge {
+  position: absolute;
+  left: 50%;
+  top: -14px;
+  transform: translateX(-50%);
+  padding: 4px 14px 5px;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #eef7ff;
+  background: linear-gradient(145deg, rgba(190, 228, 255, 0.13), rgba(140, 205, 255, 0.06));
+  border: 1px solid rgba(200, 230, 255, 0.38);
+  box-shadow: 0 8px 16px rgba(4, 11, 19, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(6px) saturate(120%);
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
+  clip-path: polygon(0 12%, 92% 12%, 100% 50%, 92% 88%, 0 88%, 6% 50%);
+  z-index: 4;
+  white-space: nowrap;
+}
+
+.admin-profile .admin-icon-btn,
+.admin-header-title-wrap > div:first-child,
+.admin-status-row span {
+  background: linear-gradient(145deg, rgba(193, 230, 255, 0.09), rgba(135, 201, 255, 0.04)) !important;
+  border-color: rgba(198, 228, 255, 0.34) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 6px 12px rgba(4, 11, 19, 0.2);
+  backdrop-filter: blur(6px) saturate(118%);
+  -webkit-backdrop-filter: blur(6px) saturate(118%);
+}
+
+.admin-header-actions {
+  margin-left: auto;
+}
+
+@media (max-width: 1023px) {
+  .admin-top-title-badge {
+    font-size: 10px;
+    padding: 4px 10px;
+    top: -11px;
+    max-width: 62vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 .admin-header .admin-breadcrumb span:last-child {
@@ -1122,9 +1270,9 @@
   width: 92px;
   height: 34px;
   clip-path: polygon(8% 0, 92% 0, 100% 50%, 92% 100%, 8% 100%, 0 50%);
-  border-color: rgba(124, 231, 225, 0.62);
-  color: rgba(238, 243, 251, 0.92);
-  background: linear-gradient(180deg, rgba(7, 12, 13, 0.95), rgba(4, 7, 8, 0.92));
+  border-color: rgba(198, 228, 255, 0.36);
+  color: #eef7ff;
+  background: linear-gradient(145deg, rgba(193, 230, 255, 0.1), rgba(135, 201, 255, 0.04));
 }
 
 .admin-dock-item svg {
@@ -1132,7 +1280,7 @@
 }
 
 .admin-dock-item--active {
-  box-shadow: 0 0 9px rgba(127, 184, 255, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 0 10px rgba(156, 215, 255, 0.28);
 }
 
 @media (min-width: 1280px) {
@@ -1156,24 +1304,24 @@
 
 .admin-dock-label {
   bottom: 36px;
-  background: rgba(8, 13, 14, 0.92);
-  border-color: rgba(124, 231, 225, 0.45);
+  background: linear-gradient(145deg, rgba(193, 230, 255, 0.14), rgba(135, 201, 255, 0.06));
+  border-color: rgba(198, 228, 255, 0.34);
   font-size: 8px;
 }
 
 .admin-dock-item:hover,
 .admin-dock-item--active {
-  border-color: rgba(127, 184, 255, 0.95);
-  background: linear-gradient(120deg, rgba(11, 17, 24, 0.95), rgba(127, 184, 255, 0.85));
-  color: #eef3fb;
+  border-color: rgba(214, 239, 255, 0.64);
+  background: linear-gradient(145deg, rgba(214, 239, 255, 0.17), rgba(152, 211, 255, 0.09));
+  color: #f6fbff;
 }
 
 .admin-dock-item::after {
   content: "";
   position: absolute;
   inset: auto 12% 5%;
-  height: 4px;
-  background: repeating-linear-gradient(100deg, rgba(127, 184, 255, 0.78) 0 10px, rgba(127, 184, 255, 0.2) 10px 15px);
+  height: 3px;
+  background: linear-gradient(90deg, rgba(241, 250, 255, 0.44), rgba(176, 224, 255, 0.18));
   clip-path: polygon(0 40%, 13% 0, 100% 22%, 92% 100%, 22% 76%);
   opacity: 0;
 }
@@ -1181,6 +1329,73 @@
 .admin-dock-item--active::after,
 .admin-dock-item:hover::after {
   opacity: 0.95;
+}
+
+@keyframes adminGlassSheen {
+  from {
+    transform: translateX(-135%) skewX(-22deg);
+  }
+  to {
+    transform: translateX(145%) skewX(-22deg);
+  }
+}
+
+@keyframes adminGlassPulse {
+  0%,
+  100% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 10px rgba(156, 215, 255, 0.2);
+  }
+  50% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.46), 0 0 14px rgba(184, 229, 255, 0.34);
+  }
+}
+
+.admin-profile .admin-icon-btn,
+.admin-top-title-badge,
+.admin-status-row span,
+.admin-dock-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-profile .admin-icon-btn::after,
+.admin-top-title-badge::after,
+.admin-status-row span::after {
+  content: "";
+  position: absolute;
+  inset: -28% -16%;
+  background: linear-gradient(108deg, transparent 34%, rgba(255, 255, 255, 0.32) 49%, transparent 64%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.admin-profile .admin-icon-btn:hover::after,
+.admin-top-title-badge:hover::after,
+.admin-status-row span:hover::after {
+  opacity: 1;
+  animation: adminGlassSheen 0.9s ease-out 1;
+}
+
+.admin-dock-item {
+  background-image:
+    linear-gradient(145deg, rgba(193, 230, 255, 0.1), rgba(135, 201, 255, 0.04)),
+    linear-gradient(108deg, transparent 35%, rgba(255, 255, 255, 0.24) 50%, transparent 66%);
+  background-size: 100% 100%, 240% 100%;
+  background-position: 0 0, 130% 0;
+  background-repeat: no-repeat;
+}
+
+.admin-dock-item:hover,
+.admin-dock-item--active {
+  background-image:
+    linear-gradient(145deg, rgba(214, 239, 255, 0.17), rgba(152, 211, 255, 0.09)),
+    linear-gradient(108deg, transparent 34%, rgba(255, 255, 255, 0.34) 50%, transparent 66%);
+  background-size: 100% 100%, 240% 100%;
+  background-position: 0 0, -28% 0;
+}
+
+.admin-dock-item--active {
+  animation: adminGlassPulse 2.8s ease-in-out infinite;
 }
 
 .admin-priority-card {

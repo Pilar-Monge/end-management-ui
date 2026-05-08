@@ -553,15 +553,14 @@ function Modal({
                 loop
                 playsInline
                 className="absolute inset-0 w-full h-full"
-                style={{ objectFit: "cover", opacity: 0.34 }}
+                style={{ objectFit: "cover", opacity: 0.62 }}
               >
                 <source src={backgroundVideoSrc} type="video/mp4" />
               </video>
               <div
                 className="absolute inset-0"
                 style={{
-                  background: "linear-gradient(180deg, rgba(5,7,10,0.2) 0%, rgba(5,7,10,0.72) 35%, rgba(5,7,10,0.9) 100%)",
-                  backdropFilter: "blur(1px)",
+                  background: "linear-gradient(180deg, rgba(5,7,10,0.1) 0%, rgba(5,7,10,0.42) 35%, rgba(5,7,10,0.62) 100%)",
                 }}
               />
             </>
@@ -2768,6 +2767,21 @@ export default function AdminDashboard() {
     "CONFIGURACIÓN": "CONFIGURACIÓN DEL SISTEMA",
   };
 
+  const sectionIcons: Record<NavSection, React.ElementType> = {
+    "CENTRO DE MANDO": Activity,
+    "POBLACIÓN": Users,
+    "ADMISIONES IA": UserPlus,
+    "INVENTARIO": Package,
+    "EXPEDICIONES": Map,
+    "INTER-CAMPAMENTOS": Radio,
+    "SEGURIDAD / LOGS": Shield,
+    "LOGROS": Trophy,
+    "NOTIFICACIONES": Bell,
+    "CONFIGURACIÓN": Settings,
+  };
+
+  const ActiveSectionIcon = sectionIcons[activeNav];
+
   const renderSection = () => {
     switch (activeNav) {
       case "POBLACIÓN": return <ViewPoblacion mode={populationViewMode} />;
@@ -3103,48 +3117,68 @@ export default function AdminDashboard() {
             {/* MAIN */}
             <div className="admin-main flex-1 flex flex-col overflow-hidden" style={{ position: "relative", zIndex: 1 }}>
               {/* Header */}
-              <header className="admin-header scanlines relative flex-shrink-0 flex items-center justify-between px-5"
-                style={{ height: 52, background: "#0B1118", borderBottom: "1px solid #2A3444" }}>
-            <div className="admin-breadcrumb flex items-center gap-2 relative z-10">
-              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#B8C7DB" }}>CAMPAMENTO ALFA</span>
-              <ChevronRight size={10} style={{ color: UI_COLORS.textFaint }} />
-              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#7FB8FF" }}>{sectionTitles[activeNav]}</span>
+              <header className="admin-header relative flex-shrink-0 px-4 py-3"
+                style={{ background: "transparent", borderBottom: "1px solid rgba(127, 184, 255, 0.18)" }}>
+            <div className="admin-top-strip flex items-center justify-between gap-3 relative z-10">
+              <div className="hidden lg:flex items-center gap-2" style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB", letterSpacing: "0.09em" }}>
+                <ChevronRight size={10} style={{ color: "#7FB8FF", transform: "rotate(180deg)" }} />
+                <span>VOLVER AL CENTRO DE MANDO</span>
+              </div>
+              <div className="admin-top-title-badge">
+                {activeNav === "CENTRO DE MANDO" ? "CENTRO DE MANDO" : activeNav}
+              </div>
+              <div className="admin-profile admin-header-actions flex items-center gap-2">
+                <button onClick={() => setActiveNav("NOTIFICACIONES")} className="admin-icon-btn relative p-1.5 rounded-sm"
+                  style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
+                  <Bell size={14} style={{ color: "#7FB8FF" }} />
+                  {unreadNotifs > 0 && (
+                    <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-sm"
+                      style={{ background: "#DC2626", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EEF3FB" }}>{unreadNotifs}</span>
+                  )}
+                </button>
+                <button onClick={() => setActiveNav("CONFIGURACIÓN")} className="admin-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
+                  style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
+                  <Settings size={12} style={{ color: "#7FB8FF" }} />
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EEF3FB" }}>CONFIG</span>
+                </button>
+                <button onClick={() => setSessionPanelOpen(prev => !prev)} className="admin-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
+                  style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
+                  <div className="w-5 h-5 rounded-sm flex items-center justify-center"
+                    style={{ background: "#7FB8FF", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#05070A", fontWeight: 700 }}>
+                    {currentUser.name.split(" ").map(part => part[0]).join("").slice(0, 2)}
+                  </div>
+                  <ChevronDown size={10} style={{ color: "#B8C7DB", transform: sessionPanelOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />
+                </button>
+              </div>
             </div>
-            <div className="admin-status-row hidden lg:flex items-center gap-3 relative z-10">
+
+            <div className="admin-header-title-wrap flex items-start gap-2 min-w-0 relative z-10 mt-2">
+              <div className="w-7 h-7 rounded-sm flex items-center justify-center flex-shrink-0" style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
+                <ActiveSectionIcon size={14} style={{ color: "#7FB8FF" }} />
+              </div>
+              <div className="min-w-0">
+                <div className="admin-breadcrumb flex items-center gap-1.5 mb-0.5">
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB", letterSpacing: "0.08em" }}>CAMPAMENTO ALFA</span>
+                  <ChevronRight size={9} style={{ color: UI_COLORS.textFaint }} />
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#7F93AC", letterSpacing: "0.08em" }}>OPERACIÓN CENTRAL</span>
+                </div>
+                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 14, fontWeight: 700, color: "#EEF3FB", letterSpacing: "0.04em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {sectionTitles[activeNav]}
+                </div>
+              </div>
+            </div>
+
+            <div className="admin-status-row hidden lg:flex items-center gap-2 relative z-10 mt-2 pt-2" style={{ borderTop: "1px solid rgba(127, 184, 255, 0.2)" }}>
               {[
-                { label: "SERVIDOR: ONLINE", color: "#0D9488" },
-                { label: "DÍA 47 DEL APOCALIPSIS", color: "#EEF3FB" },
-                { label: "247 SUPERVIVIENTES", color: "#EEF3FB" },
-                { label: "3 ALERTAS CRÍTICAS", color: "#DC2626" },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-1">
-                  {i > 0 && <span style={{ color: "#2A3444" }}>|</span>}
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: item.color }}>{item.label}</span>
-                </div>
+                { label: "SERVIDOR ONLINE", color: "#4AAED2", bg: "transparent" },
+                { label: "DÍA 47", color: "#EEF3FB", bg: "transparent" },
+                { label: "247 SUPERVIVIENTES", color: "#EEF3FB", bg: "transparent" },
+                { label: "3 ALERTAS CRÍTICAS", color: "#FCA5A5", bg: "transparent" },
+              ].map((item) => (
+                <span key={item.label} className="px-2 py-1 rounded-sm" style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: item.color, background: item.bg, border: "1px solid rgba(127, 184, 255, 0.24)" }}>
+                  {item.label}
+                </span>
               ))}
-            </div>
-            <div className="admin-profile flex items-center gap-2 relative z-10">
-              <button onClick={() => setActiveNav("NOTIFICACIONES")} className="admin-icon-btn relative p-1.5 rounded-sm"
-                style={{ background: "#121B26", border: "1px solid #2A3444" }}>
-                <Bell size={14} style={{ color: "#7FB8FF" }} />
-                {unreadNotifs > 0 && (
-                  <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-sm"
-                    style={{ background: "#DC2626", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EEF3FB" }}>{unreadNotifs}</span>
-                )}
-              </button>
-              <button onClick={() => setActiveNav("CONFIGURACIÓN")} className="admin-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
-                style={{ background: "#121B26", border: "1px solid #2A3444" }}>
-                <Settings size={12} style={{ color: "#7FB8FF" }} />
-                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EEF3FB" }}>CONFIG</span>
-              </button>
-              <button onClick={() => setSessionPanelOpen(prev => !prev)} className="admin-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
-                style={{ background: "#121B26", border: "1px solid #2A3444" }}>
-                <div className="w-5 h-5 rounded-sm flex items-center justify-center"
-                  style={{ background: "#7FB8FF", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#05070A", fontWeight: 700 }}>
-                  {currentUser.name.split(" ").map(part => part[0]).join("").slice(0, 2)}
-                </div>
-                <ChevronDown size={10} style={{ color: "#B8C7DB", transform: sessionPanelOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />
-              </button>
             </div>
           </header>
 
