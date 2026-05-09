@@ -7,6 +7,8 @@ import { AdmissionPage } from './features/admission'
 import { MainHomePage } from './features/main-homepage'
 import { CampsPage } from './features/camps'
 import { PersonsPage } from './features/persons'
+import { ExpeditionsPage } from './features/expeditions'
+import { ResourceMainViewPage } from './features/resources'
 import { AdminDashboardPage } from './features/admin-dashboard'
 import {
   ResourceTypesPage,
@@ -99,6 +101,8 @@ function App() {
       <Route path="/admission" element={<AdmissionPage />} />
       <Route path="/camps" element={<CampsPage />} />
       <Route path="/persons" element={<PersonsPage />} />
+      <Route path="/expeditions" element={<ExpeditionsPage />} />
+      <Route path="/resource-main-view" element={<ResourceMainViewPage />} />
       <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
       <Route path="/dashboard" element={<AdminDashboardPage />} />
       <Route path="/catalogs" element={<CatalogsLayout />} />
