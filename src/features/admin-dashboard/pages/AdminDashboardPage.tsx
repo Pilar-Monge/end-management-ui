@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import "./admin-dashboard.css";
 import {
   Users, UserPlus, Package, Map, Radio,
-  Trophy, Bell, Settings, ChevronRight,
+  Trophy, Bell, Settings,
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle,
   XCircle, Activity, ChevronDown,
   BarChart2, Search, Edit2, Trash2, Shield,
@@ -842,7 +842,7 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
       <Modal open={!!selected} onClose={() => { setSelected(null); setEditMode(false); }} title={editMode ? "EDITAR PERSONA" : "FICHA INDIVIDUAL"}>
         {selected && (
           <div className="admin-stack-md">
-                {editMode ? (
+            {editMode ? (
               <>
                 <div className="p-2 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
                   <div className="flex items-center gap-2">
@@ -1243,8 +1243,8 @@ function ViewInventario({ mode, canAdjust }: { mode: InventoryViewMode; canAdjus
           <SectionHeader title="BODEGA COMPLETA" accent={false} />
           <div className="flex-1" />
           <SearchBar value={search} onChange={setSearch} placeholder="BUSCAR RECURSO..." />
-          <ActionBtn label="VER MOVIMIENTOS" color="#B8C7DB" onClick={() => {}} />
-          <ActionBtn label="VER ALERTAS" color="#B8C7DB" onClick={() => {}} />
+          <ActionBtn label="VER MOVIMIENTOS" color="#B8C7DB" onClick={() => { }} />
+          <ActionBtn label="VER ALERTAS" color="#B8C7DB" onClick={() => { }} />
           <SecuredActionBtn allowed={canAdjust} reason="Requiere permiso de gestión de inventario" label="+ AGREGAR ÍTEM" color="#0D9488" onClick={() => setShowAdd(true)} />
         </div>
         <div style={{ height: 1, background: "linear-gradient(90deg, #7FB8FF 0%, transparent 100%)", marginBottom: 12 }} />
@@ -1504,60 +1504,60 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
 
       {/* Expedition list */}
       {(["active", "planning", "history"] as ExpeditionsViewMode[]).includes(mode) && (
-      <div className="admin-stack-md">
-        {(mode === "active" ? expeditions.filter(e => e.status !== "COMPLETADA") : mode === "history" ? expeditions.filter(e => e.status === "COMPLETADA") : expeditions).map(exp => {
-          const pct = exp.total > 0 ? Math.round((exp.day / exp.total) * 100) : 0;
-          const sc = expColor(exp.status);
-          return (
-            <Card key={exp.id} className="cursor-pointer hover:opacity-90 transition-opacity" glow={exp.status === "EN CURSO" ? "#7FB8FF" : ""}>
-              <div onClick={() => setSelected(exp)}>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Map size={12} style={{ color: sc }} />
-                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: "#EEF3FB" }}>{exp.name}</span>
+        <div className="admin-stack-md">
+          {(mode === "active" ? expeditions.filter(e => e.status !== "COMPLETADA") : mode === "history" ? expeditions.filter(e => e.status === "COMPLETADA") : expeditions).map(exp => {
+            const pct = exp.total > 0 ? Math.round((exp.day / exp.total) * 100) : 0;
+            const sc = expColor(exp.status);
+            return (
+              <Card key={exp.id} className="cursor-pointer hover:opacity-90 transition-opacity" glow={exp.status === "EN CURSO" ? "#7FB8FF" : ""}>
+                <div onClick={() => setSelected(exp)}>
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Map size={12} style={{ color: sc }} />
+                        <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: "#EEF3FB" }}>{exp.name}</span>
+                      </div>
+                      <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#B8C7DB" }}>{exp.sector}</span>
                     </div>
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#B8C7DB" }}>{exp.sector}</span>
+                    <div className="flex items-center gap-2">
+                      <Badge label={exp.status} color={sc} />
+                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: sc }}>DÍA {exp.day}/{exp.total}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge label={exp.status} color={sc} />
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: sc }}>DÍA {exp.day}/{exp.total}</span>
+                  <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#B8C7DB", marginBottom: 8 }}>{exp.objective}</p>
+                  {exp.total > 0 && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="admin-bar flex-1 h-1.5 rounded-sm overflow-hidden" style={{ background: "#2A3444" }}>
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={MOTION.progress}
+                          className="admin-bar-fill" style={{ height: "100%", background: sc, borderRadius: 2 }} />
+                      </div>
+                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{pct}%</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1">
+                    {exp.participants.slice(0, 6).map((p, i) => (
+                      <div key={i} className="w-6 h-6 rounded-sm flex items-center justify-center flex-shrink-0"
+                        style={{ background: "#121B26", border: "1px solid #2A3444", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>
+                        {p}
+                      </div>
+                    ))}
+                    {exp.participants.length > 6 && (
+                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>+{exp.participants.length - 6}</span>
+                    )}
                   </div>
                 </div>
-                <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#B8C7DB", marginBottom: 8 }}>{exp.objective}</p>
-                {exp.total > 0 && (
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="admin-bar flex-1 h-1.5 rounded-sm overflow-hidden" style={{ background: "#2A3444" }}>
-                      <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={MOTION.progress}
-                        className="admin-bar-fill" style={{ height: "100%", background: sc, borderRadius: 2 }} />
-                    </div>
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{pct}%</span>
+                {exp.status !== "COMPLETADA" && (
+                  <div className="flex gap-2 mt-3 pt-3" style={{ borderTop: "1px solid #2A3444" }}>
+                    <ActionBtn label="+ AVANZAR DÍA" color="#7FB8FF" small onClick={() => handleAdvanceDay(exp.id)} />
+                    <ActionBtn label="MARCAR COMPLETADA" color="#0D9488" small onClick={() => confirmAction("¿Marcar esta expedición como completada?", () => handleComplete(exp.id))} />
+                    <SecuredActionBtn allowed={canForce} reason="Requiere permiso de control de expediciones" label="FORZAR EN CURSO" color="#B8C7DB" small onClick={() => confirmAction("¿Forzar estado EN CURSO?", () => handleForceStatus(exp.id, "EN CURSO"))} />
+                    <SecuredActionBtn allowed={canForce} reason="Requiere permiso de control de expediciones" label="FORZAR REGRESO" color="#B8C7DB" small onClick={() => confirmAction("¿Forzar estado REGRESANDO?", () => handleForceStatus(exp.id, "REGRESANDO"))} />
                   </div>
                 )}
-                <div className="flex items-center gap-1">
-                  {exp.participants.slice(0, 6).map((p, i) => (
-                    <div key={i} className="w-6 h-6 rounded-sm flex items-center justify-center flex-shrink-0"
-                      style={{ background: "#121B26", border: "1px solid #2A3444", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>
-                      {p}
-                    </div>
-                  ))}
-                  {exp.participants.length > 6 && (
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>+{exp.participants.length - 6}</span>
-                  )}
-                </div>
-              </div>
-              {exp.status !== "COMPLETADA" && (
-                <div className="flex gap-2 mt-3 pt-3" style={{ borderTop: "1px solid #2A3444" }}>
-                  <ActionBtn label="+ AVANZAR DÍA" color="#7FB8FF" small onClick={() => handleAdvanceDay(exp.id)} />
-                  <ActionBtn label="MARCAR COMPLETADA" color="#0D9488" small onClick={() => confirmAction("¿Marcar esta expedición como completada?", () => handleComplete(exp.id))} />
-                  <SecuredActionBtn allowed={canForce} reason="Requiere permiso de control de expediciones" label="FORZAR EN CURSO" color="#B8C7DB" small onClick={() => confirmAction("¿Forzar estado EN CURSO?", () => handleForceStatus(exp.id, "EN CURSO"))} />
-                  <SecuredActionBtn allowed={canForce} reason="Requiere permiso de control de expediciones" label="FORZAR REGRESO" color="#B8C7DB" small onClick={() => confirmAction("¿Forzar estado REGRESANDO?", () => handleForceStatus(exp.id, "REGRESANDO"))} />
-                </div>
-              )}
-            </Card>
-          );
-        })}
-      </div>
+              </Card>
+            );
+          })}
+        </div>
       )}
 
       {mode === "participants" && (
@@ -1934,14 +1934,14 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
           <SearchBar value={search} onChange={setSearch} placeholder="BUSCAR EN LOGS..." />
           <div className="flex gap-1">
             {levels.map(l => (
-                <button key={l} onClick={() => setFilterLevel(l)}
+              <button key={l} onClick={() => setFilterLevel(l)}
                 className="admin-chip-btn px-2 py-1 rounded-sm cursor-pointer"
                 style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, background: filterLevel === l ? logLevelColor(l) : "#121B26", color: filterLevel === l ? "#05070A" : "#B8C7DB", border: "1px solid #2A3444" }}>
                 {l}
               </button>
             ))}
           </div>
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>AUTO-REFRESH</span>
             <Toggle active={autoRefresh} onChange={() => setAutoRefresh(prev => !prev)} />
           </div>
@@ -2009,36 +2009,36 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
     <div className="admin-stack-lg">
       {mode === "overview" && (
         <Card glow="#7FB8FF">
-        <div className="flex items-center gap-4">
-          <div className="text-center">
-            <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textFaint }}>NIVEL</div>
-            <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 48, fontWeight: 900, color: "#4AAED2", lineHeight: 1 }}>7</div>
-            <Badge label="CONSOLIDADO" color="#7FB8FF" />
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textFaint }}>NIVEL</div>
+              <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 48, fontWeight: 900, color: "#4AAED2", lineHeight: 1 }}>7</div>
+              <Badge label="CONSOLIDADO" color="#7FB8FF" />
+            </div>
+            <div className="flex-1">
+              <div className="flex justify-between mb-2">
+                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>EXPERIENCIA TOTAL</span>
+                <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, color: "#4AAED2" }}>{totalXP} / {nextLevelXP} XP</span>
+              </div>
+              <div className="admin-bar h-3 rounded-sm overflow-hidden mb-1" style={{ background: "#2A3444" }}>
+                <motion.div initial={{ width: 0 }} animate={{ width: `${(totalXP / nextLevelXP) * 100}%` }} transition={MOTION.progress}
+                  className="admin-bar-fill" style={{ height: "100%", background: "linear-gradient(90deg, #7FB8FF, #4AAED2)", borderRadius: 2 }} />
+              </div>
+              <div className="grid grid-cols-4 gap-2 mt-3">
+                {[
+                  { label: "LOGROS", value: `${achievements.filter(a => a.unlocked).length}/${achievements.length}` },
+                  { label: "DESBLOQUEADOS", value: achievements.filter(a => a.unlocked).length },
+                  { label: "EN PROGRESO", value: achievements.filter(a => !a.unlocked).length },
+                  { label: "PRÓXIMO NIVEL", value: `${nextLevelXP - totalXP} XP` },
+                ].map(({ label, value }) => (
+                  <div key={label} className="p-2 rounded-sm text-center" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
+                    <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 13, fontWeight: 900, color: "#EEF3FB" }}>{value}</div>
+                    <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          <div className="flex-1">
-            <div className="flex justify-between mb-2">
-              <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>EXPERIENCIA TOTAL</span>
-              <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 11, color: "#4AAED2" }}>{totalXP} / {nextLevelXP} XP</span>
-            </div>
-            <div className="admin-bar h-3 rounded-sm overflow-hidden mb-1" style={{ background: "#2A3444" }}>
-              <motion.div initial={{ width: 0 }} animate={{ width: `${(totalXP / nextLevelXP) * 100}%` }} transition={MOTION.progress}
-                className="admin-bar-fill" style={{ height: "100%", background: "linear-gradient(90deg, #7FB8FF, #4AAED2)", borderRadius: 2 }} />
-            </div>
-            <div className="grid grid-cols-4 gap-2 mt-3">
-              {[
-                { label: "LOGROS", value: `${achievements.filter(a => a.unlocked).length}/${achievements.length}` },
-                { label: "DESBLOQUEADOS", value: achievements.filter(a => a.unlocked).length },
-                { label: "EN PROGRESO", value: achievements.filter(a => !a.unlocked).length },
-                { label: "PRÓXIMO NIVEL", value: `${nextLevelXP - totalXP} XP` },
-              ].map(({ label, value }) => (
-                <div key={label} className="p-2 rounded-sm text-center" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
-                  <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 13, fontWeight: 900, color: "#EEF3FB" }}>{value}</div>
-                  <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
         </Card>
       )}
 
@@ -2144,7 +2144,7 @@ function ViewNotificaciones({ mode }: { mode: NotifsViewMode }) {
           <div className="flex-1" />
           <div className="flex gap-1">
             {levels.map(l => (
-                <button key={l} onClick={() => setFilter(l)}
+              <button key={l} onClick={() => setFilter(l)}
                 className="admin-chip-btn px-2 py-1 rounded-sm cursor-pointer"
                 style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, background: filter === l ? notifColor(l) : "#121B26", color: filter === l ? "#05070A" : "#B8C7DB", border: "1px solid #2A3444" }}>
                 {l.toUpperCase()}
@@ -2258,115 +2258,115 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {mode === "camp" && (
           <Card>
-          <SectionHeader title="CONFIGURACIÓN DEL CAMPAMENTO" />
-          <div className="admin-stack-md">
-            {[
-              { label: "NOMBRE DEL CAMPAMENTO", key: "campName" },
-              { label: "NOMBRE DEL ADMINISTRADOR", key: "adminName" },
-            ].map(({ label, key }) => (
-              <div key={key}>
-                <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{label}</label>
-                <input value={(settings as any)[key]} onChange={e => setSettings(prev => ({ ...prev, [key]: e.target.value }))}
+            <SectionHeader title="CONFIGURACIÓN DEL CAMPAMENTO" />
+            <div className="admin-stack-md">
+              {[
+                { label: "NOMBRE DEL CAMPAMENTO", key: "campName" },
+                { label: "NOMBRE DEL ADMINISTRADOR", key: "adminName" },
+              ].map(({ label, key }) => (
+                <div key={key}>
+                  <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{label}</label>
+                  <input value={(settings as any)[key]} onChange={e => setSettings(prev => ({ ...prev, [key]: e.target.value }))}
+                    className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
+                    style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
+                </div>
+              ))}
+              <div>
+                <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>DÍA ACTUAL DEL APOCALIPSIS</label>
+                <input type="number" value={settings.day} onChange={e => setSettings(prev => ({ ...prev, day: Number(e.target.value) }))}
+                  className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
+                  style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#4AAED2" }} />
+              </div>
+              <div>
+                <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>UMBRAL DE ALERTA DE INVENTARIO (%)</label>
+                <input type="number" min={1} max={100} value={settings.alertThreshold} onChange={e => setSettings(prev => ({ ...prev, alertThreshold: Number(e.target.value) }))}
                   className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
                   style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
               </div>
-            ))}
-            <div>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>DÍA ACTUAL DEL APOCALIPSIS</label>
-              <input type="number" value={settings.day} onChange={e => setSettings(prev => ({ ...prev, day: Number(e.target.value) }))}
-                className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#4AAED2" }} />
             </div>
-            <div>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>UMBRAL DE ALERTA DE INVENTARIO (%)</label>
-              <input type="number" min={1} max={100} value={settings.alertThreshold} onChange={e => setSettings(prev => ({ ...prev, alertThreshold: Number(e.target.value) }))}
-                className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
-            </div>
-          </div>
           </Card>
         )}
 
         {mode === "camp" && (
           <Card>
-          <SectionHeader title="AUTOMATIZACIONES" />
-          <div className="admin-stack-md">
-            {[
-              { label: "BACKUP AUTOMÁTICO DIARIO", key: "autoBackup", icon: Database },
-              { label: "ALERTAS DE SONIDO", key: "soundAlerts", icon: Volume2 },
-              { label: "REPORTE NOCTURNO", key: "nightReport", icon: BarChart2 },
-              { label: "CONSUMO DIARIO AUTOMÁTICO", key: "dailyConsumption", icon: Cpu },
-            ].map(({ label, key, icon: Icon }) => (
-              <div key={key} className="flex items-center justify-between px-3 py-2 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
-                <div className="flex items-center gap-2">
-                  <Icon size={12} style={{ color: "#7FB8FF" }} />
-                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>{label}</span>
+            <SectionHeader title="AUTOMATIZACIONES" />
+            <div className="admin-stack-md">
+              {[
+                { label: "BACKUP AUTOMÁTICO DIARIO", key: "autoBackup", icon: Database },
+                { label: "ALERTAS DE SONIDO", key: "soundAlerts", icon: Volume2 },
+                { label: "REPORTE NOCTURNO", key: "nightReport", icon: BarChart2 },
+                { label: "CONSUMO DIARIO AUTOMÁTICO", key: "dailyConsumption", icon: Cpu },
+              ].map(({ label, key, icon: Icon }) => (
+                <div key={key} className="flex items-center justify-between px-3 py-2 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
+                  <div className="flex items-center gap-2">
+                    <Icon size={12} style={{ color: "#7FB8FF" }} />
+                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>{label}</span>
+                  </div>
+                  <Toggle active={(settings as any)[key]} onChange={() => setSettings(prev => ({ ...prev, [key]: !(prev as any)[key] }))} />
                 </div>
-                <Toggle active={(settings as any)[key]} onChange={() => setSettings(prev => ({ ...prev, [key]: !(prev as any)[key] }))} />
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
           </Card>
         )}
 
         {mode === "system" && (
           <Card>
-          <SectionHeader title="SISTEMA" />
-          <div className="admin-stack-md">
-            <div>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>IDIOMA</label>
-              <select value={settings.language} onChange={e => setSettings(prev => ({ ...prev, language: e.target.value }))}
-                className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>
-                <option value="es">Español</option>
-                <option value="en">English</option>
-              </select>
+            <SectionHeader title="SISTEMA" />
+            <div className="admin-stack-md">
+              <div>
+                <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>IDIOMA</label>
+                <select value={settings.language} onChange={e => setSettings(prev => ({ ...prev, language: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
+                  style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>
+                  <option value="es">Español</option>
+                  <option value="en">English</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>ZONA HORARIA</label>
+                <select value={settings.timezone} onChange={e => setSettings(prev => ({ ...prev, timezone: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
+                  style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>
+                  <option value="America/Costa_Rica">America/Costa_Rica (UTC-6)</option>
+                  <option value="America/New_York">America/New_York (UTC-5)</option>
+                  <option value="America/Bogota">America/Bogota (UTC-5)</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>TIMEOUT DE SESIÓN (MINUTOS)</label>
+                <input type="number" value={settings.sessionTimeout} onChange={e => setSettings(prev => ({ ...prev, sessionTimeout: Number(e.target.value) }))}
+                  className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
+                  style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
+              </div>
             </div>
-            <div>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>ZONA HORARIA</label>
-              <select value={settings.timezone} onChange={e => setSettings(prev => ({ ...prev, timezone: e.target.value }))}
-                className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>
-                <option value="America/Costa_Rica">America/Costa_Rica (UTC-6)</option>
-                <option value="America/New_York">America/New_York (UTC-5)</option>
-                <option value="America/Bogota">America/Bogota (UTC-5)</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>TIMEOUT DE SESIÓN (MINUTOS)</label>
-              <input type="number" value={settings.sessionTimeout} onChange={e => setSettings(prev => ({ ...prev, sessionTimeout: Number(e.target.value) }))}
-                className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
-            </div>
-          </div>
           </Card>
         )}
 
         {mode === "system" && (
           <Card>
-          <SectionHeader title="INFORMACIÓN DEL SISTEMA" />
-          <div className="admin-stack-sm">
-            {[
-              { label: "VERSIÓN", value: "1.0.0" },
-              { label: "BASE DE DATOS", value: "NEON DB (PostgreSQL)" },
-              { label: "SERVIDOR", value: "VERCEL SERVERLESS" },
-              { label: "MODELO IA", value: "admission-v1 (Precisión 89%)" },
-              { label: "ÚLTIMA SINCRONIZACIÓN", value: "HOY 14:32" },
-              { label: "UPTIME", value: "47 DÍAS" },
-            ].map(({ label, value }) => (
-              <div key={label} className="flex justify-between items-center px-3 py-2 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
-                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{label}</span>
-                <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{value}</span>
-              </div>
-            ))}
-          </div>
+            <SectionHeader title="INFORMACIÓN DEL SISTEMA" />
+            <div className="admin-stack-sm">
+              {[
+                { label: "VERSIÓN", value: "1.0.0" },
+                { label: "BASE DE DATOS", value: "NEON DB (PostgreSQL)" },
+                { label: "SERVIDOR", value: "VERCEL SERVERLESS" },
+                { label: "MODELO IA", value: "admission-v1 (Precisión 89%)" },
+                { label: "ÚLTIMA SINCRONIZACIÓN", value: "HOY 14:32" },
+                { label: "UPTIME", value: "47 DÍAS" },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex justify-between items-center px-3 py-2 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{label}</span>
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{value}</span>
+                </div>
+              ))}
+            </div>
           </Card>
         )}
       </div>
 
       <div className="flex gap-3">
         <ActionBtn label="GUARDAR CONFIGURACIÓN" color="#0D9488" onClick={handleSave} />
-        <ActionBtn label="RESTABLECER VALORES" color="#B8C7DB" onClick={() => {}} />
+        <ActionBtn label="RESTABLECER VALORES" color="#B8C7DB" onClick={() => { }} />
       </div>
     </div>
   );
@@ -2754,34 +2754,6 @@ export default function AdminDashboard() {
   const fmtTime = (d: Date) =>
     d.toLocaleTimeString("es-CR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 
-  const sectionTitles: Record<NavSection, string> = {
-    "CENTRO DE MANDO": "CENTRO DE MANDO",
-    "POBLACIÓN": "REGISTRO DE POBLACIÓN",
-    "ADMISIONES IA": "ADMISIONES — EVALUACIÓN IA",
-    "INVENTARIO": "GESTIÓN DE INVENTARIO",
-    "EXPEDICIONES": "GESTIÓN DE EXPEDICIONES",
-    "INTER-CAMPAMENTOS": "COMUNICACIONES INTER-CAMPAMENTO",
-    "SEGURIDAD / LOGS": "SEGURIDAD Y LOGS DE ACCESO",
-    "LOGROS": "LOGROS Y GAMIFICACIÓN",
-    "NOTIFICACIONES": "CENTRO DE NOTIFICACIONES",
-    "CONFIGURACIÓN": "CONFIGURACIÓN DEL SISTEMA",
-  };
-
-  const sectionIcons: Record<NavSection, React.ElementType> = {
-    "CENTRO DE MANDO": Activity,
-    "POBLACIÓN": Users,
-    "ADMISIONES IA": UserPlus,
-    "INVENTARIO": Package,
-    "EXPEDICIONES": Map,
-    "INTER-CAMPAMENTOS": Radio,
-    "SEGURIDAD / LOGS": Shield,
-    "LOGROS": Trophy,
-    "NOTIFICACIONES": Bell,
-    "CONFIGURACIÓN": Settings,
-  };
-
-  const ActiveSectionIcon = sectionIcons[activeNav];
-
   const renderSection = () => {
     switch (activeNav) {
       case "POBLACIÓN": return <ViewPoblacion mode={populationViewMode} />;
@@ -2923,264 +2895,224 @@ export default function AdminDashboard() {
               "NOTIFICACIONES",
               "CONFIGURACIÓN",
             ].includes(activeNav) && (
-              <aside className="admin-sidebar hidden md:flex flex-col flex-shrink-0" style={{ width: 250, background: "transparent", borderRight: "1px solid #2A3444", zIndex: 1 }}>
-                <div className="admin-logo px-4 py-5 flex flex-col" style={{ borderBottom: "1px solid #2A3444" }}>
-                  <div className="flex items-center gap-2 mb-1">
-                    {activeNav === "POBLACIÓN" && <Users size={18} style={{ color: "#7FB8FF" }} />}
-                    {activeNav === "ADMISIONES IA" && <UserPlus size={18} style={{ color: "#7FB8FF" }} />}
-                    {activeNav === "INVENTARIO" && <Package size={18} style={{ color: "#7FB8FF" }} />}
-                    {activeNav === "EXPEDICIONES" && <Map size={18} style={{ color: "#7FB8FF" }} />}
-                    {activeNav === "INTER-CAMPAMENTOS" && <Radio size={18} style={{ color: "#7FB8FF" }} />}
-                    {activeNav === "SEGURIDAD / LOGS" && <Shield size={18} style={{ color: "#7FB8FF" }} />}
-                    {activeNav === "LOGROS" && <Trophy size={18} style={{ color: "#7FB8FF" }} />}
-                    {activeNav === "NOTIFICACIONES" && <Bell size={18} style={{ color: "#7FB8FF" }} />}
-                    {activeNav === "CONFIGURACIÓN" && <Settings size={18} style={{ color: "#7FB8FF" }} />}
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 13, color: "#7FB8FF", letterSpacing: "0.06em" }}>{activeNav}</span>
+                <aside className="admin-sidebar hidden md:flex flex-col flex-shrink-0" style={{ width: 250, background: "transparent", borderRight: "1px solid #2A3444", zIndex: 1 }}>
+                  <div className="admin-logo px-4 py-5 flex flex-col" style={{ borderBottom: "1px solid #2A3444" }}>
+                    <div className="flex items-center gap-2 mb-1">
+                      {activeNav === "POBLACIÓN" && <Users size={18} style={{ color: "#7FB8FF" }} />}
+                      {activeNav === "ADMISIONES IA" && <UserPlus size={18} style={{ color: "#7FB8FF" }} />}
+                      {activeNav === "INVENTARIO" && <Package size={18} style={{ color: "#7FB8FF" }} />}
+                      {activeNav === "EXPEDICIONES" && <Map size={18} style={{ color: "#7FB8FF" }} />}
+                      {activeNav === "INTER-CAMPAMENTOS" && <Radio size={18} style={{ color: "#7FB8FF" }} />}
+                      {activeNav === "SEGURIDAD / LOGS" && <Shield size={18} style={{ color: "#7FB8FF" }} />}
+                      {activeNav === "LOGROS" && <Trophy size={18} style={{ color: "#7FB8FF" }} />}
+                      {activeNav === "NOTIFICACIONES" && <Bell size={18} style={{ color: "#7FB8FF" }} />}
+                      {activeNav === "CONFIGURACIÓN" && <Settings size={18} style={{ color: "#7FB8FF" }} />}
+                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 13, color: "#7FB8FF", letterSpacing: "0.06em" }}>{activeNav}</span>
+                    </div>
                   </div>
-                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#B8C7DB" }}>Acceso rápido del módulo</span>
-                </div>
 
-                <nav className="admin-nav flex-1 px-3 py-3 overflow-y-auto">
-                  {activeNav === "POBLACIÓN" && (
-                    <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${populationViewMode === "stats" ? " admin-nav-button--active" : ""}`} onClick={() => setPopulationViewMode("stats")} style={{ color: populationViewMode === "stats" ? "#05070A" : "#B8C7DB" }}>
-                        <BarChart2 size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Ver estadísticas</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${populationViewMode === "users" ? " admin-nav-button--active" : ""}`} onClick={() => setPopulationViewMode("users")} style={{ color: populationViewMode === "users" ? "#05070A" : "#B8C7DB" }}>
-                        <Users size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Ver usuarios y filtros</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${populationViewMode === "tempRoles" ? " admin-nav-button--active" : ""}`} onClick={() => setPopulationViewMode("tempRoles")} style={{ color: populationViewMode === "tempRoles" ? "#05070A" : "#B8C7DB" }}>
-                        <Activity size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Oficios temporales</span>
-                      </button>
-                    </>
-                  )}
+                  <nav className="admin-nav flex-1 px-3 py-3 overflow-y-auto">
+                    {activeNav === "POBLACIÓN" && (
+                      <>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${populationViewMode === "stats" ? " admin-nav-button--active" : ""}`} onClick={() => setPopulationViewMode("stats")} style={{ color: populationViewMode === "stats" ? "#05070A" : "#B8C7DB" }}>
+                          <BarChart2 size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Ver estadísticas</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${populationViewMode === "users" ? " admin-nav-button--active" : ""}`} onClick={() => setPopulationViewMode("users")} style={{ color: populationViewMode === "users" ? "#05070A" : "#B8C7DB" }}>
+                          <Users size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Ver usuarios y filtros</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${populationViewMode === "tempRoles" ? " admin-nav-button--active" : ""}`} onClick={() => setPopulationViewMode("tempRoles")} style={{ color: populationViewMode === "tempRoles" ? "#05070A" : "#B8C7DB" }}>
+                          <Activity size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Oficios temporales</span>
+                        </button>
+                      </>
+                    )}
 
-                  {activeNav === "ADMISIONES IA" && (
-                    <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${admissionsViewMode === "queue" ? " admin-nav-button--active" : ""}`} onClick={() => setAdmissionsViewMode("queue")} style={{ color: admissionsViewMode === "queue" ? "#05070A" : "#B8C7DB" }}>
-                        <AlertTriangle size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Cola pendiente</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${admissionsViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setAdmissionsViewMode("history")} style={{ color: admissionsViewMode === "history" ? "#05070A" : "#B8C7DB" }}>
-                        <CheckCircle size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Historial procesado</span>
-                      </button>
-                    </>
-                  )}
+                    {activeNav === "ADMISIONES IA" && (
+                      <>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${admissionsViewMode === "queue" ? " admin-nav-button--active" : ""}`} onClick={() => setAdmissionsViewMode("queue")} style={{ color: admissionsViewMode === "queue" ? "#05070A" : "#B8C7DB" }}>
+                          <AlertTriangle size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Cola pendiente</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${admissionsViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setAdmissionsViewMode("history")} style={{ color: admissionsViewMode === "history" ? "#05070A" : "#B8C7DB" }}>
+                          <CheckCircle size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Historial procesado</span>
+                        </button>
+                      </>
+                    )}
 
-                  {activeNav === "INVENTARIO" && (
-                    <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "summary" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("summary")} style={{ color: inventoryViewMode === "summary" ? "#05070A" : "#B8C7DB" }}>
-                        <BarChart2 size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Resumen por categoría</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "items" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("items")} style={{ color: inventoryViewMode === "items" ? "#05070A" : "#B8C7DB" }}>
-                        <Package size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Gestión de ítems</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "movements" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("movements")} style={{ color: inventoryViewMode === "movements" ? "#05070A" : "#B8C7DB" }}>
-                        <Activity size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Movimientos</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "alerts" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("alerts")} style={{ color: inventoryViewMode === "alerts" ? "#05070A" : "#B8C7DB" }}>
-                        <AlertTriangle size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Alertas</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "collection" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("collection")} style={{ color: inventoryViewMode === "collection" ? "#05070A" : "#B8C7DB" }}>
-                        <Database size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Recolección diaria</span>
-                      </button>
-                    </>
-                  )}
+                    {activeNav === "INVENTARIO" && (
+                      <>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "summary" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("summary")} style={{ color: inventoryViewMode === "summary" ? "#05070A" : "#B8C7DB" }}>
+                          <BarChart2 size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Resumen por categoría</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "items" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("items")} style={{ color: inventoryViewMode === "items" ? "#05070A" : "#B8C7DB" }}>
+                          <Package size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Gestión de ítems</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "movements" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("movements")} style={{ color: inventoryViewMode === "movements" ? "#05070A" : "#B8C7DB" }}>
+                          <Activity size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Movimientos</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "alerts" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("alerts")} style={{ color: inventoryViewMode === "alerts" ? "#05070A" : "#B8C7DB" }}>
+                          <AlertTriangle size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Alertas</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${inventoryViewMode === "collection" ? " admin-nav-button--active" : ""}`} onClick={() => setInventoryViewMode("collection")} style={{ color: inventoryViewMode === "collection" ? "#05070A" : "#B8C7DB" }}>
+                          <Database size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Recolección diaria</span>
+                        </button>
+                      </>
+                    )}
 
-                  {activeNav === "EXPEDICIONES" && (
-                    <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "active" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("active")} style={{ color: expeditionsViewMode === "active" ? "#05070A" : "#B8C7DB" }}>
-                        <Activity size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Activas y en curso</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "planning" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("planning")} style={{ color: expeditionsViewMode === "planning" ? "#05070A" : "#B8C7DB" }}>
-                        <Map size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Planificación</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("history")} style={{ color: expeditionsViewMode === "history" ? "#05070A" : "#B8C7DB" }}>
-                        <Trophy size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Completadas</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "participants" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("participants")} style={{ color: expeditionsViewMode === "participants" ? "#05070A" : "#B8C7DB" }}>
-                        <Users size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Participantes</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "consumed" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("consumed")} style={{ color: expeditionsViewMode === "consumed" ? "#05070A" : "#B8C7DB" }}>
-                        <TrendingDown size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Recursos consumidos</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "gained" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("gained")} style={{ color: expeditionsViewMode === "gained" ? "#05070A" : "#B8C7DB" }}>
-                        <TrendingUp size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Recursos obtenidos</span>
-                      </button>
-                    </>
-                  )}
+                    {activeNav === "EXPEDICIONES" && (
+                      <>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "active" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("active")} style={{ color: expeditionsViewMode === "active" ? "#05070A" : "#B8C7DB" }}>
+                          <Activity size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Activas y en curso</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "planning" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("planning")} style={{ color: expeditionsViewMode === "planning" ? "#05070A" : "#B8C7DB" }}>
+                          <Map size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Planificación</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("history")} style={{ color: expeditionsViewMode === "history" ? "#05070A" : "#B8C7DB" }}>
+                          <Trophy size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Completadas</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "participants" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("participants")} style={{ color: expeditionsViewMode === "participants" ? "#05070A" : "#B8C7DB" }}>
+                          <Users size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Participantes</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "consumed" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("consumed")} style={{ color: expeditionsViewMode === "consumed" ? "#05070A" : "#B8C7DB" }}>
+                          <TrendingDown size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Recursos consumidos</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "gained" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("gained")} style={{ color: expeditionsViewMode === "gained" ? "#05070A" : "#B8C7DB" }}>
+                          <TrendingUp size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Recursos obtenidos</span>
+                        </button>
+                      </>
+                    )}
 
-                  {activeNav === "INTER-CAMPAMENTOS" && (
-                    <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "pending" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("pending")} style={{ color: intercampViewMode === "pending" ? "#05070A" : "#B8C7DB" }}>
-                        <AlertTriangle size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Pendientes</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("history")} style={{ color: intercampViewMode === "history" ? "#05070A" : "#B8C7DB" }}>
-                        <Radio size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Historial</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "send" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("send")} style={{ color: intercampViewMode === "send" ? "#05070A" : "#B8C7DB" }}>
-                        <Bell size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Enviar mensaje</span>
-                      </button>
-                    </>
-                  )}
+                    {activeNav === "INTER-CAMPAMENTOS" && (
+                      <>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "pending" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("pending")} style={{ color: intercampViewMode === "pending" ? "#05070A" : "#B8C7DB" }}>
+                          <AlertTriangle size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Pendientes</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("history")} style={{ color: intercampViewMode === "history" ? "#05070A" : "#B8C7DB" }}>
+                          <Radio size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Historial</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "send" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("send")} style={{ color: intercampViewMode === "send" ? "#05070A" : "#B8C7DB" }}>
+                          <Bell size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Enviar mensaje</span>
+                        </button>
+                      </>
+                    )}
 
-                  {activeNav === "SEGURIDAD / LOGS" && (
-                    <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "live" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("live")} style={{ color: securityViewMode === "live" ? "#05070A" : "#B8C7DB" }}>
-                        <Activity size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Monitoreo en vivo</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "errors" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("errors")} style={{ color: securityViewMode === "errors" ? "#05070A" : "#B8C7DB" }}>
-                        <AlertTriangle size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Errores y alertas</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "system" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("system")} style={{ color: securityViewMode === "system" ? "#05070A" : "#B8C7DB" }}>
-                        <Cpu size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Eventos del sistema</span>
-                      </button>
-                    </>
-                  )}
+                    {activeNav === "SEGURIDAD / LOGS" && (
+                      <>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "live" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("live")} style={{ color: securityViewMode === "live" ? "#05070A" : "#B8C7DB" }}>
+                          <Activity size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Monitoreo en vivo</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "errors" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("errors")} style={{ color: securityViewMode === "errors" ? "#05070A" : "#B8C7DB" }}>
+                          <AlertTriangle size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Errores y alertas</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${securityViewMode === "system" ? " admin-nav-button--active" : ""}`} onClick={() => setSecurityViewMode("system")} style={{ color: securityViewMode === "system" ? "#05070A" : "#B8C7DB" }}>
+                          <Cpu size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Eventos del sistema</span>
+                        </button>
+                      </>
+                    )}
 
-                  {activeNav === "LOGROS" && (
-                    <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${logrosViewMode === "overview" ? " admin-nav-button--active" : ""}`} onClick={() => setLogrosViewMode("overview")} style={{ color: logrosViewMode === "overview" ? "#05070A" : "#B8C7DB" }}>
-                        <Trophy size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Resumen de nivel</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${logrosViewMode === "progress" ? " admin-nav-button--active" : ""}`} onClick={() => setLogrosViewMode("progress")} style={{ color: logrosViewMode === "progress" ? "#05070A" : "#B8C7DB" }}>
-                        <BarChart2 size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Progreso por categorías</span>
-                      </button>
-                    </>
-                  )}
+                    {activeNav === "LOGROS" && (
+                      <>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${logrosViewMode === "overview" ? " admin-nav-button--active" : ""}`} onClick={() => setLogrosViewMode("overview")} style={{ color: logrosViewMode === "overview" ? "#05070A" : "#B8C7DB" }}>
+                          <Trophy size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Resumen de nivel</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${logrosViewMode === "progress" ? " admin-nav-button--active" : ""}`} onClick={() => setLogrosViewMode("progress")} style={{ color: logrosViewMode === "progress" ? "#05070A" : "#B8C7DB" }}>
+                          <BarChart2 size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Progreso por categorías</span>
+                        </button>
+                      </>
+                    )}
 
-                  {activeNav === "NOTIFICACIONES" && (
-                    <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "all" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("all")} style={{ color: notifsViewMode === "all" ? "#05070A" : "#B8C7DB" }}>
-                        <Bell size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Todas</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "unread" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("unread")} style={{ color: notifsViewMode === "unread" ? "#05070A" : "#B8C7DB" }}>
-                        <CheckCircle size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Sin leer</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "critical" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("critical")} style={{ color: notifsViewMode === "critical" ? "#05070A" : "#B8C7DB" }}>
-                        <AlertTriangle size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Críticas</span>
-                      </button>
-                    </>
-                  )}
+                    {activeNav === "NOTIFICACIONES" && (
+                      <>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "all" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("all")} style={{ color: notifsViewMode === "all" ? "#05070A" : "#B8C7DB" }}>
+                          <Bell size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Todas</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "unread" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("unread")} style={{ color: notifsViewMode === "unread" ? "#05070A" : "#B8C7DB" }}>
+                          <CheckCircle size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Sin leer</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${notifsViewMode === "critical" ? " admin-nav-button--active" : ""}`} onClick={() => setNotifsViewMode("critical")} style={{ color: notifsViewMode === "critical" ? "#05070A" : "#B8C7DB" }}>
+                          <AlertTriangle size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Críticas</span>
+                        </button>
+                      </>
+                    )}
 
-                  {activeNav === "CONFIGURACIÓN" && (
-                    <>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${configViewMode === "camp" ? " admin-nav-button--active" : ""}`} onClick={() => setConfigViewMode("camp")} style={{ color: configViewMode === "camp" ? "#05070A" : "#B8C7DB" }}>
-                        <Users size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Campamento</span>
-                      </button>
-                      <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${configViewMode === "system" ? " admin-nav-button--active" : ""}`} onClick={() => setConfigViewMode("system")} style={{ color: configViewMode === "system" ? "#05070A" : "#B8C7DB" }}>
-                        <Settings size={14} />
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Sistema</span>
-                      </button>
-                    </>
-                  )}
-                </nav>
+                    {activeNav === "CONFIGURACIÓN" && (
+                      <>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${configViewMode === "camp" ? " admin-nav-button--active" : ""}`} onClick={() => setConfigViewMode("camp")} style={{ color: configViewMode === "camp" ? "#05070A" : "#B8C7DB" }}>
+                          <Users size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Campamento</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${configViewMode === "system" ? " admin-nav-button--active" : ""}`} onClick={() => setConfigViewMode("system")} style={{ color: configViewMode === "system" ? "#05070A" : "#B8C7DB" }}>
+                          <Settings size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Sistema</span>
+                        </button>
+                      </>
+                    )}
+                  </nav>
 
-                <div className="px-3 py-3" style={{ borderTop: "1px solid #2A3444" }}>
-                  <div className="admin-clock px-2 py-1 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
-                    <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#4AAED2", letterSpacing: "0.1em" }}>{fmtTime(serverTime)}</span>
+                  <div className="px-3" style={{ borderTop: "1px solid #2A3444", paddingTop: 0, paddingBottom: 80 }}>
+                    <div className="admin-clock px-2 py-1 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
+                      <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#4AAED2", letterSpacing: "0.1em" }}>{fmtTime(serverTime)}</span>
+                    </div>
                   </div>
-                  <div className="mt-2">
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>Si tocas este módulo otra vez vuelves al Centro de Mando</span>
-                  </div>
-                </div>
-              </aside>
-            )}
+                </aside>
+              )}
 
             {/* MAIN */}
             <div className="admin-main flex-1 flex flex-col overflow-hidden" style={{ position: "relative", zIndex: 1 }}>
               {/* Header */}
               <header className="admin-header relative flex-shrink-0 px-4 py-3"
-                style={{ background: "transparent", borderBottom: "1px solid rgba(127, 184, 255, 0.18)" }}>
-            <div className="admin-top-strip flex items-center justify-between gap-3 relative z-10">
-              <div className="hidden lg:flex items-center gap-2" style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB", letterSpacing: "0.09em" }}>
-                <ChevronRight size={10} style={{ color: "#7FB8FF", transform: "rotate(180deg)" }} />
-                <span>VOLVER AL CENTRO DE MANDO</span>
-              </div>
-              <div className="admin-top-title-badge">
-                {activeNav === "CENTRO DE MANDO" ? "CENTRO DE MANDO" : activeNav}
-              </div>
-              <div className="admin-profile admin-header-actions flex items-center gap-2">
-                <button onClick={() => setActiveNav("NOTIFICACIONES")} className="admin-icon-btn relative p-1.5 rounded-sm"
-                  style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
-                  <Bell size={14} style={{ color: "#7FB8FF" }} />
-                  {unreadNotifs > 0 && (
-                    <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-sm"
-                      style={{ background: "#DC2626", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EEF3FB" }}>{unreadNotifs}</span>
-                  )}
-                </button>
-                <button onClick={() => setActiveNav("CONFIGURACIÓN")} className="admin-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
-                  style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
-                  <Settings size={12} style={{ color: "#7FB8FF" }} />
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EEF3FB" }}>CONFIG</span>
-                </button>
-                <button onClick={() => setSessionPanelOpen(prev => !prev)} className="admin-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
-                  style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
-                  <div className="w-5 h-5 rounded-sm flex items-center justify-center"
-                    style={{ background: "#7FB8FF", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#05070A", fontWeight: 700 }}>
-                    {currentUser.name.split(" ").map(part => part[0]).join("").slice(0, 2)}
+                style={{ background: "transparent", borderBottom: "none" }}>
+                <div className="admin-top-strip flex items-center justify-end gap-3 relative z-10">
+                  <div className="admin-profile admin-header-actions flex items-center gap-2">
+                    <button onClick={() => setActiveNav("NOTIFICACIONES")} className="admin-icon-btn relative p-1.5 rounded-sm"
+                      style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
+                      <Bell size={14} style={{ color: "#7FB8FF" }} />
+                      {unreadNotifs > 0 && (
+                        <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-sm"
+                          style={{ background: "#DC2626", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EEF3FB" }}>{unreadNotifs}</span>
+                      )}
+                    </button>
+                    <button onClick={() => setActiveNav("CONFIGURACIÓN")} className="admin-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
+                      style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
+                      <Settings size={12} style={{ color: "#7FB8FF" }} />
+                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EEF3FB" }}>CONFIG</span>
+                    </button>
+                    <button onClick={() => setSessionPanelOpen(prev => !prev)} className="admin-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
+                      style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
+                      <div className="w-5 h-5 rounded-sm flex items-center justify-center"
+                        style={{ background: "#7FB8FF", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#05070A", fontWeight: 700 }}>
+                        {currentUser.name.split(" ").map(part => part[0]).join("").slice(0, 2)}
+                      </div>
+                      <ChevronDown size={10} style={{ color: "#B8C7DB", transform: sessionPanelOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />
+                    </button>
                   </div>
-                  <ChevronDown size={10} style={{ color: "#B8C7DB", transform: sessionPanelOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />
-                </button>
-              </div>
-            </div>
-
-            <div className="admin-header-title-wrap flex items-start gap-2 min-w-0 relative z-10 mt-2">
-              <div className="w-7 h-7 rounded-sm flex items-center justify-center flex-shrink-0" style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
-                <ActiveSectionIcon size={14} style={{ color: "#7FB8FF" }} />
-              </div>
-              <div className="min-w-0">
-                <div className="admin-breadcrumb flex items-center gap-1.5 mb-0.5">
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB", letterSpacing: "0.08em" }}>CAMPAMENTO ALFA</span>
-                  <ChevronRight size={9} style={{ color: UI_COLORS.textFaint }} />
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#7F93AC", letterSpacing: "0.08em" }}>OPERACIÓN CENTRAL</span>
                 </div>
-                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 14, fontWeight: 700, color: "#EEF3FB", letterSpacing: "0.04em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {sectionTitles[activeNav]}
-                </div>
-              </div>
-            </div>
-
-            <div className="admin-status-row hidden lg:flex items-center gap-2 relative z-10 mt-2 pt-2" style={{ borderTop: "1px solid rgba(127, 184, 255, 0.2)" }}>
-              {[
-                { label: "SERVIDOR ONLINE", color: "#4AAED2", bg: "transparent" },
-                { label: "DÍA 47", color: "#EEF3FB", bg: "transparent" },
-                { label: "247 SUPERVIVIENTES", color: "#EEF3FB", bg: "transparent" },
-                { label: "3 ALERTAS CRÍTICAS", color: "#FCA5A5", bg: "transparent" },
-              ].map((item) => (
-                <span key={item.label} className="px-2 py-1 rounded-sm" style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: item.color, background: item.bg, border: "1px solid rgba(127, 184, 255, 0.24)" }}>
-                  {item.label}
-                </span>
-              ))}
-            </div>
-          </header>
+              </header>
 
               {typeof document !== "undefined" && createPortal(
                 <AnimatePresence initial={false} mode="wait">
