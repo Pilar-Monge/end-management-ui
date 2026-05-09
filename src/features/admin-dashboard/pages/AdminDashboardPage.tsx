@@ -598,6 +598,7 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
   const [editData, setEditData] = useState<Partial<Person>>({});
   const [assignments, setAssignments] = useState<TempOccupationAssignment[]>(INITIAL_TEMP_ASSIGNMENTS);
   const [newAssign, setNewAssign] = useState({ personId: 0, occupationName: "", startDate: "", endDate: "", reason: "" });
+  const [assignSearch, setAssignSearch] = useState("");
   const [isLoading] = useState(false);
   const [errorCode] = useState<HttpCode | null>(null);
   const [page, setPage] = useState(() => Number(new URLSearchParams(window.location.search).get("pob_page") ?? "1") || 1);
@@ -619,6 +620,22 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
   const totalPages = Math.max(1, Math.ceil(filtered.length / limit));
   const safePage = Math.min(page, totalPages);
   const pagedFiltered = filtered.slice((safePage - 1) * limit, safePage * limit);
+
+  const assignmentCandidates = persons.filter(person => {
+    const normalizedSearch = assignSearch.toLowerCase().trim();
+    const matchSearch =
+      normalizedSearch.length === 0 ||
+      person.name.toLowerCase().includes(normalizedSearch) ||
+      person.role.toLowerCase().includes(normalizedSearch) ||
+      person.sector.toLowerCase().includes(normalizedSearch);
+    const matchStatus = person.status === "Activo";
+    return matchSearch && matchStatus;
+  });
+  const visibleCandidates = assignmentCandidates.slice(0, 60);
+  const selectedCandidate = persons.find(p => p.id === newAssign.personId) ?? null;
+  const hasRequiredAssignmentData = Boolean(
+    selectedCandidate && newAssign.occupationName.trim() && newAssign.startDate && newAssign.endDate,
+  );
 
   useEffect(() => {
     setPage(1);
@@ -661,6 +678,7 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
       status: "ACTIVA",
     }, ...prev]);
     setNewAssign({ personId: 0, occupationName: "", startDate: "", endDate: "", reason: "" });
+    setAssignSearch("");
   };
 
   const handleFinishAssignment = (id: number) => {
@@ -769,71 +787,217 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
         </Card>
       ) : (
         <div className="admin-stack-lg">
-          <Card>
-            <SectionHeader title="ASIGNACIONES TEMPORALES ACTIVAS" />
-            <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginBottom: 10 }} />
-            <div className="admin-stack-sm">
-              {assignments.filter(a => a.status === "ACTIVA").map(a => (
-                <div key={a.id} className="p-3 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textPrimary }}>{a.personName}</span>
-                    <Badge label={a.status} color={UI_COLORS.state.warning} />
+          <div className="grid grid-cols-1 xl:grid-cols-5 gap-3">
+            <Card>
+              <SectionHeader title="ASIGNACIONES ACTIVAS" />
+              <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginBottom: 10 }} />
+              <div className="admin-stack-sm" style={{ maxHeight: 420, overflowY: "auto" }}>
+                {assignments.filter(a => a.status === "ACTIVA").map(a => (
+                  <div key={a.id} className="p-3 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
+                    <div className="flex items-center justify-between mb-1 gap-2">
+                      <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 13, fontWeight: 700, color: UI_COLORS.textPrimary }}>{a.personName}</span>
+                      <Badge label={a.status} color={UI_COLORS.state.warning} />
+                    </div>
+                    <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, marginBottom: 5 }}>
+                      {a.startDate} - {a.endDate}
+                    </div>
+                    <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>{a.fromRole} → {a.occupationName}</div>
+                    <div className="flex items-center justify-end mt-2">
+                      <SecuredActionBtn allowed reason="" label="FINALIZAR" color={UI_COLORS.accent} small onClick={() => confirmAction("¿Finalizar esta asignación temporal?", () => handleFinishAssignment(a.id))} />
+                    </div>
                   </div>
-                  <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>{a.fromRole} → {a.occupationName}</div>
-                  <div className="flex items-center justify-between mt-2">
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{a.startDate} a {a.endDate}</span>
-                    <SecuredActionBtn allowed reason="" label="FINALIZAR" color={UI_COLORS.accent} small onClick={() => confirmAction("¿Finalizar esta asignación temporal?", () => handleFinishAssignment(a.id))} />
+                ))}
+                {assignments.filter(a => a.status === "ACTIVA").length === 0 && <EmptyState title="SIN ASIGNACIONES ACTIVAS" hint="No hay coberturas temporales en curso" icon={Users} />}
+              </div>
+            </Card>
+
+            <Card>
+              <SectionHeader title="1) SELECCIONAR PERSONA" />
+              <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginBottom: 10 }} />
+              <div className="admin-stack-sm">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    value={assignSearch}
+                    onChange={e => setAssignSearch(e.target.value)}
+                    placeholder="Buscar por nombre, rol o sector..."
+                    className="flex-1 min-w-[220px] px-3 py-2 rounded-sm outline-none"
+                    style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssignSearch("");
+                      setNewAssign(prev => ({ ...prev, personId: 0 }));
+                    }}
+                    className="px-3 py-2 rounded-sm outline-none cursor-pointer"
+                    style={{
+                      backgroundImage: "linear-gradient(152deg, rgba(255, 255, 255, 0.24) 0%, rgba(220, 241, 255, 0.14) 42%, rgba(162, 211, 243, 0.1) 100%), linear-gradient(108deg, transparent 28%, rgba(255, 255, 255, 0.34) 50%, transparent 72%)",
+                      backgroundSize: "100% 100%, 230% 100%",
+                      backgroundPosition: "0 0, 115% 0",
+                      backgroundRepeat: "no-repeat",
+                      border: "1px solid rgba(214, 236, 255, 0.7)",
+                      color: UI_COLORS.textPrimary,
+                      fontFamily: "'Share Tech Mono', monospace",
+                      fontSize: 10,
+                      letterSpacing: "0.08em",
+                      fontWeight: 700,
+                      minWidth: 88,
+                      boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.42), inset 0 -1px 0 rgba(160, 205, 234, 0.3), 0 8px 18px rgba(4, 11, 19, 0.28), 0 0 12px rgba(176, 223, 255, 0.2)",
+                      backdropFilter: "blur(10px) saturate(136%)",
+                      WebkitBackdropFilter: "blur(10px) saturate(136%)",
+                      transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                    }}
+                  >
+                    LIMPIAR
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>
+                    {assignmentCandidates.length} resultado(s)
+                  </span>
+                  {assignmentCandidates.length > visibleCandidates.length && (
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>
+                      Mostrando {visibleCandidates.length}. Afina búsqueda.
+                    </span>
+                  )}
+                </div>
+
+                <div className="admin-stack-sm p-2 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, maxHeight: 240, overflowY: "auto" }}>
+                  {visibleCandidates.map(person => {
+                    const isSelected = person.id === newAssign.personId;
+                    return (
+                      <button
+                        key={person.id}
+                        type="button"
+                        onClick={() => setNewAssign(prev => ({ ...prev, personId: person.id }))}
+                        className="w-full text-left p-2 rounded-sm cursor-pointer"
+                        style={{
+                          background: isSelected ? "#121B26" : "#0B1118",
+                          border: `1px solid ${isSelected ? UI_COLORS.accent : UI_COLORS.border}`,
+                        }}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textPrimary, fontWeight: 700 }}>{person.name}</span>
+                          <Badge label={person.status} color={personStatusColor(person.status)} />
+                        </div>
+                        <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>
+                          {person.role} — {person.sector}
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {visibleCandidates.length === 0 && <EmptyState title="SIN COINCIDENCIAS" hint="Prueba por rol o sector" icon={Search} />}
+                </div>
+
+                <div className="p-3 rounded-sm" style={{ background: "#0B1118", border: `1px dashed ${selectedCandidate ? UI_COLORS.accent : UI_COLORS.border}` }}>
+                  <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, marginBottom: 4 }}>PERSONA SELECCIONADA</div>
+                  {selectedCandidate ? (
+                    <>
+                      <div className="flex items-center justify-between gap-2">
+                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 14, color: UI_COLORS.textPrimary, fontWeight: 700 }}>{selectedCandidate.name}</span>
+                        <Badge label={selectedCandidate.status} color={personStatusColor(selectedCandidate.status)} />
+                      </div>
+                      <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>{selectedCandidate.role} — {selectedCandidate.sector}</div>
+                    </>
+                  ) : (
+                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>Selecciona una persona para continuar.</span>
+                  )}
+                </div>
+              </div>
+            </Card>
+
+            <Card>
+              <SectionHeader title="2) DATOS DEL ROL TEMPORAL" />
+              <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginBottom: 10 }} />
+              <div className="admin-stack-md">
+                <div>
+                  <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>OFICIO TEMPORAL *</label>
+                  <input
+                    value={newAssign.occupationName}
+                    onChange={e => setNewAssign(prev => ({ ...prev, occupationName: e.target.value }))}
+                    placeholder="Ej: Guardia de perímetro"
+                    className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
+                    style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>PERIODO *</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center mt-1">
+                    <input type="date" value={newAssign.startDate} onChange={e => setNewAssign(prev => ({ ...prev, startDate: e.target.value }))} className="px-3 py-2 rounded-sm outline-none" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }} />
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textFaint, textAlign: "center" }}>HASTA</span>
+                    <input type="date" value={newAssign.endDate} onChange={e => setNewAssign(prev => ({ ...prev, endDate: e.target.value }))} className="px-3 py-2 rounded-sm outline-none" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }} />
                   </div>
                 </div>
-              ))}
-              {assignments.filter(a => a.status === "ACTIVA").length === 0 && <EmptyState title="SIN ASIGNACIONES ACTIVAS" hint="No hay coberturas temporales en curso" icon={Users} />}
-            </div>
-          </Card>
 
-          <Card>
-            <SectionHeader title="CREAR ASIGNACIÓN TEMPORAL" />
-            <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginBottom: 10 }} />
-            <div className="admin-stack-md">
-              <div>
-                <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>PERSONA</label>
-                <select value={newAssign.personId || ""} onChange={e => setNewAssign(prev => ({ ...prev, personId: Number(e.target.value) }))}
-                  className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                  style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }}>
-                  <option value="">-- Seleccionar --</option>
-                  {persons.map(p => <option key={p.id} value={p.id}>{p.name} ({p.role})</option>)}
-                </select>
+                <div>
+                  <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>MOTIVO (OPCIONAL)</label>
+                  <textarea
+                    value={newAssign.reason}
+                    onChange={e => setNewAssign(prev => ({ ...prev, reason: e.target.value }))}
+                    rows={3}
+                    placeholder="Ej: Cobertura por licencia o necesidad operativa"
+                    className="w-full mt-1 px-3 py-2 rounded-sm outline-none resize-none"
+                    style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }}
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCreateAssignment}
+                  disabled={!hasRequiredAssignmentData}
+                  className="admin-btn w-full px-3 py-2 rounded-sm cursor-pointer"
+                  style={{
+                    background: hasRequiredAssignmentData ? UI_COLORS.accent : UI_COLORS.border,
+                    color: hasRequiredAssignmentData ? "#05070A" : UI_COLORS.textFaint,
+                    border: `1px solid ${hasRequiredAssignmentData ? UI_COLORS.accent : UI_COLORS.border}`,
+                    fontFamily: "'Share Tech Mono', monospace",
+                    fontSize: 10,
+                    letterSpacing: "0.08em",
+                    fontWeight: 700,
+                    opacity: hasRequiredAssignmentData ? 1 : 0.72,
+                  }}
+                >
+                  ASIGNAR TEMPORALMENTE
+                </button>
               </div>
-              <div>
-                <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>OFICIO TEMPORAL</label>
-                <input value={newAssign.occupationName} onChange={e => setNewAssign(prev => ({ ...prev, occupationName: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                  style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }} />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input type="date" value={newAssign.startDate} onChange={e => setNewAssign(prev => ({ ...prev, startDate: e.target.value }))} className="px-3 py-2 rounded-sm outline-none" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }} />
-                <input type="date" value={newAssign.endDate} onChange={e => setNewAssign(prev => ({ ...prev, endDate: e.target.value }))} className="px-3 py-2 rounded-sm outline-none" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }} />
-              </div>
-              <textarea value={newAssign.reason} onChange={e => setNewAssign(prev => ({ ...prev, reason: e.target.value }))} rows={2}
-                className="w-full px-3 py-2 rounded-sm outline-none resize-none"
-                style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }} />
-              <ActionBtn label="ASIGNAR TEMPORALMENTE" color={UI_COLORS.accent} onClick={handleCreateAssignment} />
-            </div>
-          </Card>
+            </Card>
+          </div>
 
           <Card>
             <SectionHeader title="HISTÓRICO DE ASIGNACIONES" />
             <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginBottom: 10 }} />
-            <div className="admin-stack-sm">
-              {assignments.filter(a => a.status === "FINALIZADA").map(a => (
-                <div key={a.id} className="p-3 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
-                  <div className="flex items-center justify-between">
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textPrimary }}>{a.personName}</span>
-                    <Badge label="FINALIZADA" color={UI_COLORS.state.system} />
+            <div className="admin-table grid gap-px" style={{ background: "#2A3444" }}>
+              <div className="admin-table-header grid grid-cols-12 px-3 py-2" style={{ background: "#0B1118" }}>
+                {[
+                  { label: "PERSONA", span: "col-span-3" },
+                  { label: "CAMBIO", span: "col-span-3" },
+                  { label: "PERIODO", span: "col-span-3" },
+                  { label: "ESTADO", span: "col-span-2" },
+                  { label: "MOTIVO", span: "col-span-1" },
+                ].map(item => (
+                  <div key={item.label} className={item.span}>
+                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, letterSpacing: "0.08em" }}>{item.label}</span>
                   </div>
-                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>{a.fromRole} → {a.occupationName}</span>
+                ))}
+              </div>
+
+              {assignments.filter(a => a.status === "FINALIZADA").map(a => (
+                <div key={a.id} className="admin-table-row grid grid-cols-12 items-center px-3 py-2" style={{ background: "#0B1118" }}>
+                  <div className="col-span-3"><span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textPrimary, fontWeight: 700 }}>{a.personName}</span></div>
+                  <div className="col-span-3"><span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>{a.fromRole} → {a.occupationName}</span></div>
+                  <div className="col-span-3"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{a.startDate} a {a.endDate}</span></div>
+                  <div className="col-span-2"><Badge label="FINALIZADA" color={UI_COLORS.state.system} /></div>
+                  <div className="col-span-1"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>{a.reason ? "SI" : "-"}</span></div>
                 </div>
               ))}
             </div>
+            {assignments.filter(a => a.status === "FINALIZADA").length === 0 && (
+              <div className="mt-2">
+                <EmptyState title="SIN HISTÓRICO" hint="Aún no hay asignaciones finalizadas" icon={Activity} />
+              </div>
+            )}
           </Card>
         </div>
       )}
@@ -2751,6 +2915,19 @@ export default function AdminDashboard() {
     { icon: Radio, label: "Intercamp", target: "INTER-CAMPAMENTOS" },
   ];
 
+  const navWithSidebar: NavSection[] = [
+    "POBLACIÓN",
+    "ADMISIONES IA",
+    "INVENTARIO",
+    "EXPEDICIONES",
+    "INTER-CAMPAMENTOS",
+    "SEGURIDAD / LOGS",
+    "LOGROS",
+    "NOTIFICACIONES",
+    "CONFIGURACIÓN",
+  ];
+  const hasSidebar = navWithSidebar.includes(activeNav);
+
   const fmtTime = (d: Date) =>
     d.toLocaleTimeString("es-CR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 
@@ -2884,17 +3061,7 @@ export default function AdminDashboard() {
           <div className="admin-hud" aria-hidden="true" />
 
           <div className="admin-layout">
-            {[
-              "POBLACIÓN",
-              "ADMISIONES IA",
-              "INVENTARIO",
-              "EXPEDICIONES",
-              "INTER-CAMPAMENTOS",
-              "SEGURIDAD / LOGS",
-              "LOGROS",
-              "NOTIFICACIONES",
-              "CONFIGURACIÓN",
-            ].includes(activeNav) && (
+            {hasSidebar && (
                 <aside className="admin-sidebar hidden md:flex flex-col flex-shrink-0" style={{ width: 250, background: "transparent", borderRight: "1px solid #2A3444", zIndex: 1 }}>
                   <div className="admin-logo px-4 py-5 flex flex-col" style={{ borderBottom: "1px solid #2A3444" }}>
                     <div className="flex items-center gap-2 mb-1">
@@ -3235,7 +3402,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </main>
-              <footer className="admin-dock" aria-label="Acceso rapido">
+              <footer className={`admin-dock${hasSidebar ? " admin-dock--sidebar-offset" : ""}`} aria-label="Acceso rapido">
                 {quickAccess.map((item) => {
                   const isActive = activeNav === item.target;
                   const Icon = item.icon;

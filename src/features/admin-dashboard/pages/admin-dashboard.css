@@ -99,7 +99,7 @@
 
 .admin-hud {
   position: absolute;
-  inset: 1.6% 0.8% 2.6%;
+  inset: 0.6% -5.4% -1.1%;
   z-index: 2;
   border: 1px solid rgba(112, 182, 255, 0.2);
   clip-path: polygon(0 6.4%, 33.2% 6.4%, 37.4% 0, 62.6% 0, 66.8% 6.4%, 100% 6.4%, 100% 93.6%, 66.8% 93.6%, 62.6% 100%, 37.4% 100%, 33.2% 93.6%, 0 93.6%);
@@ -134,7 +134,7 @@
   background:
     linear-gradient(0deg, rgba(255, 255, 255, 0.16) 0%, rgba(125, 195, 255, 0.14) 58%, rgba(0, 0, 0, 0) 100%),
     url("/textures/grunge-noise.png");
-  background-size: 100% 100%, 280px 280px;
+  background-size: 80% 100%, 280px 280px;
   background-repeat: no-repeat, repeat;
   opacity: 0.53;
 }
@@ -716,6 +716,12 @@
   -webkit-backdrop-filter: none;
   flex-shrink: 0;
   z-index: 2;
+}
+
+@media (min-width: 768px) {
+  .admin-dock--sidebar-offset {
+    transform: translateX(-125px);
+  }
 }
 
 .admin-dock::before {
@@ -1386,7 +1392,31 @@
 .admin-hud {
   border-top: 2px solid var(--hud-cyan-soft);
   border-bottom: 2px solid rgba(124, 231, 225, 0.25);
+  clip-path: polygon(0 4.2%, 12% 4.2%, 15.2% 1.2%, 33.6% 1.2%, 36.2% 0, 58.4% 0, 61.2% 1.6%, 79.8% 1.6%, 83.2% 4.2%, 100% 4.2%, 100% 93.6%, 66.8% 93.6%, 62.6% 100%, 37.4% 100%, 33.2% 93.6%, 0 93.6%);
   filter: drop-shadow(0 0 7px rgba(124, 231, 225, 0.3));
+}
+
+
+.admin-hud::before {
+  height: 26px;
+  clip-path: polygon(0 64%, 12% 64%, 15.2% 0, 33.6% 0, 36.2% 16%, 58.4% 16%, 61.2% 24%, 79.8% 24%, 83.2% 64%, 100% 64%, 100% 100%, 0 100%);
+  opacity: 0.42;
+}
+
+
+.admin-layout::before {
+  content: "";
+  position: absolute;
+  left: 1.2%;
+  right: 1.2%;
+  top: 9px;
+  height: 7px;
+  background-image: url("/textures/BLUE-brushstroke.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  clip-path: polygon(0 84%, 16% 84%, 19.5% 42%, 30% 42%, 34% 16%, 49% 16%, 52.5% 48%, 69% 48%, 72% 26%, 86% 26%, 89.5% 84%, 100% 84%, 100% 100%, 0 100%);
+  pointer-events: none;
+  opacity: 0.42;
 }
 
 
@@ -1396,10 +1426,10 @@
   left: 1.6%;
   right: 1.6%;
   top: 8px;
-  height: 2px;
+  height: 1px;
   background: linear-gradient(90deg, rgba(238, 243, 251, 0.88), rgba(127, 184, 255, 0.45) 50%, rgba(238, 243, 251, 0.88));
-  clip-path: polygon(0 100%, 19% 100%, 22% 0, 62% 0, 65% 100%, 100% 100%, 100% 0, 0 0);
-  opacity: 0.52;
+  clip-path: polygon(0 100%, 15% 100%, 18% 34%, 31% 34%, 34% 0, 50% 0, 53% 40%, 70% 40%, 73% 16%, 87% 16%, 90% 100%, 100% 100%, 100% 0, 0 0);
+  opacity: 0.42;
   pointer-events: none;
 }
 
@@ -1638,7 +1668,7 @@
 .admin-dock {
   gap: 10px;
   padding-bottom: 2px;
-  margin-bottom: 9px;
+  margin-bottom: 0px;
 }
 
 .admin-dock-item {
@@ -1674,7 +1704,7 @@
   .admin-dock {
     gap: 9px;
     padding-bottom: 2px;
-    margin-bottom: 10px;
+    margin-bottom: 30px;
   }
 }
 
@@ -1812,7 +1842,7 @@
   .admin-dock {
     gap: 4px;
     padding: 6px 8px 2px;
-    margin-bottom: 6px;
+    margin-bottom: 2px;
   }
 
   .admin-dock-label {
@@ -1823,4 +1853,30 @@
   .admin-priority-card {
     box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.14), 0 0 16px rgba(220, 38, 38, 0.1);
   }
+}
+
+.admin-layout::before,
+.admin-layout::after,
+.admin-logo::after,
+.admin-sidebar::after,
+.admin-card::before,
+.admin-card::after,
+.admin-panel::before,
+.admin-panel-frame::after,
+.admin-panel-inner::before,
+.admin-panel-inner > div::after,
+.admin-dock::before,
+.admin-dock-item::after {
+  content: none !important;
+  background: none !important;
+}
+
+.admin-header,
+.admin-card,
+.admin-panel-inner {
+  background-image: none !important;
+}
+
+.admin-dashboard input[type="range"]::-webkit-slider-runnable-track {
+  background: rgba(7, 10, 10, 0.86);
 }
