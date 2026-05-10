@@ -2334,8 +2334,7 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
   );
 }
 
-function ViewNotificaciones({ mode }: { mode: NotifsViewMode }) {
-  const [notifs, setNotifs] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
+function ViewNotificaciones({ mode, notifs, setNotifs }: { mode: NotifsViewMode; notifs: Notification[]; setNotifs: React.Dispatch<React.SetStateAction<Notification[]>> }) {
   const [filter, setFilter] = useState(() => new URLSearchParams(window.location.search).get("not_type") ?? "todas");
   const [page, setPage] = useState(() => Number(new URLSearchParams(window.location.search).get("not_page") ?? "1") || 1);
   const [limit] = useState(() => Number(new URLSearchParams(window.location.search).get("not_limit") ?? "6") || 6);
@@ -2601,7 +2600,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
 
 // ─── DASHBOARD (overview) ─────────────────────────────────────────────────────
 
-function ViewDashboard({ onQuickNav }: { onQuickNav?: (target: NavSection) => void }) {
+function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSection) => void; notifs: Notification[] }) {
   const [countdown, setCountdown] = useState({ h: 3, m: 28, s: 0 });
   const [threatLevel, setThreatLevel] = useState(72);
   const [automations] = useState([
@@ -2641,7 +2640,7 @@ function ViewDashboard({ onQuickNav }: { onQuickNav?: (target: NavSection) => vo
     { name: "Fuera", value: 17, color: "#4AAED2" },
   ];
   const totalPop = populationData.reduce((a, b) => a + b.value, 0);
-  const liveAlerts = INITIAL_NOTIFICATIONS.filter(n => !n.read).slice(0, 5);
+  const liveAlerts = notifs.filter(n => !n.read).slice(0, 5);
 
   const crisisToday = {
     title: "CRISIS DEL DÍA: RIESGO DE ABASTECIMIENTO",
@@ -2916,6 +2915,7 @@ export default function AdminDashboard() {
   const [activeNav, setActiveNav] = useState<NavSection>("CENTRO DE MANDO");
   const currentRole: AppRole = "SYSTEM_ADMIN";
   const [sessionPanelOpen, setSessionPanelOpen] = useState(false);
+  const [profilePreviewOpen, setProfilePreviewOpen] = useState(false);
   const [sessionLocked, setSessionLocked] = useState(false);
   const [globalHttpCode, setGlobalHttpCode] = useState<HttpCode | null>(null);
   const [populationViewMode, setPopulationViewMode] = useState<PopulationViewMode>("stats");
@@ -2928,13 +2928,15 @@ export default function AdminDashboard() {
   const [notifsViewMode, setNotifsViewMode] = useState<NotifsViewMode>("all");
   const [configViewMode, setConfigViewMode] = useState<ConfigViewMode>("camp");
   const [serverTime, setServerTime] = useState(new Date());
-  const [unreadNotifs] = useState(4);
+  const [notifs, setNotifs] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
+  const unreadNotifs = notifs.filter(n => !n.read).length;
   const currentUser = {
     name: "Edicson Vargas",
     email: "edicson.vargas@camp-alpha.local",
     role: currentRole,
     camp: "Campamento Alfa",
     shift: "Turno Noche",
+    profileImage: "https://i.pravatar.cc/80?img=12",
   };
   const can = (permission: string) => ROLE_PERMISSIONS[currentRole].includes(permission);
 
@@ -3003,9 +3005,9 @@ export default function AdminDashboard() {
       case "INTER-CAMPAMENTOS": return <ViewIntercamp mode={intercampViewMode} canApprove={can("intercamp.approve")} />;
       case "SEGURIDAD / LOGS": return <ViewSeguridad mode={securityViewMode} />;
       case "LOGROS": return <ViewLogros mode={logrosViewMode} />;
-      case "NOTIFICACIONES": return <ViewNotificaciones mode={notifsViewMode} />;
+      case "NOTIFICACIONES": return <ViewNotificaciones mode={notifsViewMode} notifs={notifs} setNotifs={setNotifs} />;
       case "CONFIGURACIÓN": return <ViewConfiguracion mode={configViewMode} />;
-      default: return <ViewDashboard onQuickNav={setActiveNav} />;
+      default: return <ViewDashboard onQuickNav={setActiveNav} notifs={notifs} />;
     }
   };
 
@@ -3319,25 +3321,45 @@ export default function AdminDashboard() {
                 style={{ background: "transparent", borderBottom: "none" }}>
                 <div className="admin-top-strip flex items-center justify-end gap-3 relative z-10">
                   <div className="admin-profile admin-header-actions flex items-center gap-2">
-                    <button onClick={() => setActiveNav("NOTIFICACIONES")} className="admin-icon-btn relative p-1.5 rounded-sm"
-                      style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
-                      <Bell size={14} style={{ color: "#7FB8FF" }} />
+                    <button onClick={() => setActiveNav("NOTIFICACIONES")} className="admin-icon-btn relative p-2.5 rounded-sm"
+                      style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)", minWidth: 34, minHeight: 34 }}>
+                      <Bell size={14} style={{ color: "#7FB8FF", marginTop: 4 }} />
                       {unreadNotifs > 0 && (
-                        <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-sm"
-                          style={{ background: "#DC2626", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EEF3FB" }}>{unreadNotifs}</span>
+                        <span
+                          className="absolute flex items-center justify-center rounded-sm px-1"
+                          style={{
+                            top: -1,
+                            right: -1,
+                            minWidth: 14,
+                            height: 14,
+                            lineHeight: "14px",
+                            background: "#DC2626",
+                            fontFamily: "'Share Tech Mono', monospace",
+                            fontSize: 8,
+                            fontWeight: 700,
+                            color: "#EEF3FB"
+                          }}
+                        >
+                          {unreadNotifs}
+                        </span>
                       )}
                     </button>
-                    <button onClick={() => setActiveNav("CONFIGURACIÓN")} className="admin-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
-                      style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
-                      <Settings size={12} style={{ color: "#7FB8FF" }} />
-                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EEF3FB" }}>CONFIG</span>
+                    <button onClick={() => setActiveNav("CONFIGURACIÓN")} className="admin-icon-btn flex items-center justify-center p-1.5 rounded-sm"
+                      style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)", minWidth: 34, minHeight: 34 }}>
+                      <Settings size={16} style={{ color: "#7FB8FF" }} />
                     </button>
                     <button onClick={() => setSessionPanelOpen(prev => !prev)} className="admin-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
                       style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
-                      <div className="w-5 h-5 rounded-sm flex items-center justify-center"
-                        style={{ background: "#7FB8FF", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#05070A", fontWeight: 700 }}>
-                        {currentUser.name.split(" ").map(part => part[0]).join("").slice(0, 2)}
-                      </div>
+                      <img
+                        src={currentUser.profileImage}
+                        alt={`Perfil de ${currentUser.name}`}
+                        className="w-5 h-5 rounded-sm"
+                        style={{ objectFit: "cover", border: "1px solid rgba(127, 184, 255, 0.45)", cursor: "pointer" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setProfilePreviewOpen(true);
+                        }}
+                      />
                       <ChevronDown size={10} style={{ color: "#B8C7DB", transform: sessionPanelOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />
                     </button>
                   </div>
@@ -3391,8 +3413,15 @@ export default function AdminDashboard() {
                         }}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, padding: 8, borderRadius: 6, background: "rgba(127,184,255,0.08)", border: "1px solid rgba(127,184,255,0.2)" }}>
-                          <div style={{ width: 40, height: 40, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", background: "#121B26", border: "1px solid #2A3444" }}>
-                            <User size={18} style={{ color: "#7FB8FF" }} />
+                          <div
+                            style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", background: "#121B26", border: "1px solid #2A3444", cursor: "pointer" }}
+                            onClick={() => setProfilePreviewOpen(true)}
+                          >
+                            <img
+                              src={currentUser.profileImage}
+                              alt={`Perfil de ${currentUser.name}`}
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            />
                           </div>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 14, fontWeight: 700, color: "#EEF3FB", lineHeight: 1.1 }}>{currentUser.name}</div>
@@ -3421,6 +3450,55 @@ export default function AdminDashboard() {
                         </button>
                       </motion.div>
                     </>
+                  )}
+                </AnimatePresence>,
+                document.body
+              )}
+
+              {typeof document !== "undefined" && createPortal(
+                <AnimatePresence>
+                  {profilePreviewOpen && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      onClick={() => setProfilePreviewOpen(false)}
+                      style={{
+                        position: "fixed",
+                        inset: 0,
+                        zIndex: 100000,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 16,
+                        background: "rgba(3, 7, 12, 0.74)",
+                        backdropFilter: "blur(4px)",
+                        WebkitBackdropFilter: "blur(4px)",
+                      }}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9, y: 12 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.94, y: 8 }}
+                        transition={{ duration: 0.22, ease: "easeOut" }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: "min(420px, calc(100vw - 32px))",
+                          borderRadius: 10,
+                          overflow: "hidden",
+                          border: "1px solid rgba(127, 184, 255, 0.32)",
+                          boxShadow: "0 22px 44px rgba(0, 0, 0, 0.46)",
+                          background: "#0B1118",
+                        }}
+                      >
+                        <img
+                          src={currentUser.profileImage}
+                          alt={`Perfil ampliado de ${currentUser.name}`}
+                          style={{ width: "100%", height: "auto", display: "block", maxHeight: "72vh", objectFit: "cover" }}
+                        />
+                      </motion.div>
+                    </motion.div>
                   )}
                 </AnimatePresence>,
                 document.body
