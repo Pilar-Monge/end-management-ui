@@ -10,7 +10,7 @@ import {
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle,
   XCircle, Activity, ChevronDown,
   BarChart2, Search, Edit2, Trash2, Shield,
-  X, Volume2, Database, Cpu, User
+  X, Database, Cpu, User
 } from "lucide-react";
 import {
   AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis,
@@ -685,411 +685,496 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
     setAssignments(prev => prev.map(a => a.id === id ? { ...a, status: "FINALIZADA" } : a));
   };
 
+  const getBadgeClass = (status: string) => {
+    if (status === "Activo") return "pop-badge-activo";
+    if (status === "Herido") return "pop-badge-herido";
+    if (status === "Enfermo") return "pop-badge-enfermo";
+    if (status === "Fuera") return "pop-badge-fuera";
+    return "";
+  };
+
   return (
-    <div>
-      <ModuleContext module="POBLACIÓN" />
+    <div className="pop-container">
       {isLoading && <EmptyState title="CARGANDO POBLACIÓN" hint="Sincronizando personas del campamento" icon={Users} />}
       {errorCode && <HttpStatusNotice code={errorCode} />}
+      
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="pop-title m-0 tracking-tight">Registro de Población</h2>
+        <div className="flex items-center gap-2">
+          <span className="pop-text-muted">Campamento Actual: Alfa</span>
+        </div>
+      </div>
+
       {mode === "stats" ? (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-            {Object.entries(counts).map(([k, v]) => (
-              <Card key={k}>
-                <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 24, fontWeight: 900, color: personStatusColor(k) }}>{v}</div>
-                <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#B8C7DB", letterSpacing: "0.1em" }}>{k.toUpperCase()}</div>
-              </Card>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <Card>
-              <SectionHeader title="DISTRIBUCIÓN POR ROL" />
-              <div className="admin-stack-sm">
-                {Object.entries(persons.reduce<Record<string, number>>((acc, person) => {
-                  acc[person.role] = (acc[person.role] ?? 0) + 1;
-                  return acc;
-                }, {})).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([role, total]) => (
-                  <div key={role} className="flex items-center justify-between p-2 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>{role}</span>
-                    <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#7FB8FF", fontWeight: 700 }}>{total}</span>
+        (() => {
+          const getAreaColor = (str: string) => {
+            const colors = ["#4aaed2", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            return colors[Math.abs(hash) % colors.length];
+          };
+
+          return (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" style={{ marginBottom: 22 }}>
+                {Object.entries(counts).map(([k, v], i) => {
+                  const color = getAreaColor(k);
+                  return (
+                  <div key={k} className="pop-card relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-16 h-16 opacity-10 rounded-bl-full group-hover:scale-110 transition-transform" style={{ background: `linear-gradient(to bottom right, ${color}, transparent)` }}></div>
+                    <div className="absolute left-0 top-0 w-1 h-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }}></div>
+                    <div className="pop-text-muted uppercase tracking-widest text-[10px] mb-2 flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-sm" style={{ background: color }}></div>
+                      {k}
+                    </div>
+                    <div className="pop-stat-value text-5xl font-bold tracking-tighter" style={{ textShadow: `0 0 20px ${color}40` }}>
+                      {v}
+                    </div>
                   </div>
-                ))}
+                )})}
               </div>
-            </Card>
-            <Card>
-              <SectionHeader title="OCUPACIÓN POR SECTOR" />
-              <div className="admin-stack-sm">
-                {Object.entries(persons.reduce<Record<string, number>>((acc, person) => {
-                  acc[person.sector] = (acc[person.sector] ?? 0) + 1;
-                  return acc;
-                }, {})).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([sector, total]) => (
-                  <div key={sector} className="flex items-center justify-between p-2 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#B8C7DB" }}>{sector.toUpperCase()}</span>
-                    <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 12, color: "#0D9488", fontWeight: 700 }}>{total}</span>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Roles - Horizontal Progress Bars */}
+                <div className="pop-card flex flex-col">
+                  <div className="flex justify-between items-end mb-6 border-b pb-3" style={{ borderColor: "var(--admin-border-soft)" }}>
+                    <h3 className="pop-text-primary text-lg m-0 flex items-center gap-2">
+                      <Activity size={18} style={{ color: "var(--admin-teal)" }} />
+                      DISTRIBUCIÓN POR ROL
+                    </h3>
+                    <span className="pop-text-muted text-[10px] font-mono tracking-widest">TIEMPO REAL</span>
                   </div>
-                ))}
+                  <div className="flex flex-col gap-6 flex-1">
+                    {Object.entries(persons.reduce<Record<string, number>>((acc, person) => {
+                      acc[person.role] = (acc[person.role] ?? 0) + 1;
+                      return acc;
+                    }, {}))
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 6)
+                    .map(([role, total], index, arr) => {
+                      const maxCount = Math.max(...arr.map(a => a[1]));
+                      const percent = (total / maxCount) * 100;
+                      const color = getAreaColor(role);
+                      return (
+                        <div key={role} className="relative group">
+                          <div className="flex justify-between items-end mb-3">
+                            <span className="pop-text-primary text-xs font-bold tracking-wide uppercase">{role}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="pop-text-muted text-[10px] font-mono">{(total/persons.length * 100).toFixed(1)}%</span>
+                              <span className="font-bold text-base leading-none" style={{ color }}>{total}</span>
+                            </div>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: "var(--admin-surface-alt)" }}>
+                            <motion.div 
+                              initial={{ width: 0 }} 
+                              animate={{ width: `${percent}%` }} 
+                              transition={{ duration: 1, ease: "easeOut", delay: index * 0.1 }}
+                              className="h-full rounded-full relative"
+                              style={{ background: `linear-gradient(90deg, ${color}33, ${color})`, boxShadow: `0 0 10px ${color}80` }}
+                            >
+                              <div className="absolute right-0 top-0 bottom-0 w-2 bg-white opacity-50"></div>
+                            </motion.div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Sectors - Vertical Meters in Grid */}
+                <div className="pop-card flex flex-col">
+                  <div className="flex justify-between items-end mb-6 border-b pb-3" style={{ borderColor: "var(--admin-border-soft)" }}>
+                    <h3 className="pop-text-primary text-lg m-0 flex items-center gap-2">
+                      <Map size={18} style={{ color: "var(--admin-teal)" }} />
+                      OCUPACIÓN POR SECTOR
+                    </h3>
+                    <span className="pop-text-muted text-[10px] font-mono tracking-widest">ZONAS ACTIVAS</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 flex-1">
+                    {Object.entries(persons.reduce<Record<string, number>>((acc, person) => {
+                      acc[person.sector] = (acc[person.sector] ?? 0) + 1;
+                      return acc;
+                    }, {}))
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 6)
+                    .map(([sector, total], index, arr) => {
+                      const maxCount = Math.max(...arr.map(a => a[1]));
+                      const percent = (total / maxCount) * 100;
+                      const color = getAreaColor(sector);
+                      return (
+                        <div key={sector} className="p-3 rounded-lg flex flex-col justify-between relative overflow-hidden group" style={{ background: "var(--admin-surface-alt)", border: "1px solid var(--admin-border-soft)" }}>
+                          <div className="absolute top-0 right-0 h-full w-1" style={{ background: "var(--admin-surface)" }}>
+                            <motion.div 
+                              initial={{ height: 0 }}
+                              animate={{ height: `${percent}%` }}
+                              transition={{ duration: 1, ease: "easeOut", delay: index * 0.1 }}
+                              className="absolute bottom-0 w-full"
+                              style={{ background: color, boxShadow: `0 0 8px ${color}` }}
+                            ></motion.div>
+                          </div>
+                          <span className="pop-text-muted text-[9px] font-mono tracking-widest mb-1 opacity-70">SECTOR</span>
+                          <span className="pop-text-primary font-bold text-xs uppercase mb-3 pr-4 truncate group-hover:text-white transition-colors">{sector}</span>
+                          <div className="flex items-end justify-between pr-4 mt-auto">
+                            <span className="font-bold text-xl leading-none" style={{ color: color, textShadow: `0 0 10px ${color}66` }}>{total}</span>
+                            <span className="pop-text-muted text-[9px] font-mono opacity-50">UNID.</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-            </Card>
-          </div>
-        </>
+            </>
+          );
+        })()
       ) : mode === "users" ? (
-        <Card>
-          <div className="flex items-center gap-3 mb-3 flex-wrap">
-            <SectionHeader title={`REGISTRO DE POBLACIÓN — ${persons.length} PERSONAS`} accent={false} />
-            <div className="flex-1" />
-            <SearchBar value={search} onChange={setSearch} placeholder="BUSCAR PERSONA..." />
-            <div className="flex gap-1">
+        <div className="pop-card">
+          <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6">
+            <h3 className="pop-text-primary text-lg m-0 flex-shrink-0">Lista de Personal ({persons.length})</h3>
+            <div className="flex-1">
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar por nombre o rol..."
+                className="pop-input w-full max-w-md"
+              />
+            </div>
+            <div className="flex gap-2 flex-wrap">
               {statuses.map(s => (
-                <button key={s} onClick={() => setFilterStatus(s)} className="admin-chip-btn px-2 py-1 rounded-sm cursor-pointer" style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, background: filterStatus === s ? "#7FB8FF" : "#121B26", color: filterStatus === s ? "#05070A" : "#B8C7DB", border: "1px solid #2A3444" }}>
+                <button
+                  key={s}
+                  onClick={() => setFilterStatus(s)}
+                  className="pop-btn-secondary"
+                  style={{ opacity: filterStatus === s ? 1 : 0.6, borderColor: filterStatus === s ? 'var(--admin-teal)' : '' }}
+                >
                   {s}
                 </button>
               ))}
             </div>
           </div>
-          <div style={{ height: 1, background: "linear-gradient(90deg, #7FB8FF 0%, transparent 100%)", marginBottom: 12 }} />
 
-          <div className="admin-table grid gap-px" style={{ background: "#2A3444" }}>
-            <div className="admin-table-header grid grid-cols-12 px-3 py-2" style={{ background: "#0B1118" }}>
-              {["NOMBRE", "ROL", "ESTADO", "EDAD", "SECTOR", "INGRESO", "ACC."].map((h, i) => (
-                <div key={h} className={i === 0 ? "col-span-3" : i === 1 ? "col-span-2" : i === 2 ? "col-span-2" : i === 3 ? "col-span-1" : i === 4 ? "col-span-2" : i === 5 ? "col-span-1" : "col-span-1"}>
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, letterSpacing: "0.08em" }}>{h}</span>
-                </div>
-              ))}
+          <div className="w-full overflow-x-auto">
+            <div className="min-w-[800px]">
+              <div className="pop-table-header grid grid-cols-12">
+                <div className="col-span-3">Nombre</div>
+                <div className="col-span-2">Rol</div>
+                <div className="col-span-2">Estado</div>
+                <div className="col-span-1">Edad</div>
+                <div className="col-span-2">Sector</div>
+                <div className="col-span-1">Ingreso</div>
+                <div className="col-span-1 text-center">Acciones</div>
+              </div>
+              
+              <div className="mt-2 flex flex-col gap-1">
+                <AnimatePresence>
+                  {pagedFiltered.map(person => (
+                    <motion.div
+                      key={person.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="pop-table-row grid grid-cols-12 items-center cursor-pointer shadow-sm"
+                      onClick={() => { setSelected(person); setEditMode(false); setEditData({}); }}
+                      style={{ borderLeft: selected?.id === person.id ? '4px solid var(--admin-teal)' : '4px solid transparent' }}
+                    >
+                      <div className="col-span-3 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0" style={{ background: "var(--admin-surface-alt)", color: "var(--admin-text-primary)", border: "1px solid var(--admin-border)" }}>
+                          {person.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                        </div>
+                        <span className="font-bold pop-text-primary">{person.name}</span>
+                      </div>
+                      <div className="col-span-2 pop-text-muted text-sm">{person.role}</div>
+                      <div className="col-span-2">
+                        <span className={`pop-badge ${getBadgeClass(person.status)}`}>{person.status}</span>
+                      </div>
+                      <div className="col-span-1 font-semibold pop-text-muted">{person.age}</div>
+                      <div className="col-span-2 pop-text-muted text-sm">{person.sector}</div>
+                      <div className="col-span-1 pop-text-muted text-xs font-mono">{person.joined}</div>
+                      <div className="col-span-1 flex gap-2 justify-center">
+                        <button 
+                          onClick={event => { event.stopPropagation(); setSelected(person); setEditMode(true); setEditData(person); }} 
+                          className="pop-icon-btn edit shadow-sm"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button 
+                          onClick={event => { event.stopPropagation(); confirmAction("¿Eliminar este registro de persona?", () => handleDelete(person.id)); }} 
+                          className="pop-icon-btn danger shadow-sm"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
             </div>
-            {pagedFiltered.map(person => (
-              <motion.div
-                key={person.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="admin-table-row grid grid-cols-12 items-center px-3 py-2 cursor-pointer hover:opacity-90 transition-opacity"
-                style={{ background: selected?.id === person.id ? "#121B26" : "#0B1118" }}
-                onClick={() => { setSelected(person); setEditMode(false); setEditData({}); }}
-              >
-                <div className="col-span-3 flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-sm flex items-center justify-center flex-shrink-0" style={{ background: "#121B26", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB", border: "1px solid #2A3444" }}>
-                    {person.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                  </div>
-                  <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, fontWeight: 600, color: "#EEF3FB" }}>{person.name}</span>
-                </div>
-                <div className="col-span-2"><span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#B8C7DB" }}>{person.role}</span></div>
-                <div className="col-span-2"><Badge label={person.status} color={personStatusColor(person.status)} /></div>
-                <div className="col-span-1"><span style={{ fontFamily: "'Orbitron', monospace", fontSize: 10, color: "#EEF3FB" }}>{person.age}</span></div>
-                <div className="col-span-2"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{person.sector}</span></div>
-                <div className="col-span-1"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{person.joined}</span></div>
-                <div className="col-span-1 flex gap-1">
-                  <button onClick={event => { event.stopPropagation(); setSelected(person); setEditMode(true); setEditData(person); }} className="admin-icon-btn"><Edit2 size={11} style={{ color: "#7FB8FF" }} /></button>
-                  <button onClick={event => { event.stopPropagation(); confirmAction("¿Eliminar este registro de persona?", () => handleDelete(person.id)); }} className="admin-icon-btn"><Trash2 size={11} style={{ color: "#DC2626" }} /></button>
-                </div>
-              </motion.div>
-            ))}
           </div>
-          {filtered.length === 0 && <EmptyState title="SIN RESULTADOS" hint="Ajusta filtros o búsqueda" icon={Users} />}
-          <PaginationBar page={safePage} totalPages={totalPages} totalItems={filtered.length} onPageChange={setPage} />
-        </Card>
+          
+          {filtered.length === 0 && (
+            <div className="text-center py-12">
+              <Users size={40} className="mx-auto pop-text-muted mb-3 opacity-50" />
+              <div className="pop-text-muted font-medium">No se encontraron resultados</div>
+            </div>
+          )}
+          
+          <div className="mt-4 pt-4 flex justify-between items-center text-sm pop-text-muted border-t" style={{ borderColor: "var(--admin-border)" }}>
+            <div>Registros: <span className="font-bold pop-text-primary">{filtered.length}</span></div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setPage(Math.max(1, page - 1))} 
+                disabled={page <= 1}
+                className="pop-btn-secondary cursor-pointer disabled:opacity-50"
+              >ANT</button>
+              <span className="px-2 font-medium pop-text-primary">Pág {safePage} / {totalPages}</span>
+              <button 
+                onClick={() => setPage(Math.min(totalPages, page + 1))} 
+                disabled={page >= totalPages}
+                className="pop-btn-secondary cursor-pointer disabled:opacity-50"
+              >SIG</button>
+            </div>
+          </div>
+        </div>
       ) : (
-        <div className="admin-stack-lg">
-          <div className="grid grid-cols-1 xl:grid-cols-5 gap-3">
-            <Card>
-              <SectionHeader title="ASIGNACIONES ACTIVAS" />
-              <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginBottom: 10 }} />
-              <div className="admin-stack-sm" style={{ maxHeight: 420, overflowY: "auto" }}>
+        <div className="flex flex-col gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+            <div className="pop-card xl:col-span-3">
+              <h3 className="pop-text-primary text-lg mb-4">ASIGNACIONES ACTIVAS</h3>
+              <div className="flex flex-col gap-3 max-h-[400px] overflow-y-auto pr-2">
                 {assignments.filter(a => a.status === "ACTIVA").map(a => (
-                  <div key={a.id} className="p-3 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
-                    <div className="flex items-center justify-between mb-1 gap-2">
-                      <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 13, fontWeight: 700, color: UI_COLORS.textPrimary }}>{a.personName}</span>
-                      <Badge label={a.status} color={UI_COLORS.state.warning} />
+                  <div key={a.id} className="p-4 rounded-xl shadow-sm relative overflow-hidden" style={{ background: "var(--admin-surface-alt)", border: "1px solid var(--admin-border-soft)" }}>
+                    <div className="absolute top-0 left-0 w-1 h-full" style={{ background: "var(--admin-teal)" }}></div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="pop-text-primary font-bold text-lg">{a.personName}</span>
+                      <span className="pop-badge pop-badge-herido">{a.status}</span>
                     </div>
-                    <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, marginBottom: 5 }}>
-                      {a.startDate} - {a.endDate}
+                    <div className="text-xs font-mono mb-2 px-2 py-1 rounded inline-block shadow-sm" style={{ background: "var(--admin-surface)", color: "var(--admin-text-muted)", border: "1px solid var(--admin-border)" }}>
+                      {a.startDate} — {a.endDate}
                     </div>
-                    <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>{a.fromRole} → {a.occupationName}</div>
-                    <div className="flex items-center justify-end mt-2">
-                      <SecuredActionBtn allowed reason="" label="FINALIZAR" color={UI_COLORS.accent} small onClick={() => confirmAction("¿Finalizar esta asignación temporal?", () => handleFinishAssignment(a.id))} />
+                    <div className="pop-text-primary font-medium flex items-center gap-2">
+                      <span className="pop-text-muted line-through">{a.fromRole}</span> 
+                      <span className="font-bold" style={{ color: "var(--admin-teal)" }}>→</span> 
+                      <span style={{ color: "var(--admin-teal)" }}>{a.occupationName}</span>
+                    </div>
+                    <div className="flex justify-end mt-3">
+                      <button 
+                        className="pop-btn-primary"
+                        onClick={() => confirmAction("¿Finalizar esta asignación temporal?", () => handleFinishAssignment(a.id))}
+                      >
+                        FINALIZAR
+                      </button>
                     </div>
                   </div>
                 ))}
-                {assignments.filter(a => a.status === "ACTIVA").length === 0 && <EmptyState title="SIN ASIGNACIONES ACTIVAS" hint="No hay coberturas temporales en curso" icon={Users} />}
+                {assignments.filter(a => a.status === "ACTIVA").length === 0 && (
+                  <div className="text-center py-8 pop-text-muted">No hay coberturas temporales en curso</div>
+                )}
               </div>
-            </Card>
+            </div>
 
-            <Card>
-              <SectionHeader title="1) SELECCIONAR PERSONA" />
-              <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginBottom: 10 }} />
-              <div className="admin-stack-sm">
-                <div className="flex items-center gap-2 flex-wrap">
+            <div className="xl:col-span-2 flex flex-col gap-6">
+              <div className="pop-card">
+                <h3 className="pop-text-primary text-lg mb-4">1. SELECCIONAR PERSONA</h3>
+                <div className="flex gap-2 mb-3">
                   <input
                     value={assignSearch}
                     onChange={e => setAssignSearch(e.target.value)}
-                    placeholder="Buscar por nombre, rol o sector..."
-                    className="flex-1 min-w-[220px] px-3 py-2 rounded-sm outline-none"
-                    style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }}
+                    placeholder="Buscar por nombre..."
+                    className="pop-input flex-1"
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAssignSearch("");
-                      setNewAssign(prev => ({ ...prev, personId: 0 }));
-                    }}
-                    className="px-3 py-2 rounded-sm outline-none cursor-pointer"
-                    style={{
-                      backgroundImage: "linear-gradient(152deg, rgba(255, 255, 255, 0.24) 0%, rgba(220, 241, 255, 0.14) 42%, rgba(162, 211, 243, 0.1) 100%), linear-gradient(108deg, transparent 28%, rgba(255, 255, 255, 0.34) 50%, transparent 72%)",
-                      backgroundSize: "100% 100%, 230% 100%",
-                      backgroundPosition: "0 0, 115% 0",
-                      backgroundRepeat: "no-repeat",
-                      border: "1px solid rgba(214, 236, 255, 0.7)",
-                      color: UI_COLORS.textPrimary,
-                      fontFamily: "'Share Tech Mono', monospace",
-                      fontSize: 10,
-                      letterSpacing: "0.08em",
-                      fontWeight: 700,
-                      minWidth: 88,
-                      boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.42), inset 0 -1px 0 rgba(160, 205, 234, 0.3), 0 8px 18px rgba(4, 11, 19, 0.28), 0 0 12px rgba(176, 223, 255, 0.2)",
-                      backdropFilter: "blur(10px) saturate(136%)",
-                      WebkitBackdropFilter: "blur(10px) saturate(136%)",
-                      transition: "transform 0.2s ease, box-shadow 0.2s ease",
-                    }}
-                  >
-                    LIMPIAR
-                  </button>
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>
-                    {assignmentCandidates.length} resultado(s)
-                  </span>
-                  {assignmentCandidates.length > visibleCandidates.length && (
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>
-                      Mostrando {visibleCandidates.length}. Afina búsqueda.
-                    </span>
-                  )}
-                </div>
-
-                <div className="admin-stack-sm p-2 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, maxHeight: 240, overflowY: "auto" }}>
+                
+                <div className="flex flex-col gap-2 max-h-[160px] overflow-y-auto mb-4 pr-1">
                   {visibleCandidates.map(person => {
                     const isSelected = person.id === newAssign.personId;
                     return (
-                      <button
+                      <div
                         key={person.id}
-                        type="button"
                         onClick={() => setNewAssign(prev => ({ ...prev, personId: person.id }))}
-                        className="w-full text-left p-2 rounded-sm cursor-pointer"
-                        style={{
-                          background: isSelected ? "#121B26" : "#0B1118",
-                          border: `1px solid ${isSelected ? UI_COLORS.accent : UI_COLORS.border}`,
-                        }}
+                        className="p-2 rounded-lg cursor-pointer transition-colors border"
+                        style={{ background: isSelected ? "var(--admin-border)" : "transparent", borderColor: isSelected ? "var(--admin-teal)" : "var(--admin-border-soft)" }}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textPrimary, fontWeight: 700 }}>{person.name}</span>
-                          <Badge label={person.status} color={personStatusColor(person.status)} />
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-sm pop-text-primary">{person.name}</span>
+                          <span className={`pop-badge text-[9px] px-2 py-0.5 ${getBadgeClass(person.status)}`}>{person.status}</span>
                         </div>
-                        <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>
-                          {person.role} — {person.sector}
-                        </div>
-                      </button>
+                        <div className="text-xs pop-text-muted">{person.role}</div>
+                      </div>
                     );
                   })}
-                  {visibleCandidates.length === 0 && <EmptyState title="SIN COINCIDENCIAS" hint="Prueba por rol o sector" icon={Search} />}
                 </div>
+                
+                {selectedCandidate && (
+                  <div className="p-3 rounded-lg border" style={{ background: "rgba(74, 174, 210, 0.1)", borderColor: "rgba(74, 174, 210, 0.3)" }}>
+                    <div className="text-xs font-bold mb-1 uppercase tracking-wider" style={{ color: "var(--admin-teal)" }}>Seleccionado</div>
+                    <div className="font-bold pop-text-primary">{selectedCandidate.name}</div>
+                  </div>
+                )}
+              </div>
 
-                <div className="p-3 rounded-sm" style={{ background: "#0B1118", border: `1px dashed ${selectedCandidate ? UI_COLORS.accent : UI_COLORS.border}` }}>
-                  <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, marginBottom: 4 }}>PERSONA SELECCIONADA</div>
-                  {selectedCandidate ? (
-                    <>
-                      <div className="flex items-center justify-between gap-2">
-                        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 14, color: UI_COLORS.textPrimary, fontWeight: 700 }}>{selectedCandidate.name}</span>
-                        <Badge label={selectedCandidate.status} color={personStatusColor(selectedCandidate.status)} />
-                      </div>
-                      <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>{selectedCandidate.role} — {selectedCandidate.sector}</div>
-                    </>
-                  ) : (
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>Selecciona una persona para continuar.</span>
+              <div className="pop-card">
+                <h3 className="pop-text-primary text-lg mb-4">2. DATOS DEL ROL</h3>
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <label className="block text-xs font-bold pop-text-muted mb-1">OFICIO TEMPORAL *</label>
+                    <input
+                      value={newAssign.occupationName}
+                      onChange={e => setNewAssign(prev => ({ ...prev, occupationName: e.target.value }))}
+                      placeholder="Ej: Guardia de perímetro"
+                      className="pop-input"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold pop-text-muted mb-1">DESDE *</label>
+                      <input type="date" value={newAssign.startDate} onChange={e => setNewAssign(prev => ({ ...prev, startDate: e.target.value }))} className="pop-input" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold pop-text-muted mb-1">HASTA *</label>
+                      <input type="date" value={newAssign.endDate} onChange={e => setNewAssign(prev => ({ ...prev, endDate: e.target.value }))} className="pop-input" />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleCreateAssignment}
+                    disabled={!hasRequiredAssignmentData}
+                    className={`pop-btn-primary w-full py-3 text-sm mt-2 ${!hasRequiredAssignmentData ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    ASIGNAR TEMPORALMENTE
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="pop-card">
+            <h3 className="pop-text-primary text-lg mb-4">HISTÓRICO DE ASIGNACIONES</h3>
+            <div className="w-full overflow-x-auto">
+              <div className="min-w-[700px]">
+                <div className="pop-table-header grid grid-cols-12">
+                  <div className="col-span-3">Persona</div>
+                  <div className="col-span-3">Cambio</div>
+                  <div className="col-span-3">Periodo</div>
+                  <div className="col-span-2">Estado</div>
+                  <div className="col-span-1">Motivo</div>
+                </div>
+                <div className="mt-2 flex flex-col gap-1">
+                  {assignments.filter(a => a.status === "FINALIZADA").map(a => (
+                    <div key={a.id} className="pop-table-row grid grid-cols-12 items-center">
+                      <div className="col-span-3 font-bold">{a.personName}</div>
+                      <div className="col-span-3 text-sm pop-text-muted">{a.fromRole} → {a.occupationName}</div>
+                      <div className="col-span-3 text-xs font-mono pop-text-muted">{a.startDate} a {a.endDate}</div>
+                      <div className="col-span-2"><span className="pop-badge pop-badge-fuera">FINALIZADA</span></div>
+                      <div className="col-span-1 pop-text-muted text-sm">{a.reason ? "SI" : "-"}</div>
+                    </div>
+                  ))}
+                  {assignments.filter(a => a.status === "FINALIZADA").length === 0 && (
+                    <div className="text-center py-6 pop-text-muted">Aún no hay asignaciones finalizadas</div>
                   )}
                 </div>
               </div>
-            </Card>
-
-            <Card>
-              <SectionHeader title="2) DATOS DEL ROL TEMPORAL" />
-              <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginBottom: 10 }} />
-              <div className="admin-stack-md">
-                <div>
-                  <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>OFICIO TEMPORAL *</label>
-                  <input
-                    value={newAssign.occupationName}
-                    onChange={e => setNewAssign(prev => ({ ...prev, occupationName: e.target.value }))}
-                    placeholder="Ej: Guardia de perímetro"
-                    className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                    style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>PERIODO *</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center mt-1">
-                    <input type="date" value={newAssign.startDate} onChange={e => setNewAssign(prev => ({ ...prev, startDate: e.target.value }))} className="px-3 py-2 rounded-sm outline-none" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }} />
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textFaint, textAlign: "center" }}>HASTA</span>
-                    <input type="date" value={newAssign.endDate} onChange={e => setNewAssign(prev => ({ ...prev, endDate: e.target.value }))} className="px-3 py-2 rounded-sm outline-none" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }} />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>MOTIVO (OPCIONAL)</label>
-                  <textarea
-                    value={newAssign.reason}
-                    onChange={e => setNewAssign(prev => ({ ...prev, reason: e.target.value }))}
-                    rows={3}
-                    placeholder="Ej: Cobertura por licencia o necesidad operativa"
-                    className="w-full mt-1 px-3 py-2 rounded-sm outline-none resize-none"
-                    style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textPrimary }}
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleCreateAssignment}
-                  disabled={!hasRequiredAssignmentData}
-                  className="admin-btn w-full px-3 py-2 rounded-sm cursor-pointer"
-                  style={{
-                    background: hasRequiredAssignmentData ? UI_COLORS.accent : UI_COLORS.border,
-                    color: hasRequiredAssignmentData ? "#05070A" : UI_COLORS.textFaint,
-                    border: `1px solid ${hasRequiredAssignmentData ? UI_COLORS.accent : UI_COLORS.border}`,
-                    fontFamily: "'Share Tech Mono', monospace",
-                    fontSize: 10,
-                    letterSpacing: "0.08em",
-                    fontWeight: 700,
-                    opacity: hasRequiredAssignmentData ? 1 : 0.72,
-                  }}
-                >
-                  ASIGNAR TEMPORALMENTE
-                </button>
-              </div>
-            </Card>
-          </div>
-
-          <Card>
-            <SectionHeader title="HISTÓRICO DE ASIGNACIONES" />
-            <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginBottom: 10 }} />
-            <div className="admin-table grid gap-px" style={{ background: "#2A3444" }}>
-              <div className="admin-table-header grid grid-cols-12 px-3 py-2" style={{ background: "#0B1118" }}>
-                {[
-                  { label: "PERSONA", span: "col-span-3" },
-                  { label: "CAMBIO", span: "col-span-3" },
-                  { label: "PERIODO", span: "col-span-3" },
-                  { label: "ESTADO", span: "col-span-2" },
-                  { label: "MOTIVO", span: "col-span-1" },
-                ].map(item => (
-                  <div key={item.label} className={item.span}>
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, letterSpacing: "0.08em" }}>{item.label}</span>
-                  </div>
-                ))}
-              </div>
-
-              {assignments.filter(a => a.status === "FINALIZADA").map(a => (
-                <div key={a.id} className="admin-table-row grid grid-cols-12 items-center px-3 py-2" style={{ background: "#0B1118" }}>
-                  <div className="col-span-3"><span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textPrimary, fontWeight: 700 }}>{a.personName}</span></div>
-                  <div className="col-span-3"><span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textMuted }}>{a.fromRole} → {a.occupationName}</span></div>
-                  <div className="col-span-3"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{a.startDate} a {a.endDate}</span></div>
-                  <div className="col-span-2"><Badge label="FINALIZADA" color={UI_COLORS.state.system} /></div>
-                  <div className="col-span-1"><span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>{a.reason ? "SI" : "-"}</span></div>
-                </div>
-              ))}
             </div>
-            {assignments.filter(a => a.status === "FINALIZADA").length === 0 && (
-              <div className="mt-2">
-                <EmptyState title="SIN HISTÓRICO" hint="Aún no hay asignaciones finalizadas" icon={Activity} />
-              </div>
-            )}
-          </Card>
+          </div>
         </div>
       )}
 
-      {/* Detail/Edit panel */}
-      <Modal open={!!selected} onClose={() => { setSelected(null); setEditMode(false); }} title={editMode ? "EDITAR PERSONA" : "FICHA INDIVIDUAL"}>
+      {/* Modern Modal using custom implementation instead of standard Modal so it matches the theme */}
+      <AnimatePresence>
         {selected && (
-          <div className="admin-stack-md">
-            {editMode ? (
-              <>
-                <div className="p-2 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 rounded-sm flex items-center justify-center" style={{ background: UI_COLORS.panelRaised, border: `1px solid ${UI_COLORS.border}` }}>
-                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 12, color: UI_COLORS.textMuted }}>{selected.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            onClick={() => { setSelected(null); setEditMode(false); }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              onClick={e => e.stopPropagation()}
+              className="rounded-lg shadow-2xl w-full max-w-lg overflow-hidden pop-card !p-0"
+            >
+              <div className="px-6 py-4 flex justify-between items-center" style={{ borderBottom: "1px solid var(--admin-teal)", background: "rgba(74, 174, 210, 0.1)" }}>
+                <h3 className="font-bold pop-text-primary m-0 text-lg uppercase font-mono tracking-wider">{editMode ? "EDITAR PERSONA" : "FICHA INDIVIDUAL"}</h3>
+                <button onClick={() => { setSelected(null); setEditMode(false); }} className="pop-icon-btn">
+                  <X size={18} />
+                </button>
+              </div>
+              
+              <div className="p-6">
+                {editMode ? (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold pop-text-muted mb-1 uppercase">Nombre</label>
+                        <input value={(editData as any)["name"] ?? ""} onChange={e => setEditData(prev => ({ ...prev, name: e.target.value }))} className="pop-input" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold pop-text-muted mb-1 uppercase">Rol</label>
+                        <input value={(editData as any)["role"] ?? ""} onChange={e => setEditData(prev => ({ ...prev, role: e.target.value }))} className="pop-input" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold pop-text-muted mb-1 uppercase">Sector</label>
+                        <input value={(editData as any)["sector"] ?? ""} onChange={e => setEditData(prev => ({ ...prev, sector: e.target.value }))} className="pop-input" />
+                      </div>
                     </div>
                     <div>
-                      <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>PREVIEW FOTO DE PERFIL</div>
-                      <button className="admin-chip-btn px-2 py-1 rounded-sm" style={{ border: `1px solid ${UI_COLORS.border}`, color: UI_COLORS.textFaint }}>ACTUALIZAR FOTO (UI)</button>
+                      <label className="block text-xs font-bold pop-text-muted mb-1 uppercase">Estado</label>
+                      <select value={(editData.status as string) ?? selected.status} onChange={e => setEditData(prev => ({ ...prev, status: e.target.value as Person["status"] }))} className="pop-input cursor-pointer">
+                        {["Activo", "Herido", "Enfermo", "Fuera"].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex gap-3 justify-end mt-4 pt-4" style={{ borderTop: "1px solid var(--admin-border)" }}>
+                      <button className="pop-btn-secondary" onClick={() => setEditMode(false)}>CANCELAR</button>
+                      <button className="pop-btn-primary" onClick={handleSaveEdit}>GUARDAR CAMBIOS</button>
                     </div>
                   </div>
-                </div>
-                {[
-                  { label: "NOMBRE", key: "name" },
-                  { label: "ROL", key: "role" },
-                  { label: "SECTOR", key: "sector" },
-                ].map(({ label, key }) => (
-                  <div key={key}>
-                    <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{label}</label>
-                    <input
-                      value={(editData as any)[key] ?? ""}
-                      onChange={e => setEditData(prev => ({ ...prev, [key]: e.target.value }))}
-                      className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                      style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}
-                    />
-                  </div>
-                ))}
-                <div>
-                  <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>ESTADO</label>
-                  <select
-                    value={(editData.status as string) ?? selected.status}
-                    onChange={e => setEditData(prev => ({ ...prev, status: e.target.value as Person["status"] }))}
-                    className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                    style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}
-                  >
-                    {["Activo", "Herido", "Enfermo", "Fuera"].map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div className="flex gap-2 mt-2">
-                  <ActionBtn label="GUARDAR" color="#0D9488" onClick={handleSaveEdit} />
-                  <ActionBtn label="CANCELAR" color="#B8C7DB" onClick={() => setEditMode(false)} />
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-sm flex items-center justify-center" style={{ background: "#121B26", border: "1px solid #2A3444" }}>
-                    <User size={24} style={{ color: "#7FB8FF" }} />
-                  </div>
-                  <div>
-                    <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 18, fontWeight: 700, color: "#EEF3FB" }}>{selected.name}</div>
-                    <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{selected.role} — {selected.sector}</div>
-                  </div>
-                  <Badge label={selected.status} color={personStatusColor(selected.status)} />
-                </div>
-                <div className="p-2 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
-                  <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted, marginBottom: 4 }}>FOTO DE PERFIL</div>
-                  <div className="w-full h-20 rounded-sm flex items-center justify-center" style={{ background: UI_COLORS.panelRaised, border: `1px dashed ${UI_COLORS.border}` }}>
-                    <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 16, color: UI_COLORS.textFaint }}>{selected.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: "EDAD", value: `${selected.age} años` },
-                    { label: "INGRESO", value: selected.joined },
-                    { label: "SECTOR", value: selected.sector },
-                    { label: "ESTADO", value: selected.status },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="p-2 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
-                      <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{label}</div>
-                      <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 13, color: "#EEF3FB", fontWeight: 600 }}>{value}</div>
+                ) : (
+                  <div className="flex flex-col gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-sm flex items-center justify-center shadow-md" style={{ background: "var(--admin-surface-alt)", border: "1px solid var(--admin-border)" }}>
+                        <User size={32} style={{ color: "var(--admin-teal)" }} />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold pop-text-primary m-0 uppercase">{selected.name}</h2>
+                        <div className="pop-text-muted font-medium font-mono">{selected.role}</div>
+                      </div>
+                      <div className="ml-auto">
+                        <span className={`pop-badge px-3 py-1 text-xs ${getBadgeClass(selected.status)}`}>{selected.status}</span>
+                      </div>
                     </div>
-                  ))}
-                </div>
-                <div className="flex gap-2 mt-1">
-                  <ActionBtn label="EDITAR" color="#7FB8FF" onClick={() => { setEditMode(true); setEditData(selected); }} />
-                  <ActionBtn label="ELIMINAR REGISTRO" color="#DC2626" onClick={() => confirmAction("¿Confirmas eliminar este registro?", () => handleDelete(selected.id))} />
-                </div>
-              </>
-            )}
-          </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      {[
+                        { label: "EDAD", value: `${selected.age} años` },
+                        { label: "INGRESO", value: selected.joined },
+                        { label: "SECTOR", value: selected.sector },
+                        { label: "ID DE REGISTRO", value: `#${selected.id.toString().padStart(4, '0')}` },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="p-3 rounded-lg" style={{ background: "var(--admin-surface-alt)", border: "1px solid var(--admin-border-soft)" }}>
+                          <div className="text-xs font-bold mb-1 tracking-wider pop-text-muted">{label}</div>
+                          <div className="font-semibold pop-text-primary">{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="flex gap-3 justify-end mt-2 pt-4" style={{ borderTop: "1px solid var(--admin-border)" }}>
+                      <button className="pop-btn-secondary text-red-400 border-red-900 hover:bg-red-900/30 hover:text-red-300" onClick={() => confirmAction("¿Confirmas eliminar este registro?", () => handleDelete(selected.id))}>
+                        ELIMINAR
+                      </button>
+                      <button className="pop-btn-primary" onClick={() => { setEditMode(true); setEditData(selected); }}>
+                        EDITAR REGISTRO
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
         )}
-      </Modal>
+      </AnimatePresence>
     </div>
   );
 }
@@ -2419,7 +2504,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className={`grid grid-cols-1 ${mode === "system" ? "lg:grid-cols-2" : ""} gap-4`}>
         {mode === "camp" && (
           <Card>
             <SectionHeader title="CONFIGURACIÓN DEL CAMPAMENTO" />
@@ -2447,28 +2532,6 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
                   className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
                   style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
               </div>
-            </div>
-          </Card>
-        )}
-
-        {mode === "camp" && (
-          <Card>
-            <SectionHeader title="AUTOMATIZACIONES" />
-            <div className="admin-stack-md">
-              {[
-                { label: "BACKUP AUTOMÁTICO DIARIO", key: "autoBackup", icon: Database },
-                { label: "ALERTAS DE SONIDO", key: "soundAlerts", icon: Volume2 },
-                { label: "REPORTE NOCTURNO", key: "nightReport", icon: BarChart2 },
-                { label: "CONSUMO DIARIO AUTOMÁTICO", key: "dailyConsumption", icon: Cpu },
-              ].map(({ label, key, icon: Icon }) => (
-                <div key={key} className="flex items-center justify-between px-3 py-2 rounded-sm" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
-                  <div className="flex items-center gap-2">
-                    <Icon size={12} style={{ color: "#7FB8FF" }} />
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>{label}</span>
-                  </div>
-                  <Toggle active={(settings as any)[key]} onChange={() => setSettings(prev => ({ ...prev, [key]: !(prev as any)[key] }))} />
-                </div>
-              ))}
             </div>
           </Card>
         )}
@@ -2528,7 +2591,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
         )}
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 justify-center flex-wrap">
         <ActionBtn label="GUARDAR CONFIGURACIÓN" color="#0D9488" onClick={handleSave} />
         <ActionBtn label="RESTABLECER VALORES" color="#B8C7DB" onClick={() => { }} />
       </div>
