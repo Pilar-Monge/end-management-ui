@@ -436,21 +436,21 @@
 
 .credits-list {
   display: grid;
-  gap: 0.45rem;
-  padding: 0.9rem 1rem 1.05rem;
+  gap: 0.3rem;
+  padding: 0.7rem 0.8rem 0.85rem;
 }
 
 .credits-member {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.68rem 0.78rem;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
   background: rgba(10, 23, 36, 0.52);
   color: #ffffff;
   font-family: 'Oswald', sans-serif;
-  font-size: 0.82rem;
-  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
   transition: border-color 0.22s ease, color 0.22s ease, transform 0.22s ease, background 0.22s ease;
 }
 
