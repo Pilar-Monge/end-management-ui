@@ -155,6 +155,7 @@ export default function HomePage() {
           </button>
 
           <button
+            onClick={() => navigate('/admin-main-view-ui')}
             style={{
               background: 'rgba(150, 83, 184, 0.16)',
               border: '1px solid rgba(211, 132, 255, 0.4)',

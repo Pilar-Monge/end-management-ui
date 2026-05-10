@@ -10,6 +10,7 @@ import { PersonsPage } from './features/persons'
 import { ExpeditionsPage } from './features/expeditions'
 import { ResourceMainViewPage } from './features/resources'
 import { AdminDashboardPage } from './features/admin-dashboard'
+import { AdminMainViewUiPage } from './features/admin-main-view-ui'
 import {
   ResourceTypesPage,
   OccupationsPage,
@@ -104,6 +105,7 @@ function App() {
       <Route path="/expeditions" element={<ExpeditionsPage />} />
       <Route path="/resource-main-view" element={<ResourceMainViewPage />} />
       <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
+      <Route path="/admin-main-view-ui" element={<AdminMainViewUiPage />} />
       <Route path="/dashboard" element={<AdminDashboardPage />} />
       <Route path="/catalogs" element={<CatalogsLayout />} />
       <Route path="*" element={<Navigate to="/" replace />} />
