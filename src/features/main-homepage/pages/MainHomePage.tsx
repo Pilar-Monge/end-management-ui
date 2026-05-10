@@ -1636,7 +1636,7 @@ export function MainHomePage() {
                   className="relative z-10 transition-all duration-300 group-hover:scale-110 group-hover:rotate-90" 
                 />
               </button>
-              <div className="text-xl font-bold tracking-tighter uppercase text-white drop-shadow-lg">
+              <div className="text-xl font-bold tracking-tighter uppercase text-white drop-shadow-lg" style={{ fontFamily: "'Oswald', sans-serif" }}>
                 End Management
               </div>
             </div>

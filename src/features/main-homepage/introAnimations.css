@@ -71,6 +71,8 @@
   display: block;
   width: max-content;
   color: #fff;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
   filter: url(#grunge) drop-shadow(0 0 8px rgba(59, 130, 246, 0.4));
   /* Ensure the SVG filter can reference the element correctly */
   isolation: isolate;
