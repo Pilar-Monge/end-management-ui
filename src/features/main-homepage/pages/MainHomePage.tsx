@@ -454,7 +454,7 @@ export function MainHomePage() {
     }
     
     // Skip loading overlay for video/bridge states to ensure seamless transitions
-    if (appState !== 'video' && appState !== 'bridge') {
+    if (appState !== 'video' && appState !== 'bridge' && appState !== 'landing') {
       setIsTransitioning(true);
       const timer = setTimeout(() => setIsTransitioning(false), 250);
       return () => clearTimeout(timer);
@@ -593,12 +593,6 @@ export function MainHomePage() {
     // volume is handled via setVolume directly in the UI
 
 
-
-  useEffect(() => {
-    if (localStorage.getItem('token')) {
-      setAppState('menu');
-    }
-  }, []);
 
   useEffect(() => {
     if (audioRef.current) {
