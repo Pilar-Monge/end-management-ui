@@ -179,9 +179,9 @@ export default function AdmissionPage() {
       <div className="admission-backdrop" />
       {shouldReturnToGlobalMap && (
         <button
-          aria-label="Volver al mapa global"
+          aria-label="Volver al lobby"
           className="admission-map-close"
-          onClick={() => navigate('/main-homepage', { state: { initialAppState: 'global-map' } })}
+          onClick={() => navigate('/main-homepage', { state: { initialAppState: 'explore' } })}
           type="button"
         >
           <X size={24} className="admission-map-close-icon" />

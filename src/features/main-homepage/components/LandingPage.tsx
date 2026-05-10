@@ -62,72 +62,70 @@ export default function LandingPage({
   setIsAudioEnabled,
   onExit
 }: LandingPageProps) {
+  const decodeChars = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const [showUI, setShowUI] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showCredits, setShowCredits] = useState(false);
   const [active, setActive] = useState<"intro" | "menu" | "login">("login");
   const [showVolumePanel, setShowVolumePanel] = useState(false);
-  
-  // Decoding Effect
   const [isDecoding, setIsDecoding] = useState(true);
-  const [decodedTitle, setDecodedTitle] = useState("END MANAGEMENT");
-  const decodeChars = "!@#$%^&*()_+-=[]{}|;:,.<>?/~`ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
-  // Typewriter Effect
+  const [decodedTitle, setDecodedTitle] = useState('END MANAGEMENT');
   const [subtitleText, setSubtitleText] = useState("");
   const subtitleFull = "SURVIVAL SYSTEM — PROJECT X";
   const subtitleStarted = useRef(false);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setShowUI(true), 100);
-    const t2 = setTimeout(() => setShowMenu(true), 300);
+    const uiTimer = window.setTimeout(() => setShowUI(true), 800);
+    const menuTimer = window.setTimeout(() => setShowMenu(true), 1500);
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
+      window.clearTimeout(uiTimer);
+      window.clearTimeout(menuTimer);
     };
   }, []);
 
   useEffect(() => {
-    const target = "END MANAGEMENT";
+    const target = 'END MANAGEMENT';
     let iteration = 0;
-    const interval = setInterval(() => {
+
+    const interval = window.setInterval(() => {
       setDecodedTitle(
         target
-          .split("")
-          .map((ch, i) => {
-            if (ch === " ") return " ";
-            if (i < iteration) return target[i];
+          .split('')
+          .map((char, index) => {
+            if (char === ' ') return ' ';
+            if (index < iteration) return target[index];
             return decodeChars[Math.floor(Math.random() * decodeChars.length)];
           })
-          .join("")
+          .join(''),
       );
-      iteration += 1.5;
+
+      iteration += 0.3;
       if (iteration >= target.length + 1) {
-        clearInterval(interval);
+        window.clearInterval(interval);
         setDecodedTitle(target);
         setIsDecoding(false);
       }
-    }, 6);
-    return () => clearInterval(interval);
+    }, 90);
+
+    return () => window.clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    const startDelay = setTimeout(() => {
+    const startDelay = window.setTimeout(() => {
       if (subtitleStarted.current) return;
       subtitleStarted.current = true;
       let idx = 0;
-      const interval = setInterval(() => {
-        idx += 2;
+      const interval = window.setInterval(() => {
+        idx += 1;
         setSubtitleText(subtitleFull.slice(0, idx));
-        if (idx >= subtitleFull.length) clearInterval(interval);
-      }, 2);
-      return () => clearInterval(interval);
-    }, 50);
-    return () => clearTimeout(startDelay);
+        if (idx >= subtitleFull.length) window.clearInterval(interval);
+      }, 55);
+    }, 800);
+    return () => window.clearTimeout(startDelay);
   }, []);
 
-  const [titleTop, ...titleRest] = decodedTitle.split(" ");
-  const titleBottom = titleRest.join(" ");
+  const [titleTop, ...titleRest] = decodedTitle.split(' ');
+  const titleBottom = titleRest.join(' ');
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black text-white select-none">
@@ -258,30 +256,26 @@ export default function LandingPage({
         style={{ fontFamily: "'Oswald', sans-serif" }}
       >
         <h1
-          className={`font-extrabold leading-[0.88] overflow-hidden title-distressed title-glitch-hover ${
-            isDecoding ? "title-decoding-flicker" : ""
-          }`}
-          data-text={titleTop || "END"}
+          className={`font-extrabold leading-[0.88] overflow-hidden title-distressed title-glitch-hover ${isDecoding ? 'title-decoding-flicker' : ''}`}
+          data-text={titleTop || 'END'}
           style={{
             fontSize: "clamp(70px, 12vw, 180px)",
             letterSpacing: "-3px",
             WebkitTextStroke: "1px rgba(255,255,255,0.2)",
           }}
         >
-          <span className="title-text-white">{titleTop || "END"}</span>
+          <span className="title-text-white">{titleTop || 'END'}</span>
         </h1>
 
         <h1
-          className={`font-extrabold leading-[0.88] mt-4 overflow-hidden title-distressed title-glitch-hover ${
-            isDecoding ? "title-decoding-flicker" : ""
-          }`}
-          data-text={titleBottom || "MANAGEMENT"}
+          className={`font-extrabold leading-[0.88] mt-4 overflow-hidden title-distressed title-glitch-hover ${isDecoding ? 'title-decoding-flicker' : ''}`}
+          data-text={titleBottom || 'MANAGEMENT'}
           style={{
             fontSize: "clamp(70px, 12vw, 180px)",
             letterSpacing: "-3px",
           }}
         >
-          <span className="title-text-gold">{titleBottom || "MANAGEMENT"}</span>
+          <span className="title-text-gold">{titleBottom || 'MANAGEMENT'}</span>
         </h1>
 
         <div className="mt-4 flex items-center gap-3">
@@ -342,7 +336,7 @@ export default function LandingPage({
 
       {/* ── Créditos / Studio Badge ── */}
       <div
-        className={`absolute bottom-6 left-6 z-40 transition-all duration-1000 delay-[3500ms] ${
+        className={`absolute bottom-6 left-6 z-40 transition-all duration-1000 delay-[1600ms] ${
           showMenu ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
         }`}
       >
