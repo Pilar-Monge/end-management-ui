@@ -47,6 +47,33 @@ export default function HomePage() {
 
         <div style={{ display: 'flex', gap: '16px', flexDirection: 'column' }}>
           <button
+            onClick={() => navigate('/main-homepage')}
+            style={{
+              background: 'rgba(74, 138, 48, 0.2)',
+              border: '1px solid rgba(125, 219, 80, 0.5)',
+              color: '#7ddb50',
+              fontFamily: "'Courier New', monospace",
+              fontSize: 12,
+              letterSpacing: '2px',
+              padding: '14px 32px',
+              borderRadius: 4,
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(125, 219, 80, 0.15)'
+              e.currentTarget.style.boxShadow = '0 0 12px rgba(125, 219, 80, 0.2)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(74, 138, 48, 0.2)'
+              e.currentTarget.style.boxShadow = 'none'
+            }}
+          >
+            Inicio
+          </button>
+
+          <button
             onClick={() => navigate('/admission')}
             style={{
               background: 'rgba(74, 138, 48, 0.2)',
