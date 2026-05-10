@@ -15,7 +15,7 @@ export interface CreateResourceTypeRequest {
   unit: string
 }
 
-export interface UpdateResourceTypeRequest extends Partial<CreateResourceTypeRequest> {}
+export type UpdateResourceTypeRequest = Partial<CreateResourceTypeRequest>
 export interface Occupation {
   id: number
   name: string
@@ -33,7 +33,7 @@ export interface CreateOccupationRequest {
   minimumExperience: number
 }
 
-export interface UpdateOccupationRequest extends Partial<CreateOccupationRequest> {}
+export type UpdateOccupationRequest = Partial<CreateOccupationRequest>
 export interface OccupationAssignmentCriteria {
   id: number
   occupationId: number
@@ -53,7 +53,7 @@ export interface CreateOccupationAssignmentCriteriaRequest {
   evaluationType: OccupationAssignmentCriteria['evaluationType']
 }
 
-export interface UpdateOccupationAssignmentCriteriaRequest extends Partial<CreateOccupationAssignmentCriteriaRequest> {}
+export type UpdateOccupationAssignmentCriteriaRequest = Partial<CreateOccupationAssignmentCriteriaRequest>
 export type CreateOccupationCriteriaRequest = CreateOccupationAssignmentCriteriaRequest
 export type UpdateOccupationCriteriaRequest = UpdateOccupationAssignmentCriteriaRequest
 export interface Achievement {
@@ -75,7 +75,7 @@ export interface CreateAchievementRequest {
   category: Achievement['category']
 }
 
-export interface UpdateAchievementRequest extends Partial<CreateAchievementRequest> {}
+export type UpdateAchievementRequest = Partial<CreateAchievementRequest>
 export interface PaginatedResponse<T> {
   data: T[]
   total: number

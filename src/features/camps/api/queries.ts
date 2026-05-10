@@ -1,5 +1,5 @@
 import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
-import type { Camp, CampWithStats, ApiError } from '../types'
+import type { Camp, CampWithStats, CampsStats, CampResourceItem, ApiError } from '../types'
 import { campsKeys, ENDPOINTS } from './keys'
 
 const getToken = () => localStorage.getItem('token')
@@ -41,23 +41,23 @@ export function useCampById(
   })
 }
 
-export async function fetchCampStats(): Promise<any> {
+export async function fetchCampStats(): Promise<CampsStats> {
   const res = await fetch(ENDPOINTS.campStats, { headers })
   if (!res.ok) throw new Error('Failed to fetch camp stats')
   return res.json()
 }
 
 export function useCampStats(
-  options?: Omit<UseQueryOptions<any, ApiError>, 'queryKey' | 'queryFn'>,
+  options?: Omit<UseQueryOptions<CampsStats, ApiError>, 'queryKey' | 'queryFn'>,
 ) {
-  return useQuery({
+  return useQuery<CampsStats, ApiError>({
     queryKey: campsKeys.stats(),
     queryFn: fetchCampStats,
     ...options,
   })
 }
 
-export async function fetchCampResources(campId: number): Promise<any[]> {
+export async function fetchCampResources(campId: number): Promise<CampResourceItem[]> {
   const res = await fetch(`${ENDPOINTS.campResources}?campId=${campId}`, { headers })
   if (!res.ok) throw new Error('Failed to fetch camp resources')
   return res.json()
@@ -65,9 +65,9 @@ export async function fetchCampResources(campId: number): Promise<any[]> {
 
 export function useCampResources(
   campId: number,
-  options?: Omit<UseQueryOptions<any[], ApiError>, 'queryKey' | 'queryFn'>,
+  options?: Omit<UseQueryOptions<CampResourceItem[], ApiError>, 'queryKey' | 'queryFn'>,
 ) {
-  return useQuery({
+  return useQuery<CampResourceItem[], ApiError>({
     queryKey: campsKeys.resourcesByCamp(campId),
     queryFn: () => fetchCampResources(campId),
     enabled: !!campId,

@@ -1,22 +1,42 @@
 
+import { Suspense, lazy, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import LoginPage from './features/login/pages/LoginPage'
 import MainAppPage from './app/layout/MainAppPage'
 import { AdmissionPage } from './features/admission'
 import { MainHomePage } from './features/main-homepage'
-import { CampsPage } from './features/camps'
-import { PersonsPage } from './features/persons'
-import { ExpeditionsPage } from './features/expeditions'
-import { ResourceMainViewPage } from './features/resources'
-import { AdminDashboardPage } from './features/admin-dashboard'
-import {
-  ResourceTypesPage,
-  OccupationsPage,
-  OccupationCriteriaPage,
-  AchievementsPage,
-} from './features/catalogs'
 import { useSessionManager } from './shared/hooks'
+
+const CampsPage = lazy(() => import('./features/camps').then((m) => ({ default: m.CampsPage })))
+const PersonsPage = lazy(() => import('./features/persons').then((m) => ({ default: m.PersonsPage })))
+const ExpeditionsPage = lazy(() => import('./features/expeditions').then((m) => ({ default: m.ExpeditionsPage })))
+const ResourceMainViewPage = lazy(() =>
+  import('./features/resources').then((m) => ({ default: m.ResourceMainViewPage })),
+)
+const AdminDashboardPage = lazy(() =>
+  import('./features/admin-dashboard').then((m) => ({ default: m.AdminDashboardPage })),
+)
+const ResourceTypesPage = lazy(() =>
+  import('./features/catalogs').then((m) => ({ default: m.ResourceTypesPage })),
+)
+const OccupationsPage = lazy(() =>
+  import('./features/catalogs').then((m) => ({ default: m.OccupationsPage })),
+)
+const OccupationCriteriaPage = lazy(() =>
+  import('./features/catalogs').then((m) => ({ default: m.OccupationCriteriaPage })),
+)
+const AchievementsPage = lazy(() =>
+  import('./features/catalogs').then((m) => ({ default: m.AchievementsPage })),
+)
+
+const routeFallback = (
+  <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#060a04', color: '#7ddb50' }}>
+    Cargando modulo...
+  </div>
+)
+
+const withSuspense = (node: ReactNode) => <Suspense fallback={routeFallback}>{node}</Suspense>
 
 function CatalogsLayout() {
   const navigate = useNavigate()
@@ -84,7 +104,9 @@ function CatalogsLayout() {
           Volver
         </button>
       </div>
-      <ActiveComponent />
+      <Suspense fallback={routeFallback}>
+        <ActiveComponent />
+      </Suspense>
     </div>
   )
 }
@@ -99,13 +121,13 @@ function App() {
       <Route path="/main-homepage" element={<MainHomePage />} />
       <Route path="/app" element={<MainAppPage />} />
       <Route path="/admission" element={<AdmissionPage />} />
-      <Route path="/camps" element={<CampsPage />} />
-      <Route path="/persons" element={<PersonsPage />} />
-      <Route path="/expeditions" element={<ExpeditionsPage />} />
-      <Route path="/resource-main-view" element={<ResourceMainViewPage />} />
-      <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
-      <Route path="/dashboard" element={<AdminDashboardPage />} />
-      <Route path="/catalogs" element={<CatalogsLayout />} />
+      <Route path="/camps" element={withSuspense(<CampsPage />)} />
+      <Route path="/persons" element={withSuspense(<PersonsPage />)} />
+      <Route path="/expeditions" element={withSuspense(<ExpeditionsPage />)} />
+      <Route path="/resource-main-view" element={withSuspense(<ResourceMainViewPage />)} />
+      <Route path="/admin-dashboard" element={withSuspense(<AdminDashboardPage />)} />
+      <Route path="/dashboard" element={withSuspense(<AdminDashboardPage />)} />
+      <Route path="/catalogs" element={withSuspense(<CatalogsLayout />)} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

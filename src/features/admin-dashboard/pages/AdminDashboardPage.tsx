@@ -1,5 +1,6 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -70,7 +71,7 @@ const MOTION = {
   base: { duration: 0.24, ease: "easeOut" as const },
   alert: { duration: 0.2, ease: "easeInOut" as const },
   progress: { duration: 0.7, ease: "easeOut" as const },
-  page: { duration: 0.18, ease: "easeOut" as const },
+  page: { duration: 0.26, ease: "easeOut" as const },
 } as const;
 
 const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
@@ -374,12 +375,6 @@ function logLevelColor(l: string) {
   if (l === "warn") return UI_COLORS.state.warning;
   if (l === "system") return UI_COLORS.state.system;
   return UI_COLORS.state.info;
-}
-function personStatusColor(s: string) {
-  if (s === "Activo") return "#0D9488";
-  if (s === "Herido") return "#EA580C";
-  if (s === "Enfermo") return "#DC2626";
-  return "#4AAED2";
 }
 function notifColor(l: string) {
   if (l === "critical") return UI_COLORS.state.critical;
@@ -717,7 +712,7 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
           return (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" style={{ marginBottom: 22 }}>
-                {Object.entries(counts).map(([k, v], i) => {
+                {Object.entries(counts).map(([k, v]) => {
                   const color = getAreaColor(k);
                   return (
                   <div key={k} className="pop-card relative overflow-hidden group">
@@ -853,8 +848,8 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
             </div>
           </div>
 
-          <div className="w-full overflow-x-auto">
-            <div className="min-w-[800px]">
+            <div className="w-full overflow-x-auto">
+            <div style={{ minWidth: 740 }}>
               <div className="pop-table-header grid grid-cols-12">
                 <div className="col-span-3">Nombre</div>
                 <div className="col-span-2">Rol</div>
@@ -1049,7 +1044,7 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
           <div className="pop-card">
             <h3 className="pop-text-primary text-lg mb-4">HISTÓRICO DE ASIGNACIONES</h3>
             <div className="w-full overflow-x-auto">
-              <div className="min-w-[700px]">
+              <div style={{ minWidth: 640 }}>
                 <div className="pop-table-header grid grid-cols-12">
                   <div className="col-span-3">Persona</div>
                   <div className="col-span-3">Cambio</div>
@@ -2176,12 +2171,12 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
         ))}
       </div>
 
-      <Card>
-        <div className="flex items-center gap-3 mb-3 flex-wrap">
+      <Card className="notifs-shell">
+        <div className="notifs-toolbar flex items-center gap-3 mb-3 flex-wrap">
           <SectionHeader title={mode === "errors" ? "ALERTAS Y ERRORES" : mode === "system" ? "EVENTOS DEL SISTEMA" : "REGISTRO DE ACCESO Y ACTIVIDAD"} accent={false} />
           <div className="flex-1" />
           <SearchBar value={search} onChange={setSearch} placeholder="BUSCAR EN LOGS..." />
-          <div className="flex gap-1">
+          <div className="notifs-filters flex gap-1">
             {levels.map(l => (
               <button key={l} onClick={() => setFilterLevel(l)}
                 className="admin-chip-btn px-2 py-1 rounded-sm cursor-pointer"
@@ -2195,7 +2190,7 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
             <Toggle active={autoRefresh} onChange={() => setAutoRefresh(prev => !prev)} />
           </div>
         </div>
-        <div style={{ height: 1, background: "linear-gradient(90deg, #7FB8FF 0%, transparent 100%)", marginBottom: 12 }} />
+        <div className="notifs-divider" style={{ height: 1, background: "linear-gradient(90deg, #7FB8FF 0%, transparent 100%)", marginBottom: 12 }} />
 
         {autoRefresh && (
           <div className="flex items-center gap-1.5 mb-3">
@@ -2204,7 +2199,7 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
           </div>
         )}
 
-        <div className="admin-stack-sm">
+        <div className="admin-stack-sm notifs-list">
           <AnimatePresence initial={false}>
             {filtered.map(log => {
               const lc = logLevelColor(log.level);
@@ -2411,7 +2406,7 @@ function ViewNotificaciones({ mode, notifs, setNotifs }: { mode: NotifsViewMode;
               const nc = notifColor(n.level);
               return (
                 <motion.div key={n.id} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10, height: 0 }} transition={MOTION.base}
-                  className="p-3 rounded-sm"
+                  className="notifs-item p-3 rounded-sm"
                   style={{ background: n.read ? "#0B1118" : "#0B1118", border: `1px solid ${n.read ? "#2A3444" : nc + "55"}`, borderLeft: `3px solid ${n.read ? "#2A3444" : nc}` }}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
@@ -3127,7 +3122,7 @@ export default function AdminDashboard() {
 
           <div className="admin-layout">
             {hasSidebar && (
-                <aside className="admin-sidebar hidden md:flex flex-col flex-shrink-0" style={{ width: 250, background: "transparent", borderRight: "1px solid #2A3444", zIndex: 1 }}>
+                <aside className="admin-sidebar hidden md:flex flex-col flex-shrink-0" style={{ width: "clamp(220px, 24vw, 250px)", background: "transparent", borderRight: "1px solid #2A3444", zIndex: 1 }}>
                   <div className="admin-logo px-4 py-5 flex flex-col" style={{ borderBottom: "1px solid #2A3444" }}>
                     <div className="flex items-center gap-2 mb-1">
                       {activeNav === "POBLACIÓN" && <Users size={18} style={{ color: "#7FB8FF" }} />}
@@ -3321,7 +3316,7 @@ export default function AdminDashboard() {
                 style={{ background: "transparent", borderBottom: "none" }}>
                 <div className="admin-top-strip flex items-center justify-end gap-3 relative z-10">
                   <div className="admin-profile admin-header-actions flex items-center gap-2">
-                    <button onClick={() => setActiveNav("NOTIFICACIONES")} className="admin-icon-btn relative p-2.5 rounded-sm"
+                    <button onClick={() => setActiveNav("NOTIFICACIONES")} className="admin-icon-btn admin-header-icon-btn relative p-2.5 rounded-sm"
                       style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)", minWidth: 34, minHeight: 34 }}>
                       <Bell size={14} style={{ color: "#7FB8FF", marginTop: 4 }} />
                       {unreadNotifs > 0 && (
@@ -3344,11 +3339,11 @@ export default function AdminDashboard() {
                         </span>
                       )}
                     </button>
-                    <button onClick={() => setActiveNav("CONFIGURACIÓN")} className="admin-icon-btn flex items-center justify-center p-1.5 rounded-sm"
+                    <button onClick={() => setActiveNav("CONFIGURACIÓN")} className="admin-icon-btn admin-header-icon-btn flex items-center justify-center p-1.5 rounded-sm"
                       style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)", minWidth: 34, minHeight: 34 }}>
                       <Settings size={16} style={{ color: "#7FB8FF" }} />
                     </button>
-                    <button onClick={() => setSessionPanelOpen(prev => !prev)} className="admin-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
+                    <button onClick={() => setSessionPanelOpen(prev => !prev)} className="admin-icon-btn admin-header-icon-btn flex items-center gap-1.5 px-2 py-1 rounded-sm"
                       style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)" }}>
                       <img
                         src={currentUser.profileImage}
@@ -3531,9 +3526,9 @@ export default function AdminDashboard() {
                     <AnimatePresence mode="wait">
                       <motion.div
                         key={activeNav}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
+                        initial={{ opacity: 0, y: 12, scale: 0.995 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.995 }}
                         transition={MOTION.page}
                       >
                         {renderSection()}
