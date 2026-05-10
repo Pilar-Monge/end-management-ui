@@ -3,6 +3,7 @@ import Globe from "react-globe.gl";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, HelpCircle } from "lucide-react";
 import { Canvas, useFrame } from "@react-three/fiber";
+import { useNavigate } from "react-router-dom";
 import * as THREE from 'three';
 
 interface ParticleSystemProps {
@@ -194,6 +195,7 @@ const CAMPAMENTOS_DATA: Campamento[] = [
 ];
 
 const ReplicaGlobe = ({ onLoadingComplete }: { onLoadingComplete?: () => void }) => {
+  const navigate = useNavigate();
   const globeEl = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
@@ -509,7 +511,7 @@ const ReplicaGlobe = ({ onLoadingComplete }: { onLoadingComplete?: () => void })
                       INGRESAR
                     </span>
                   </button>
-                  <button class="action-btn menu-brush w-full py-3 rounded-none uppercase tracking-[0.2em] font-black italic flex items-center justify-center group/btn relative overflow-hidden active:scale-[0.98] transition-transform">
+                  <button class="admission-request-btn action-btn menu-brush w-full py-3 rounded-none uppercase tracking-[0.2em] font-black italic flex items-center justify-center group/btn relative overflow-hidden active:scale-[0.98] transition-transform">
                     <span class="relative z-10 flex items-center justify-center gap-3 text-white text-[11px] transition-transform duration-300 group-hover/btn:scale-105 pointer-events-none">
                       ${fileIcon}
                       SOLICITAR ACCESO
@@ -536,6 +538,11 @@ const ReplicaGlobe = ({ onLoadingComplete }: { onLoadingComplete?: () => void })
               handleSelectCampamento(null);
               return;
             }
+
+            if (clickTarget.closest('.admission-request-btn')) {
+              navigate('/admission', { state: { returnToGlobalMap: true } });
+              return;
+            }
             
             if (clickTarget.closest('.marker-dot-area')) {
               handleSelectCampamento(camp.isSelected ? null : camp);
@@ -553,7 +560,7 @@ const ReplicaGlobe = ({ onLoadingComplete }: { onLoadingComplete?: () => void })
           });
 
           return el;
-        }, [handleSelectCampamento])}
+        }, [handleSelectCampamento, navigate])}
       />
       </motion.div>
 

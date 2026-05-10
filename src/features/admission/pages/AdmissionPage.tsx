@@ -1,5 +1,7 @@
 import type { ChangeEvent, FormEvent } from 'react'
 import { useMemo, useState } from 'react'
+import { X } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import '../admission.css'
 import { submitAdmission } from '../services/admissionApi'
 import type { CalendarDay, FormState } from '../types'
@@ -89,6 +91,9 @@ const buildCalendar = (viewDate: Date, selectedValue: string): CalendarDay[] => 
 }
 
 export default function AdmissionPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const shouldReturnToGlobalMap = Boolean((location.state as { returnToGlobalMap?: boolean } | null)?.returnToGlobalMap)
   const [form, setForm] = useState<FormState>(initialForm)
   const [photoPreview, setPhotoPreview] = useState<string>('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -172,6 +177,16 @@ export default function AdmissionPage() {
   return (
     <main className="admission-page">
       <div className="admission-backdrop" />
+      {shouldReturnToGlobalMap && (
+        <button
+          aria-label="Volver al mapa global"
+          className="admission-map-close"
+          onClick={() => navigate('/main-homepage', { state: { initialAppState: 'global-map' } })}
+          type="button"
+        >
+          <X size={24} className="admission-map-close-icon" />
+        </button>
+      )}
       <div className="ash ash-one" />
       <div className="ash ash-two" />
       <div className="ember ember-one" />

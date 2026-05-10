@@ -10,6 +10,7 @@ import { PointerLockControls } from 'three/addons/controls/PointerLockControls.j
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Compass, Volume2, VolumeX, X, ChevronLeft, ChevronRight, Menu, Wind, HelpCircle } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { MEDIA_URLS } from '../config/mediaUrls';
 
 import LandingPage from '../components/LandingPage';
@@ -436,10 +437,12 @@ function getTerrainY(x: number, z: number): number {
 type appState = 'landing' | 'intro' | 'bridge' | 'video' | 'menu' | 'explore' | 'login' | 'register' | 'global-map' | 'camp-detail';
 
 export function MainHomePage() {
+  const location = useLocation();
   const containerRef = useRef<HTMLDivElement>(null);
+  const initialAppState = (location.state as { initialAppState?: appState } | null)?.initialAppState;
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [appState,     setAppState]     = useState<appState>('landing');
+  const [appState,     setAppState]     = useState<appState>(initialAppState ?? 'landing');
   const [selectedCamp, setSelectedCamp] = useState<any>(null);
   const [currentMode,  setCurrentMode]  = useState<Mode>('Storm');
   const [storyIndex,   setStoryIndex]   = useState(-1);
