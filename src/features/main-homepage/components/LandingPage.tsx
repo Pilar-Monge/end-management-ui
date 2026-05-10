@@ -101,13 +101,13 @@ export default function LandingPage({
           })
           .join("")
       );
-      iteration += 0.8;
+      iteration += 1.5;
       if (iteration >= target.length + 1) {
         clearInterval(interval);
         setDecodedTitle(target);
         setIsDecoding(false);
       }
-    }, 20);
+    }, 6);
     return () => clearInterval(interval);
   }, []);
 
@@ -117,12 +117,12 @@ export default function LandingPage({
       subtitleStarted.current = true;
       let idx = 0;
       const interval = setInterval(() => {
-        idx++;
+        idx += 2;
         setSubtitleText(subtitleFull.slice(0, idx));
         if (idx >= subtitleFull.length) clearInterval(interval);
-      }, 15);
+      }, 2);
       return () => clearInterval(interval);
-    }, 200);
+    }, 50);
     return () => clearTimeout(startDelay);
   }, []);
 
