@@ -155,6 +155,32 @@ export default function HomePage() {
           </button>
 
           <button
+            style={{
+              background: 'rgba(150, 83, 184, 0.16)',
+              border: '1px solid rgba(211, 132, 255, 0.4)',
+              color: '#d384ff',
+              fontFamily: "'Courier New', monospace",
+              fontSize: 12,
+              letterSpacing: '2px',
+              padding: '14px 32px',
+              borderRadius: 4,
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(211, 132, 255, 0.14)'
+              e.currentTarget.style.boxShadow = '0 0 10px rgba(211, 132, 255, 0.18)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(150, 83, 184, 0.16)'
+              e.currentTarget.style.boxShadow = 'none'
+            }}
+          >
+            Vista Principal de Admin UI
+          </button>
+
+          <button
             onClick={() => navigate('/expeditions')}
             style={{
               background: 'rgba(58, 106, 88, 0.16)',
