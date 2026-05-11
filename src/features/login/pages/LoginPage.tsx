@@ -5,6 +5,7 @@ import { ApocInput } from '../components/ApocInput'
 import { LandingGhosts } from '../components/LandingGhosts'
 import { HudCorners, Scanlines } from '../components/BackgroundEffects'
 import { loginRequest } from '../services/authApi'
+import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
 import type { LoginErrors, LoginForm } from '../types'
 
 export default function LoginPage() {
@@ -44,6 +45,7 @@ export default function LoginPage() {
 
       localStorage.setItem('token', response.token)
       localStorage.setItem('user', JSON.stringify(response.user))
+      window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
       navigate('/app')
     } catch (error) {
       setErrors({

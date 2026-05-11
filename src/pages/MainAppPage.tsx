@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ModuleMap } from '../features/login/components/ModuleMap'
+import { SESSION_TOKEN_CHANGED_EVENT } from '../shared/services/sessionService'
 
 export default function MainAppPage() {
   const navigate = useNavigate()
@@ -74,6 +75,7 @@ export default function MainAppPage() {
           onClick={() => {
             localStorage.removeItem('token')
             localStorage.removeItem('user')
+            window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
             navigate('/')
           }}
           style={{

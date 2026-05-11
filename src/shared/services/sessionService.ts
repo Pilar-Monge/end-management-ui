@@ -2,6 +2,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 
 const SESSION_TIMEOUT_MS = 20 * 60 * 1000
 const HEARTBEAT_INTERVAL_MS = 3 * 60 * 1000
+export const SESSION_TOKEN_CHANGED_EVENT = 'session-token-changed'
 
 export class SessionService {
   private lastActivityAt = Date.now()
@@ -19,11 +20,13 @@ export class SessionService {
 
   private saveToken(token: string): void {
     localStorage.setItem('token', token)
+    window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
   }
 
   private clearSession(): void {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
   }
 
   private async checkSession(): Promise<string | null> {
@@ -101,9 +104,10 @@ export class SessionService {
   }
 
   public expireSession(): void {
+    const onSessionExpired = this.onSessionExpired
     this.stop()
     this.clearSession()
-    this.onSessionExpired?.()
+    onSessionExpired?.()
   }
 
   public start(onSessionExpired: () => void, onTokenRefreshed: () => void): void {

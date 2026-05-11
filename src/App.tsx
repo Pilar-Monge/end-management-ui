@@ -17,6 +17,9 @@ const ResourceMainViewPage = lazy(() =>
 const AdminDashboardPage = lazy(() =>
   import('./features/admin-dashboard').then((m) => ({ default: m.AdminDashboardPage })),
 )
+const AdminMainViewUiPage = lazy(() =>
+  import('./features/admin-main-view-ui').then((m) => ({ default: m.AdminMainViewUiPage })),
+)
 const ResourceTypesPage = lazy(() =>
   import('./features/catalogs').then((m) => ({ default: m.ResourceTypesPage })),
 )
@@ -121,13 +124,14 @@ function App() {
       <Route path="/main-homepage" element={<MainHomePage />} />
       <Route path="/app" element={<MainAppPage />} />
       <Route path="/admission" element={<AdmissionPage />} />
-      <Route path="/camps" element={withSuspense(<CampsPage />)} />
-      <Route path="/persons" element={withSuspense(<PersonsPage />)} />
-      <Route path="/expeditions" element={withSuspense(<ExpeditionsPage />)} />
-      <Route path="/resource-main-view" element={withSuspense(<ResourceMainViewPage />)} />
-      <Route path="/admin-dashboard" element={withSuspense(<AdminDashboardPage />)} />
-      <Route path="/dashboard" element={withSuspense(<AdminDashboardPage />)} />
-      <Route path="/catalogs" element={withSuspense(<CatalogsLayout />)} />
+  <Route path="/camps" element={withSuspense(<CampsPage />)} />
+  <Route path="/persons" element={withSuspense(<PersonsPage />)} />
+  <Route path="/expeditions" element={withSuspense(<ExpeditionsPage />)} />
+  <Route path="/resource-main-view" element={withSuspense(<ResourceMainViewPage />)} />
+  <Route path="/admin-dashboard" element={withSuspense(<AdminDashboardPage />)} />
+  <Route path="/admin-main-view-ui" element={withSuspense(<AdminMainViewUiPage />)} />
+  <Route path="/dashboard" element={withSuspense(<AdminDashboardPage />)} />
+  <Route path="/catalogs" element={withSuspense(<CatalogsLayout />)} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

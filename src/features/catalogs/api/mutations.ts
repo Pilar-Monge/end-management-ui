@@ -18,14 +18,16 @@ import { catalogsKeys, ENDPOINTS } from './keys'
 
 const getToken = () => localStorage.getItem('token')
 
-const headers = {
-  'Content-Type': 'application/json',
-  Authorization: `Bearer ${getToken()}`,
+function buildHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${getToken()}`,
+  }
 }
 export async function createResourceType(data: CreateResourceTypeRequest): Promise<ResourceType> {
   const res = await fetch(ENDPOINTS.resourceTypes, {
     method: 'POST',
-    headers,
+    headers: buildHeaders(),
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to create resource type')
@@ -54,7 +56,7 @@ export async function updateResourceType(
 ): Promise<ResourceType> {
   const res = await fetch(`${ENDPOINTS.resourceTypes}/${id}`, {
     method: 'PUT',
-    headers,
+    headers: buildHeaders(),
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to update resource type')
@@ -81,7 +83,7 @@ export function useUpdateResourceType(
 export async function deleteResourceType(id: number): Promise<void> {
   const res = await fetch(`${ENDPOINTS.resourceTypes}/${id}`, {
     method: 'DELETE',
-    headers,
+    headers: buildHeaders(),
   })
   if (!res.ok) throw new Error('Failed to delete resource type')
 }
@@ -101,7 +103,7 @@ export function useDeleteResourceType(
 export async function createOccupation(data: CreateOccupationRequest): Promise<Occupation> {
   const res = await fetch(ENDPOINTS.occupations, {
     method: 'POST',
-    headers,
+    headers: buildHeaders(),
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to create occupation')
@@ -127,7 +129,7 @@ export async function updateOccupation(
 ): Promise<Occupation> {
   const res = await fetch(`${ENDPOINTS.occupations}/${id}`, {
     method: 'PUT',
-    headers,
+    headers: buildHeaders(),
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to update occupation')
@@ -154,7 +156,7 @@ export function useUpdateOccupation(
 export async function deleteOccupation(id: number): Promise<void> {
   const res = await fetch(`${ENDPOINTS.occupations}/${id}`, {
     method: 'DELETE',
-    headers,
+    headers: buildHeaders(),
   })
   if (!res.ok) throw new Error('Failed to delete occupation')
 }
@@ -176,7 +178,7 @@ export async function createOccupationCriteria(
 ): Promise<OccupationAssignmentCriteria> {
   const res = await fetch(ENDPOINTS.criteria, {
     method: 'POST',
-    headers,
+    headers: buildHeaders(),
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to create criteria')
@@ -213,7 +215,7 @@ export async function updateOccupationCriteria(
 ): Promise<OccupationAssignmentCriteria> {
   const res = await fetch(`${ENDPOINTS.criteria}/${id}`, {
     method: 'PUT',
-    headers,
+    headers: buildHeaders(),
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to update criteria')
@@ -248,7 +250,7 @@ export function useUpdateOccupationCriteria(
 export async function deleteOccupationCriteria(id: number): Promise<void> {
   const res = await fetch(`${ENDPOINTS.criteria}/${id}`, {
     method: 'DELETE',
-    headers,
+    headers: buildHeaders(),
   })
   if (!res.ok) throw new Error('Failed to delete criteria')
 }
@@ -268,7 +270,7 @@ export function useDeleteOccupationCriteria(
 export async function createAchievement(data: CreateAchievementRequest): Promise<Achievement> {
   const res = await fetch(ENDPOINTS.achievements, {
     method: 'POST',
-    headers,
+    headers: buildHeaders(),
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to create achievement')
@@ -294,7 +296,7 @@ export async function updateAchievement(
 ): Promise<Achievement> {
   const res = await fetch(`${ENDPOINTS.achievements}/${id}`, {
     method: 'PUT',
-    headers,
+    headers: buildHeaders(),
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to update achievement')
@@ -321,7 +323,7 @@ export function useUpdateAchievement(
 export async function deleteAchievement(id: number): Promise<void> {
   const res = await fetch(`${ENDPOINTS.achievements}/${id}`, {
     method: 'DELETE',
-    headers,
+    headers: buildHeaders(),
   })
   if (!res.ok) throw new Error('Failed to delete achievement')
 }

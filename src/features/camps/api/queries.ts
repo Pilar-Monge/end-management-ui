@@ -4,12 +4,14 @@ import { campsKeys, ENDPOINTS } from './keys'
 
 const getToken = () => localStorage.getItem('token')
 
-const headers = {
-  'Content-Type': 'application/json',
-  Authorization: `Bearer ${getToken()}`,
+function buildHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${getToken()}`,
+  }
 }
 export async function fetchCamps(): Promise<Camp[]> {
-  const res = await fetch(ENDPOINTS.camps, { headers })
+  const res = await fetch(ENDPOINTS.camps, { headers: buildHeaders() })
   if (!res.ok) throw new Error('Failed to fetch camps')
   return res.json()
 }
@@ -25,7 +27,7 @@ export function useCamps(
 }
 
 export async function fetchCampById(id: number): Promise<CampWithStats> {
-  const res = await fetch(`${ENDPOINTS.camps}/${id}`, { headers })
+  const res = await fetch(`${ENDPOINTS.camps}/${id}`, { headers: buildHeaders() })
   if (!res.ok) throw new Error('Failed to fetch camp')
   return res.json()
 }
@@ -42,7 +44,7 @@ export function useCampById(
 }
 
 export async function fetchCampStats(): Promise<CampsStats> {
-  const res = await fetch(ENDPOINTS.campStats, { headers })
+  const res = await fetch(ENDPOINTS.campStats, { headers: buildHeaders() })
   if (!res.ok) throw new Error('Failed to fetch camp stats')
   return res.json()
 }
@@ -58,7 +60,7 @@ export function useCampStats(
 }
 
 export async function fetchCampResources(campId: number): Promise<CampResourceItem[]> {
-  const res = await fetch(`${ENDPOINTS.campResources}?campId=${campId}`, { headers })
+  const res = await fetch(`${ENDPOINTS.campResources}?campId=${campId}`, { headers: buildHeaders() })
   if (!res.ok) throw new Error('Failed to fetch camp resources')
   return res.json()
 }
