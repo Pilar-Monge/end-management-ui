@@ -28,15 +28,40 @@ const textFields = [
   { name: 'segundoApellido', label: 'Segundo apellido', maxLength: 100, required: false },
 ] as const
 
-const healthFields = [
-  { name: 'salud', label: 'Nivel de salud declarado', placeholder: 'Sin enfermedades conocidas' },
-  { name: 'experiencia', label: 'Experiencia previa', placeholder: '10 años en expediciones' },
-  { name: 'condicion', label: 'Condición física', placeholder: 'Buen estado físico' },
-  {
-    name: 'habilidades',
-    label: 'Habilidades',
-    placeholder: 'Navegación GPS, primeros auxilios, cocina',
-  },
+// Opciones predefinidas basadas en cómo el backend procesa estos campos
+const healthLevelOptions = [
+  { value: '', label: 'Seleccionar nivel de salud' },
+  { value: 'healthy no symptoms', label: 'Sin enfermedades conocidas' },
+  { value: 'stable under treatment', label: 'Salud estable' },
+  { value: 'moderate stable', label: 'Enfermedades crónicas controladas' },
+  { value: 'severe high fever respiratory', label: 'Enfermedades graves' },
+  { value: 'critical sepsis', label: 'Enfermedad crítica' },
+] as const
+
+const physicalConditionOptions = [
+  { value: '', label: 'Seleccionar condición física' },
+  { value: 'athletic strong endurance excellent', label: 'Excelente estado físico' },
+  { value: 'strong endurance', label: 'Muy buen estado físico' },
+  { value: 'average acceptable', label: 'Buen estado físico' },
+  { value: 'moderate acceptable', label: 'Condición física moderada' },
+  { value: 'limited mobility recovering', label: 'Movilidad limitada' },
+  { value: 'immobile cannot walk', label: 'Inmovilizado' },
+] as const
+
+const skillsOptions = [
+  { value: '', label: 'Seleccionar habilidades', disabled: true },
+  { value: 'medic', label: 'Medico' },
+  { value: 'nurse', label: 'Enfermero' },
+  { value: 'doctor', label: 'Doctor' },
+  { value: 'mechanic', label: 'Mecanico' },
+  { value: 'engineer', label: 'Ingeniero' },
+  { value: 'hunter', label: 'Cazador' },
+  { value: 'security', label: 'Seguridad' },
+  { value: 'farmer', label: 'Agricultor' },
+  { value: 'logistics', label: 'Logistica' },
+  { value: 'cook', label: 'Cocinero' },
+  { value: 'radio', label: 'Operador de radio' },
+  { value: 'none', label: 'Ninguna' },
 ] as const
 
 const genderOptions = ['MALE', 'FEMALE', 'OTHER']
@@ -128,9 +153,37 @@ export default function AdmissionPage() {
     setForm((current) => ({ ...current, [name]: value }))
   }
 
-  const handleInput = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = event.target
+  const handleInput = (
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+  ) => {
+    const { name, value } = event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     updateFormValue(name as keyof FormState, value)
+  }
+
+  const handleSkillToggle = (event: ChangeEvent<HTMLInputElement>) => {
+    const { value, checked } = event.target
+    const currentSkills = form.habilidades
+      ? form.habilidades === 'none'
+        ? []
+        : form.habilidades
+            .split(',')
+            .map((skill) => skill.trim())
+            .filter(Boolean)
+      : []
+
+    if (value === 'none') {
+      updateFormValue('habilidades', checked ? 'none' : '')
+      return
+    }
+
+    let nextSkills = currentSkills.filter((skill) => skill !== 'none')
+    if (checked) {
+      if (!nextSkills.includes(value)) nextSkills = [...nextSkills, value]
+    } else {
+      nextSkills = nextSkills.filter((skill) => skill !== value)
+    }
+
+    updateFormValue('habilidades', nextSkills.join(', '))
   }
 
   const handleCampSelect = (event: ChangeEvent<HTMLSelectElement>) => {
@@ -197,6 +250,12 @@ export default function AdmissionPage() {
     setWarning('')
     setSuccessMessage('')
     setAiResult(null)
+    
+    // Formatear experiencia: si es solo número, agregar "años"
+    const formattedExperience = form.experiencia && !Number.isNaN(Number(form.experiencia)) 
+      ? `${form.experiencia} años` 
+      : form.experiencia || null
+    
     const payload = {
       name: form.nombre,
       lastName1: form.primerApellido,
@@ -206,9 +265,9 @@ export default function AdmissionPage() {
       gender: form.genero,
       birthDate: form.nacimiento,
       declaredHealthLevel: form.salud || null,
-      previousExperience: form.experiencia || null,
+      previousExperience: formattedExperience,
       physicalCondition: form.condicion || null,
-      declaredSkills: form.habilidades || null,
+      declaredSkills: form.habilidades && form.habilidades !== 'none' ? form.habilidades : null,
       campId: Number(form.campId),
     }
 
@@ -279,6 +338,15 @@ export default function AdmissionPage() {
       onError: handleError,
     })
   }
+
+  const selectedSkills = form.habilidades
+    ? form.habilidades === 'none'
+      ? ['none']
+      : form.habilidades
+          .split(',')
+          .map((skill) => skill.trim())
+          .filter(Boolean)
+    : []
 
   return (
     <main className="admission-page">
@@ -432,19 +500,84 @@ export default function AdmissionPage() {
             <fieldset className="file-section animate-rise-delay">
               <legend className="section-title">Información de salud</legend>
               <div className="admission-health-grid">
-                {healthFields.map((field) => (
-                  <label className="field-label" key={field.name}>
-                    {field.label}
-                    <textarea
-                      className="classified-input classified-textarea"
-                      name={field.name}
-                      onChange={handleInput}
-                      placeholder={field.placeholder}
-                      required
-                      value={form[field.name]}
-                    />
-                  </label>
-                ))}
+                <label className="field-label">
+                  Nivel de salud declarado
+                  <select
+                    className="classified-input"
+                    name="salud"
+                    onChange={handleInput}
+                    required
+                    value={form.salud}
+                  >
+                    {healthLevelOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field-label">
+                  Experiencia previa (años)
+                  <input
+                    className="classified-input"
+                    type="number"
+                    name="experiencia"
+                    onChange={handleInput}
+                    placeholder="0"
+                    required
+                    value={form.experiencia}
+                    min="0"
+                    max="60"
+                  />
+                </label>
+
+                <label className="field-label">
+                  Condición física
+                  <select
+                    className="classified-input"
+                    name="condicion"
+                    onChange={handleInput}
+                    required
+                    value={form.condicion}
+                  >
+                    {physicalConditionOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="field-label">
+                  <span>Habilidades</span>
+                  <div className="classified-input">
+                    {skillsOptions
+                      .filter((option) => option.value)
+                      .map((option) => (
+                        <label key={option.value} className="field-label">
+                          <input
+                            checked={selectedSkills.includes(option.value)}
+                            name="habilidades"
+                            onChange={handleSkillToggle}
+                            type="checkbox"
+                            value={option.value}
+                          />
+                          {option.label}
+                        </label>
+                      ))}
+                  </div>
+                  <input
+                    aria-hidden="true"
+                    className="sr-only"
+                    name="habilidadesRequired"
+                    readOnly
+                    required
+                    tabIndex={-1}
+                    type="text"
+                    value={form.habilidades}
+                  />
+                </div>
               </div>
             </fieldset>
           </div>
