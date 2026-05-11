@@ -17,6 +17,51 @@ import {
   AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
+import { fetchPersons as fetchPersonsApi } from "../../persons/api/queries";
+import { updatePerson as updatePersonApi, deletePerson as deletePersonApi } from "../../persons/api/mutations";
+import { fetchCamps as fetchCampsApi } from "../../camps/api/queries";
+import { fetchOccupations as fetchOccupationsApi, fetchResourceTypes as fetchResourceTypesApi } from "../../catalogs/api/queries";
+import type { Person as BackendPerson, PersonStatus } from "../../persons/types";
+import type { Camp as BackendCamp } from "../../camps/types";
+import type { Occupation as BackendOccupation, ResourceType as BackendResourceType } from "../../catalogs/types";
+import { ApiHttpError } from "../../../shared/services";
+import {
+  completeExpedition,
+  getDeliveredTransferResourceById,
+  getCampInventoryEntry,
+  getIntercampRequestById,
+  deleteCampInventory,
+  getExpeditionsDashboard,
+  getGeneralDashboard,
+  getInventoryMovementById,
+  getInventoryDashboard,
+  getNotificationById,
+  getPersonStatusHistoryById,
+  getTransferById,
+  getTransferHistoryById,
+  getTransferPersonById,
+  getUserRoleHistoryById,
+  listActiveExpeditions,
+  listAdmissionRequests,
+  listNotifications,
+  markNotificationAsRead,
+  upsertCampInventory,
+  updateAdmissionRequestStatus,
+  type AuditRecord,
+} from "../services";
+import {
+  extractCampInventoryEntries,
+  extractDailyCollections,
+  extractInventoryAlerts,
+  extractInventoryMovements,
+  extractNumberByHint,
+  mapAdmissionFromApi,
+  mapExpeditionFromApi,
+  mapIntercampFromApi,
+  mapNotificationFromApi,
+  summarizeAuditRecord,
+  toDisplayDate,
+} from "../mappers/adminMappers";
 
 // ─── FONTS ──────────────────────────────────────────────────────────────────
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Permanent+Marker&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');`;
@@ -95,6 +140,7 @@ function confirmAction(message: string, onConfirm: () => void) {
 interface Person {
   id: number;
   name: string;
+  profileImage: string;
   role: string;
   status: "Activo" | "Herido" | "Enfermo" | "Fuera";
   age: number;
@@ -199,21 +245,53 @@ interface Notification {
   level: "critical" | "warning" | "info";
 }
 
+const INVENTORY_CATEGORY_MAP: Record<BackendResourceType["category"], string> = {
+  CONSUMABLE: "Esencial",
+  FOOD: "Esencial",
+  MEDICINE: "Médico",
+  EQUIPMENT: "Defensa",
+  TOOL: "Agricultura",
+  OTHER: "Bienestar",
+};
+
+function toHttpCode(error: unknown): HttpCode | null {
+  if (!(error instanceof ApiHttpError)) return null;
+  const status = error.statusCode;
+  if (status === 400 || status === 401 || status === 403 || status === 404) {
+    return status;
+  }
+  return null;
+}
+
+function mapPersonStatus(status: PersonStatus): Person["status"] {
+  if (status === "ACTIVE") return "Activo";
+  if (status === "INJURED") return "Herido";
+  if (status === "MISSING") return "Fuera";
+  return "Fuera";
+}
+
+function unmapPersonStatus(status: Person["status"]): PersonStatus {
+  if (status === "Activo") return "ACTIVE";
+  if (status === "Herido") return "INJURED";
+  if (status === "Enfermo") return "INJURED";
+  return "MISSING";
+}
+
 // ─── INITIAL DATA ─────────────────────────────────────────────────────────────
 
 const INITIAL_PERSONS: Person[] = [
-  { id: 1, name: "María González", role: "Médica", status: "Activo", age: 34, sector: "Enfermería", joined: "D-40" },
-  { id: 2, name: "Roberto Soto", role: "Mecánico", status: "Activo", age: 42, sector: "Taller", joined: "D-35" },
-  { id: 3, name: "Ana Quirós", role: "Agricultora", status: "Activo", age: 28, sector: "Huerto", joined: "D-47" },
-  { id: 4, name: "Luis Mora", role: "Guardia", status: "Fuera", age: 31, sector: "Perimetro", joined: "D-20" },
-  { id: 5, name: "Karen Torres", role: "Cocinera", status: "Activo", age: 25, sector: "Cocina", joined: "D-47" },
-  { id: 6, name: "Pedro Jiménez", role: "Ingeniero", status: "Herido", age: 39, sector: "Construcción", joined: "D-30" },
-  { id: 7, name: "Sofía Vargas", role: "Médica", status: "Activo", age: 45, sector: "Enfermería", joined: "D-10" },
-  { id: 8, name: "Diego Ramírez", role: "Explorador", status: "Fuera", age: 27, sector: "Exteriores", joined: "D-38" },
-  { id: 9, name: "Valeria López", role: "Maestra", status: "Activo", age: 33, sector: "Educación", joined: "D-41" },
-  { id: 10, name: "Camilo Ruiz", role: "Guardia", status: "Enfermo", age: 22, sector: "Perimetro", joined: "D-45" },
-  { id: 11, name: "Natalia Castro", role: "Química", status: "Activo", age: 37, sector: "Laboratorio", joined: "D-15" },
-  { id: 12, name: "Andrés Blanco", role: "Chofer", status: "Activo", age: 50, sector: "Logística", joined: "D-22" },
+  { id: 1, name: "María González", profileImage: "https://i.pravatar.cc/96?img=5", role: "Médica", status: "Activo", age: 34, sector: "Enfermería", joined: "D-40" },
+  { id: 2, name: "Roberto Soto", profileImage: "https://i.pravatar.cc/96?img=12", role: "Mecánico", status: "Activo", age: 42, sector: "Taller", joined: "D-35" },
+  { id: 3, name: "Ana Quirós", profileImage: "https://i.pravatar.cc/96?img=20", role: "Agricultora", status: "Activo", age: 28, sector: "Huerto", joined: "D-47" },
+  { id: 4, name: "Luis Mora", profileImage: "https://i.pravatar.cc/96?img=15", role: "Guardia", status: "Fuera", age: 31, sector: "Perimetro", joined: "D-20" },
+  { id: 5, name: "Karen Torres", profileImage: "https://i.pravatar.cc/96?img=32", role: "Cocinera", status: "Activo", age: 25, sector: "Cocina", joined: "D-47" },
+  { id: 6, name: "Pedro Jiménez", profileImage: "https://i.pravatar.cc/96?img=53", role: "Ingeniero", status: "Herido", age: 39, sector: "Construcción", joined: "D-30" },
+  { id: 7, name: "Sofía Vargas", profileImage: "https://i.pravatar.cc/96?img=47", role: "Médica", status: "Activo", age: 45, sector: "Enfermería", joined: "D-10" },
+  { id: 8, name: "Diego Ramírez", profileImage: "https://i.pravatar.cc/96?img=68", role: "Explorador", status: "Fuera", age: 27, sector: "Exteriores", joined: "D-38" },
+  { id: 9, name: "Valeria López", profileImage: "https://i.pravatar.cc/96?img=36", role: "Maestra", status: "Activo", age: 33, sector: "Educación", joined: "D-41" },
+  { id: 10, name: "Camilo Ruiz", profileImage: "https://i.pravatar.cc/96?img=69", role: "Guardia", status: "Enfermo", age: 22, sector: "Perimetro", joined: "D-45" },
+  { id: 11, name: "Natalia Castro", profileImage: "https://i.pravatar.cc/96?img=41", role: "Química", status: "Activo", age: 37, sector: "Laboratorio", joined: "D-15" },
+  { id: 12, name: "Andrés Blanco", profileImage: "https://i.pravatar.cc/96?img=13", role: "Chofer", status: "Activo", age: 50, sector: "Logística", joined: "D-22" },
 ];
 
 const INITIAL_ADMISSIONS: Admission[] = [
@@ -584,8 +662,11 @@ function DonutCenter({ cx, cy, total }: { cx?: number; cy?: number; total: numbe
 
 // ─── SECTION VIEWS ───────────────────────────────────────────────────────────
 
-function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
+function ViewPoblacion({ mode, campId }: { mode: PopulationViewMode; campId?: number }) {
   const [persons, setPersons] = useState<Person[]>(INITIAL_PERSONS);
+  const [backendPersons, setBackendPersons] = useState<BackendPerson[]>([]);
+  const [occupationCatalog, setOccupationCatalog] = useState<BackendOccupation[]>([]);
+  const [campCatalog, setCampCatalog] = useState<BackendCamp[]>([]);
   const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get("pob_q") ?? "");
   const [filterStatus, setFilterStatus] = useState(() => new URLSearchParams(window.location.search).get("pob_status") ?? "Todos");
   const [selected, setSelected] = useState<Person | null>(null);
@@ -594,10 +675,53 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
   const [assignments, setAssignments] = useState<TempOccupationAssignment[]>(INITIAL_TEMP_ASSIGNMENTS);
   const [newAssign, setNewAssign] = useState({ personId: 0, occupationName: "", startDate: "", endDate: "", reason: "" });
   const [assignSearch, setAssignSearch] = useState("");
-  const [isLoading] = useState(false);
-  const [errorCode] = useState<HttpCode | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorCode, setErrorCode] = useState<HttpCode | null>(null);
   const [page, setPage] = useState(() => Number(new URLSearchParams(window.location.search).get("pob_page") ?? "1") || 1);
+  const [personPhotoPreview, setPersonPhotoPreview] = useState<{ src: string; name: string } | null>(null);
   const limit = Number(new URLSearchParams(window.location.search).get("pob_limit") ?? "8") || 8;
+
+  const mapBackendPerson = (person: BackendPerson, occupations: BackendOccupation[], camps: BackendCamp[]) => {
+    const role = occupations.find((occupation) => occupation.id === person.occupationId)?.name ?? `Ocupación #${person.occupationId}`;
+    const sector = camps.find((camp) => camp.id === person.campId)?.name ?? `Campamento #${person.campId}`;
+    return {
+      id: person.id,
+      name: [person.firstName, person.lastName].filter(Boolean).join(" ").trim() || person.alias || `Persona #${person.id}`,
+      profileImage: `https://i.pravatar.cc/96?img=${(person.id % 69) + 1}`,
+      role,
+      status: mapPersonStatus(person.status),
+      age: person.age,
+      sector,
+      joined: toDisplayDate(person.admissionDate),
+    } as Person;
+  };
+
+  const loadPopulation = async () => {
+    setIsLoading(true);
+    setErrorCode(null);
+
+    try {
+      const [personsData, occupations, camps] = await Promise.all([
+        fetchPersonsApi(),
+        fetchOccupationsApi(),
+        fetchCampsApi(),
+      ]);
+
+      const campFilteredPersons = campId
+        ? personsData.filter((person) => person.campId === campId)
+        : personsData;
+
+      setBackendPersons(campFilteredPersons);
+      setOccupationCatalog(occupations);
+      setCampCatalog(camps);
+      setPersons(campFilteredPersons.map((person) => mapBackendPerson(person, occupations, camps)));
+    } catch (error) {
+      setErrorCode(toHttpCode(error));
+      console.error("Error loading population data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const statuses = ["Todos", "Activo", "Herido", "Enfermo", "Fuera"];
   const filtered = persons.filter(p => {
@@ -633,6 +757,10 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
   );
 
   useEffect(() => {
+    void loadPopulation();
+  }, [campId]);
+
+  useEffect(() => {
     setPage(1);
   }, [search, filterStatus, mode]);
 
@@ -647,14 +775,64 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
 
   const handleSaveEdit = () => {
     if (!selected) return;
-    setPersons(prev => prev.map(p => p.id === selected.id ? { ...p, ...editData } : p));
-    setSelected(prev => prev ? { ...prev, ...editData } as Person : null);
-    setEditMode(false);
+    const source = backendPersons.find((person) => person.id === selected.id);
+    if (!source) return;
+
+    const fullName = ((editData as { name?: string }).name ?? selected.name).trim();
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    const firstName = parts[0] ?? source.firstName;
+    const lastName = parts.slice(1).join(" ") || source.lastName;
+
+    const nextStatus = ((editData as { status?: Person["status"] }).status ?? selected.status);
+    const nextRoleName = ((editData as { role?: string }).role ?? selected.role).trim();
+    const nextSectorName = ((editData as { sector?: string }).sector ?? selected.sector).trim();
+
+    const matchedOccupation = occupationCatalog.find((occupation) => occupation.name.toLowerCase() === nextRoleName.toLowerCase());
+    const matchedCamp = campCatalog.find((camp) => camp.name.toLowerCase() === nextSectorName.toLowerCase());
+
+    setIsLoading(true);
+    setErrorCode(null);
+
+    updatePersonApi(selected.id, {
+      firstName,
+      lastName,
+      age: source.age,
+      occupationId: matchedOccupation?.id ?? source.occupationId,
+      campId: matchedCamp?.id ?? source.campId,
+      status: unmapPersonStatus(nextStatus),
+      notes: source.notes,
+      alias: source.alias,
+    })
+      .then(() => loadPopulation())
+      .then(() => {
+        setEditMode(false);
+        setSelected(null);
+      })
+      .catch((error) => {
+        setErrorCode(toHttpCode(error));
+        window.alert(error instanceof Error ? error.message : "No se pudo actualizar la persona");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const handleDelete = (id: number) => {
-    setPersons(prev => prev.filter(p => p.id !== id));
-    setSelected(null);
+    setIsLoading(true);
+    setErrorCode(null);
+
+    deletePersonApi(id)
+      .then(() => loadPopulation())
+      .then(() => {
+        setSelected(null);
+      })
+      .catch((error) => {
+        setErrorCode(toHttpCode(error));
+        window.alert(error instanceof Error ? error.message : "No se pudo eliminar la persona");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const handleCreateAssignment = () => {
@@ -873,9 +1051,17 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
                       style={{ borderLeft: selected?.id === person.id ? '4px solid var(--admin-teal)' : '4px solid transparent' }}
                     >
                       <div className="col-span-3 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0" style={{ background: "var(--admin-surface-alt)", color: "var(--admin-text-primary)", border: "1px solid var(--admin-border)" }}>
-                          {person.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={event => {
+                            event.stopPropagation();
+                            setPersonPhotoPreview({ src: person.profileImage, name: person.name });
+                          }}
+                          className="w-8 h-8 rounded-full shrink-0 overflow-hidden cursor-pointer"
+                          style={{ border: "1px solid var(--admin-border)", padding: 0, background: "var(--admin-surface-alt)" }}
+                        >
+                          <img src={person.profileImage} alt={`Perfil de ${person.name}`} className="w-full h-full" style={{ objectFit: "cover" }} />
+                        </button>
                         <span className="font-bold pop-text-primary">{person.name}</span>
                       </div>
                       <div className="col-span-2 pop-text-muted text-sm">{person.role}</div>
@@ -1073,30 +1259,48 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
       )}
 
       {/* Modern Modal using custom implementation instead of standard Modal so it matches the theme */}
-      <AnimatePresence>
-        {selected && (
-          <motion.div
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {selected && (
+            <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            className="p-4"
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 100,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(0,0,0,0.8)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+            }}
             onClick={() => { setSelected(null); setEditMode(false); }}
           >
-            <motion.div
+              <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
               onClick={e => e.stopPropagation()}
-              className="rounded-lg shadow-2xl w-full max-w-lg overflow-hidden pop-card !p-0"
+              className="rounded-lg shadow-2xl overflow-hidden pop-card !p-0"
+              style={{ width: "min(100%, 32rem)" }}
             >
-              <div className="px-6 py-4 flex justify-between items-center" style={{ borderBottom: "1px solid var(--admin-teal)", background: "rgba(74, 174, 210, 0.1)" }}>
+              <div className="relative px-6 pt-5 pb-4" style={{ borderBottom: "1px solid #2A3444", background: "#0B1118" }}>
                 <h3 className="font-bold pop-text-primary m-0 text-lg uppercase font-mono tracking-wider">{editMode ? "EDITAR PERSONA" : "FICHA INDIVIDUAL"}</h3>
-                <button onClick={() => { setSelected(null); setEditMode(false); }} className="pop-icon-btn">
-                  <X size={18} />
+                <button
+                  onClick={() => { setSelected(null); setEditMode(false); }}
+                  className="pop-icon-btn"
+                  style={{ position: "absolute", top: 12, right: 12 }}
+                  aria-label="Cerrar ficha"
+                >
+                  <X size={16} />
                 </button>
               </div>
-              
-              <div className="p-6">
+
+              <div className="p-6" style={{ background: "#070C12" }}>
                 {editMode ? (
                   <div className="flex flex-col gap-4">
                     <div className="flex gap-4">
@@ -1128,10 +1332,15 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-sm flex items-center justify-center shadow-md" style={{ background: "var(--admin-surface-alt)", border: "1px solid var(--admin-border)" }}>
-                        <User size={32} style={{ color: "var(--admin-teal)" }} />
-                      </div>
+                    <div className="flex items-center gap-4 p-4 rounded-lg" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
+                      <button
+                        type="button"
+                        className="w-16 h-16 rounded-sm shadow-md overflow-hidden cursor-pointer"
+                        onClick={() => setPersonPhotoPreview({ src: selected.profileImage, name: selected.name })}
+                        style={{ background: "var(--admin-surface-alt)", border: "1px solid #2A3444", padding: 0 }}
+                      >
+                        <img src={selected.profileImage} alt={`Perfil de ${selected.name}`} className="w-full h-full" style={{ objectFit: "cover" }} />
+                      </button>
                       <div>
                         <h2 className="text-2xl font-bold pop-text-primary m-0 uppercase">{selected.name}</h2>
                         <div className="pop-text-muted font-medium font-mono">{selected.role}</div>
@@ -1148,9 +1357,9 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
                         { label: "SECTOR", value: selected.sector },
                         { label: "ID DE REGISTRO", value: `#${selected.id.toString().padStart(4, '0')}` },
                       ].map(({ label, value }) => (
-                        <div key={label} className="p-3 rounded-lg" style={{ background: "var(--admin-surface-alt)", border: "1px solid var(--admin-border-soft)" }}>
-                          <div className="text-xs font-bold mb-1 tracking-wider pop-text-muted">{label}</div>
-                          <div className="font-semibold pop-text-primary">{value}</div>
+                        <div key={label} className="p-3 rounded-lg" style={{ background: "#0B1118", border: "1px solid #2A3444" }}>
+                          <div className="text-xs font-bold mb-1 tracking-wider" style={{ color: "#B8C7DB" }}>{label}</div>
+                          <div className="font-semibold pop-text-primary" style={{ fontSize: 20, lineHeight: 1.1, fontFamily: "'Orbitron', monospace", wordBreak: "break-word" }}>{value}</div>
                         </div>
                       ))}
                     </div>
@@ -1166,20 +1375,70 @@ function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
                   </div>
                 )}
               </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {personPhotoPreview && (
+            <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setPersonPhotoPreview(null)}
+            className="p-4"
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 120,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(3, 7, 12, 0.74)",
+              backdropFilter: "blur(4px)",
+              WebkitBackdropFilter: "blur(4px)",
+            }}
+          >
+              <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 8 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              onClick={event => event.stopPropagation()}
+              style={{
+                width: "min(420px, calc(100vw - 32px))",
+                borderRadius: 10,
+                overflow: "hidden",
+                border: "1px solid rgba(127, 184, 255, 0.32)",
+                boxShadow: "0 22px 44px rgba(0, 0, 0, 0.46)",
+                background: "#0B1118",
+              }}
+            >
+              <img
+                src={personPhotoPreview.src}
+                alt={`Perfil ampliado de ${personPhotoPreview.name}`}
+                style={{ width: "100%", height: "auto", display: "block", maxHeight: "72vh", objectFit: "cover" }}
+              />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
 
-function ViewAdmisiones({ mode, canReview }: { mode: AdmissionsViewMode; canReview: boolean }) {
+function ViewAdmisiones({ mode, canReview, campId }: { mode: AdmissionsViewMode; canReview: boolean; campId?: number }) {
   const [admissions, setAdmissions] = useState<Admission[]>(INITIAL_ADMISSIONS);
   const [selected, setSelected] = useState<Admission | null>(null);
   const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
-  const [isLoading] = useState(false);
-  const [errorCode] = useState<HttpCode | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorCode, setErrorCode] = useState<HttpCode | null>(null);
   const [page, setPage] = useState(() => Number(new URLSearchParams(window.location.search).get("adm_page") ?? "1") || 1);
   const limit = Number(new URLSearchParams(window.location.search).get("adm_limit") ?? "6") || 6;
 
@@ -1188,16 +1447,57 @@ function ViewAdmisiones({ mode, canReview }: { mode: AdmissionsViewMode; canRevi
     setTimeout(() => setToast(null), 2500);
   };
 
+  const loadAdmissions = async () => {
+    setIsLoading(true);
+    setErrorCode(null);
+
+    try {
+      const incoming = await listAdmissionRequests(campId);
+      setAdmissions(incoming.map(mapAdmissionFromApi));
+    } catch (error) {
+      setErrorCode(toHttpCode(error));
+      console.error("Error loading admissions:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleApprove = (id: number) => {
-    setAdmissions(prev => prev.map(a => a.id === id ? { ...a, status: "approved" } : a));
-    setSelected(null);
-    showToast("ADMISIÓN APROBADA — Persona añadida al registro.", "#0D9488");
+    setIsLoading(true);
+    setErrorCode(null);
+
+    updateAdmissionRequestStatus(id, "approved")
+      .then(() => loadAdmissions())
+      .then(() => {
+        setSelected(null);
+        showToast("ADMISIÓN APROBADA — Persona añadida al registro.", "#0D9488");
+      })
+      .catch((error) => {
+        setErrorCode(toHttpCode(error));
+        showToast(error instanceof Error ? error.message : "No se pudo aprobar la admisión", "#DC2626");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const handleReject = (id: number) => {
-    setAdmissions(prev => prev.map(a => a.id === id ? { ...a, status: "rejected" } : a));
-    setSelected(null);
-    showToast("ADMISIÓN RECHAZADA — Persona bloqueada.", "#DC2626");
+    setIsLoading(true);
+    setErrorCode(null);
+
+    updateAdmissionRequestStatus(id, "rejected")
+      .then(() => loadAdmissions())
+      .then(() => {
+        setSelected(null);
+        showToast("ADMISIÓN RECHAZADA — Persona bloqueada.", "#DC2626");
+      })
+      .catch((error) => {
+        setErrorCode(toHttpCode(error));
+        showToast(error instanceof Error ? error.message : "No se pudo rechazar la admisión", "#DC2626");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const pending = admissions.filter(a => a.status === "pending");
@@ -1210,6 +1510,10 @@ function ViewAdmisiones({ mode, canReview }: { mode: AdmissionsViewMode; canRevi
   useEffect(() => {
     setPage(1);
   }, [mode, admissions.length]);
+
+  useEffect(() => {
+    void loadAdmissions();
+  }, [campId]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1381,21 +1685,24 @@ function ViewAdmisiones({ mode, canReview }: { mode: AdmissionsViewMode; canRevi
   );
 }
 
-function ViewInventario({ mode, canAdjust }: { mode: InventoryViewMode; canAdjust: boolean }) {
+function ViewInventario({ mode, canAdjust, campId }: { mode: InventoryViewMode; canAdjust: boolean; campId?: number }) {
   const [items, setItems] = useState<InventoryItem[]>(INITIAL_INVENTORY);
-  const [movements] = useState<InventoryMovement[]>(INITIAL_MOVEMENTS);
+  const [movements, setMovements] = useState<InventoryMovement[]>(INITIAL_MOVEMENTS);
   const [invAlerts, setInvAlerts] = useState<InventoryAlert[]>(INITIAL_INV_ALERTS);
-  const [collections] = useState<DailyCollection[]>(INITIAL_COLLECTIONS);
+  const [resourceTypes, setResourceTypes] = useState<BackendResourceType[]>([]);
+  const [maxByResourceType, setMaxByResourceType] = useState<Record<number, number>>({});
+  const [collections, setCollections] = useState<DailyCollection[]>(INITIAL_COLLECTIONS);
   const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get("inv_q") ?? "");
   const [editing, setEditing] = useState<InventoryItem | null>(null);
   const [editUnits, setEditUnits] = useState(0);
   const [showAdd, setShowAdd] = useState(false);
   const [newItem, setNewItem] = useState<Partial<InventoryItem>>({ name: "", category: "Esencial", units: 0, max: 100 });
   const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
-  const [isLoading] = useState(false);
-  const [errorCode] = useState<HttpCode | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorCode, setErrorCode] = useState<HttpCode | null>(null);
   const [page, setPage] = useState(() => Number(new URLSearchParams(window.location.search).get("inv_page") ?? "1") || 1);
   const limit = Number(new URLSearchParams(window.location.search).get("inv_limit") ?? "7") || 7;
+  const activeCampId = campId ?? 1;
 
   const showToast = (msg: string, color: string) => {
     setToast({ msg, color });
@@ -1409,27 +1716,150 @@ function ViewInventario({ mode, canAdjust }: { mode: InventoryViewMode; canAdjus
     return "OK";
   };
 
+  const loadInventory = async () => {
+    setIsLoading(true);
+    setErrorCode(null);
+
+    try {
+      const [resourceTypesData, dashboardPayload] = await Promise.all([
+        fetchResourceTypesApi(),
+        getInventoryDashboard(),
+      ]);
+
+      const inventoryEntryResults = await Promise.allSettled(
+        resourceTypesData.map((resourceType) => getCampInventoryEntry(activeCampId, resourceType.id)),
+      );
+
+      const campResourcesFromInventory = inventoryEntryResults
+        .filter((result): result is PromiseFulfilledResult<{ campId: number; resourceTypeId: number; quantity: number; updatedAt?: string }> => result.status === "fulfilled")
+        .map((result) => result.value)
+        .filter((entry) => entry.campId === activeCampId);
+
+      const campResourcesFromDashboard = extractCampInventoryEntries(dashboardPayload, activeCampId)
+        .filter((entry) => entry.campId === activeCampId);
+
+      const campResources = campResourcesFromInventory.length > 0
+        ? campResourcesFromInventory
+        : campResourcesFromDashboard;
+      const movementsFromApi = extractInventoryMovements(dashboardPayload);
+      const alertsFromApi = extractInventoryAlerts(dashboardPayload);
+      const collectionsFromApi = extractDailyCollections(dashboardPayload);
+
+      const maxLookup: Record<number, number> = {};
+      const mappedItems = campResources.map((entry) => {
+        const type = resourceTypesData.find((resourceType) => resourceType.id === entry.resourceTypeId);
+        const max = Math.max(entry.quantity, 100);
+        const pct = max > 0 ? Math.min(100, Math.round((entry.quantity / max) * 100)) : 0;
+        maxLookup[entry.resourceTypeId] = max;
+
+        return {
+          id: entry.resourceTypeId,
+          name: type?.name ?? `Recurso #${entry.resourceTypeId}`,
+          category: type ? INVENTORY_CATEGORY_MAP[type.category] : "Esencial",
+          pct,
+          units: entry.quantity,
+          max,
+          status: computeStatus(pct),
+        } as InventoryItem;
+      });
+
+      setResourceTypes(resourceTypesData);
+      setMaxByResourceType(maxLookup);
+      setItems(mappedItems);
+      if (movementsFromApi.length > 0) setMovements(movementsFromApi);
+      if (alertsFromApi.length > 0) {
+        setInvAlerts(alertsFromApi);
+      } else {
+        setInvAlerts(
+          mappedItems
+            .filter((item) => item.pct < 40)
+            .map((item) => ({
+              id: item.id,
+              resource: item.name,
+              severity: item.pct < 20 ? "CRÍTICA" : "MEDIA",
+              status: "ACTIVA",
+              threshold: item.pct < 20 ? 20 : 40,
+            } as InventoryAlert)),
+        );
+      }
+      if (collectionsFromApi.length > 0) setCollections(collectionsFromApi);
+    } catch (error) {
+      setErrorCode(toHttpCode(error));
+      console.error("Error loading inventory:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSaveEdit = () => {
     if (!editing) return;
-    const pct = Math.round((editUnits / editing.max) * 100);
-    setItems(prev => prev.map(i => i.id === editing.id ? { ...i, units: editUnits, pct, status: computeStatus(pct) } : i));
-    setEditing(null);
-    showToast("INVENTARIO ACTUALIZADO", "#0D9488");
+    const max = maxByResourceType[editing.id] ?? editing.max;
+    const pct = max > 0 ? Math.round((editUnits / max) * 100) : 0;
+
+    setIsLoading(true);
+    setErrorCode(null);
+
+    upsertCampInventory({ campId: activeCampId, resourceTypeId: editing.id, quantity: editUnits })
+      .then(() => loadInventory())
+      .then(() => {
+        setEditing(null);
+        showToast("INVENTARIO ACTUALIZADO", "#0D9488");
+      })
+      .catch((error) => {
+        setErrorCode(toHttpCode(error));
+        showToast(error instanceof Error ? error.message : "No se pudo actualizar el inventario", "#DC2626");
+      })
+      .finally(() => {
+        setItems((prev) => prev.map((item) => item.id === editing.id ? { ...item, units: editUnits, pct, status: computeStatus(pct) } : item));
+        setIsLoading(false);
+      });
   };
 
   const handleDelete = (id: number) => {
-    setItems(prev => prev.filter(i => i.id !== id));
-    showToast("ÍTEM ELIMINADO", "#DC2626");
+    setIsLoading(true);
+    setErrorCode(null);
+
+    deleteCampInventory(activeCampId, id)
+      .then(() => loadInventory())
+      .then(() => {
+        showToast("ÍTEM ELIMINADO", "#DC2626");
+      })
+      .catch((error) => {
+        setErrorCode(toHttpCode(error));
+        showToast(error instanceof Error ? error.message : "No se pudo eliminar el recurso", "#DC2626");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const handleAdd = () => {
-    if (!newItem.name || !newItem.units || !newItem.max) return;
-    const pct = Math.round((newItem.units! / newItem.max!) * 100);
-    const id = Math.max(...items.map(i => i.id)) + 1;
-    setItems(prev => [...prev, { ...newItem, id, pct, status: computeStatus(pct) } as InventoryItem]);
-    setNewItem({ name: "", category: "Esencial", units: 0, max: 100 });
-    setShowAdd(false);
-    showToast("ÍTEM AGREGADO", "#0D9488");
+    if (!newItem.name || newItem.units === undefined || newItem.units === null) return;
+
+    const resourceType = resourceTypes.find((type) => type.name.toLowerCase() === String(newItem.name).trim().toLowerCase());
+    if (!resourceType) {
+      showToast("El recurso debe existir en el catálogo", "#DC2626");
+      return;
+    }
+
+    const quantity = Number(newItem.units) || 0;
+    setIsLoading(true);
+    setErrorCode(null);
+
+    upsertCampInventory({ campId: activeCampId, resourceTypeId: resourceType.id, quantity })
+      .then(() => loadInventory())
+      .then(() => {
+        setNewItem({ name: "", category: "Esencial", units: 0, max: 100 });
+        setShowAdd(false);
+        showToast("ÍTEM AGREGADO", "#0D9488");
+      })
+      .catch((error) => {
+        setErrorCode(toHttpCode(error));
+        showToast(error instanceof Error ? error.message : "No se pudo agregar el recurso", "#DC2626");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()) || i.category.toLowerCase().includes(search.toLowerCase()));
@@ -1441,6 +1871,10 @@ function ViewInventario({ mode, canAdjust }: { mode: InventoryViewMode; canAdjus
   useEffect(() => {
     setPage(1);
   }, [search, mode, items.length]);
+
+  useEffect(() => {
+    void loadInventory();
+  }, [activeCampId]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1620,16 +2054,29 @@ function ViewInventario({ mode, canAdjust }: { mode: InventoryViewMode; canAdjus
       {/* Add item modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="AGREGAR ÍTEM AL INVENTARIO">
         <div className="admin-stack-md">
-          {[
-            { label: "NOMBRE DEL RECURSO", key: "name" },
-          ].map(({ label, key }) => (
-            <div key={key}>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{label}</label>
-              <input value={(newItem as any)[key] ?? ""} onChange={e => setNewItem(prev => ({ ...prev, [key]: e.target.value }))}
-                className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
-            </div>
-          ))}
+          <div>
+            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>NOMBRE DEL RECURSO</label>
+            <select
+              value={newItem.name ?? ""}
+              onChange={e => {
+                const selectedResource = resourceTypes.find((resourceType) => resourceType.name === e.target.value);
+                setNewItem(prev => ({
+                  ...prev,
+                  name: e.target.value,
+                  category: selectedResource ? INVENTORY_CATEGORY_MAP[selectedResource.category] : prev.category,
+                }));
+              }}
+              className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
+              style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}
+            >
+              <option value="">Seleccione un recurso...</option>
+              {resourceTypes.map((resourceType) => (
+                <option key={resourceType.id} value={resourceType.name}>
+                  {resourceType.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>CATEGORÍA</label>
             <select value={newItem.category ?? "Esencial"} onChange={e => setNewItem(prev => ({ ...prev, category: e.target.value }))}
@@ -1667,8 +2114,25 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
   const [newExp, setNewExp] = useState<Partial<Expedition>>({ name: "", objective: "", sector: "", total: 5, participants: [], status: "PROGRAMADA" });
   const [participantInput, setParticipantInput] = useState("");
   const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
-  const [isLoading] = useState(false);
-  const [errorCode] = useState<HttpCode | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorCode, setErrorCode] = useState<HttpCode | null>(null);
+
+  const loadExpeditions = async () => {
+    setIsLoading(true);
+    setErrorCode(null);
+
+    try {
+      const records = await listActiveExpeditions();
+      if (records.length > 0) {
+        setExpeditions(records.map(mapExpeditionFromApi));
+      }
+    } catch (error) {
+      setErrorCode(toHttpCode(error));
+      console.error("Error loading expeditions:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const showToast = (msg: string, color: string) => {
     setToast({ msg, color });
@@ -1694,9 +2158,22 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
   };
 
   const handleComplete = (id: number) => {
-    setExpeditions(prev => prev.map(e => e.id === id ? { ...e, status: "COMPLETADA" } : e));
-    setSelected(null);
-    showToast("EXPEDICIÓN MARCADA COMO COMPLETADA", "#0D9488");
+    setIsLoading(true);
+    setErrorCode(null);
+
+    completeExpedition(id)
+      .then(() => {
+        setExpeditions(prev => prev.map(e => e.id === id ? { ...e, status: "COMPLETADA" } : e));
+        setSelected(null);
+        showToast("EXPEDICIÓN MARCADA COMO COMPLETADA", "#0D9488");
+      })
+      .catch((error) => {
+        setErrorCode(toHttpCode(error));
+        showToast(error instanceof Error ? error.message : "No se pudo completar la expedición", "#DC2626");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const handleForceStatus = (id: number, status: Expedition["status"]) => {
@@ -1713,6 +2190,10 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
   const active = expeditions.filter(e => e.status === "EN CURSO" || e.status === "REGRESANDO");
   const scheduled = expeditions.filter(e => e.status === "PROGRAMADA");
   const completed = expeditions.filter(e => e.status === "COMPLETADA");
+
+  useEffect(() => {
+    void loadExpeditions();
+  }, []);
 
   return (
     <div className="admin-stack-lg">
@@ -1930,9 +2411,10 @@ function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canAppro
   const [requests, setRequests] = useState<IntercampRequest[]>(INITIAL_INTERCAMP);
   const [showSend, setShowSend] = useState(false);
   const [newReq, setNewReq] = useState({ to: "", text: "", type: "solicitud" });
+  const [lookupId, setLookupId] = useState("");
   const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
-  const [isLoading] = useState(false);
-  const [errorCode] = useState<HttpCode | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorCode, setErrorCode] = useState<HttpCode | null>(null);
   const [page, setPage] = useState(() => Number(new URLSearchParams(window.location.search).get("ic_page") ?? "1") || 1);
   const limit = Number(new URLSearchParams(window.location.search).get("ic_limit") ?? "6") || 6;
 
@@ -1961,6 +2443,57 @@ function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canAppro
     setShowSend(false);
     setNewReq({ to: "", text: "", type: "solicitud" });
     showToast("MENSAJE ENVIADO", "#0D9488");
+  };
+
+  const mergeRequest = (incoming: IntercampRequest) => {
+    setRequests((prev) => {
+      const filtered = prev.filter((request) => request.id !== incoming.id);
+      return [incoming, ...filtered];
+    });
+  };
+
+  const handleLookup = () => {
+    const id = Number(lookupId);
+    if (!Number.isFinite(id) || id <= 0) {
+      showToast("Ingresa un ID válido", "#DC2626");
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorCode(null);
+
+    const tryLoad = async () => {
+      const loaders = [
+        () => getIntercampRequestById(id),
+        () => getTransferById(id),
+        () => getTransferHistoryById(id),
+        () => getTransferPersonById(id),
+        () => getDeliveredTransferResourceById(id),
+      ];
+
+      for (const load of loaders) {
+        try {
+          return await load();
+        } catch {
+          // keep trying remaining endpoints
+        }
+      }
+
+      throw new Error("No se encontró registro inter-camp para ese ID");
+    };
+
+    tryLoad()
+      .then((record) => {
+        mergeRequest(mapIntercampFromApi(record));
+        showToast(`Registro #${id} sincronizado`, "#0D9488");
+      })
+      .catch((error) => {
+        setErrorCode(toHttpCode(error));
+        showToast(error instanceof Error ? error.message : "No se pudo consultar el ID", "#DC2626");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const pending = requests.filter(r => r.status === "PENDIENTE");
@@ -2015,6 +2548,20 @@ function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canAppro
       {(mode === "send" || mode === "pending") && <div className="flex justify-end">
         <ActionBtn label="+ ENVIAR MENSAJE" color="#0D9488" onClick={() => setShowSend(true)} />
       </div>}
+
+      <Card>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>CONSULTA RÁPIDA POR ID</span>
+          <input
+            value={lookupId}
+            onChange={event => setLookupId(event.target.value)}
+            placeholder="ID de solicitud/transferencia"
+            className="px-3 py-2 rounded-sm outline-none"
+            style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#EEF3FB", minWidth: 220 }}
+          />
+          <ActionBtn label="CARGAR ID" color="#7FB8FF" onClick={handleLookup} />
+        </div>
+      </Card>
 
       {mode === "pending" && pending.length > 0 && (
         <Card glow="#EA580C">
@@ -2119,6 +2666,52 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
   const [filterLevel, setFilterLevel] = useState("todos");
   const [search, setSearch] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lookupSource, setLookupSource] = useState("inventory");
+  const [lookupId, setLookupId] = useState("");
+  const [isLoadingLookup, setIsLoadingLookup] = useState(false);
+
+  const loadAuditRecordBySource = async (source: string, id: number): Promise<AuditRecord> => {
+    if (source === "inventory") return getInventoryMovementById(id);
+    if (source === "notification") return getNotificationById(id);
+    if (source === "person-status") return getPersonStatusHistoryById(id);
+    return getUserRoleHistoryById(id);
+  };
+
+  const handleLookupLog = () => {
+    const id = Number(lookupId);
+    if (!Number.isFinite(id) || id <= 0) {
+      return;
+    }
+
+    setIsLoadingLookup(true);
+    loadAuditRecordBySource(lookupSource, id)
+      .then((record) => {
+        const label = lookupSource === "inventory"
+          ? "INVENTORY_MOVEMENT"
+          : lookupSource === "notification"
+            ? "NOTIFICATION"
+            : lookupSource === "person-status"
+              ? "PERSON_STATUS"
+              : "USER_ROLE";
+
+        setLogs((prev) => [summarizeAuditRecord(label, record), ...prev]);
+      })
+      .catch((error) => {
+        const now = new Date().toLocaleTimeString("es-CR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+        const message = error instanceof Error ? error.message : "Error consultando registro";
+
+        setLogs((prev) => [{
+          id: Date.now(),
+          time: now,
+          level: "error",
+          user: "SISTEMA",
+          action: `LOOKUP FALLIDO #${id} (${lookupSource}) — ${message}`,
+        }, ...prev]);
+      })
+      .finally(() => {
+        setIsLoadingLookup(false);
+      });
+  };
 
   useEffect(() => {
     if (!autoRefresh) return;
@@ -2188,6 +2781,27 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
           <div className="flex items-center gap-2">
             <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>AUTO-REFRESH</span>
             <Toggle active={autoRefresh} onChange={() => setAutoRefresh(prev => !prev)} />
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={lookupSource}
+              onChange={event => setLookupSource(event.target.value)}
+              className="px-2 py-1 rounded-sm outline-none"
+              style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}
+            >
+              <option value="inventory">Inventory Movement</option>
+              <option value="notification">Notification</option>
+              <option value="person-status">Person Status</option>
+              <option value="user-role">User Role</option>
+            </select>
+            <input
+              value={lookupId}
+              onChange={event => setLookupId(event.target.value)}
+              placeholder="ID"
+              className="px-2 py-1 rounded-sm outline-none"
+              style={{ width: 80, background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EEF3FB" }}
+            />
+            <ActionBtn label={isLoadingLookup ? "CARGANDO..." : "LOOKUP"} color="#7FB8FF" small onClick={handleLookupLog} />
           </div>
         </div>
         <div className="notifs-divider" style={{ height: 1, background: "linear-gradient(90deg, #7FB8FF 0%, transparent 100%)", marginBottom: 12 }} />
@@ -2333,11 +2947,59 @@ function ViewNotificaciones({ mode, notifs, setNotifs }: { mode: NotifsViewMode;
   const [filter, setFilter] = useState(() => new URLSearchParams(window.location.search).get("not_type") ?? "todas");
   const [page, setPage] = useState(() => Number(new URLSearchParams(window.location.search).get("not_page") ?? "1") || 1);
   const [limit] = useState(() => Number(new URLSearchParams(window.location.search).get("not_limit") ?? "6") || 6);
-  const [isLoading] = useState(false);
-  const [error] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorCode, setErrorCode] = useState<HttpCode | null>(null);
 
-  const markRead = (id: number) => setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-  const markAllRead = () => setNotifs(prev => prev.map(n => ({ ...n, read: true })));
+  const loadNotifs = async () => {
+    setIsLoading(true);
+    setErrorCode(null);
+
+    try {
+      const notifications = await listNotifications();
+      setNotifs(notifications.map(mapNotificationFromApi));
+    } catch (error) {
+      setErrorCode(toHttpCode(error));
+      console.error("Error loading notifications:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const markRead = (id: number) => {
+    setIsLoading(true);
+    setErrorCode(null);
+
+    markNotificationAsRead(id)
+      .then(() => {
+        setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      })
+      .catch((error) => {
+        setErrorCode(toHttpCode(error));
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  };
+
+  const markAllRead = () => {
+    const unread = notifs.filter((notification) => !notification.read);
+    if (unread.length === 0) return;
+
+    setIsLoading(true);
+    setErrorCode(null);
+
+    Promise.all(unread.map((notification) => markNotificationAsRead(notification.id)))
+      .then(() => {
+        setNotifs(prev => prev.map(n => ({ ...n, read: true })));
+      })
+      .catch((error) => {
+        setErrorCode(toHttpCode(error));
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  };
+
   const dismiss = (id: number) => setNotifs(prev => prev.filter(n => n.id !== id));
 
   const levels = ["todas", "critical", "warning", "info"];
@@ -2364,6 +3026,10 @@ function ViewNotificaciones({ mode, notifs, setNotifs }: { mode: NotifsViewMode;
   useEffect(() => {
     setPage(1);
   }, [filter, mode]);
+
+  useEffect(() => {
+    void loadNotifs();
+  }, []);
 
   return (
     <div className="admin-stack-lg">
@@ -2400,7 +3066,7 @@ function ViewNotificaciones({ mode, notifs, setNotifs }: { mode: NotifsViewMode;
 
         <div className="admin-stack-sm">
           {isLoading && <EmptyState title="CARGANDO BANDEJA" hint="Consultando notificaciones del campamento" icon={Bell} />}
-          {error && <HttpStatusNotice code={403} />}
+          {errorCode && <HttpStatusNotice code={errorCode} />}
           <AnimatePresence>
             {paged.map(n => {
               const nc = notifColor(n.level);
@@ -2427,7 +3093,7 @@ function ViewNotificaciones({ mode, notifs, setNotifs }: { mode: NotifsViewMode;
               );
             })}
           </AnimatePresence>
-          {!isLoading && !error && filtered.length === 0 && <EmptyState title="SIN NOTIFICACIONES" hint="No hay eventos para este filtro" icon={Bell} />}
+          {!isLoading && !errorCode && filtered.length === 0 && <EmptyState title="SIN NOTIFICACIONES" hint="No hay eventos para este filtro" icon={Bell} />}
         </div>
         <PaginationBar page={safePage} totalPages={totalPages} totalItems={filtered.length} onPageChange={setPage} />
       </Card>
@@ -2598,12 +3264,87 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
 function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSection) => void; notifs: Notification[] }) {
   const [countdown, setCountdown] = useState({ h: 3, m: 28, s: 0 });
   const [threatLevel, setThreatLevel] = useState(72);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorCode, setErrorCode] = useState<HttpCode | null>(null);
+  const [kpi, setKpi] = useState({
+    populationTotal: 247,
+    criticalResources: 3,
+    activeExpeditions: 2,
+    pendingIntercamp: 5,
+    activePopulation: 189,
+    injuredPopulation: 23,
+    sickPopulation: 18,
+    outPopulation: 17,
+  });
   const [automations] = useState([
     { ok: true, name: "Consumo diario de raciones", time: "Ejecutado 06:00", active: true },
     { ok: true, name: "Colecta de recursos", time: "Ejecutado 06:00", active: true },
     { ok: false, name: "Alerta de inventario", time: "3 alertas activas", active: true },
     { ok: true, name: "Reporte nocturno", time: "Enviado 00:00", active: true },
   ]);
+
+  const refreshDashboard = async () => {
+    setIsLoading(true);
+    setErrorCode(null);
+
+    const [generalResult, inventoryResult, expeditionsResult] = await Promise.allSettled([
+      getGeneralDashboard(),
+      getInventoryDashboard(),
+      getExpeditionsDashboard(),
+    ]);
+
+    const general = generalResult.status === "fulfilled" ? generalResult.value : null;
+    const inventory = inventoryResult.status === "fulfilled" ? inventoryResult.value : null;
+    const expeditions = expeditionsResult.status === "fulfilled" ? expeditionsResult.value : null;
+
+    if (!general && !inventory && !expeditions) {
+      const firstError = generalResult.status === "rejected"
+        ? generalResult.reason
+        : inventoryResult.status === "rejected"
+          ? inventoryResult.reason
+          : expeditionsResult.status === "rejected"
+            ? expeditionsResult.reason
+            : null;
+
+      setErrorCode(toHttpCode(firstError));
+      console.error("Error loading dashboard metrics:", firstError);
+      setIsLoading(false);
+      return;
+    }
+
+    if (generalResult.status === "rejected" || inventoryResult.status === "rejected" || expeditionsResult.status === "rejected") {
+      const firstError = generalResult.status === "rejected"
+        ? generalResult.reason
+        : inventoryResult.status === "rejected"
+          ? inventoryResult.reason
+          : expeditionsResult.status === "rejected"
+            ? expeditionsResult.reason
+            : null;
+      setErrorCode(toHttpCode(firstError));
+    }
+
+    const populationTotal = extractNumberByHint(general, ["population", "persons", "totalpeople", "total"], kpi.populationTotal);
+    const activePopulation = extractNumberByHint(general, ["active", "healthy"], kpi.activePopulation);
+    const injuredPopulation = extractNumberByHint(general, ["injured"], kpi.injuredPopulation);
+    const sickPopulation = extractNumberByHint(general, ["sick", "ill"], kpi.sickPopulation);
+    const outPopulation = extractNumberByHint(general, ["missing", "outside", "out"], kpi.outPopulation);
+    const criticalResources = extractNumberByHint(inventory, ["critical", "alert", "low"], kpi.criticalResources);
+    const activeExpeditions = extractNumberByHint(expeditions, ["active", "ongoing"], kpi.activeExpeditions);
+    const pendingIntercamp = extractNumberByHint(general, ["intercamp", "transfer", "pending"], kpi.pendingIntercamp);
+
+    setKpi({
+      populationTotal,
+      criticalResources,
+      activeExpeditions,
+      pendingIntercamp,
+      activePopulation,
+      injuredPopulation,
+      sickPopulation,
+      outPopulation,
+    });
+
+    setIsLoading(false);
+  };
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -2628,11 +3369,15 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
     return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    void refreshDashboard();
+  }, []);
+
   const populationData = [
-    { name: "Activos", value: 189, color: "#0D9488" },
-    { name: "Heridos", value: 23, color: "#EA580C" },
-    { name: "Enfermos", value: 18, color: "#DC2626" },
-    { name: "Fuera", value: 17, color: "#4AAED2" },
+    { name: "Activos", value: kpi.activePopulation, color: "#0D9488" },
+    { name: "Heridos", value: kpi.injuredPopulation, color: "#EA580C" },
+    { name: "Enfermos", value: kpi.sickPopulation, color: "#DC2626" },
+    { name: "Fuera", value: kpi.outPopulation, color: "#4AAED2" },
   ];
   const totalPop = populationData.reduce((a, b) => a + b.value, 0);
   const liveAlerts = notifs.filter(n => !n.read).slice(0, 5);
@@ -2661,6 +3406,9 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
 
   return (
     <div style={{ position: "relative" }}>
+      {isLoading && <EmptyState title="CARGANDO DASHBOARD" hint="Sincronizando métricas generales" icon={Activity} />}
+      {errorCode && <HttpStatusNotice code={errorCode} />}
+
       <AnimatePresence>
         {isMaxAlert && (
           <motion.div
@@ -2681,10 +3429,10 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
       {/* KPI row (top priority, as original flow) */}
       <motion.div variants={rowVariants} initial="hidden" animate="show" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
         {[
-          { icon: Users, color: "#0D9488", value: "247", label: "POBLACIÓN TOTAL", sub: "+3 SEMANA", subColor: "#0D9488", subIcon: TrendingUp },
-          { icon: Package, color: "#DC2626", value: "3", label: "RECURSOS CRÍTICOS", sub: "CRÍTICO", subColor: "#DC2626", subIcon: TrendingDown, pulse: true },
-          { icon: Map, color: "#7FB8FF", value: "2", label: "EXPEDICIONES ACTIVAS", sub: "14 FUERA", subColor: "#4AAED2", subIcon: Activity },
-          { icon: Radio, color: "#EA580C", value: "5", label: "SOLICITUDES INTER-CAMP.", sub: "2 URGENTES", subColor: "#EA580C", subIcon: AlertTriangle },
+          { icon: Users, color: "#0D9488", value: String(kpi.populationTotal), label: "POBLACIÓN TOTAL", sub: `${kpi.activePopulation} ACTIVOS`, subColor: "#0D9488", subIcon: TrendingUp },
+          { icon: Package, color: "#DC2626", value: String(kpi.criticalResources), label: "RECURSOS CRÍTICOS", sub: "CRÍTICO", subColor: "#DC2626", subIcon: TrendingDown, pulse: kpi.criticalResources > 0 },
+          { icon: Map, color: "#7FB8FF", value: String(kpi.activeExpeditions), label: "EXPEDICIONES ACTIVAS", sub: `${kpi.outPopulation} FUERA`, subColor: "#4AAED2", subIcon: Activity },
+          { icon: Radio, color: "#EA580C", value: String(kpi.pendingIntercamp), label: "SOLICITUDES INTER-CAMP.", sub: "PENDIENTES", subColor: "#EA580C", subIcon: AlertTriangle },
         ].map(({ icon: Icon, color, value, label, sub, subColor, subIcon: SubIcon, pulse }) => (
           <motion.div key={label} variants={cardVariants}>
             <Card glow={color}>
@@ -2708,7 +3456,7 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
         <div className="flex flex-wrap gap-2 items-center justify-between">
           <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>ACCESOS RÁPIDOS DEL PANEL GENERAL</span>
           <div className="flex flex-wrap gap-2">
-            <ActionBtn label="ACTUALIZAR PANEL" color="#0D9488" onClick={() => window.location.reload()} />
+            <ActionBtn label="ACTUALIZAR PANEL" color="#0D9488" onClick={() => void refreshDashboard()} />
             <ActionBtn label="VER SOLICITUDES PENDIENTES" color="#7FB8FF" onClick={() => onQuickNav?.("ADMISIONES IA")} />
             <ActionBtn label="VER INVENTARIO" color="#B8C7DB" onClick={() => onQuickNav?.("INVENTARIO")} />
             <ActionBtn label="IR A EXPEDICIONES" color="#B8C7DB" onClick={() => onQuickNav?.("EXPEDICIONES")} />
@@ -2908,7 +3656,28 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
 
 export default function AdminDashboard() {
   const [activeNav, setActiveNav] = useState<NavSection>("CENTRO DE MANDO");
-  const currentRole: AppRole = "SYSTEM_ADMIN";
+  const storedUserRaw = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+  const parsedUser = (() => {
+    if (!storedUserRaw) return null;
+    try {
+      const value = JSON.parse(storedUserRaw) as { username?: string; rol?: string; campId?: number };
+      return value;
+    } catch {
+      return null;
+    }
+  })();
+
+  const mapBackendRoleToAppRole = (role?: string): AppRole => {
+    if (!role) return "SYSTEM_ADMIN";
+    if (role === "SYSTEM_ADMIN") return "SYSTEM_ADMIN";
+    if (role === "RESOURCE_MANAGEMENT" || role === "GESTION_RECURSOS") return "GESTION_RECURSOS";
+    if (role === "WORKER" || role === "TRABAJADOR") return "TRABAJADOR";
+    if (role === "TRAVEL_MANAGER" || role === "ENCARGADO_VIAJES") return "ENCARGADO_VIAJES";
+    return "TRABAJADOR";
+  };
+
+  const currentRole: AppRole = mapBackendRoleToAppRole(parsedUser?.rol);
+  const currentCampId = typeof parsedUser?.campId === "number" ? parsedUser.campId : 1;
   const [sessionPanelOpen, setSessionPanelOpen] = useState(false);
   const [profilePreviewOpen, setProfilePreviewOpen] = useState(false);
   const [sessionLocked, setSessionLocked] = useState(false);
@@ -2926,19 +3695,35 @@ export default function AdminDashboard() {
   const [notifs, setNotifs] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
   const unreadNotifs = notifs.filter(n => !n.read).length;
   const currentUser = {
-    name: "Edicson Vargas",
-    email: "edicson.vargas@camp-alpha.local",
+    name: parsedUser?.username ?? "Operador",
+    email: `${parsedUser?.username ?? "operador"}@camp-alpha.local`,
     role: currentRole,
-    camp: "Campamento Alfa",
+    camp: `Campamento #${currentCampId}`,
     shift: "Turno Noche",
     profileImage: "https://i.pravatar.cc/80?img=12",
   };
   const can = (permission: string) => ROLE_PERMISSIONS[currentRole].includes(permission);
 
+  const loadGlobalNotifications = async () => {
+    try {
+      const notifications = await listNotifications();
+      if (notifications.length > 0) {
+        setNotifs(notifications.map(mapNotificationFromApi));
+      }
+    } catch (error) {
+      setGlobalHttpCode(toHttpCode(error));
+      console.error("Error loading global notifications:", error);
+    }
+  };
+
   useEffect(() => {
     const t = setInterval(() => setServerTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    void loadGlobalNotifications();
+  }, [currentCampId]);
 
   useEffect(() => {
     const ttl = 20 * 60 * 1000;
@@ -2993,9 +3778,9 @@ export default function AdminDashboard() {
 
   const renderSection = () => {
     switch (activeNav) {
-      case "POBLACIÓN": return <ViewPoblacion mode={populationViewMode} />;
-      case "ADMISIONES IA": return <ViewAdmisiones mode={admissionsViewMode} canReview={can("admissions.review")} />;
-      case "INVENTARIO": return <ViewInventario mode={inventoryViewMode} canAdjust={can("inventory.adjust")} />;
+      case "POBLACIÓN": return <ViewPoblacion mode={populationViewMode} campId={currentCampId} />;
+      case "ADMISIONES IA": return <ViewAdmisiones mode={admissionsViewMode} canReview={can("admissions.review")} campId={currentCampId} />;
+      case "INVENTARIO": return <ViewInventario mode={inventoryViewMode} canAdjust={can("inventory.adjust")} campId={currentCampId} />;
       case "EXPEDICIONES": return <ViewExpediciones mode={expeditionsViewMode} canForce={can("expeditions.force")} />;
       case "INTER-CAMPAMENTOS": return <ViewIntercamp mode={intercampViewMode} canApprove={can("intercamp.approve")} />;
       case "SEGURIDAD / LOGS": return <ViewSeguridad mode={securityViewMode} />;
