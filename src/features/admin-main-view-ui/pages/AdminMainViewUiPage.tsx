@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import * as THREE from 'three';
 import './admin-main-view-ui.css';
+import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService';
 
 type Vec3 = [number, number, number];
 type ViewMode = 'normal' | 'zoom';
@@ -1174,6 +1175,7 @@ export default function AdminMainViewUiPage() {
               onClick={() => {
                 window.localStorage.removeItem('token');
                 window.localStorage.removeItem('user');
+                window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT));
                 navigate('/');
               }}
             />
