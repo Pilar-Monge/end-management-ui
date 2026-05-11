@@ -538,14 +538,18 @@ const ReplicaGlobe = ({ onLoadingComplete }: { onLoadingComplete?: () => void })
               handleSelectCampamento(null);
               return;
             }
-
             if (clickTarget.closest('.admission-request-btn')) {
-              navigate('/admission', { state: { returnToGlobalMap: true } });
+              // Open admission form and pass selected camp info so form is prefilled
+              navigate('/admission', { state: { returnToGlobalMap: true, campId: camp.id, campName: camp.name } });
               return;
             }
-            
+
             if (clickTarget.closest('.marker-dot-area')) {
               handleSelectCampamento(camp.isSelected ? null : camp);
+              return;
+            }
+
+            if (clickTarget.closest('.action-btn')) {navigate('/admission', { state: { returnToGlobalMap: true, campId: camp.id, campName: camp.name } });
               return;
             }
           };

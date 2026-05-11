@@ -9,9 +9,15 @@ import type {
 import { catalogsKeys, ENDPOINTS } from './keys'
 
 const getToken = () => localStorage.getItem('token')
+
+const getHeaders = (): HeadersInit => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${getToken() || ''}`,
+})
+
 export async function fetchResourceTypes(): Promise<ResourceType[]> {
   const res = await fetch(ENDPOINTS.resourceTypes, {
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: getHeaders(),
   })
   if (!res.ok) throw new Error('Failed to fetch resource types')
   const data = await res.json()
@@ -29,7 +35,7 @@ export function useResourceTypes(
 }
 export async function fetchOccupations(): Promise<Occupation[]> {
   const res = await fetch(ENDPOINTS.occupations, {
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: getHeaders(),
   })
   if (!res.ok) throw new Error('Failed to fetch occupations')
   const data = await res.json()
@@ -47,7 +53,7 @@ export function useOccupations(
 }
 export async function fetchOccupationCriteria(): Promise<OccupationAssignmentCriteria[]> {
   const res = await fetch(ENDPOINTS.criteria, {
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: getHeaders(),
   })
   if (!res.ok) throw new Error('Failed to fetch occupation criteria')
   const data = await res.json()
@@ -68,7 +74,7 @@ export async function fetchOccupationCriteriaByOccupation(
   occupationId: number,
 ): Promise<OccupationAssignmentCriteria[]> {
   const res = await fetch(`${ENDPOINTS.criteria}?occupationId=${occupationId}`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: getHeaders(),
   })
   if (!res.ok) throw new Error('Failed to fetch criteria for occupation')
   const data = await res.json()
@@ -76,7 +82,7 @@ export async function fetchOccupationCriteriaByOccupation(
 }
 export async function fetchAchievements(): Promise<Achievement[]> {
   const res = await fetch(ENDPOINTS.achievements, {
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: getHeaders(),
   })
   if (!res.ok) throw new Error('Failed to fetch achievements')
   const data = await res.json()

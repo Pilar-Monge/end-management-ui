@@ -1,9 +1,10 @@
 import type { ChangeEvent, FormEvent } from 'react'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import '../admission.css'
-import { submitAdmission } from '../services/admissionApi'
+import { useCreateAdmissionRequest } from '../api/queries'
+import { useCamps } from '../../camps/api/queries'
 import type { CalendarDay, FormState } from '../types'
 
 const initialForm: FormState = {
@@ -18,6 +19,7 @@ const initialForm: FormState = {
   experiencia: '',
   condicion: '',
   habilidades: '',
+  campId: undefined,
 }
 
 const textFields = [
@@ -93,19 +95,36 @@ const buildCalendar = (viewDate: Date, selectedValue: string): CalendarDay[] => 
 export default function AdmissionPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const shouldReturnToGlobalMap = Boolean((location.state as { returnToGlobalMap?: boolean } | null)?.returnToGlobalMap)
+  const shouldReturnToGlobalMap = Boolean(
+    (location.state as { returnToGlobalMap?: boolean } | null)?.returnToGlobalMap,
+  )
+  const prefilledCampId = (location.state as { campId?: number } | null)?.campId
+  const prefilledCampName = (location.state as { campName?: string } | null)?.campName
+  const { data: camps = [] } = useCamps({ enabled: !prefilledCampId })
+  const createAdmission = useCreateAdmissionRequest()
+
   const [form, setForm] = useState<FormState>(initialForm)
   const [photoPreview, setPhotoPreview] = useState<string>('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
-  const [sent, setSent] = useState(false)
   const [warning, setWarning] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [genderOpen, setGenderOpen] = useState(false)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [calendarDate, setCalendarDate] = useState(() => new Date(2026, 3, 1))
+  const [showAiResult, setShowAiResult] = useState(false)
+  const [aiResult, setAiResult] = useState<{
+    status: string
+    message: string
+    type: 'success' | 'warning'
+  } | null>(null)
 
-  const calendarDays = useMemo(() => buildCalendar(calendarDate, form.nacimiento), [calendarDate, form.nacimiento])
+  const calendarDays = useMemo(
+    () => buildCalendar(calendarDate, form.nacimiento),
+    [calendarDate, form.nacimiento],
+  )
+  const isSubmitting = createAdmission.isPending
 
-  const updateFormValue = (name: keyof FormState, value: string) => {
+  const updateFormValue = (name: keyof FormState, value: string | number | undefined) => {
     setForm((current) => ({ ...current, [name]: value }))
   }
 
@@ -113,6 +132,16 @@ export default function AdmissionPage() {
     const { name, value } = event.target
     updateFormValue(name as keyof FormState, value)
   }
+
+  const handleCampSelect = (event: ChangeEvent<HTMLSelectElement>) => {
+    const campId = parseInt(event.target.value, 10) || undefined
+    updateFormValue('campId', campId)
+  }
+  useEffect(() => {
+    if (prefilledCampId) {
+      updateFormValue('campId', prefilledCampId)
+    }
+  }, [prefilledCampId])
 
   const handlePhoto = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null
@@ -160,18 +189,95 @@ export default function AdmissionPage() {
       return
     }
 
+    if (!form.campId) {
+      setWarning('Debe seleccionar un campamento para continuar.')
+      return
+    }
+
     setWarning('')
-    setSent(true)
-    submitAdmission(form, photoFile)
-      .then(() => {
-        setWarning('')
-        setSent(true)
-        window.setTimeout(() => setSent(false), 3200)
+    setSuccessMessage('')
+    setAiResult(null)
+    const payload = {
+      name: form.nombre,
+      lastName1: form.primerApellido,
+      lastName2: form.segundoApellido || null,
+      email: form.email,
+      desiredUsername: form.usuario,
+      gender: form.genero,
+      birthDate: form.nacimiento,
+      declaredHealthLevel: form.salud || null,
+      previousExperience: form.experiencia || null,
+      physicalCondition: form.condicion || null,
+      declaredSkills: form.habilidades || null,
+      campId: Number(form.campId),
+    }
+
+    const handleSuccess = (data: any) => {
+      setShowAiResult(true)
+
+      if (data.status === 'PENDING_ADMIN') {
+        setAiResult({
+          status: 'PENDING_ADMIN',
+          message: `Tu solicitud fue evaluada favorablemente por nuestro sistema de IA y está en espera de revisión administrativa. Tu rol sugerido es: ${data.aiReport?.suggestedRole || 'pendiente de evaluación'}.`,
+          type: 'success',
+        })
+        setSuccessMessage('Expediente enviado exitosamente. Espera revisión administrativa.')
+      } else if (data.status === 'REJECTED') {
+        setAiResult({
+          status: 'REJECTED',
+          message: `Tu solicitud ha sido rechazada durante la evaluación automática. Motivo: ${data.rejectionReason || data.aiReport?.admissionReason || 'No cumple con los requisitos'}`,
+          type: 'warning',
+        })
+      } else if (data.status === 'APPROVED') {
+        setAiResult({
+          status: 'APPROVED',
+          message: `Felicidades! Tu solicitud ha sido aprobada. Bienvenido al campamento.`,
+          type: 'success',
+        })
+        setSuccessMessage('Bienvenido al campamento!')
+      }
+
+      setTimeout(() => {
+        setForm(initialForm)
+        setPhotoFile(null)
+        setPhotoPreview('')
+      }, 3000)
+    }
+
+    const handleError = (error: any) => {
+      setWarning(
+        error instanceof Error ? error.message : String(error) || 'Error al procesar la solicitud',
+      )
+      setShowAiResult(false)
+    }
+    if (photoFile) {
+      const formData = new FormData()
+      formData.append('name', payload.name)
+      formData.append('lastName1', payload.lastName1)
+      if (payload.lastName2) formData.append('lastName2', payload.lastName2)
+      formData.append('email', payload.email)
+      formData.append('desiredUsername', payload.desiredUsername)
+      formData.append('gender', payload.gender)
+      formData.append('birthDate', payload.birthDate)
+      if (payload.declaredHealthLevel)
+        formData.append('declaredHealthLevel', payload.declaredHealthLevel)
+      if (payload.previousExperience)
+        formData.append('previousExperience', payload.previousExperience)
+      if (payload.physicalCondition) formData.append('physicalCondition', payload.physicalCondition)
+      if (payload.declaredSkills) formData.append('declaredSkills', payload.declaredSkills)
+      formData.append('campId', String(payload.campId))
+      formData.append('photo', photoFile)
+
+      createAdmission.mutate(formData, {
+        onSuccess: handleSuccess,
+        onError: handleError,
       })
-      .catch((err) => {
-        setWarning(err instanceof Error ? err.message : String(err))
-        setSent(false)
-      })
+      return
+    }
+    createAdmission.mutate(payload, {
+      onSuccess: handleSuccess,
+      onError: handleError,
+    })
   }
 
   return (
@@ -216,6 +322,42 @@ export default function AdmissionPage() {
         <form className="admission-form-shell" onSubmit={handleSubmit}>
           <div className="admission-main">
             <fieldset className="file-section animate-rise">
+              <legend className="section-title">Selección de campamento</legend>
+              <div className="admission-personal-grid">
+                <label className="field-label">
+                  Campamento
+                  {prefilledCampId ? (
+                    <select
+                      className="classified-input"
+                      name="campId"
+                      disabled
+                      value={form.campId ?? ''}
+                    >
+                      <option value={prefilledCampId}>
+                        {prefilledCampName ?? `Campamento ${prefilledCampId}`}
+                      </option>
+                    </select>
+                  ) : (
+                    <select
+                      className="classified-input"
+                      name="campId"
+                      onChange={handleCampSelect}
+                      required
+                      value={form.campId ?? ''}
+                    >
+                      <option value="">Seleccionar campamento</option>
+                      {camps.map((camp) => (
+                        <option key={camp.id} value={camp.id}>
+                          {camp.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset className="file-section animate-rise">
               <legend className="section-title">Datos personales</legend>
               <div className="admission-personal-grid">
                 {textFields.map((field) => (
@@ -253,7 +395,6 @@ export default function AdmissionPage() {
                     minLength={3}
                     name="usuario"
                     onChange={handleInput}
-                    pattern="[A-Za-z0-9-]+"
                     placeholder="sobreviviente-01"
                     required
                     value={form.usuario}
@@ -318,20 +459,34 @@ export default function AdmissionPage() {
                   <small>PNG o JPG</small>
                 </span>
               )}
-              <input accept="image/png,image/jpeg" className="sr-only" name="foto" onChange={handlePhoto} type="file" />
+              <input
+                accept="image/png,image/jpeg"
+                className="sr-only"
+                name="foto"
+                onChange={handlePhoto}
+                type="file"
+              />
             </label>
 
-            <button className="submit-stamp" type="submit">
-              Procesar Ingreso
+            <button className="submit-stamp" disabled={isSubmitting} type="submit">
+              {isSubmitting ? 'Procesando...' : 'Procesar Ingreso'}
             </button>
 
             <p className="notice-slip">
-              NOTICE: BY SUBMITTING THIS DOCUMENT, YOU ACKNOWLEDGE THAT ALL RESOURCES PROVIDED ARE PROPERTY OF THE CAMP
-              ADMINISTRATION.
+              NOTICE: BY SUBMITTING THIS DOCUMENT, YOU ACKNOWLEDGE THAT ALL RESOURCES PROVIDED ARE
+              PROPERTY OF THE CAMP ADMINISTRATION.
             </p>
 
             {warning && <p className="form-warning">{warning}</p>}
-            {sent && <p className="animate-confirm form-confirm">Expediente enviado.</p>}
+            {successMessage && <p className="animate-confirm form-confirm">{successMessage}</p>}
+            {showAiResult && aiResult && (
+              <div
+                className={`ai-result-box ${aiResult.type === 'success' ? 'success' : 'warning'}`}
+              >
+                <p className="ai-result-status">{aiResult.status}</p>
+                <p className="ai-result-message">{aiResult.message}</p>
+              </div>
+            )}
           </aside>
         </form>
       </section>
@@ -359,16 +514,29 @@ export default function AdmissionPage() {
 
       {calendarOpen && (
         <div className="modal-backdrop" onClick={() => setCalendarOpen(false)}>
-          <div className="calendar-popover animate-pop" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="calendar-popover animate-pop"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="calendar-header">
               <strong>
                 {monthNames[calendarDate.getMonth()]} de {calendarDate.getFullYear()}
               </strong>
               <div className="calendar-header-actions">
-                <button aria-label="Mes anterior" className="cal-nav" onClick={() => changeCalendarMonth(-1)} type="button">
+                <button
+                  aria-label="Mes anterior"
+                  className="cal-nav"
+                  onClick={() => changeCalendarMonth(-1)}
+                  type="button"
+                >
                   ◄
                 </button>
-                <button aria-label="Mes siguiente" className="cal-nav" onClick={() => changeCalendarMonth(1)} type="button">
+                <button
+                  aria-label="Mes siguiente"
+                  className="cal-nav"
+                  onClick={() => changeCalendarMonth(1)}
+                  type="button"
+                >
                   ►
                 </button>
               </div>
