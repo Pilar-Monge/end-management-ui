@@ -1,6 +1,5 @@
 import type {
   AdmissionRequest,
-  CreateAdmissionRequestInput,
   ProcessAIPayload,
   ReviewAdmissionPayload,
 } from '../types'
@@ -46,7 +45,6 @@ export async function submitAdmission(
   return data.data
 }
 export async function fetchPendingAdmissions(campId: number): Promise<AdmissionRequest[]> {
-  const token = getToken()
   const res = await fetch(`${BASE_URL}/admission-requests/camps/${campId}/pending`, {
     headers: getHeaders(),
   })
@@ -58,7 +56,6 @@ export async function fetchPendingAdmissions(campId: number): Promise<AdmissionR
   return data.data
 }
 export async function fetchAdmissionRequestById(id: number): Promise<AdmissionRequest> {
-  const token = getToken()
   const res = await fetch(`${BASE_URL}/admission-requests/${id}`, {
     headers: getHeaders(),
   })
@@ -73,7 +70,6 @@ export async function processAdmissionWithAI(
   id: number,
   payload: ProcessAIPayload,
 ): Promise<AdmissionRequest> {
-  const token = getToken()
   const res = await fetch(`${BASE_URL}/admission-requests/${id}/process-ai`, {
     method: 'POST',
     headers: getHeaders(),
@@ -90,7 +86,6 @@ export async function reviewAdmissionRequest(
   id: number,
   payload: ReviewAdmissionPayload,
 ): Promise<AdmissionRequest> {
-  const token = getToken()
   const res = await fetch(`${BASE_URL}/admission-requests/${id}/review`, {
     method: 'POST',
     headers: getHeaders(),

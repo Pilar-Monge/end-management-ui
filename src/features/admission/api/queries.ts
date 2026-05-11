@@ -50,12 +50,12 @@ export function useAdmissionRequest(
 
 export function useCreateAdmissionRequest(
   options?: Omit<
-    UseMutationOptions<AdmissionRequest, Error, any>,
+    UseMutationOptions<AdmissionRequest, Error, FormData | Record<string, any>>,
     'mutationFn'
   >,
 ) {
   const queryClient = useQueryClient()
-  return useMutation<AdmissionRequest, Error, FormData>({
+  return useMutation<AdmissionRequest, Error, FormData | Record<string, any>>({
     mutationFn: (payload) => submitAdmission(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: admissionKeys.all })
