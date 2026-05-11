@@ -10,8 +10,10 @@ import { PointerLockControls } from 'three/addons/controls/PointerLockControls.j
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Compass, Volume2, VolumeX, X, ChevronLeft, ChevronRight, Menu, Wind, HelpCircle } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { MEDIA_URLS } from '../config/mediaUrls';
+import { loginRequest } from '../../login/services/authApi';
+import type { LoginErrors, LoginForm } from '../../login/types';
 
 import LandingPage from '../components/LandingPage';
 import ReplicaGlobe from '../components/ReplicaGlobe';
@@ -437,6 +439,7 @@ function getTerrainY(x: number, z: number): number {
 type appState = 'landing' | 'intro' | 'bridge' | 'video' | 'menu' | 'explore' | 'login' | 'register' | 'global-map' | 'camp-detail';
 
 export function MainHomePage() {
+  const navigate = useNavigate();
   const location = useLocation();
   const containerRef = useRef<HTMLDivElement>(null);
   const initialAppState = (location.state as { initialAppState?: appState } | null)?.initialAppState;
@@ -498,6 +501,9 @@ export function MainHomePage() {
   const [loginVideoIndex, setLoginVideoIndex] = useState(0);
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null);
   const [showCharError, setShowCharError] = useState(false);
+  const [authForm, setAuthForm] = useState<LoginForm>({ username: '', password: '', campId: 1 });
+  const [authErrors, setAuthErrors] = useState<LoginErrors>({});
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const loginVideos = [
     MEDIA_URLS.images.characters.principal,
     MEDIA_URLS.images.characters.mecanico,
@@ -526,6 +532,65 @@ export function MainHomePage() {
       setCurrentMode('Storm');
     }
   }, [appState]);
+
+  useEffect(() => {
+    if (appState !== 'login') {
+      setAuthErrors({});
+      setIsAuthenticating(false);
+    }
+  }, [appState]);
+
+  function validateLoginForm(): boolean {
+    const nextErrors: LoginErrors = {};
+
+    if (!authForm.username.trim()) nextErrors.username = 'Campo requerido';
+    if (authForm.username.length > 0 && authForm.username.length < 3)
+      nextErrors.username = 'Minimo 3 caracteres';
+
+    if (!authForm.password) nextErrors.password = 'Campo requerido';
+    if (authForm.password.length > 0 && authForm.password.length < 6)
+      nextErrors.password = 'Minimo 6 caracteres';
+
+    setAuthErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
+
+  function handleAuthFieldChange(field: 'username' | 'password', value: string) {
+    setAuthForm((prev) => ({ ...prev, [field]: value }));
+    if (authErrors[field]) setAuthErrors((prev) => ({ ...prev, [field]: undefined }));
+    if (authErrors.general) setAuthErrors((prev) => ({ ...prev, general: undefined }));
+  }
+
+  async function handleAuthSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (appState === 'register') {
+      if (selectedCharacter === null) {
+        setShowCharError(true);
+        return;
+      }
+      setAppState('explore');
+      return;
+    }
+
+    if (!validateLoginForm()) return;
+
+    setIsAuthenticating(true);
+    setAuthErrors({});
+
+    try {
+      const response = await loginRequest(authForm);
+      localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
+      navigate('/app');
+    } catch (error) {
+      setAuthErrors({
+        general: error instanceof Error ? error.message : 'No se pudo iniciar sesion contra el backend',
+      });
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -2031,22 +2096,20 @@ export function MainHomePage() {
                     </div>
                   </div>
 
-                  <form className="space-y-6" onSubmit={(e) => { 
-                    e.preventDefault(); 
-                    if (appState === 'register' && selectedCharacter === null) {
-                      setShowCharError(true);
-                      return;
-                    }
-                    setAppState('explore'); 
-                  }}>
+                  <form className="space-y-6" onSubmit={handleAuthSubmit}>
                     <div className="space-y-3 w-full max-w-[260px]">
                       <label className="text-[11px] uppercase font-bold tracking-[0.2em] text-white block">Nombre de Usuario</label>
                       <input 
                         type="text" 
                         className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-1 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all font-mono text-xs placeholder:text-white/10"
                         placeholder="ID_USUARIO"
+                        value={authForm.username}
+                        onChange={(event) => handleAuthFieldChange('username', event.target.value)}
                         required
                       />
+                      {appState === 'login' && authErrors.username && (
+                        <p className="text-[10px] text-red-400 uppercase tracking-[0.08em]">{authErrors.username}</p>
+                      )}
                     </div>
                     
                     <div className="space-y-3 w-full max-w-[260px]">
@@ -2055,8 +2118,13 @@ export function MainHomePage() {
                         type="password" 
                         className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-1 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all font-mono text-xs placeholder:text-white/10"
                         placeholder="••••••••"
+                        value={authForm.password}
+                        onChange={(event) => handleAuthFieldChange('password', event.target.value)}
                         required
                       />
+                      {appState === 'login' && authErrors.password && (
+                        <p className="text-[10px] text-red-400 uppercase tracking-[0.08em]">{authErrors.password}</p>
+                      )}
                     </div>
 
                     {appState === 'register' && (
@@ -2073,13 +2141,20 @@ export function MainHomePage() {
 
                     <button
                       type="submit"
+                      disabled={appState === 'login' && isAuthenticating}
                       className="group relative w-full max-w-[260px] py-4 font-black uppercase tracking-[0.4em] text-xs transition-all menu-brush text-white mt-4 text-left px-8"
                       style={{ fontFamily: "'Oswald', sans-serif" }}
                     >
                       <span className="relative z-10 transition-colors">
-                        {appState === 'login' ? 'Autenticar' : 'REGISTRAR'}
+                        {appState === 'login' ? (isAuthenticating ? 'Autenticando...' : 'Autenticar') : 'REGISTRAR'}
                       </span>
                     </button>
+
+                    {appState === 'login' && authErrors.general && (
+                      <p className="text-[10px] text-red-400 uppercase tracking-[0.08em] max-w-[260px]">
+                        {authErrors.general}
+                      </p>
+                    )}
                   </form>
 
                   <div className="mt-12 pt-10 border-t border-white/5">
