@@ -45,7 +45,16 @@ export default function LoginPage() {
 
       localStorage.setItem('token', response.token)
       localStorage.setItem('user', JSON.stringify(normalizedUser))
-      navigate('/app')
+      
+      let redirectPath = '/app'
+      if (normalizedUser.role === 'SYSTEM_ADMIN') {
+        redirectPath = '/admin-main-view-ui'
+      } else if (normalizedUser.role === 'RESOURCE_MANAGEMENT') {
+        redirectPath = '/resource-main-view'
+      } else if (normalizedUser.role === 'TRAVEL_MANAGER') {
+        redirectPath = '/expeditions'
+      }
+      navigate(redirectPath)
     } catch (error) {
       setErrors({
         general:
