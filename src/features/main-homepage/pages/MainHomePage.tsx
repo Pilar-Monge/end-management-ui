@@ -501,7 +501,7 @@ export function MainHomePage() {
   const [loginVideoIndex, setLoginVideoIndex] = useState(0);
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null);
   const [showCharError, setShowCharError] = useState(false);
-  const [authForm, setAuthForm] = useState<LoginForm>({ username: '', password: '', campId: 1 });
+  const [authForm, setAuthForm] = useState<LoginForm>({ username: '', password: '', campId: 2 });
   const [authErrors, setAuthErrors] = useState<LoginErrors>({});
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const loginVideos = [
@@ -580,8 +580,9 @@ export function MainHomePage() {
 
     try {
       const response = await loginRequest(authForm);
+      const normalizedUser = { ...response.user, role: response.user.rol }
       localStorage.setItem('token', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
+      localStorage.setItem('user', JSON.stringify(normalizedUser))
       navigate('/app');
     } catch (error) {
       setAuthErrors({

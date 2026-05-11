@@ -10,7 +10,7 @@ import type { LoginErrors, LoginForm } from '../types'
 export default function LoginPage() {
   const navigate = useNavigate()
 
-  const [form, setForm] = useState<LoginForm>({ username: '', password: '', campId: 1 })
+  const [form, setForm] = useState<LoginForm>({ username: '', password: '', campId: 2 })
   const [errors, setErrors] = useState<LoginErrors>({})
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -41,9 +41,10 @@ export default function LoginPage() {
 
     try {
       const response = await loginRequest(form)
+      const normalizedUser = { ...response.user, role: response.user.rol }
 
       localStorage.setItem('token', response.token)
-      localStorage.setItem('user', JSON.stringify(response.user))
+      localStorage.setItem('user', JSON.stringify(normalizedUser))
       navigate('/app')
     } catch (error) {
       setErrors({
