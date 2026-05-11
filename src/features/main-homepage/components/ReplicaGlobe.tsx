@@ -194,7 +194,7 @@ const CAMPAMENTOS_DATA: Campamento[] = [
   { id: 5, lat: -22.5621, lng: 17.0658, name: "Ciudadela Arena", status: "En Alerta", survivors: 95, description: "Puerto estratégico de vigilancia en la meseta. Control estricto de accesos perimetrales." },
 ];
 
-const ReplicaGlobe = ({ onLoadingComplete }: { onLoadingComplete?: () => void }) => {
+const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?: () => void; onLoginClick?: () => void }) => {
   const navigate = useNavigate();
   const globeEl = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -539,7 +539,6 @@ const ReplicaGlobe = ({ onLoadingComplete }: { onLoadingComplete?: () => void })
               return;
             }
             if (clickTarget.closest('.admission-request-btn')) {
-              // Open admission form and pass selected camp info so form is prefilled
               navigate('/admission', { state: { returnToGlobalMap: true, campId: camp.id, campName: camp.name } });
               return;
             }
@@ -549,7 +548,8 @@ const ReplicaGlobe = ({ onLoadingComplete }: { onLoadingComplete?: () => void })
               return;
             }
 
-            if (clickTarget.closest('.action-btn')) {navigate('/admission', { state: { returnToGlobalMap: true, campId: camp.id, campName: camp.name } });
+            if (clickTarget.closest('.action-btn')) {
+              onLoginClick?.();
               return;
             }
           };

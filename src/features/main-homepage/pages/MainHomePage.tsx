@@ -2326,7 +2326,10 @@ export function MainHomePage() {
               </button>
               
               <div className="w-full h-full">
-                <ReplicaGlobe onLoadingComplete={() => setIsGlobeLoaded(true)} />
+                <ReplicaGlobe 
+                  onLoadingComplete={() => setIsGlobeLoaded(true)} 
+                  onLoginClick={() => { setAppState('login'); setCurrentMode('Storm'); }}
+                />
               </div>
 
               {/* Text Overlay for Global Map */}
