@@ -1,8 +1,4 @@
-/* ═══════════════════════════════════════════════════
-   ANIMATIONS FOR END MANAGEMENT INTRO
-   ═══════════════════════════════════════════════════ */
 
-/* ── Background reveal ── */
 .anim-bg-reveal {
   animation: bgReveal 1.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
@@ -20,7 +16,7 @@
   }
 }
 
-/* ── Background depth layers ── */
+
 .background-depth-light {
   position: absolute;
   inset: 0;
@@ -65,7 +61,7 @@
   }
 }
 
-/* ── Distressed texture on title ── */
+
 .title-distressed {
   position: relative;
   display: block;
@@ -74,7 +70,6 @@
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
   filter: url(#grunge) drop-shadow(0 0 8px rgba(59, 130, 246, 0.4));
-  /* Ensure the SVG filter can reference the element correctly */
   isolation: isolate;
 }
 
@@ -118,7 +113,6 @@
   }
 }
 
-/* ── Glitch hover effect on title ── */
 .title-glitch-hover {
   transition: text-shadow 0.2s ease, transform 0.2s ease;
 }
@@ -150,7 +144,6 @@
   }
 }
 
-/* ── Typewriter cursor ── */
 .typewriter-cursor {
   display: inline-block;
   color: #93c5fd;
@@ -169,7 +162,6 @@
   }
 }
 
-/* ── Menu item arrow pulse ── */
 .arrow-pulse {
   display: inline-block;
   animation: arrowPulse 1s ease-in-out infinite;
@@ -186,7 +178,6 @@
   }
 }
 
-/* ── Scan lines overlay ── */
 .scanlines {
   background: repeating-linear-gradient(
     0deg,
@@ -208,7 +199,6 @@
   }
 }
 
-/* ── Brush-stroke menu buttons ── */
 .menu-brush {
   position: relative;
   isolation: isolate;
@@ -261,7 +251,6 @@
   background: linear-gradient(90deg, rgba(8, 20, 36, 1), rgba(147, 197, 253, 1));
 }
 
-/* ── Brush-stroke panels ── */
 .panel-brush {
   position: relative;
   isolation: isolate;
@@ -483,7 +472,6 @@
   }
 }
 
-/* ── Top-right icon buttons ── */
 .icon-btn {
   position: relative;
   color: #ffffff;
@@ -516,7 +504,6 @@
   transform: scale(1);
 }
 
-/* Audio icon — wave pulse on hover */
 .icon-audio:hover svg line:nth-child(1) {
   animation: audioWave 0.4s ease-in-out infinite alternate;
   animation-delay: 0s;
@@ -543,7 +530,6 @@
   100% { transform: scaleY(1.4); opacity: 1; }
 }
 
-/* Settings icon — rotate on hover */
 .icon-settings:hover svg {
   animation: settingsSpin 0.8s cubic-bezier(.22,1,.36,1);
 }
@@ -555,7 +541,6 @@
   100% { transform: rotate(180deg); }
 }
 
-/* Exit icon — slide out on hover */
 .icon-exit:hover svg path,
 .icon-exit:hover svg polyline,
 .icon-exit:hover svg line {
@@ -571,7 +556,6 @@
   100% { transform: translateX(3px); }
 }
 
-/* ── Threat detection alert ── */
 .threat-alert {
   display: flex;
   align-items: center;
@@ -600,7 +584,7 @@
   50% { opacity: 0; }
 }
 
-/* ── Atmosphere icon idle pulse ── */
+
 .anim-atmosphere-pulse {
   animation: atmospherePulse 8s ease-in-out infinite;
 }
@@ -616,7 +600,6 @@
   }
 }
 
-/* ── Radio / Walkie-Talkie periodic alert ── */
 .anim-radio-shiver {
   animation: radioShiver 30s ease-in-out infinite;
   transform-origin: bottom center;

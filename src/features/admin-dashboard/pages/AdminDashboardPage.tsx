@@ -1,5 +1,5 @@
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import "./admin-dashboard.css";
@@ -16,10 +16,9 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
 
-// ─── FONTS ──────────────────────────────────────────────────────────────────
+
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Permanent+Marker&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');`;
 
-// ─── TYPES ───────────────────────────────────────────────────────────────────
 
 type NavSection =
   | "CENTRO DE MANDO"
@@ -139,7 +138,6 @@ interface Notification {
   level: "critical" | "warning" | "info";
 }
 
-// ─── INITIAL DATA ─────────────────────────────────────────────────────────────
 
 const INITIAL_PERSONS: Person[] = [
   { id: 1, name: "María González", role: "Médica", status: "Activo", age: 34, sector: "Enfermería", joined: "D-40" },
@@ -222,7 +220,6 @@ const resourceTrendData = [
   { day: "HOY", food: 23, water: 8, ammo: 67 },
 ];
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function scoreColor(s: number) {
   if (s < 50) return "#DC2626";
@@ -273,7 +270,6 @@ function notifColor(l: string) {
   return UI_COLORS.state.info;
 }
 
-// ─── SHARED UI ───────────────────────────────────────────────────────────────
 
 function Card({ children, className = "", glow = "" }: { children: React.ReactNode; className?: string; glow?: string }) {
   return (
@@ -397,7 +393,6 @@ function DonutCenter({ cx, cy, total }: { cx?: number; cy?: number; total: numbe
   );
 }
 
-// ─── SECTION VIEWS ───────────────────────────────────────────────────────────
 
 function ViewPoblacion({ mode }: { mode: PopulationViewMode }) {
   const [persons, setPersons] = useState<Person[]>(INITIAL_PERSONS);
@@ -1743,7 +1738,6 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
   );
 }
 
-// ─── DASHBOARD (overview) ─────────────────────────────────────────────────────
 
 function ViewDashboard() {
   const [countdown, setCountdown] = useState({ h: 3, m: 28, s: 0 });
@@ -2040,9 +2034,6 @@ function ViewDashboard() {
   );
 }
 
-// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-
-// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
   const [activeNav, setActiveNav] = useState<NavSection>("CENTRO DE MANDO");

@@ -28,7 +28,6 @@ const textFields = [
   { name: 'segundoApellido', label: 'Segundo apellido', maxLength: 100, required: false },
 ] as const
 
-// Opciones predefinidas basadas en cómo el backend procesa estos campos
 const healthLevelOptions = [
   { value: '', label: 'Seleccionar nivel de salud' },
   { value: 'healthy no symptoms', label: 'Sin enfermedades conocidas' },
@@ -251,7 +250,6 @@ export default function AdmissionPage() {
     setSuccessMessage('')
     setAiResult(null)
     
-    // Formatear experiencia: si es solo número, agregar "años"
     const formattedExperience = form.experiencia && !Number.isNaN(Number(form.experiencia)) 
       ? `${form.experiencia} años` 
       : form.experiencia || null
