@@ -486,6 +486,25 @@ export default function ResourceMainThreeScene({ onExit }: ResourceMainThreeScen
   const [zoomedTarget, setZoomedTarget] = useState<ResourceZoomTarget>(null)
   const [isSyncing, setIsSyncing] = useState(false)
 
+  
+  useEffect(() => {
+    useGLTF.preload(HANGAR_URL)
+
+    const timer = setTimeout(() => {
+      useGLTF.preload(MONITORING_STATION_URL)
+      useGLTF.preload(BEER_BREWERY_URL)
+      useGLTF.preload(FORD_URL)
+      useGLTF.preload(MEAT_URL)
+      useGLTF.preload(SHELF_URL)
+      useGLTF.preload(FORKLIFT_URL)
+      useGLTF.preload(CEILING_LAMP_URL)
+      useGLTF.preload(FRUIT_URL)
+      useGLTF.preload(CHAIR_URL)
+    }, 2000)
+
+    return () => clearTimeout(timer)
+  }, [])
+
   const handleBack = useCallback(() => {
     if (isSyncing) {
       setIsSyncing(false)
@@ -515,7 +534,8 @@ export default function ResourceMainThreeScene({ onExit }: ResourceMainThreeScen
         shadows={{ type: THREE.BasicShadowMap }}
         camera={{ position: INITIAL_CAMERA, fov: 45 }}
         dpr={[1, 1.5]}
-        gl={{ antialias: true, alpha: false }}
+        gl={{ antialias: false, alpha: false }}
+        performance={{ min: 0.5 }}
       >
         <Suspense fallback={null}>
           <ResourceSceneContent
@@ -576,14 +596,3 @@ export default function ResourceMainThreeScene({ onExit }: ResourceMainThreeScen
     </div>
   )
 }
-
-useGLTF.preload(HANGAR_URL)
-useGLTF.preload(MONITORING_STATION_URL)
-useGLTF.preload(BEER_BREWERY_URL)
-useGLTF.preload(FORD_URL)
-useGLTF.preload(MEAT_URL)
-useGLTF.preload(SHELF_URL)
-useGLTF.preload(FORKLIFT_URL)
-useGLTF.preload(CEILING_LAMP_URL)
-useGLTF.preload(FRUIT_URL)
-useGLTF.preload(CHAIR_URL)
