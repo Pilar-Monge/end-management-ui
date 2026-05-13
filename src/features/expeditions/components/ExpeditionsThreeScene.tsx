@@ -109,7 +109,6 @@ function ExpeditionLoadingOverlay() {
   );
 }
 
-// Componente para manejar la sincronización aisladamente
 function SyncOverlay({ 
   isSyncing, 
   onComplete 
@@ -211,7 +210,6 @@ function CameraReset({ zoomedTarget }: { zoomedTarget: 'station' | 'map' | null 
 
   useEffect(() => {
     if (prevTarget.current !== null && zoomedTarget === null) {
-      // Regresamos a la vista inicial con una orientación fija
       camera.position.set(12, 12, 12);
       camera.lookAt(0, 2.5, 0);
     }
@@ -221,7 +219,6 @@ function CameraReset({ zoomedTarget }: { zoomedTarget: 'station' | 'map' | null 
   return null;
 }
 
-// Componente para manejar el zoom suave de la cámara
 function CameraZoom({ 
   target, 
   lookTarget 
@@ -234,7 +231,6 @@ function CameraZoom({
   const lookVec = useMemo(() => new THREE.Vector3(...lookTarget), [lookTarget]);
   
   useFrame((_, delta) => {
-    // Aumentamos el lerp para que el zoom sea más rápido y responsivo
     camera.position.lerp(targetVec, 6 * delta);
     camera.lookAt(lookVec);
   });
@@ -242,7 +238,6 @@ function CameraZoom({
   return null;
 }
 
-// Estación de interacción
 function InteractionStation({ 
   isZoomed, 
   onHover, 
@@ -301,6 +296,23 @@ export default function ExpeditionsThreeScene({ onExit }: ExpeditionsThreeSceneP
   const [zoomedTarget, setZoomedTarget] = useState<'station' | 'map' | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  useEffect(() => {
+    useGLTF.preload(MODEL_URL)
+    const timer = setTimeout(() => {
+      useGLTF.preload(CARRO1_URL);
+      useGLTF.preload(CARRO2_URL);
+      useGLTF.preload(RADIO_DECORACION_URL);
+      useGLTF.preload(GAS_BARRELS_URL);
+      useGLTF.preload(TOOL_CART_URL);
+      useGLTF.preload(MONITORING_STATION_URL);
+      useGLTF.preload(GEOSYNTH_TABLE_URL);
+      useGLTF.preload(CHAIR_URL);
+      useGLTF.preload(CARDBOARD_BOXES_URL);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   const onHangarLoaded = useCallback((scene: THREE.Group) => {
     if (modelRef.current) return;
     modelRef.current = scene;
@@ -321,7 +333,7 @@ export default function ExpeditionsThreeScene({ onExit }: ExpeditionsThreeSceneP
       setHoveredStation(false);
       setZoomedTarget('station');
     } else if (zoomedTarget === 'station' && !isSyncing) {
-      // Segundo click en zoom entra a sincronización (Solo para la estación de monitoreo)
+      
       setIsSyncing(true);
     }
   }, [zoomedTarget, isSyncing]);
@@ -333,7 +345,7 @@ export default function ExpeditionsThreeScene({ onExit }: ExpeditionsThreeSceneP
       setHoveredMap(false);
       setZoomedTarget('map');
     }
-    // Solo un click para el mapa, no entra a sincronización
+   
   }, [zoomedTarget]);
 
   const handleSyncComplete = useCallback(() => {
@@ -363,9 +375,11 @@ export default function ExpeditionsThreeScene({ onExit }: ExpeditionsThreeSceneP
 
       <Suspense fallback={null}>
         <Canvas 
-          shadows={{ type: THREE.PCFShadowMap }} 
+          dpr={[1, 1.5]}
+          shadows={{ type: THREE.PCFSoftShadowMap }} 
           camera={{ position: [12, 12, 12], fov: 45 }} 
-          gl={{ antialias: true }}
+          gl={{ antialias: false }}
+          performance={{ min: 0.5 }}
         >
           <CameraReset zoomedTarget={zoomedTarget} />
           <color attach="background" args={['#050505']} />
@@ -500,11 +514,11 @@ export default function ExpeditionsThreeScene({ onExit }: ExpeditionsThreeSceneP
         </Canvas>
       </Suspense>
 
-      {/* Interfaz de Control Estilo Sci-Fi */}
+      {}
       <div className="expedition-hud">
-        {/* Top Left: Grouped Controls */}
+        {}
         <div className="expedition-hud-left">
-          {/* Volver - Siempre visible */}
+          {}
           <button className="expedition-hud-button expedition-hud-button--back" onClick={handleBack}>
             <div className="expedition-hud-button-bg"
                  style={{ 
@@ -523,9 +537,9 @@ export default function ExpeditionsThreeScene({ onExit }: ExpeditionsThreeSceneP
           </button>
         </div>
 
-        {/* Top Right: Icons Group */}
+        {}
         <div className="expedition-hud-actions">
-          {/* Audio Icon */}
+          {}
           <button className="expedition-hud-icon-button">
             <div className="expedition-hud-button-bg"
                  style={{ 
@@ -540,7 +554,7 @@ export default function ExpeditionsThreeScene({ onExit }: ExpeditionsThreeSceneP
             </svg>
           </button>
 
-          {/* Settings Icon */}
+          {}
           <button className="expedition-hud-icon-button">
             <div className="expedition-hud-button-bg"
                  style={{ 
@@ -553,7 +567,7 @@ export default function ExpeditionsThreeScene({ onExit }: ExpeditionsThreeSceneP
             </svg>
           </button>
 
-          {/* Exit Icon */}
+          {}
           <button className="expedition-hud-icon-button" onClick={onExit}>
             <div className="expedition-hud-button-bg"
                  style={{ 
@@ -573,14 +587,3 @@ export default function ExpeditionsThreeScene({ onExit }: ExpeditionsThreeSceneP
     </div>
   );
 }
-
-useGLTF.preload(MODEL_URL);
-useGLTF.preload(CARRO1_URL);
-useGLTF.preload(CARRO2_URL);
-useGLTF.preload(RADIO_DECORACION_URL);
-useGLTF.preload(GAS_BARRELS_URL);
-useGLTF.preload(TOOL_CART_URL);
-useGLTF.preload(MONITORING_STATION_URL);
-useGLTF.preload(GEOSYNTH_TABLE_URL);
-useGLTF.preload(CHAIR_URL);
-useGLTF.preload(CARDBOARD_BOXES_URL);
