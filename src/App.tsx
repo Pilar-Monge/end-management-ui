@@ -1,22 +1,33 @@
 
+import { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import LoginPage from './features/login/pages/LoginPage'
-import MainAppPage from './app/layout/MainAppPage'
-import { AdmissionPage } from './features/admission'
-import { MainHomePage } from './features/main-homepage'
-import { CampsPage } from './features/camps'
-import { PersonsPage } from './features/persons'
-import { ExpeditionsPage } from './features/expeditions'
-import { ResourceMainViewPage } from './features/resources'
-import { AdminDashboardPage } from './features/admin-dashboard'
-import { AdminMainViewUiPage } from './features/admin-main-view-ui'
-import {
-  ResourceTypesPage,
-  OccupationsPage,
-  OccupationCriteriaPage,
-  AchievementsPage,
-} from './features/catalogs'
+
+const LoadingSkeleton = () => (
+  <div className="flex items-center justify-center min-h-screen bg-black">
+    <div className="text-center">
+      <div className="animate-pulse mb-4">
+        <div className="h-12 w-12 bg-gray-700 rounded-full mx-auto"></div>
+      </div>
+      <p className="text-gray-400 text-sm">Cargando...</p>
+    </div>
+  </div>
+)
+
+const MainAppPage = lazy(() => import('./app/layout/MainAppPage'))
+const AdmissionPage = lazy(() => import('./features/admission/pages/AdmissionPage'))
+const MainHomePage = lazy(() => import('./features/main-homepage/pages/MainHomePage').then(m => ({ default: m.MainHomePage })))
+const CampsPage = lazy(() => import('./features/camps/pages/CampsPage').then(m => ({ default: m.CampsPage })))
+const PersonsPage = lazy(() => import('./features/persons/pages/PersonsPage').then(m => ({ default: m.PersonsPage })))
+const ExpeditionsPage = lazy(() => import('./features/expeditions/pages/ExpeditionsPage'))
+const ResourceMainViewPage = lazy(() => import('./features/resources/pages/ResourceMainViewPage'))
+const AdminDashboardPage = lazy(() => import('./features/admin-dashboard/pages/AdminDashboardPage').then(m => ({ default: m.default })))
+const AdminMainViewUiPage = lazy(() => import('./features/admin-main-view-ui/pages/AdminMainViewUiPage').then(m => ({ default: m.default })))
+const ResourceTypesPage = lazy(() => import('./features/catalogs/pages/ResourceTypesPage').then(m => ({ default: m.ResourceTypesPage })))
+const OccupationsPage = lazy(() => import('./features/catalogs/pages/OccupationsPage').then(m => ({ default: m.OccupationsPage })))
+const OccupationCriteriaPage = lazy(() => import('./features/catalogs/pages/OccupationCriteriaPage').then(m => ({ default: m.OccupationCriteriaPage })))
+const AchievementsPage = lazy(() => import('./features/catalogs/pages/AchievementsPage').then(m => ({ default: m.AchievementsPage })))
 import { useSessionManager } from './shared/hooks'
 
 function CatalogsLayout() {
@@ -85,7 +96,9 @@ function CatalogsLayout() {
           Volver
         </button>
       </div>
-      <ActiveComponent />
+      <Suspense fallback={<LoadingSkeleton />}>
+        <ActiveComponent />
+      </Suspense>
     </div>
   )
 }
@@ -97,16 +110,16 @@ function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/main-homepage" element={<MainHomePage />} />
-      <Route path="/app" element={<MainAppPage />} />
-      <Route path="/admission" element={<AdmissionPage />} />
-      <Route path="/camps" element={<CampsPage />} />
-      <Route path="/persons" element={<PersonsPage />} />
-      <Route path="/expeditions" element={<ExpeditionsPage />} />
-      <Route path="/resource-main-view" element={<ResourceMainViewPage />} />
-      <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
-      <Route path="/admin-main-view-ui" element={<AdminMainViewUiPage />} />
-      <Route path="/dashboard" element={<AdminDashboardPage />} />
+      <Route path="/main-homepage" element={<Suspense fallback={<LoadingSkeleton />}><MainHomePage /></Suspense>} />
+      <Route path="/app" element={<Suspense fallback={<LoadingSkeleton />}><MainAppPage /></Suspense>} />
+      <Route path="/admission" element={<Suspense fallback={<LoadingSkeleton />}><AdmissionPage /></Suspense>} />
+      <Route path="/camps" element={<Suspense fallback={<LoadingSkeleton />}><CampsPage /></Suspense>} />
+      <Route path="/persons" element={<Suspense fallback={<LoadingSkeleton />}><PersonsPage /></Suspense>} />
+      <Route path="/expeditions" element={<Suspense fallback={<LoadingSkeleton />}><ExpeditionsPage /></Suspense>} />
+      <Route path="/resource-main-view" element={<Suspense fallback={<LoadingSkeleton />}><ResourceMainViewPage /></Suspense>} />
+      <Route path="/admin-dashboard" element={<Suspense fallback={<LoadingSkeleton />}><AdminDashboardPage /></Suspense>} />
+      <Route path="/admin-main-view-ui" element={<Suspense fallback={<LoadingSkeleton />}><AdminMainViewUiPage /></Suspense>} />
+      <Route path="/dashboard" element={<Suspense fallback={<LoadingSkeleton />}><AdminDashboardPage /></Suspense>} />
       <Route path="/catalogs" element={<CatalogsLayout />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
