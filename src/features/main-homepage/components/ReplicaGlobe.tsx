@@ -8,7 +8,7 @@ import * as THREE from 'three';
 
 interface ParticleSystemProps {
   onComplete?: () => void;
-  progress: number; // 0 to 1
+  progress: number; 
   isReady: boolean;
 }
 
@@ -67,13 +67,13 @@ const ParticleSystem: React.FC<ParticleSystemProps> = ({ progress, isReady }) =>
     return { positions, velocities };
   }, []);
 
-  // Track when globe became ready to start the delayed fade
+  
   const readyTimestamp = useRef<number | null>(null);
 
   useFrame((state) => {
     const time = state.clock.getElapsedTime();
 
-    // Swarm Animation
+    
     if (swarmRef.current) {
       const currentPositions = swarmRef.current.geometry.attributes.position.array as Float32Array;
       for (let i = 0; i < formationCount; i++) {
@@ -84,7 +84,7 @@ const ParticleSystem: React.FC<ParticleSystemProps> = ({ progress, isReady }) =>
       }
       swarmRef.current.geometry.attributes.position.needsUpdate = true;
 
-      // Opacity logic: Stay solid (1) until globe is ready + 2s (intro time), then fade
+      
       if (swarmMaterialRef.current) {
         if (!isReady) {
           readyTimestamp.current = null;
@@ -92,8 +92,8 @@ const ParticleSystem: React.FC<ParticleSystemProps> = ({ progress, isReady }) =>
         } else {
           if (!readyTimestamp.current) readyTimestamp.current = Date.now();
           const elapsedSinceReady = Date.now() - readyTimestamp.current;
-          const fadeStartThreshold = 2500; // Wait 2.5s after isReady (globe anim is 2s)
-          const fadeDuration = 1500; // 1.5s fade out
+          const fadeStartThreshold = 2500; 
+          const fadeDuration = 1500; 
 
           if (elapsedSinceReady < fadeStartThreshold) {
             swarmMaterialRef.current.opacity = 1;
@@ -105,7 +105,7 @@ const ParticleSystem: React.FC<ParticleSystemProps> = ({ progress, isReady }) =>
       }
     }
 
-    // Cyber Drift (Always active)
+   
     if (cyberRef.current) {
       const cyberPositions = cyberRef.current.geometry.attributes.position.array as Float32Array;
       for (let i = 0; i < cyberCount; i++) {
@@ -209,14 +209,14 @@ const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?:
   const [formationProgress, setFormationProgress] = useState(0);
   const [displayProgress, setDisplayProgress] = useState(0);
 
-  // Notify parent when loading is complete
+  
   useEffect(() => {
     if (isReady && onLoadingComplete) {
       onLoadingComplete();
     }
   }, [isReady, onLoadingComplete]);
 
-  // Handle resizing to keep alignment
+ 
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
@@ -242,17 +242,17 @@ const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?:
     }
   }, [selectedCampamento]);
 
-  // Initial animation sequence
+ 
   useEffect(() => {
     let frameId: number;
-    const chaosDuration = 2000; // 2 seconds of chaos
-    const formationDuration = 4000; // 4 seconds to form
-    const holdDuration = 1500; // Time to hold the circle before globe appears
-    const introDuration = 2000; // Globe intro animation duration
-    const particleFadeDelay = 2500; // Wait before starting fade
-    const particleFadeDuration = 1500; // Fade duration
+    const chaosDuration = 2000; 
+    const formationDuration = 4000; 
+    const holdDuration = 1500; 
+    const introDuration = 2000; 
+    const particleFadeDelay = 2500; 
+    const particleFadeDuration = 1500; 
     
-    // Total wait time after "ready" to clear loading
+    
     const totalWaitAfterReady = Math.max(introDuration, particleFadeDelay + particleFadeDuration) + 500;
     const totalDuration = chaosDuration + formationDuration + holdDuration + totalWaitAfterReady;
     
@@ -263,20 +263,20 @@ const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?:
       const now = Date.now();
       const elapsed = now - startTimestamp;
 
-      // Update display progress (0 to 1 over total duration)
+      
       setDisplayProgress(Math.min(elapsed / totalDuration, 1));
 
       if (elapsed < chaosDuration) {
-        // Phase 1: Chaos
+       
         setFormationProgress(0);
         frameId = requestAnimationFrame(animate);
       } else if (elapsed < chaosDuration + formationDuration) {
-        // Phase 2: Formation
+        
         const formationElapsed = elapsed - chaosDuration;
         setFormationProgress(formationElapsed / formationDuration);
         frameId = requestAnimationFrame(animate);
       } else {
-        // Phase 3: Static Circle & Transition to Globe
+        
         setFormationProgress(1);
         
         const readyPoint = chaosDuration + formationDuration + holdDuration;
@@ -284,7 +284,7 @@ const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?:
         if (elapsed < readyPoint) {
           frameId = requestAnimationFrame(animate);
         } else {
-          // Phase 4: Globe is appearing, waiting for particles to fade
+          
           if (!hasTriggeredReady) {
             setIsReady(true);
             hasTriggeredReady = true;
@@ -293,7 +293,7 @@ const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?:
           if (elapsed < readyPoint + totalWaitAfterReady) {
             frameId = requestAnimationFrame(animate);
           } else {
-            // All animations finished
+            
             setDisplayProgress(1);
             setIsLoading(false);
           }
@@ -327,7 +327,7 @@ const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?:
 
   return (
     <div ref={containerRef} className="w-full h-full bg-transparent overflow-hidden relative font-sans text-white">
-      {/* Persistent Particle field */}
+      {}
       <div className={`absolute inset-0 pointer-events-none transition-all duration-1000 ${isReady ? 'z-[15] opacity-50' : 'z-[80]'}`}>
         <Canvas
           camera={{ position: [0, 0, 250], fov: 45 }}
@@ -338,7 +338,7 @@ const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?:
         </Canvas>
       </div>
 
-      {/* Loading Overlay Background */}
+      {}
       <AnimatePresence>
         {!isReady && (
           <motion.div
@@ -351,7 +351,7 @@ const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?:
         )}
       </AnimatePresence>
 
-      {/* Loading Overlay Text */}
+      {}
       <AnimatePresence>
         {isLoading && (
           <motion.div
@@ -568,11 +568,11 @@ const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?:
       />
       </motion.div>
 
-      {/* Interface Elements */}
+      {}
       <AnimatePresence>
         {isReady && !isLoading && (
           <>
-            {/* Search Component - Top-Left */}
+            {}
             <motion.div 
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -667,7 +667,7 @@ const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?:
               </AnimatePresence>
             </motion.div>
 
-            {/* Bottom Guide Control */}
+            {}
             <motion.button
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -685,7 +685,7 @@ const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?:
         )}
       </AnimatePresence>
 
-      {/* Manual Modal (Guía del Sobreviviente) */}
+      {}
       <AnimatePresence>
         {isGuideOpen && (
           <motion.div 
