@@ -194,7 +194,7 @@ const CAMPAMENTOS_DATA: Campamento[] = [
   { id: 5, lat: -22.5621, lng: 17.0658, name: "Ciudadela Arena", status: "En Alerta", survivors: 95, description: "Puerto estratégico de vigilancia en la meseta. Control estricto de accesos perimetrales." },
 ];
 
-const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?: () => void; onLoginClick?: () => void }) => {
+const ReplicaGlobe = ({ onLoadingComplete, onLoginClick, onSelectCamp }: { onLoadingComplete?: () => void; onLoginClick?: () => void; onSelectCamp?: (campId: number) => void }) => {
   const navigate = useNavigate();
   const globeEl = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -234,7 +234,7 @@ const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?:
     return () => observer.disconnect();
   }, []);
 
-  // Auto-rotation control
+  
   useEffect(() => {
     if (globeEl.current) {
       globeEl.current.controls().autoRotate = !selectedCampamento;
@@ -320,10 +320,14 @@ const ReplicaGlobe = ({ onLoadingComplete, onLoginClick }: { onLoadingComplete?:
         lng: camp.lng,
         altitude: 0.3
       }, 1500);
+      
+      onSelectCamp?.(camp.id);
     } else if (globeEl.current) {
       globeEl.current.pointOfView({ altitude: 2.5 }, 1200);
+      
+      onSelectCamp?.(0);
     }
-  }, []);
+  }, [onSelectCamp]);
 
   return (
     <div ref={containerRef} className="w-full h-full bg-transparent overflow-hidden relative font-sans text-white">

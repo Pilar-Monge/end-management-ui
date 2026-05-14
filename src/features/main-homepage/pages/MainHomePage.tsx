@@ -14,6 +14,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { MEDIA_URLS } from '../config/mediaUrls';
 import { loginRequest } from '../../login/services/authApi';
 import type { LoginErrors, LoginForm } from '../../login/types';
+import { useAuthDispatch } from '../../../shared/context/AuthContext';
 
 import LandingPage from '../components/LandingPage';
 import ReplicaGlobe from '../components/ReplicaGlobe';
@@ -441,6 +442,7 @@ type appState = 'landing' | 'intro' | 'bridge' | 'video' | 'menu' | 'explore' | 
 export function MainHomePage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const authDispatch = useAuthDispatch();
   const containerRef = useRef<HTMLDivElement>(null);
   const initialAppState = (location.state as { initialAppState?: appState } | null)?.initialAppState;
 
@@ -501,7 +503,7 @@ export function MainHomePage() {
   const [loginVideoIndex, setLoginVideoIndex] = useState(0);
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null);
   const [showCharError, setShowCharError] = useState(false);
-  const [authForm, setAuthForm] = useState<LoginForm>({ username: '', password: '', campId: 2 });
+  const [authForm, setAuthForm] = useState<LoginForm>({ username: '', password: '', campId: null as any });
   const [authErrors, setAuthErrors] = useState<LoginErrors>({});
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const loginVideos = [
@@ -2310,6 +2312,12 @@ export function MainHomePage() {
                 <ReplicaGlobe 
                   onLoadingComplete={() => setIsGlobeLoaded(true)} 
                   onLoginClick={() => { setAppState('login'); setCurrentMode('Storm'); }}
+                  onSelectCamp={(campId) => {
+                    if (campId > 0) {
+                      authDispatch({ type: 'SELECT_CAMP', payload: campId });
+                      setAuthForm(prev => ({ ...prev, campId }));
+                    }
+                  }}
                 />
               </div>
 

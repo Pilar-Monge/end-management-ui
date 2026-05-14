@@ -16,6 +16,7 @@ export interface AuthState {
   isSessionValid: boolean;
   isLoading: boolean;
   error: string | null;
+  selectedCampId: number | null;
 }
 
 
@@ -25,7 +26,8 @@ export type AuthAction =
   | { type: 'UPDATE_SESSION'; payload: Partial<AuthState> }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'INVALIDATE_SESSION' };
+  | { type: 'INVALIDATE_SESSION' }
+  | { type: 'SELECT_CAMP'; payload: number };
 
 
 const initialState: AuthState = {
@@ -35,6 +37,7 @@ const initialState: AuthState = {
   isSessionValid: true,
   isLoading: false,
   error: null,
+  selectedCampId: null,
 };
 
 
@@ -76,6 +79,12 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
       return {
         ...state,
         isSessionValid: false,
+      };
+
+    case 'SELECT_CAMP':
+      return {
+        ...state,
+        selectedCampId: action.payload,
       };
 
     default:
