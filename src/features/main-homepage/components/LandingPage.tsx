@@ -296,8 +296,8 @@ export default function LandingPage({
         style={{ fontFamily: "'Oswald', sans-serif" }}
       >
         <ul className="flex flex-col items-end gap-2">
-          {(["intro", "menu", "login"] as const).map((item, idx) => {
-            const labels = { intro: "INTRO", menu: "LOBBY", login: "LOGIN" };
+          {(["intro", "menu"] as const).map((item, idx) => {
+            const labels = { intro: "INTRO", menu: "LOBBY" };
             return (
               <li
                 key={item}
@@ -313,17 +313,16 @@ export default function LandingPage({
                     setActive(item);
                     if (item === "intro") onIntro();
                     else if (item === "menu") onMenu();
-                    else if (item === "login") onLogin();
                   }}
                   className={`text-2xl md:text-3xl font-bold tracking-wider transition-colors duration-200 menu-item menu-brush ${
-                    (active === item || item === "login")
+                    active === item
                       ? "text-white menu-brush-active-blue"
                       : "text-white"
                   }`}
                 >
                   <span className="relative z-[2] inline-flex items-center gap-3">
                     {labels[item]}
-                    {active === item && (
+                    {item === "intro" && (
                       <span className="text-white arrow-pulse">▶</span>
                     )}
                   </span>
