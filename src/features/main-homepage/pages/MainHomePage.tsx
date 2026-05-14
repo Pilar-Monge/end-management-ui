@@ -2353,7 +2353,6 @@ export function MainHomePage() {
             activeState={appState}
             onIntro={() => { setAppState('intro'); setStoryIndex(-1); }}
             onMenu={() => setAppState('explore')}
-            onLogin={() => { setAppState('login'); setCurrentMode('Storm'); }}
             volume={volume}
             setVolume={setVolume}
             isAudioEnabled={isAudioEnabled}

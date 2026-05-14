@@ -6,7 +6,6 @@ interface LandingPageProps {
   activeState: string;
   onIntro: () => void;
   onMenu: () => void;
-  onLogin: () => void;
   volume: number;
   setVolume: (v: number) => void;
   isAudioEnabled: boolean;
@@ -55,7 +54,6 @@ function SoundWave({ isActive }: { isActive: boolean }) {
 export default function LandingPage({ 
   onIntro, 
   onMenu, 
-  onLogin, 
   volume, 
   setVolume, 
   isAudioEnabled, 
@@ -66,7 +64,7 @@ export default function LandingPage({
   const [showUI, setShowUI] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showCredits, setShowCredits] = useState(false);
-  const [active, setActive] = useState<"intro" | "menu" | "login">("login");
+  const [active, setActive] = useState<"intro" | "menu">("menu");
   const [showVolumePanel, setShowVolumePanel] = useState(false);
   const [isDecoding, setIsDecoding] = useState(true);
   const [decodedTitle, setDecodedTitle] = useState('END MANAGEMENT');
