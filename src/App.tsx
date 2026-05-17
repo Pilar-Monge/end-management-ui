@@ -3,10 +3,11 @@ import { Suspense, lazy, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import LoginPage from './features/login/pages/LoginPage'
-import MainAppPage from './app/layout/MainAppPage'
-import { AdmissionPage } from './features/admission'
-import { MainHomePage } from './features/main-homepage'
 import { useSessionManager } from './shared/hooks'
+
+const MainAppPage = lazy(() => import('./app/layout/MainAppPage'))
+const AdmissionPage = lazy(() => import('./features/admission').then((m) => ({ default: m.AdmissionPage })))
+const MainHomePage = lazy(() => import('./features/main-homepage').then((m) => ({ default: m.MainHomePage })))
 
 const CampsPage = lazy(() => import('./features/camps').then((m) => ({ default: m.CampsPage })))
 const PersonsPage = lazy(() => import('./features/persons').then((m) => ({ default: m.PersonsPage })))
@@ -107,7 +108,7 @@ function CatalogsLayout() {
           Volver
         </button>
       </div>
-      <Suspense fallback={routeFallback}>
+  <Suspense fallback={routeFallback}>
         <ActiveComponent />
       </Suspense>
     </div>
@@ -121,9 +122,9 @@ function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/main-homepage" element={<MainHomePage />} />
-      <Route path="/app" element={<MainAppPage />} />
-      <Route path="/admission" element={<AdmissionPage />} />
+  <Route path="/main-homepage" element={withSuspense(<MainHomePage />)} />
+  <Route path="/app" element={withSuspense(<MainAppPage />)} />
+  <Route path="/admission" element={withSuspense(<AdmissionPage />)} />
   <Route path="/camps" element={withSuspense(<CampsPage />)} />
   <Route path="/persons" element={withSuspense(<PersonsPage />)} />
   <Route path="/expeditions" element={withSuspense(<ExpeditionsPage />)} />

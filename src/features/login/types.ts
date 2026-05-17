@@ -2,7 +2,7 @@ export interface LoginForm {
   username: string
   password: string
 
-  campId: number
+  campId: number | null
 }
 export interface Camp {
   id: number

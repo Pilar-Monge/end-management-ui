@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { ApocInput } from '../components/ApocInput'
@@ -6,17 +6,26 @@ import { LandingGhosts } from '../components/LandingGhosts'
 import { HudCorners, Scanlines } from '../components/BackgroundEffects'
 import { loginRequest } from '../services/authApi'
 import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
+import { useAuthState } from '../../../shared/context/AuthContext'
 import type { LoginErrors, LoginForm } from '../types'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const authState = useAuthState()
 
-  const [form, setForm] = useState<LoginForm>({ username: '', password: '', campId: 1 })
+  const [form, setForm] = useState<LoginForm>({ username: '', password: '', campId: null })
   const [errors, setErrors] = useState<LoginErrors>({})
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showLoginForm, setShowLoginForm] = useState(false)
   const [cinematicPulse, setCinematicPulse] = useState(0)
+
+  
+  useEffect(() => {
+    if (authState?.selectedCampId) {
+      setForm(prev => ({ ...prev, campId: authState.selectedCampId }))
+    }
+  }, [authState?.selectedCampId])
 
   function validate(): boolean {
     const nextErrors: LoginErrors = {}
@@ -28,6 +37,10 @@ export default function LoginPage() {
     if (!form.password) nextErrors.password = 'Campo requerido'
     if (form.password.length > 0 && form.password.length < 6)
       nextErrors.password = 'Mínimo 6 caracteres'
+
+    if (!form.campId) {
+      (nextErrors as any).campId = 'Debes seleccionar un campamento en el globo'
+    }
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -42,11 +55,23 @@ export default function LoginPage() {
 
     try {
       const response = await loginRequest(form)
+      const normalizedUser = { ...response.user, role: response.user.rol }
 
       localStorage.setItem('token', response.token)
       localStorage.setItem('user', JSON.stringify(response.user))
       window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
       navigate('/app')
+      localStorage.setItem('user', JSON.stringify(normalizedUser))
+      
+      let redirectPath = '/app'
+      if (normalizedUser.role === 'SYSTEM_ADMIN') {
+        redirectPath = '/admin-main-view-ui'
+      } else if (normalizedUser.role === 'RESOURCE_MANAGEMENT') {
+        redirectPath = '/resource-main-view'
+      } else if (normalizedUser.role === 'TRAVEL_MANAGER') {
+        redirectPath = '/expeditions'
+      }
+      navigate(redirectPath)
     } catch (error) {
       setErrors({
         general:

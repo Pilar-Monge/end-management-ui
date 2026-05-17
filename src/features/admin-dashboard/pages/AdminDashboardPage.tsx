@@ -63,10 +63,9 @@ import {
   toDisplayDate,
 } from "../mappers/adminMappers";
 
-// ─── FONTS ──────────────────────────────────────────────────────────────────
+
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Permanent+Marker&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');`;
 
-// ─── TYPES ───────────────────────────────────────────────────────────────────
 
 type NavSection =
   | "CENTRO DE MANDO"
@@ -357,6 +356,7 @@ const INITIAL_COLLECTIONS: DailyCollection[] = [
   { id: 3, resource: "Semillas", amountCollected: 12, date: "D-47", notes: "Huerto norte" },
 ];
 
+//  INITIAL DATA 
 const INITIAL_EXPEDITIONS: Expedition[] = [
   { id: 1, name: "EXPEDICIÓN NORTE", day: 3, total: 5, participants: ["JR", "MA", "PC", "LS", "KT"], status: "EN CURSO", objective: "Buscar suministros médicos en hospital abandonado.", sector: "Sector Norte — 12km" },
   { id: 2, name: "EXPLORACIÓN SECTOR 7", day: 0, total: 5, participants: ["DN", "AS", "FG", "JL"], status: "PROGRAMADA", objective: "Reconocimiento de rutas alternativas.", sector: "Sector Este — 8km" },
@@ -415,7 +415,6 @@ const resourceTrendData = [
   { day: "HOY", food: 23, water: 8, ammo: 67 },
 ];
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function scoreColor(s: number) {
   if (s < 50) return "#DC2626";
@@ -460,7 +459,6 @@ function notifColor(l: string) {
   return UI_COLORS.state.info;
 }
 
-// ─── SHARED UI ───────────────────────────────────────────────────────────────
 
 function Card({ children, className = "", glow = "" }: { children: React.ReactNode; className?: string; glow?: string }) {
   return (
@@ -660,7 +658,6 @@ function DonutCenter({ cx, cy, total }: { cx?: number; cy?: number; total: numbe
   );
 }
 
-// ─── SECTION VIEWS ───────────────────────────────────────────────────────────
 
 function ViewPoblacion({ mode, campId }: { mode: PopulationViewMode; campId?: number }) {
   const [persons, setPersons] = useState<Person[]>(INITIAL_PERSONS);
@@ -3259,7 +3256,6 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
   );
 }
 
-// ─── DASHBOARD (overview) ─────────────────────────────────────────────────────
 
 function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSection) => void; notifs: Notification[] }) {
   const [countdown, setCountdown] = useState({ h: 3, m: 28, s: 0 });
@@ -3650,9 +3646,6 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
   );
 }
 
-// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-
-// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
   const [activeNav, setActiveNav] = useState<NavSection>("CENTRO DE MANDO");

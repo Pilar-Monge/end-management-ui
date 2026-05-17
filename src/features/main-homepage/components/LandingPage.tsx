@@ -6,7 +6,6 @@ interface LandingPageProps {
   activeState: string;
   onIntro: () => void;
   onMenu: () => void;
-  onLogin: () => void;
   volume: number;
   setVolume: (v: number) => void;
   isAudioEnabled: boolean;
@@ -55,7 +54,6 @@ function SoundWave({ isActive }: { isActive: boolean }) {
 export default function LandingPage({ 
   onIntro, 
   onMenu, 
-  onLogin, 
   volume, 
   setVolume, 
   isAudioEnabled, 
@@ -66,7 +64,7 @@ export default function LandingPage({
   const [showUI, setShowUI] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showCredits, setShowCredits] = useState(false);
-  const [active, setActive] = useState<"intro" | "menu" | "login">("login");
+  const [active, setActive] = useState<"intro" | "menu">("menu");
   const [showVolumePanel, setShowVolumePanel] = useState(false);
   const [isDecoding, setIsDecoding] = useState(true);
   const [decodedTitle, setDecodedTitle] = useState('END MANAGEMENT');
@@ -129,7 +127,7 @@ export default function LandingPage({
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black text-white select-none">
-      {/* ── Background Layer ── */}
+      {}
       <div
         className="absolute inset-0 bg-cover bg-center anim-bg-reveal"
         style={{
@@ -138,7 +136,7 @@ export default function LandingPage({
         }}
       />
 
-      {/* ── Overlays ── */}
+      {}
       <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/20 to-black/80" />
       <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-black/40" />
       <div
@@ -148,12 +146,12 @@ export default function LandingPage({
         }}
       />
 
-      {/* ── Depth Layers ── */}
+      {}
       <div className="background-depth-light" />
       <div className="background-depth-fog" />
       <div className="background-depth-shadow" />
 
-      {/* ── Grain ── */}
+      {}
       <div
         className="absolute inset-0 opacity-[0.18] mix-blend-overlay pointer-events-none"
         style={{
@@ -161,10 +159,10 @@ export default function LandingPage({
         }}
       />
 
-      {/* ── Scanlines ── */}
+      {}
       <div className="absolute inset-0 pointer-events-none z-30 scanlines" />
 
-      {/* ── Icons Superiores ── */}
+      {}
       <div
         className={`absolute top-5 right-6 flex items-center gap-5 z-20 transition-all duration-1000 ${
           showUI ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
@@ -250,7 +248,7 @@ export default function LandingPage({
       </div>
 
 
-      {/* ── Título ── */}
+      {}
       <div
         className="absolute top-[5%] left-[3.5%] z-20"
         style={{ fontFamily: "'Oswald', sans-serif" }}
@@ -290,14 +288,14 @@ export default function LandingPage({
         </div>
       </div>
 
-      {/* ── Menú Inferior Derecho ── */}
+      {}
       <div
         className="absolute bottom-10 right-10 z-20 text-right"
         style={{ fontFamily: "'Oswald', sans-serif" }}
       >
         <ul className="flex flex-col items-end gap-2">
-          {(["intro", "menu", "login"] as const).map((item, idx) => {
-            const labels = { intro: "INTRO", menu: "LOBBY", login: "LOGIN" };
+          {(["intro", "menu"] as const).map((item, idx) => {
+            const labels = { intro: "INTRO", menu: "LOBBY" };
             return (
               <li
                 key={item}
@@ -313,17 +311,16 @@ export default function LandingPage({
                     setActive(item);
                     if (item === "intro") onIntro();
                     else if (item === "menu") onMenu();
-                    else if (item === "login") onLogin();
                   }}
                   className={`text-2xl md:text-3xl font-bold tracking-wider transition-colors duration-200 menu-item menu-brush ${
-                    (active === item || item === "login")
+                    active === item
                       ? "text-white menu-brush-active-blue"
                       : "text-white"
                   }`}
                 >
                   <span className="relative z-[2] inline-flex items-center gap-3">
                     {labels[item]}
-                    {active === item && (
+                    {item === "intro" && (
                       <span className="text-white arrow-pulse">▶</span>
                     )}
                   </span>
@@ -334,7 +331,7 @@ export default function LandingPage({
         </ul>
       </div>
 
-      {/* ── Créditos / Studio Badge ── */}
+      {}
       <div
         className={`absolute bottom-6 left-6 z-40 transition-all duration-1000 delay-[1600ms] ${
           showMenu ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
@@ -410,7 +407,7 @@ export default function LandingPage({
         )}
       </AnimatePresence>
 
-      {/* ── SVG Decorativo ── */}
+      {}
       <svg
         className="absolute inset-0 w-full h-full pointer-events-none z-10 opacity-60"
         viewBox="0 0 1920 1080"
@@ -422,7 +419,7 @@ export default function LandingPage({
         </g>
       </svg>
 
-      {/* ── Filtro SVG Grunge ── */}
+      {}
       <svg className="absolute" style={{ width: 0, height: 0 }}>
         <defs>
           <filter id="grunge">

@@ -1,31 +1,100 @@
-import type { FormState } from '../types'
+import type {
+  AdmissionRequest,
+  ProcessAIPayload,
+  ReviewAdmissionPayload,
+} from '../types'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
 
-export async function submitAdmission(form: FormState, photo: File | null): Promise<void> {
-  const formData = new FormData()
+const getToken = (): string | null => localStorage.getItem('token')
 
-  formData.append('nombre', form.nombre)
-  formData.append('primer_apellido', form.primerApellido)
-  formData.append('segundo_apellido', form.segundoApellido)
-  formData.append('email', form.email)
-  formData.append('usuario', form.usuario)
-  formData.append('genero', form.genero)
-  formData.append('nacimiento', form.nacimiento)
-  formData.append('salud', form.salud)
-  formData.append('experiencia', form.experiencia)
-  formData.append('condicion', form.condicion)
-  formData.append('habilidades', form.habilidades)
+const getHeaders = (): HeadersInit => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${getToken() || ''}`,
+})
 
-  if (photo) {
-    formData.append('photo', photo)
+export async function submitAdmission(
+  payload: FormData | Record<string, any>,
+): Promise<AdmissionRequest> {
+  const token = getToken()
+  if (payload instanceof FormData) {
+    const res = await fetch(`${BASE_URL}/admission-requests`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token || ''}`,
+      },
+      body: payload,
+    })
+
+    const data = await res.json()
+    if (!res.ok) {
+      throw new Error(data.message || 'Error al enviar la solicitud de admisión')
+    }
+    return data.data
   }
-
-  const response = await fetch(`${BASE_URL}/admission_requests`, {
+  const res = await fetch(`${BASE_URL}/admission-requests`, {
     method: 'POST',
-    body: formData,
+    headers: getHeaders(),
+    body: JSON.stringify(payload),
   })
 
-  const errorText = await response.text()
-  if (!response.ok) throw new Error(errorText || 'Error al enviar el formulario')
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.message || 'Error al enviar la solicitud de admisión')
+  }
+  return data.data
+}
+export async function fetchPendingAdmissions(campId: number): Promise<AdmissionRequest[]> {
+  const res = await fetch(`${BASE_URL}/admission-requests/camps/${campId}/pending`, {
+    headers: getHeaders(),
+  })
+
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.message || 'Error al obtener solicitudes pendientes')
+  }
+  return data.data
+}
+export async function fetchAdmissionRequestById(id: number): Promise<AdmissionRequest> {
+  const res = await fetch(`${BASE_URL}/admission-requests/${id}`, {
+    headers: getHeaders(),
+  })
+
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.message || 'Error obteniendo solicitud')
+  }
+  return data.data
+}
+export async function processAdmissionWithAI(
+  id: number,
+  payload: ProcessAIPayload,
+): Promise<AdmissionRequest> {
+  const res = await fetch(`${BASE_URL}/admission-requests/${id}/process-ai`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(payload),
+  })
+
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.message || 'Error procesando con IA')
+  }
+  return data.data
+}
+export async function reviewAdmissionRequest(
+  id: number,
+  payload: ReviewAdmissionPayload,
+): Promise<AdmissionRequest> {
+  const res = await fetch(`${BASE_URL}/admission-requests/${id}/review`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(payload),
+  })
+
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.message || 'Error en revisión de solicitud')
+  }
+  return data.data
 }

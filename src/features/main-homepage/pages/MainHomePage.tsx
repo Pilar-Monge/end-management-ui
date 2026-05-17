@@ -10,14 +10,17 @@ import { PointerLockControls } from 'three/addons/controls/PointerLockControls.j
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Compass, Volume2, VolumeX, X, ChevronLeft, ChevronRight, Menu, Wind, HelpCircle } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { MEDIA_URLS } from '../config/mediaUrls';
+import { loginRequest } from '../../login/services/authApi';
+import type { LoginErrors, LoginForm } from '../../login/types';
+import { useAuthDispatch } from '../../../shared/context/AuthContext';
 
 import LandingPage from '../components/LandingPage';
 import ReplicaGlobe from '../components/ReplicaGlobe';
 import '../mainHomepage.css';
 
-// --- Constants & Types ---
+
 
 declare global {
   interface Window {
@@ -86,7 +89,7 @@ const TEAM_MEMBERS = [
 void GitHubIcon;
 void TEAM_MEMBERS;
 
-// ── Hologram Globe Component ───────────────────────────────────────────────
+
 const HologramGlobe = ({ onSelectCamp, isPaused }: { onSelectCamp: (camp: any) => void; isPaused: boolean }) => {
   const mountRef = React.useRef<HTMLDivElement>(null);
   const controlsRef = React.useRef<any>(null);
@@ -102,7 +105,7 @@ const HologramGlobe = ({ onSelectCamp, isPaused }: { onSelectCamp: (camp: any) =
   React.useEffect(() => {
     if (!mountRef.current) return;
     
-    // Dynamic import of three-globe
+   
     import('three-globe').then(({ default: ThreeGlobe }) => {
       if (!mountRef.current) return;
       const width = mountRef.current.clientWidth;
@@ -176,7 +179,7 @@ const HologramGlobe = ({ onSelectCamp, isPaused }: { onSelectCamp: (camp: any) =
       controls.autoRotateSpeed = 0.4;
       controlsRef.current = controls;
 
-      // Click detection
+     
       const raycaster = new THREE.Raycaster();
       const mouse = new THREE.Vector2();
       const onClick = (e: MouseEvent) => {
@@ -218,13 +221,13 @@ const HologramGlobe = ({ onSelectCamp, isPaused }: { onSelectCamp: (camp: any) =
         const w = mountRef.current.clientWidth;
         const h = mountRef.current.clientHeight;
         camera.aspect = w / h;
-        // Adjust camera Z based on width for responsiveness
+        
         camera.position.z = w < 768 ? 350 : 220;
         camera.updateProjectionMatrix();
         renderer.setSize(w, h);
       };
       window.addEventListener('resize', handleResize);
-      handleResize(); // Initial call
+      handleResize(); 
 
       return () => {
         cancelAnimationFrame(animId);
@@ -248,7 +251,7 @@ const HologramGlobe = ({ onSelectCamp, isPaused }: { onSelectCamp: (camp: any) =
 };
 void HologramGlobe;
 
-// ── Camp Structure Component ────────────────────────────────────────────────
+
 function CampStructure({ camp, onBack }: { camp: any, onBack: () => void }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [seeThrough, setSeeThrough] = useState(0.5);
@@ -270,10 +273,10 @@ function CampStructure({ camp, onBack }: { camp: any, onBack: () => void }) {
     renderer.setPixelRatio(window.devicePixelRatio);
     mountRef.current.appendChild(renderer.domElement);
 
-    // Structure - A complex geometric shape representing a futuristic bunker
+   
     const group = new THREE.Group();
     
-    // Outer shell
+  
     const outerGeom = new THREE.IcosahedronGeometry(8, 1);
     const outerMat = new THREE.MeshPhongMaterial({
       color: 0x222222,
@@ -285,18 +288,18 @@ function CampStructure({ camp, onBack }: { camp: any, onBack: () => void }) {
     const outer = new THREE.Mesh(outerGeom, outerMat);
     group.add(outer);
 
-    // Wireframe overlay (Amber)
+   
     const wireMat = new THREE.MeshBasicMaterial({ color: 0xd2a679, wireframe: true, transparent: true, opacity: 0.3 });
     const wire = new THREE.Mesh(outerGeom, wireMat);
     group.add(wire);
 
-    // Inner core (Amber glow)
+    
     const innerGeom = new THREE.BoxGeometry(4, 4, 4);
     const innerMat = new THREE.MeshPhongMaterial({ color: 0xd2a679, emissive: 0xd2a679, emissiveIntensity: 0.5 });
     const inner = new THREE.Mesh(innerGeom, innerMat);
     group.add(inner);
 
-    // Internal structures
+  
     for(let i=0; i<8; i++) {
       const room = new THREE.Mesh(
         new THREE.BoxGeometry(1.5, 1.5, 1.5),
@@ -326,7 +329,7 @@ function CampStructure({ camp, onBack }: { camp: any, onBack: () => void }) {
       frameId = requestAnimationFrame(animate);
       controls.update();
       
-      // Update opacity based on state
+     
       outerMat.opacity = 1 - seeThrough;
       group.children.forEach(child => {
         if (child instanceof THREE.Mesh && child !== outer && child !== wire && child !== inner) {
@@ -359,12 +362,12 @@ function CampStructure({ camp, onBack }: { camp: any, onBack: () => void }) {
 
   return (
     <div className="w-full h-full relative bg-[#0a0805]">
-      {/* Background Glow - Amber */}
+      
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(210,166,121,0.08)_0%,transparent_70%)] pointer-events-none" />
       
       <div ref={mountRef} className="w-full h-full" />
       
-      {/* UI Overlay */}
+     
       <div className="absolute top-12 left-12 z-10 max-w-md pointer-events-none">
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -415,7 +418,7 @@ function CampStructure({ camp, onBack }: { camp: any, onBack: () => void }) {
         </button>
       </div>
 
-      {/* Technical Data */}
+      
       <div className="absolute bottom-12 right-12 z-10 text-right pointer-events-none text-white">
         <div className="text-[10px] font-mono text-white">TEMP: 24.5°C</div>
         <div className="text-[10px] font-mono text-white">PRES: 1013 hPa</div>
@@ -426,22 +429,24 @@ function CampStructure({ camp, onBack }: { camp: any, onBack: () => void }) {
 }
 void CampStructure;
 
-// Helper to compute terrain height at any (x, z)
+
 function getTerrainY(x: number, z: number): number {
   return (Math.sin(x / 15) * Math.cos(z / 15) * 15) +
          (Math.sin(x / 40) * Math.cos(z / 40) * 20);
 }
 
-// --- Component ---
+
 
 type appState = 'landing' | 'intro' | 'bridge' | 'video' | 'menu' | 'explore' | 'login' | 'register' | 'global-map' | 'camp-detail';
 
 export function MainHomePage() {
+  const navigate = useNavigate();
   const location = useLocation();
+  const authDispatch = useAuthDispatch();
   const containerRef = useRef<HTMLDivElement>(null);
   const initialAppState = (location.state as { initialAppState?: appState } | null)?.initialAppState;
 
-  // ── State ──────────────────────────────────────────────────────────────────
+
   const [appState,     setAppState]     = useState<appState>(initialAppState ?? 'landing');
   const [selectedCamp, setSelectedCamp] = useState<any>(null);
   const [currentMode,  setCurrentMode]  = useState<Mode>('Storm');
@@ -456,7 +461,7 @@ export function MainHomePage() {
       }
     }
     
-    // Skip loading overlay for video/bridge states to ensure seamless transitions
+
     if (appState !== 'video' && appState !== 'bridge' && appState !== 'landing') {
       setIsTransitioning(true);
       const timer = setTimeout(() => setIsTransitioning(false), 250);
@@ -498,6 +503,9 @@ export function MainHomePage() {
   const [loginVideoIndex, setLoginVideoIndex] = useState(0);
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null);
   const [showCharError, setShowCharError] = useState(false);
+  const [authForm, setAuthForm] = useState<LoginForm>({ username: '', password: '', campId: null as any });
+  const [authErrors, setAuthErrors] = useState<LoginErrors>({});
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const loginVideos = [
     MEDIA_URLS.images.characters.principal,
     MEDIA_URLS.images.characters.mecanico,
@@ -510,7 +518,6 @@ export function MainHomePage() {
     { name: 'SARA "THE SCOUT"', quote: '"Veo lo que otros prefieren ignorar."' }
   ];
 
-  // Auto-cycle characters in Login mode
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (appState === 'login') {
@@ -528,17 +535,86 @@ export function MainHomePage() {
   }, [appState]);
 
   useEffect(() => {
+    if (appState !== 'login') {
+      setAuthErrors({});
+      setIsAuthenticating(false);
+    }
+  }, [appState]);
+
+  function validateLoginForm(): boolean {
+    const nextErrors: LoginErrors = {};
+
+    if (!authForm.username.trim()) nextErrors.username = 'Campo requerido';
+    if (authForm.username.length > 0 && authForm.username.length < 3)
+      nextErrors.username = 'Minimo 3 caracteres';
+
+    if (!authForm.password) nextErrors.password = 'Campo requerido';
+    if (authForm.password.length > 0 && authForm.password.length < 6)
+      nextErrors.password = 'Minimo 6 caracteres';
+
+    setAuthErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
+
+  function handleAuthFieldChange(field: 'username' | 'password', value: string) {
+    setAuthForm((prev) => ({ ...prev, [field]: value }));
+    if (authErrors[field]) setAuthErrors((prev) => ({ ...prev, [field]: undefined }));
+    if (authErrors.general) setAuthErrors((prev) => ({ ...prev, general: undefined }));
+  }
+
+  async function handleAuthSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (appState === 'register') {
+      if (selectedCharacter === null) {
+        setShowCharError(true);
+        return;
+      }
+      setAppState('explore');
+      return;
+    }
+
+    if (!validateLoginForm()) return;
+
+    setIsAuthenticating(true);
+    setAuthErrors({});
+
+    try {
+      const response = await loginRequest(authForm);
+      const normalizedUser = { ...response.user, role: response.user.rol }
+      localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(normalizedUser))
+      
+      let redirectPath = '/app'
+      if (normalizedUser.role === 'SYSTEM_ADMIN') {
+        redirectPath = '/admin-main-view-ui'
+      } else if (normalizedUser.role === 'RESOURCE_MANAGEMENT') {
+        redirectPath = '/resource-main-view'
+      } else if (normalizedUser.role === 'TRAVEL_MANAGER') {
+        redirectPath = '/expeditions'
+      }
+      navigate(redirectPath);
+    } catch (error) {
+      setAuthErrors({
+        general: error instanceof Error ? error.message : 'No se pudo iniciar sesion contra el backend',
+      });
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }
+
+  useEffect(() => {
     const interval = setInterval(() => {
       setCoords({ ...coordsRef.current });
     }, 150);
     return () => clearInterval(interval);
   }, []);
 
-  // ── Audio State ──────────────────────────────────────────────────────────
+
   const [isAudioEnabled, setIsAudioEnabled] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // ── Refs that mirror state (for animation loop — avoids stale closures) ────
+
   const appStateRef   = useRef(appState);
   const isPausedRef   = useRef(isPaused);
   const currentModeRef = useRef(currentMode);
@@ -549,14 +625,14 @@ export function MainHomePage() {
   useEffect(() => { currentModeRef.current = currentMode; }, [currentMode]);
   useEffect(() => { isAnyMenuOpenRef.current = isAnyMenuOpen; }, [isAnyMenuOpen]);
 
-  // ── Mouse position ref (for Flight steering) ──────────────────────────────
+
   const mouse = useRef({ x: 0, y: 0, lastX: 0, lastY: 0, deltaX: 0, deltaY: 0 });
   const isMouseDown = useRef(false);
 
-  // ── Keyboard state ────────────────────────────────────────────────────────
+ 
   const keys = useRef<Record<string, boolean>>({});
 
-  // ── Three.js object refs ──────────────────────────────────────────────────
+
   const sceneRef      = useRef<THREE.Scene | null>(null);
   const cameraRef     = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef   = useRef<THREE.WebGLRenderer | null>(null);
@@ -577,7 +653,7 @@ export function MainHomePage() {
   const bridgeVideoRef = useRef<HTMLVideoElement>(null);
   const mainVideoRef   = useRef<HTMLVideoElement>(null);
 
-  // ── Video Pause Logic ───────────────────────────────────────────────────
+
   useEffect(() => {
     if (bridgeVideoRef.current) {
       if (isPaused || appState !== 'bridge') bridgeVideoRef.current.pause();
@@ -592,9 +668,6 @@ export function MainHomePage() {
     }
   }, [isPaused, appState]);
 
-    // ── Audio Logic ──────────────────────────────────────────────────────────
-    // volume is handled via setVolume directly in the UI
-
 
 
   useEffect(() => {
@@ -603,7 +676,7 @@ export function MainHomePage() {
     }
   }, [volume]);
 
-  // ── Story progression ─────────────────────────────────────────────────────
+
   useEffect(() => {
     if (appState !== 'intro' || isPaused) return;
     if (storyIndex === -1) { setStoryIndex(0); return; }
@@ -612,7 +685,7 @@ export function MainHomePage() {
 
     const timer = setTimeout(() => {
       if (storyIndex === 4) {
-        // Transition to bridge state after step 4
+      
         setAppState('bridge');
       } else if (storyIndex < 4) {
         setStoryIndex(prev => prev + 1);
@@ -622,10 +695,10 @@ export function MainHomePage() {
     return () => clearTimeout(timer);
   }, [appState, storyIndex, isPaused]);
 
-  // Removed old video text effect useEffect
 
 
-  // ── Scene mode (atmosphere) changes ──────────────────────────────────────
+
+  
   useEffect(() => {
     if (!sceneRef.current) return;
     const config = MODES[currentMode];
@@ -633,7 +706,7 @@ export function MainHomePage() {
     
     console.log(`Changing mode to: ${currentMode}`, config);
 
-    // Smooth transition for background and fog
+    
     scene.background = new THREE.Color(config.skyColor);
     if (scene.fog instanceof THREE.FogExp2) {
       scene.fog.color.set(config.fogColor);
@@ -694,7 +767,7 @@ export function MainHomePage() {
         child.intensity = config.ambientIntensity;
         child.color.set(config.fogColor);
       }
-      // Wet effect for terrain during storm
+
       if (child instanceof THREE.Mesh && child.geometry instanceof THREE.PlaneGeometry) {
         const mat = child.material as THREE.MeshStandardMaterial;
         if (currentMode === 'Storm') {
@@ -708,11 +781,11 @@ export function MainHomePage() {
     });
   }, [currentMode, isSceneReady]);
 
-  // ── Three.js init (runs once) ─────────────────────────────────────────────
+
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // ── Scene & Camera ───────────────────────────────────────────
+
     const scene  = new THREE.Scene();
     scene.background = new THREE.Color(MODES[currentModeRef.current].skyColor);
     scene.fog        = new THREE.FogExp2(MODES[currentModeRef.current].fogColor, MODES[currentModeRef.current].fogDensity);
@@ -723,7 +796,7 @@ export function MainHomePage() {
     camera.rotation.order = 'YXZ';
     cameraRef.current = camera;
 
-    // ── Renderer ─────────────────────────────────────────────────
+  
     const renderer = new THREE.WebGLRenderer({ 
       antialias: true, 
       powerPreference: "high-performance",
@@ -735,7 +808,7 @@ export function MainHomePage() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.setClearColor(0x000000, 1);
     
-    // Clear container to prevent multiple canvases (React 18 StrictMode fix)
+   
     if (containerRef.current) {
       containerRef.current.innerHTML = '';
       renderer.domElement.style.display = 'block';
@@ -743,30 +816,30 @@ export function MainHomePage() {
     }
     rendererRef.current = renderer;
     
-    // ── Lights ───────────────────────────────────────────────────
+   
     const ambientLight = new THREE.AmbientLight(0xffffff, MODES[currentModeRef.current].ambientIntensity);
     scene.add(ambientLight);
 
-    // ── OrbitControls ────────────────────────────────────────────
+  
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.enabled = false;
     controlsRef.current = controls;
 
-    // ── PointerLockControls ──────────────────────────────────────
+   
     const fpControls = new PointerLockControls(camera, document.body);
     fpControlsRef.current = fpControls;
     fpControls.addEventListener('lock',   () => setIsLocked(true));
     fpControls.addEventListener('unlock', () => setIsLocked(false));
 
-    // ── Keyboard ─────────────────────────────────────────────────
+   
     const onKeyDown = (e: KeyboardEvent) => { keys.current[e.code] = true; };
     const onKeyUp   = (e: KeyboardEvent) => { keys.current[e.code] = false; };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup',   onKeyUp);
 
-    // ── Mouse & Touch ────────────────────────────────────────────
+  
     const onMouseMove = (e: MouseEvent) => {
       const currentX = (e.clientX / window.innerWidth) * 2 - 1;
       const currentY = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -810,7 +883,7 @@ export function MainHomePage() {
     window.addEventListener('touchmove', onTouchMove, { passive: false });
     window.addEventListener('touchend', onTouchEnd);
 
-    // ── Terrain ──────────────────────────────────────────────────
+
     const terrainGeo = new THREE.PlaneGeometry(1000, 1000, 100, 100);
     terrainGeo.rotateX(-Math.PI / 2);
     const verts = terrainGeo.attributes.position.array as Float32Array;
@@ -822,10 +895,9 @@ export function MainHomePage() {
     terrainMesh.receiveShadow = true;
     scene.add(terrainMesh);
 
-    // ── Trees ────────────────────────────────────────────────────
     const treeGroup    = new THREE.Group();
     
-    // Create Bark Texture
+  
     const barkCanvas = document.createElement('canvas');
     barkCanvas.width = 64;
     barkCanvas.height = 128;
@@ -844,8 +916,7 @@ export function MainHomePage() {
     const leavesMat    = new THREE.MeshStandardMaterial({ color: 0x000000, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
     const deadMat      = new THREE.MeshStandardMaterial({ color: 0x111111 });
 
-    // Use BufferGeometryUtils for merging if available, or manual merge
-    // Since we are in a single file, we'll do a simple manual merge or just reduce complexity
+    
     for (let i = 0; i < 150; i++) {
       const x = (Math.random() - 0.5) * 800;
       const z = (Math.random() - 0.5) * 800;
@@ -874,28 +945,28 @@ export function MainHomePage() {
           tree.add(leaf);
         }
       } else {
-        // Improved dead tree look: more branches, better distribution
+       
         const branchCount = 8 + Math.floor(Math.random() * 5);
         for (let j = 0; j < branchCount; j++) {
           const branchHeight = 2 + Math.random() * 3;
           const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.05, branchHeight, 4), deadMat);
-          // Distribute branches along the upper 70% of the trunk
+          
           branch.position.y = height * 0.3 + Math.random() * (height * 0.6);
           branch.rotation.x = Math.random() * Math.PI;
           branch.rotation.z = Math.random() * Math.PI;
-          // Offset slightly from center
+          
           branch.position.x = (Math.random() - 0.5) * 0.2;
           branch.position.z = (Math.random() - 0.5) * 0.2;
           tree.add(branch);
         }
-        // Add a slight tilt to the whole dead tree
+        
         tree.rotation.x = (Math.random() - 0.5) * 0.15;
         tree.rotation.z = (Math.random() - 0.5) * 0.15;
       }
 
       tree.position.set(x, getTerrainY(x, z) - 1.2, z);
       tree.scale.setScalar(0.8 + Math.random() * 1.2);
-      // Store tree-wide sway
+     
       tree.userData = {
         swayOffset: Math.random() * Math.PI * 2,
         swaySpeed: 0.3 + Math.random() * 0.4
@@ -906,27 +977,27 @@ export function MainHomePage() {
     scene.add(treeGroup);
     treeGroupRef.current = treeGroup;
 
-    // ── Quarantine Signs (GLB) ──────────────────────────────────
+   
     const gltfLoader = new GLTFLoader();
     const signUrl = "https://tuieldonbxswmopvyryx.supabase.co/storage/v1/object/public/1.principal/quarantine_sign.glb";
     const lightPoleUrl = "https://tuieldonbxswmopvyryx.supabase.co/storage/v1/object/public/1.principal/ligthpole.glb";
     const areaSignUrl = "https://tuieldonbxswmopvyryx.supabase.co/storage/v1/object/public/1.principal/areasing.glb";
     
-    // Explicit coordinates for signs (including intro path for visibility)
+    
     const signPositions = [
-        { x: 120, z: -150 }, // Mountain North
-        { x: -180, z: 200 }, // Mountain South
-        { x: 8, z: 180 },    // Intro Path 1 - even closer to center
-        { x: -8, z: 85 }     // Intro Path 2 - even closer to center
+        { x: 120, z: -150 }, 
+        { x: -180, z: 200 }, 
+        { x: 8, z: 180 },    
+        { x: -8, z: 85 }    
     ];
 
-    // Explicit coordinates for Light Poles
+    
     const polePositions = [
         { x: 45, z: 45 },
         { x: -60, z: -80 }
     ];
 
-    // Explicit coordinates for Area Signs
+    
     const areaPositions = [
         { x: 115, z: 115 },
         { x: -120, z: -50 },
@@ -943,23 +1014,23 @@ export function MainHomePage() {
             sign.position.set(pos.x, y - 1.5, pos.z);
             sign.scale.set(4, 4, 4);
             
-            // For intro signs (z > 0), look towards the start of the path (z=250)
+           
             if (pos.z > 0 && Math.abs(pos.x) < 50) {
                 sign.lookAt(0, y, 300);
                 
-                // Add a local point light to illuminate the sign face subtly
+                
                 const light = new THREE.PointLight(0xffffff, 10, 15);
-                // Position it closer to the sign face
+                
                 light.position.set(pos.x, y + 2, pos.z + 4);
                 scene.add(light);
             } else {
                 sign.lookAt(0, y, 0);
             }
             
-            // Remove custom emissive overrides that were causing the yellow "neon" look
+            
             sign.traverse((child) => {
                 if (child instanceof THREE.Mesh) {
-                    // Reset emissive if it was set
+                    
                     child.material.emissive = new THREE.Color(0x000000);
                     child.material.emissiveIntensity = 0;
                     child.material.needsUpdate = true;
@@ -974,16 +1045,16 @@ export function MainHomePage() {
         polePositions.forEach(pos => {
             const pole = gltf.scene.clone();
             const y = getTerrainY(pos.x, pos.z);
-            pole.position.set(pos.x, y - 5.0, pos.z); // Sunk more for better grounding
-            pole.scale.set(8, 6, 8); // Wider and shorter as requested
+            pole.position.set(pos.x, y - 5.0, pos.z); 
+            pole.scale.set(8, 6, 8); 
             scene.add(pole);
         });
     }, undefined, (e) => console.error("LightPole Load Error:", e));
 
-    // Add lighting markers for Area Signs
+    
     areaPositions.forEach(pos => {
         const y = getTerrainY(pos.x, pos.z);
-        // Subtle point light for visibility in the storm
+        
         const light = new THREE.PointLight(0xffffff, 12, 20);
         light.position.set(pos.x, y + 4, pos.z + 4);
         scene.add(light);
@@ -993,7 +1064,6 @@ export function MainHomePage() {
         areaPositions.forEach(pos => {
             const area = gltf.scene.clone();
             const y = getTerrainY(pos.x, pos.z);
-            // Height adjusted to ensure it's grounded
             area.position.set(pos.x, y - 0.5, pos.z); 
             area.scale.set(0.5, 0.5, 0.5); 
             area.lookAt(0, y, 250); 
@@ -1001,7 +1071,6 @@ export function MainHomePage() {
         });
     }, undefined, (e) => console.error("AreaSign Load Error:", e));
 
-    // ── Sun (Horizon Light) ──────────────────────────────────────
     const sunCanvas = document.createElement('canvas');
     sunCanvas.width = 128;
     sunCanvas.height = 128;
@@ -1042,7 +1111,7 @@ export function MainHomePage() {
     sunLight.shadow.camera.bottom = -500;
     scene.add(sunLight);
 
-    // ── God Rays (Volumetric Light Shafts) ──────────────────────
+  
     const godRays = new THREE.Group();
     const rayMat = new THREE.MeshBasicMaterial({
       color: 0xffcc88,
@@ -1057,7 +1126,7 @@ export function MainHomePage() {
       const rayGeo = new THREE.CylinderGeometry(0, 50 + Math.random() * 100, 2000, 8, 1, true);
       const ray = new THREE.Mesh(rayGeo, rayMat.clone());
       
-      // Position at sun and point towards scene
+     
       ray.position.set(0, 150, -950);
       ray.lookAt(
         (Math.random() - 0.5) * 400,
@@ -1066,7 +1135,7 @@ export function MainHomePage() {
       );
       ray.rotateX(Math.PI / 2);
       
-      // Randomize initial opacity
+      
       (ray.material as THREE.MeshBasicMaterial).opacity = 0.01 + Math.random() * 0.04;
       
       godRays.add(ray);
@@ -1074,7 +1143,6 @@ export function MainHomePage() {
     scene.add(godRays);
     godRaysRef.current = godRays;
 
-    // ── Mist (Moving Fog Particles) ─────────────────────────────
     const mistCount = 1200;
     const mistGeo = new THREE.BufferGeometry();
     const mistPos = new Float32Array(mistCount * 3);
@@ -1085,7 +1153,6 @@ export function MainHomePage() {
     }
     mistGeo.setAttribute('position', new THREE.BufferAttribute(mistPos, 3));
     
-    // Create a soft circle texture for particles to avoid "squares"
     const particleCanvas = document.createElement('canvas');
     particleCanvas.width = 64;
     particleCanvas.height = 64;
@@ -1111,7 +1178,6 @@ export function MainHomePage() {
     scene.add(mist);
     mistRef.current = mist;
 
-    // ── Cabins ───────────────────────────────────────────────────
     const cabinMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
     const roofMat  = new THREE.MeshStandardMaterial({ color: 0x0a0a0a });
     for (let i = 0; i < 40; i++) {
@@ -1119,10 +1185,9 @@ export function MainHomePage() {
       const z = (Math.random() - 0.5) * 600;
       const cabin = new THREE.Group();
       
-      // Foundation (sinks much deeper into ground to avoid floating on slopes)
       const foundationMat = new THREE.MeshStandardMaterial({ color: 0x050505 });
       const foundation = new THREE.Mesh(new THREE.BoxGeometry(6.2, 8, 6.2), foundationMat);
-      foundation.position.y = -2; // Extends 6 units below ground (-2 center - 4 half-height)
+      foundation.position.y = -2; 
       cabin.add(foundation);
 
       const body = new THREE.Mesh(new THREE.BoxGeometry(6, 4, 6), cabinMat);
@@ -1138,13 +1203,13 @@ export function MainHomePage() {
       roof.receiveShadow = true;
       cabin.add(roof);
 
-      // Sink more into ground to ensure no floating on steep slopes
+
       cabin.position.set(x, getTerrainY(x, z) - 1.8, z);
       cabin.rotation.y = Math.random() * Math.PI;
       scene.add(cabin);
     }
 
-    // ── Birds ────────────────────────────────────────────────────
+    
     const birds    = new THREE.Group();
     const birdMat  = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
     for (let i = 0; i < 40; i++) {
@@ -1165,7 +1230,7 @@ export function MainHomePage() {
     scene.add(birds);
     birdsRef.current = birds;
 
-    // ── Threats (zombie dots) ────────────────────────────────────
+    
     const threatGroup = new THREE.Group();
     const threatMat   = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.05 });
     const threatGeo   = new THREE.SphereGeometry(0.3, 8, 8);
@@ -1180,7 +1245,7 @@ export function MainHomePage() {
     scene.add(threatGroup);
     threatsRef.current = threatGroup;
 
-    // ── Clouds (Fog patches) ─────────────────────────────────────
+   
     const cloudGroup = new THREE.Group();
     const cloudCanvas = document.createElement('canvas');
     cloudCanvas.width = 256;
@@ -1214,7 +1279,7 @@ export function MainHomePage() {
     scene.add(cloudGroup);
     cloudGroupRef.current = cloudGroup;
 
-    // ── Stars ────────────────────────────────────────────────────
+    
     const starCount = 6000;
     const starPos = new Float32Array(starCount * 3);
     for (let i = 0; i < starCount; i++) {
@@ -1238,7 +1303,7 @@ export function MainHomePage() {
     scene.add(stars);
     starsRef.current = stars;
 
-    // ── Moon ─────────────────────────────────────────────────────
+   
     const moonCanvas = document.createElement('canvas');
     moonCanvas.width = 128;
     moonCanvas.height = 128;
@@ -1270,9 +1335,9 @@ export function MainHomePage() {
     scene.add(moonGlow);
     moonGlowRef.current = moonGlow;
 
-    // ── Rain ─────────────────────────────────────────────────────
+    
     const rainCount = 15000;
-    const rainPos = new Float32Array(rainCount * 6); // 2 points per drop for streaks
+    const rainPos = new Float32Array(rainCount * 6); 
     for (let i = 0; i < rainCount; i++) {
       const x = (Math.random() - 0.5) * 800;
       const y = Math.random() * 250;
@@ -1281,7 +1346,7 @@ export function MainHomePage() {
       rainPos[i * 6 + 1] = y;
       rainPos[i * 6 + 2] = z;
       rainPos[i * 6 + 3] = x;
-      rainPos[i * 6 + 4] = y - 3; // streak length
+      rainPos[i * 6 + 4] = y - 3; 
       rainPos[i * 6 + 5] = z;
     }
     const rainGeo = new THREE.BufferGeometry();
@@ -1295,10 +1360,10 @@ export function MainHomePage() {
     scene.add(rain);
     rainRef.current = rain;
 
-    // Mark scene as ready to trigger atmosphere effect
+    
     setIsSceneReady(true);
 
-    // ── Animation Loop ───────────────────────────────────────────
+    
     let frame = 0;
     const animate = () => {
       requestAnimationFrame(animate);
@@ -1309,9 +1374,9 @@ export function MainHomePage() {
 
       if (!paused && appSt !== 'video' && appSt !== 'bridge') {
         frame += 0.01;
-        const speed = 0.6; // Reduced speed for smoother feel
+        const speed = 0.6; 
 
-        // ── Movement Logic (Locked if any menu is open) ───────────
+       
         if (!menuOpen) {
           const dir  = new THREE.Vector3();
           const side = new THREE.Vector3();
@@ -1323,53 +1388,53 @@ export function MainHomePage() {
           if (keys.current['KeyA']) camera.position.addScaledVector(side,  speed);
           if (keys.current['KeyD']) camera.position.addScaledVector(side, -speed);
           
-          // Vertical movement
+          
           if (keys.current['Space']) camera.position.y += speed;
           if (keys.current['ShiftLeft']) camera.position.y -= speed;
 
-          // Mouse-hold movement forward
+          
           if (isMouseDown.current && appSt === 'explore') {
             camera.position.addScaledVector(dir, speed);
           }
 
           if (appSt !== 'explore' && appSt !== 'global-map') {
-            // Cinematic auto-fly during intro - Stable path but allowing slight mouse influence for immersion
+            
             if (!keys.current['KeyW'] && !keys.current['KeyS']) camera.position.z -= 0.25;
             
-            // Subtle drift towards center if not exploring
+            
             const targetX = mouse.current.x * 8;
             camera.position.x += (targetX - camera.position.x) * 0.02;
-            camera.position.y += (10 - camera.position.y) * 0.02; // Slightly lower camera for better sign visibility
+            camera.position.y += (10 - camera.position.y) * 0.02; 
             camera.lookAt(0, 8, camera.position.z - 50);
           } else {
-            // Steering only when mouse is down (as requested by user)
+            
             if (isMouseDown.current) {
-              // Use mouse position relative to center for continuous rotation (joystick style)
+             
               camera.rotation.y -= mouse.current.x * 0.05;
               camera.rotation.x  = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, camera.rotation.x + mouse.current.y * 0.05));
             }
           }
         }
 
-        // ── Map Boundaries & Ground Safety (Always apply if not paused) ─
+        
         const LIMIT = 500;
         if (Math.abs(camera.position.x) > LIMIT || Math.abs(camera.position.z) > LIMIT) {
-          // Return to start if boundary reached
+          
           camera.position.set(0, 10, 450);
           camera.lookAt(0, 0, 0);
         }
 
-        // Keep camera above terrain (soft collision)
+        
         const terrainY = getTerrainY(camera.position.x, camera.position.z);
         if (camera.position.y < terrainY + 6) {
           camera.position.y = terrainY + 6;
         }
         
-        // Reset deltas after logic
+       
         mouse.current.deltaX = 0;
         mouse.current.deltaY = 0;
 
-        // ── Trees Animation (Wind Sway) ─────────────────────────
+        
         if (treeGroupRef.current) {
           treeGroupRef.current.children.forEach((tree) => {
             const treeSway = Math.sin(frame * tree.userData.swaySpeed + tree.userData.swayOffset) * 0.01;
@@ -1378,17 +1443,17 @@ export function MainHomePage() {
           });
         }
 
-        // ── Stars & Moon Animation ──────────────────────────────
+      
         if (starsRef.current && starsRef.current.visible) {
           starsRef.current.rotation.y += 0.00005;
           (starsRef.current.material as THREE.PointsMaterial).opacity = 0.6 + Math.sin(frame * 0.8) * 0.2;
         }
         if (moonRef.current && moonRef.current.visible) {
-          // Subtle moon drift
+         
           moonRef.current.position.y = 300 + Math.sin(frame * 0.2) * 2;
         }
 
-        // ── Clouds ───────────────────────────────────────────────
+        
         if (cloudGroupRef.current) {
           cloudGroupRef.current.children.forEach((cloud, idx) => {
             cloud.position.x += 0.05 + (idx % 5) * 0.01;
@@ -1397,7 +1462,7 @@ export function MainHomePage() {
           });
         }
 
-        // ── Mist Animation ───────────────────────────────────────
+      
         if (mistRef.current) {
           const positions = mistRef.current.geometry.attributes.position.array as Float32Array;
           const count = positions.length / 3;
@@ -1405,24 +1470,23 @@ export function MainHomePage() {
             positions[i * 3] += 0.2; // Drift speed
             if (positions[i * 3] > 500) positions[i * 3] = -500;
             
-            // Subtle vertical wave
+            
             positions[i * 3 + 1] += Math.sin(frame * 0.01 + i) * 0.05;
           }
           mistRef.current.geometry.attributes.position.needsUpdate = true;
         }
 
-        // ── God Rays Animation ───────────────────────────────────
         if (godRaysRef.current && godRaysRef.current.visible) {
           godRaysRef.current.children.forEach((ray, i) => {
             const m = (ray as THREE.Mesh).material as THREE.MeshBasicMaterial;
-            // Subtle flicker
+            
             m.opacity = 0.02 + Math.sin(frame * 2 + i) * 0.01;
-            // Subtle sway
+            
             ray.rotation.z += Math.sin(frame * 0.5 + i) * 0.0005;
           });
         }
 
-        // ── Birds ────────────────────────────────────────────────
+        
         birdsRef.current?.children.forEach(bird => {
           const d = bird.userData;
           d.angle += d.speed;
@@ -1432,7 +1496,7 @@ export function MainHomePage() {
           bird.rotation.z = Math.sin(d.angle * 2) * 0.5;
         });
 
-        // ── Threats ──────────────────────────────────────────────
+        
         threatsRef.current?.children.forEach(threat => {
           const d = threat.userData;
           d.angle += d.speed;
@@ -1440,7 +1504,7 @@ export function MainHomePage() {
           threat.position.z += Math.sin(d.angle) * 0.1;
           threat.position.y = getTerrainY(threat.position.x, threat.position.z) + 1;
           
-          // Glitch effect
+          
           if (Math.random() > 0.98) {
             threat.scale.setScalar(Math.random() * 2);
             threat.visible = Math.random() > 0.1;
@@ -1450,7 +1514,7 @@ export function MainHomePage() {
           }
         });
 
-        // ── Rain Animation ───────────────────────────────────────
+        
         if (rainRef.current?.visible) {
           const pos = rainRef.current.geometry.attributes.position.array as Float32Array;
           for (let i = 0; i < pos.length; i += 6) {
@@ -1464,7 +1528,7 @@ export function MainHomePage() {
           }
           rainRef.current.geometry.attributes.position.needsUpdate = true;
           
-          // Occasional lightning flash
+          
           if (Math.random() > 0.997 && sceneRef.current) {
             const scene = sceneRef.current;
             const originalFogColor = new THREE.Color(MODES[currentModeRef.current].fogColor);
@@ -1482,25 +1546,25 @@ export function MainHomePage() {
           }
         }
 
-        // ── Mist Animation ───────────────────────────────────────
+        
         if (mistRef.current) {
           const pos = mistRef.current.geometry.attributes.position.array as Float32Array;
           const count = pos.length / 3;
           for (let i = 0; i < count; i++) {
             const idx = i * 3;
-            // Slow horizontal drift
+            
             pos[idx] += 0.15;
-            // Vertical wave
+            
             pos[idx + 1] += Math.sin(frame * 0.3 + i) * 0.03;
             
-            // Boundary check
+           
             if (pos[idx] > 600) pos[idx] = -600;
             if (pos[idx + 1] > 80) pos[idx + 1] = 0;
           }
           mistRef.current.geometry.attributes.position.needsUpdate = true;
         }
 
-        // ── Clouds Drift ─────────────────────────────────────────
+        
         if (cloudGroupRef.current) {
           cloudGroupRef.current.children.forEach((cloud, i) => {
             cloud.position.x += 0.05;
@@ -1509,7 +1573,7 @@ export function MainHomePage() {
           });
         }
 
-        // ── Trees Swaying ────────────────────────────────────────
+        
         if (treeGroupRef.current) {
           treeGroupRef.current.children.forEach((tree, i) => {
             tree.rotation.x = Math.sin(frame + i) * 0.02;
@@ -1517,14 +1581,14 @@ export function MainHomePage() {
           });
         }
 
-        // ── Update Coordinates ───────────────────────────────────
+        
         if (appSt === 'explore') {
           coordsRef.current = {
             lat: 9.9281 + (camera.position.z / 5000),
             lng: 84.0907 + (camera.position.x / 5000)
           };
         } else if (appSt === 'menu') {
-          // Subtle jitter for "scanning" effect in menu
+          
           coordsRef.current = {
             lat: 9.9281 + (Math.random() - 0.5) * 0.0005,
             lng: 84.0907 + (Math.random() - 0.5) * 0.0005
@@ -1536,7 +1600,7 @@ export function MainHomePage() {
     };
     animate();
 
-    // ── Resize ───────────────────────────────────────────────────
+    
     const onResize = () => {
       if (!containerRef.current) return;
       const width = containerRef.current.clientWidth;
@@ -1555,13 +1619,13 @@ export function MainHomePage() {
       resizeObserver.observe(containerRef.current);
     }
     
-    // Also listen to window resize as a fallback
+   
     window.addEventListener('resize', onResize);
     
-    // Initial call
+    
     onResize();
 
-    // ── Cleanup ───────────────────────────────────────────────────
+    
     return () => {
       resizeObserver.disconnect();
       window.removeEventListener('resize',    onResize);
@@ -1578,36 +1642,36 @@ export function MainHomePage() {
       renderer.dispose();
       containerRef.current?.removeChild(renderer.domElement);
     };
-  }, []); // ← Only runs on mount. All state accessed via refs above.
+  }, []); 
 
-  // ── Click handler to lock pointer for FP mode ────────────────────────────
+  
   const handleFPClick = useCallback(() => {
     fpControlsRef.current?.lock();
   }, []);
   void handleFPClick;
 
-  // ─────────────────────────────────────────────────────────────────────────
+ 
   return (
     <div className="fixed inset-0 overflow-hidden bg-black font-sans text-white">
 
-      {/* CRT & scanline overlays */}
+      
       <div className="crt-overlay" />
       <div className="scanline" />
       <div className="vignette" />
 
-      {/* 3D Canvas */}
+      
       <div ref={containerRef} className="absolute inset-0 z-0" data-menu-open={isAnyMenuOpen} />
 
-      {/* Audio Element */}
+      
       <audio ref={audioRef} />
 
-      {/* Grain overlay */}
+      {}
       <div 
         className="absolute inset-0 z-[1500] pointer-events-none opacity-20" 
         style={{ backgroundImage: `url(${MEDIA_URLS.textures.noise})` }}
       />
 
-      {/* ── Nav ─────────────────────────────────────────────────── */}
+      {}
       <AnimatePresence>
         {!(appState === 'landing' || appState === 'login' || appState === 'register') && (
           <motion.nav 
@@ -1625,7 +1689,7 @@ export function MainHomePage() {
                 className="relative group pointer-events-auto p-2 flex items-center justify-center transition-all text-white hover:text-blue-400"
                 title="Centro de Operaciones"
               >
-                {/* Subtle background glow */}
+                {}
                 <div className="absolute inset-0 rounded-full bg-blue-400/0 group-hover:bg-blue-400/10 blur-md transition-all duration-300" />
                 
                 <Menu 
@@ -1653,12 +1717,6 @@ export function MainHomePage() {
         )}
       </AnimatePresence>
 
-      {/* ── Threat Detection Indicator (OLD) ── REMOVED */}
-
-      {/* ── Landing ─────────────────────────────────────────────── */}
-      {/* Moved to end of JSX */}
-
-      {/* ── Story overlay ────────────────────────────────────────── */}
       <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
         <AnimatePresence mode="wait">
           {appState === 'intro' && storyIndex >= 0 && storyIndex < STORY_STEPS.length - 1 && (
@@ -1705,7 +1763,7 @@ export function MainHomePage() {
                     playsInline
                     onLoadedMetadata={(e) => setBridgeVideoDuration(e.currentTarget.duration)}
                     onTimeUpdate={(e) => {
-                      // Trigger next state slightly earlier for cross-fade overlap
+                      
                       if (bridgeVideoDuration && e.currentTarget.currentTime >= bridgeVideoDuration - 1.0) {
                         setAppState('video');
                       }
@@ -1781,9 +1839,9 @@ export function MainHomePage() {
         )}
       </AnimatePresence>
 
-      {/* Menu block removed by user request */}
+      {}
 
-      {/* Atmosphere Collapsible Panel */}
+      {}
       {(appState === 'explore' || appState === 'menu') && (
         <div className="absolute top-24 right-8 z-[400] flex flex-col items-end gap-2">
           <AnimatePresence>
@@ -1794,7 +1852,7 @@ export function MainHomePage() {
                 exit={{ opacity: 0, scale: 0.95, y: -10 }}
                 className="p-8 min-w-[280px] flex flex-col gap-6 panel-brush relative"
               >
-                {/* Close Button */}
+                {}
                 <button 
                   onClick={() => setIsModePanelOpen(false)}
                   className="absolute top-4 right-4 text-white/40 hover:text-blue-400 transition-all duration-300 hover:rotate-90 hover:scale-110 active:scale-95"
@@ -1802,7 +1860,7 @@ export function MainHomePage() {
                   <X size={18} />
                 </button>
 
-                {/* Atmosphere Section */}
+                {}
                 <div className="space-y-4">
                   <div className="mb-6">
                     <h2 className="text-xl font-black italic uppercase tracking-tighter text-white mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>
@@ -1836,7 +1894,7 @@ export function MainHomePage() {
         </div>
       )}
 
-      {/* ── HUD & Controls Hint ──────────────────────────────────── */}
+      {}
       <AnimatePresence>
         {appState === 'explore' && (
           <motion.div 
@@ -1845,7 +1903,7 @@ export function MainHomePage() {
             exit={{ opacity: 0, x: -20 }}
             className="absolute bottom-12 left-12 z-[300] flex flex-col gap-6 items-start"
           >
-            {/* Walkie-Talkie Button (Now on top) */}
+            {}
             <div className="relative group cursor-pointer pointer-events-auto anim-radio-shiver" onClick={() => setAppState('global-map')}>
               <motion.div 
                 className="relative w-[50px] h-[90px] transition-all duration-500 group-hover:drop-shadow-[0_0_25px_rgba(59,130,246,0.5)]"
@@ -1864,20 +1922,20 @@ export function MainHomePage() {
                     </linearGradient>
                   </defs>
                   
-                  {/* Antenna */}
+                  {}
                   <path d="M32 22L46 2" stroke="url(#antennaGrad)" strokeWidth="4" strokeLinecap="round"/>
                   <path d="M32.5 21.5L45.5 3.5" stroke="white" strokeOpacity="0.1" strokeWidth="1" strokeLinecap="round"/>
                   
-                  {/* Body Shadow/Depth */}
+                  {}
                   <rect x="7" y="23" width="38" height="66" rx="6" fill="#050505" />
                   
-                  {/* Main Body (Metallic Blue/Dark Gradient) */}
+                  {}
                   <rect x="6" y="21" width="36" height="65" rx="5" fill="url(#walkieBody)" stroke="#334155" strokeWidth="0.5" />
                   
-                  {/* Top Bevel Highlight */}
+                  {}
                   <path d="M11 21.5H37C39 21.5 41 23.5 41 25.5" stroke="white" strokeOpacity="0.15" strokeWidth="0.5" fill="none" />
                   
-                  {/* Speaker Grille Area */}
+                  {}
                   <rect x="11" y="27" width="26" height="14" rx="2" fill="#020617" />
                   <g opacity="0.4">
                     {[30, 33, 36, 39].map(y => (
@@ -1885,10 +1943,10 @@ export function MainHomePage() {
                     ))}
                   </g>
                   
-                  {/* Screen Housing */}
+                  {}
                   <rect x="10" y="44" width="28" height="18" rx="2" fill="#080808" stroke="#1e293b" strokeWidth="1" />
                   
-                  {/* Screen Display with Glow */}
+                  {}
                   <motion.rect 
                     x="11.5" y="45.5" width="25" height="15" rx="1" 
                     fill="#60a5fa" 
@@ -1897,7 +1955,7 @@ export function MainHomePage() {
                     transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
                   />
                   
-                  {/* Screen Content (Simulated Data) */}
+                  {}
                   <g opacity="0.6">
                     <rect x="14" y="48" width="8" height="1" fill="#3b82f6" />
                     <rect x="14" y="51" width="12" height="1" fill="#3b82f6" />
@@ -1905,18 +1963,18 @@ export function MainHomePage() {
                     <circle cx="32" cy="55" r="1.5" fill="#3b82f6" />
                   </g>
                   
-                  {/* Screen Glass Reflection */}
+                  {}
                   <path d="M11.5 45.5L36.5 45.5L11.5 60.5Z" fill="white" fillOpacity="0.05" />
 
-                  {/* Side Buttons (Left - PTT) */}
+                  {}
                   <rect x="2" y="34" width="4" height="18" rx="2" fill="#111" stroke="#000" strokeWidth="0.5" />
                   <rect x="3" y="36" width="1" height="14" fill="white" fillOpacity="0.05" />
                   
-                  {/* Side Buttons (Right) */}
+                  {}
                   <rect x="42" y="40" width="3" height="10" rx="1" fill="#111" />
                   <rect x="42" y="54" width="3" height="10" rx="1" fill="#111" />
 
-                  {/* Screws (Technical Detail) */}
+                  {}
                   {[
                     { x: 9, y: 24 }, { x: 39, y: 24 },
                     { x: 9, y: 83 }, { x: 39, y: 83 }
@@ -1927,7 +1985,7 @@ export function MainHomePage() {
                     </g>
                   ))}
                   
-                  {/* Grip Texture Lines */}
+                  {}
                   <g opacity="0.15">
                     {[68, 71, 74, 77, 80].map(y => (
                       <rect key={y} x="9" y={y} width="30" height="0.5" fill="#000" />
@@ -1940,7 +1998,7 @@ export function MainHomePage() {
               </div>
             </div>
 
-            {/* GUÍA DE USUARIO BUTTON (Now at bottom) */}
+            {}
             <button
               onClick={() => {
                 setIsPaused(true);
@@ -1969,7 +2027,7 @@ export function MainHomePage() {
 
 
             <div className="relative group backdrop-blur-md bg-black/40 border border-white/10 p-4 min-w-[180px] rounded-lg shadow-xl">
-            {/* Corner Accents */}
+            {}
             <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-blue-400/50" />
             <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-blue-400/50" />
             <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-blue-400/50" />
@@ -1994,7 +2052,7 @@ export function MainHomePage() {
       )}
       </AnimatePresence>
 
-      {/* ── Login & Register ─────────────────────────────────────────── */}
+      {}
       <AnimatePresence>
         {(appState === 'login' || appState === 'register') && (
           <motion.div
@@ -2005,13 +2063,13 @@ export function MainHomePage() {
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 50 }}
-              animate={{ scale: 1, opacity: 1, y: -40 }} // Move up more (un toquecito más hacia arriba)
+              animate={{ scale: 1, opacity: 1, y: -40 }} 
               transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1] }}
               className="w-[1000px] max-w-[92vw] h-[580px] max-h-[82vh] flex flex-col-reverse md:flex-row relative panel-brush panel-contrast-accent overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.8)]"
             >
-              {/* Left side: Form Panel */}
+              {}
               <div className="w-full md:w-[340px] h-full bg-black/60 backdrop-blur-2xl border-t md:border-t-0 md:border-r border-white/5 p-8 md:p-10 flex flex-col justify-center relative z-10 overflow-y-auto">
-                {/* Decorative scanline effect for form */}
+                {}
                 <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
                 
                 <div className="relative z-10 w-full max-w-sm mx-auto">
@@ -2031,22 +2089,20 @@ export function MainHomePage() {
                     </div>
                   </div>
 
-                  <form className="space-y-6" onSubmit={(e) => { 
-                    e.preventDefault(); 
-                    if (appState === 'register' && selectedCharacter === null) {
-                      setShowCharError(true);
-                      return;
-                    }
-                    setAppState('explore'); 
-                  }}>
+                  <form className="space-y-6" onSubmit={handleAuthSubmit}>
                     <div className="space-y-3 w-full max-w-[260px]">
                       <label className="text-[11px] uppercase font-bold tracking-[0.2em] text-white block">Nombre de Usuario</label>
                       <input 
                         type="text" 
                         className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-1 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all font-mono text-xs placeholder:text-white/10"
                         placeholder="ID_USUARIO"
+                        value={authForm.username}
+                        onChange={(event) => handleAuthFieldChange('username', event.target.value)}
                         required
                       />
+                      {appState === 'login' && authErrors.username && (
+                        <p className="text-[10px] text-red-400 uppercase tracking-[0.08em]">{authErrors.username}</p>
+                      )}
                     </div>
                     
                     <div className="space-y-3 w-full max-w-[260px]">
@@ -2055,8 +2111,13 @@ export function MainHomePage() {
                         type="password" 
                         className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-1 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all font-mono text-xs placeholder:text-white/10"
                         placeholder="••••••••"
+                        value={authForm.password}
+                        onChange={(event) => handleAuthFieldChange('password', event.target.value)}
                         required
                       />
+                      {appState === 'login' && authErrors.password && (
+                        <p className="text-[10px] text-red-400 uppercase tracking-[0.08em]">{authErrors.password}</p>
+                      )}
                     </div>
 
                     {appState === 'register' && (
@@ -2073,13 +2134,20 @@ export function MainHomePage() {
 
                     <button
                       type="submit"
+                      disabled={appState === 'login' && isAuthenticating}
                       className="group relative w-full max-w-[260px] py-4 font-black uppercase tracking-[0.4em] text-xs transition-all menu-brush text-white mt-4 text-left px-8"
                       style={{ fontFamily: "'Oswald', sans-serif" }}
                     >
                       <span className="relative z-10 transition-colors">
-                        {appState === 'login' ? 'Autenticar' : 'REGISTRAR'}
+                        {appState === 'login' ? (isAuthenticating ? 'Autenticando...' : 'Autenticar') : 'REGISTRAR'}
                       </span>
                     </button>
+
+                    {appState === 'login' && authErrors.general && (
+                      <p className="text-[10px] text-red-400 uppercase tracking-[0.08em] max-w-[260px]">
+                        {authErrors.general}
+                      </p>
+                    )}
                   </form>
 
                   <div className="mt-12 pt-10 border-t border-white/5">
@@ -2101,7 +2169,7 @@ export function MainHomePage() {
                 </div>
               </div>
 
-              {/* Right side: Character Selection Visuals */}
+              {}
               <div className="w-full md:flex-1 h-[40vh] md:h-full relative overflow-hidden bg-zinc-950">
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -2121,11 +2189,11 @@ export function MainHomePage() {
                   </motion.div>
                 </AnimatePresence>
                 
-                {/* Dynamic Overlays */}
+                {}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/10 pointer-events-none" />
                 <div className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-black/90 pointer-events-none" />
                 
-                {/* HUD Corner Labels */}
+                {}
                 <div className="absolute top-6 left-6 z-20">
                   {appState === 'register' ? (
                     <span className="text-xl font-black uppercase tracking-widest text-amber-400">
@@ -2140,7 +2208,7 @@ export function MainHomePage() {
 
 
 
-                {/* Fix 1: Character Info Block (Bottom Right) */}
+                {}
                 <motion.div
                   key={`info-${loginVideoIndex}`}
                   initial={{ opacity: 0, y: 20 }}
@@ -2182,7 +2250,7 @@ export function MainHomePage() {
                   </div>
                 </motion.div>
 
-                {/* Character Selection Instruction (register only) */}
+                {}
                 {appState === 'register' && (
                   <div className="absolute bottom-6 left-0 right-0 z-40 flex flex-col items-center gap-2">
                     <div className="flex items-center justify-center gap-8">
@@ -2215,7 +2283,7 @@ export function MainHomePage() {
 
 
                 
-                {/* HUD Accents */}
+                {}
                 <div className="absolute inset-0 border-[1px] border-white/5 pointer-events-none" />
               </div>
             </motion.div>
@@ -2223,7 +2291,7 @@ export function MainHomePage() {
         )}
       </AnimatePresence>
 
-      {/* ── Global Map ────────────────────────────────────────────────── */}
+      {}
       <AnimatePresence>
         {appState === 'global-map' && (
           <motion.div
@@ -2241,10 +2309,19 @@ export function MainHomePage() {
               </button>
               
               <div className="w-full h-full">
-                <ReplicaGlobe onLoadingComplete={() => setIsGlobeLoaded(true)} />
+                <ReplicaGlobe 
+                  onLoadingComplete={() => setIsGlobeLoaded(true)} 
+                  onLoginClick={() => { setAppState('login'); setCurrentMode('Storm'); }}
+                  onSelectCamp={(campId) => {
+                    if (campId > 0) {
+                      authDispatch({ type: 'SELECT_CAMP', payload: campId });
+                      setAuthForm(prev => ({ ...prev, campId }));
+                    }
+                  }}
+                />
               </div>
 
-              {/* Text Overlay for Global Map */}
+              {}
               <AnimatePresence>
                 {!isGlobeLoaded && (
                   <div className="absolute bottom-6 left-0 right-0 flex justify-center pointer-events-none px-4 z-[100]">
@@ -2269,14 +2346,13 @@ export function MainHomePage() {
         )}
       </AnimatePresence>
 
-      {/* ── Landing ────────────────────────────────────────────────── */}
+      {}
       <AnimatePresence>
         {appState === 'landing' && (
           <LandingPage 
             activeState={appState}
             onIntro={() => { setAppState('intro'); setStoryIndex(-1); }}
             onMenu={() => setAppState('explore')}
-            onLogin={() => { setAppState('login'); setCurrentMode('Storm'); }}
             volume={volume}
             setVolume={setVolume}
             isAudioEnabled={isAudioEnabled}
@@ -2286,7 +2362,7 @@ export function MainHomePage() {
         )}
       </AnimatePresence>
 
-      {/* ── Exit Sequence ─────────────────────────────────────────── */}
+      {}
       <AnimatePresence>
         {isExiting && (
           <motion.div
@@ -2400,7 +2476,7 @@ export function MainHomePage() {
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
               className="w-full max-w-sm p-12 relative shadow-2xl flex flex-col gap-8 panel-brush"
             >
-              {/* Close Button */}
+              {}
               <button 
                 onClick={() => {
                   setIsSettingsModalOpen(false);
@@ -2412,7 +2488,7 @@ export function MainHomePage() {
               </button>
 
               <div className="space-y-6">
-                {/* Title */}
+                {}
                     <div className="text-center mb-8">
                       <h2 className="text-3xl font-black italic uppercase tracking-tighter text-white mb-2" style={{ fontFamily: "'Oswald', sans-serif" }}>
                         SISTEMA CENTRAL
@@ -2421,7 +2497,7 @@ export function MainHomePage() {
                     </div>
 
                   <div className="flex flex-col gap-4">
-                    {/* REANUDAR */}
+                    {}
                     <button
                       onClick={() => {
                         setIsSettingsModalOpen(false);
@@ -2438,7 +2514,7 @@ export function MainHomePage() {
                       </div>
                     </button>
   
-                    {/* VOLUME CONTROL */}
+                    {}
                     <div 
                       className="flex items-center gap-4 transition-all menu-brush px-5 py-6 w-full text-white"
                       style={{ fontFamily: "'Oswald', sans-serif" }}
@@ -2474,7 +2550,7 @@ export function MainHomePage() {
                       </div>
                     </div>
   
-                    {/* LOBBY */}
+                    {}
                     <button
                       onClick={() => {
                         setAppState('explore');
@@ -2492,7 +2568,7 @@ export function MainHomePage() {
                       </div>
                     </button>
 
-                    {/* VOLVER AL INICIO */}
+                    {}
                     <button
                       onClick={() => {
                         setAppState('landing');
@@ -2511,7 +2587,7 @@ export function MainHomePage() {
                       </div>
                     </button>
   
-                    {/* SALIR */}
+                    {}
                     <button 
                       onClick={() => setIsExiting(true)}
                       className="flex items-center gap-4 text-[14px] font-black italic uppercase tracking-[0.2em] transition-all menu-brush px-5 py-3 w-full text-white group/item"
@@ -2547,15 +2623,15 @@ export function MainHomePage() {
         )}
       </AnimatePresence>
 
-      {/* ── Filtro SVG Grunge (Global) ── */}
+      {}
       <svg className="absolute" style={{ width: 0, height: 0 }}>
         <defs>
           <filter id="grunge" x="-10%" y="-10%" width="120%" height="120%">
-            {/* Edge roughness */}
+            {}
             <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="3" result="edgeNoise" />
             <feDisplacementMap in="SourceGraphic" in2="edgeNoise" scale="3" result="roughEdges" />
             
-            {/* Erosion/Holes */}
+            {}
             <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="4" seed="1" result="holeNoise" />
             <feColorMatrix in="holeNoise" type="matrix" values="
               0 0 0 0 0 

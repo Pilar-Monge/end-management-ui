@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 import {
   Suspense,
   useEffect,
@@ -390,18 +390,17 @@ function CameraTransitionController({
   const { camera } = useThree();
   const destinationPosition = useMemo(() => new THREE.Vector3(...activePosition), [activePosition]);
   const destinationTarget = useMemo(() => new THREE.Vector3(...activeTarget), [activeTarget]);
-  // Keep a smooth internal target that we lerp independently of OrbitControls
+  
   const currentTarget = useRef(new THREE.Vector3());
   const initialized = useRef(false);
 
-  // When a new transition starts, snapshot where the controls target currently is
-  // so the lerp starts from the actual current look-at point, not from 0,0,0
+
   useEffect(() => {
     if (isTransitioning) {
       if (controlsRef.current) {
         currentTarget.current.copy(controlsRef.current.target);
       } else {
-        // Derive from camera direction
+        
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
         currentTarget.current.copy(camera.position).add(dir.multiplyScalar(5));
@@ -409,7 +408,7 @@ function CameraTransitionController({
     }
   }, [isTransitioning, camera, controlsRef]);
 
-  // First frame: set currentTarget to wherever the controls are pointing
+  
   useEffect(() => {
     if (!initialized.current && controlsRef.current) {
       currentTarget.current.copy(controlsRef.current.target);
@@ -424,14 +423,11 @@ function CameraTransitionController({
 
     const alpha = Math.min(1, delta * 5);
 
-    // Smoothly lerp camera position
+    
     camera.position.lerp(destinationPosition, alpha);
 
-    // Smoothly lerp the look-at target
     currentTarget.current.lerp(destinationTarget, alpha);
 
-    // Point the camera at the interpolated target — do NOT call controls.update()
-    // because that would recalculate position from spherical coords and fight the lerp
     camera.lookAt(currentTarget.current);
 
     const positionDistance = camera.position.distanceTo(destinationPosition);
@@ -442,7 +438,7 @@ function CameraTransitionController({
       currentTarget.current.copy(destinationTarget);
       camera.lookAt(destinationTarget);
 
-      // Now sync OrbitControls to the final state so it can take over cleanly
+     
       if (controlsRef.current) {
         controlsRef.current.target.copy(destinationTarget);
         controlsRef.current.update();
@@ -483,7 +479,7 @@ function Scene({
     return position.distanceTo(target) + 0.01;
   }, [activePosition, activeTarget]);
 
-  // No immediate target sync here — CameraTransitionController handles the smooth lerp
+  
 
   useEffect(() => {
     setIsTransitioning(true);
@@ -593,10 +589,10 @@ function Scene({
                             onClick={(event) => {
                               event.stopPropagation();
                               if (isSelected) {
-                                // Click 3: already zoomed into this monitor → trigger sync
+                                
                                 onMonitorAction(preset.id);
                               } else {
-                                // Click 2: select this monitor → zoom in
+                                
                                 setActivePresetId(preset.id);
                               }
                             }}
@@ -871,11 +867,9 @@ function SyncOverlay({
     return () => clearInterval(interval);
   }, [isSyncing, syncState]);
 
-  // Auto-set ready state when progress completes
   useEffect(() => {
     if (progress >= 100 && syncState === 'syncing') {
-      // Don't auto-complete, just allow the button to be enabled
-      // User must click "ACCEDER AL SISTEMA" to proceed
+      
     }
   }, [progress, syncState]);
 
@@ -1101,7 +1095,7 @@ export default function AdminMainViewUiPage() {
 
   const handleTransitionEnd = useCallback((presetId: string) => {
     if (viewMode === 'zoom' && MONITOR_PRESET_IDS.has(presetId) && syncState === 'idle') {
-      // No iniciar sync automáticamente, esperar al botón
+      
     }
   }, [viewMode, syncState]);
 
