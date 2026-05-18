@@ -4,12 +4,13 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import "./admin-dashboard.css";
 import {
   Users, UserPlus, Package, Map, Radio,
   Trophy, Bell, Settings,
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle,
-  XCircle, Activity, ChevronDown,
+  XCircle, Activity, ChevronDown, ChevronLeft,
   BarChart2, Search, Edit2, Trash2, Shield,
   X, Database, Cpu, User
 } from "lucide-react";
@@ -3648,6 +3649,7 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
 
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState<NavSection>("CENTRO DE MANDO");
   const storedUserRaw = typeof window !== "undefined" ? localStorage.getItem("user") : null;
   const parsedUser = (() => {
@@ -4092,7 +4094,17 @@ export default function AdminDashboard() {
               {/* Header */}
               <header className="admin-header relative flex-shrink-0 px-4 py-3"
                 style={{ background: "transparent", borderBottom: "none" }}>
-                <div className="admin-top-strip flex items-center justify-end gap-3 relative z-10">
+                <div className="admin-top-strip flex items-center justify-between gap-3 relative z-10">
+                  <div>
+                    <button
+                      onClick={() => navigate('/admin-main-view-ui')}
+                      className="admin-icon-btn admin-header-icon-btn flex items-center justify-center p-1.5 rounded-sm"
+                      style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)", minWidth: 34, minHeight: 34 }}
+                      title="Volver a vista monitor"
+                    >
+                      <ChevronLeft size={16} style={{ color: "#7FB8FF" }} />
+                    </button>
+                  </div>
                   <div className="admin-profile admin-header-actions flex items-center gap-2">
                     <button onClick={() => setActiveNav("NOTIFICACIONES")} className="admin-icon-btn admin-header-icon-btn relative p-2.5 rounded-sm"
                       style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)", minWidth: 34, minHeight: 34 }}>

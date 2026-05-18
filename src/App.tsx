@@ -39,6 +39,7 @@ const routeFallback = (
     Cargando modulo...
   </div>
 )
+
 const withSuspense = (node: ReactNode) => <Suspense fallback={routeFallback}>{node}</Suspense>
 
 function CatalogsLayout() {
@@ -107,7 +108,7 @@ function CatalogsLayout() {
           Volver
         </button>
       </div>
-    <Suspense fallback={routeFallback}>
+  <Suspense fallback={routeFallback}>
         <ActiveComponent />
       </Suspense>
     </div>
@@ -121,17 +122,17 @@ function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/main-homepage" element={withSuspense(<MainHomePage />)} />
-      <Route path="/app" element={withSuspense(<MainAppPage />)} />
-      <Route path="/admission" element={withSuspense(<AdmissionPage />)} />
-      <Route path="/camps" element={withSuspense(<CampsPage />)} />
-      <Route path="/persons" element={withSuspense(<PersonsPage />)} />
-      <Route path="/expeditions" element={withSuspense(<ExpeditionsPage />)} />
-      <Route path="/resource-main-view" element={withSuspense(<ResourceMainViewPage />)} />
-      <Route path="/admin-dashboard" element={withSuspense(<AdminDashboardPage />)} />
-      <Route path="/admin-main-view-ui" element={withSuspense(<AdminMainViewUiPage />)} />
-      <Route path="/dashboard" element={withSuspense(<AdminDashboardPage />)} />
-      <Route path="/catalogs" element={withSuspense(<CatalogsLayout />)} />
+  <Route path="/main-homepage" element={withSuspense(<MainHomePage />)} />
+  <Route path="/app" element={withSuspense(<MainAppPage />)} />
+  <Route path="/admission" element={withSuspense(<AdmissionPage />)} />
+  <Route path="/camps" element={withSuspense(<CampsPage />)} />
+  <Route path="/persons" element={withSuspense(<PersonsPage />)} />
+  <Route path="/expeditions" element={withSuspense(<ExpeditionsPage />)} />
+  <Route path="/resource-main-view" element={withSuspense(<ResourceMainViewPage />)} />
+  <Route path="/admin-dashboard" element={withSuspense(<AdminDashboardPage />)} />
+  <Route path="/admin-main-view-ui" element={withSuspense(<AdminMainViewUiPage />)} />
+  <Route path="/dashboard" element={withSuspense(<AdminDashboardPage />)} />
+  <Route path="/catalogs" element={withSuspense(<CatalogsLayout />)} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

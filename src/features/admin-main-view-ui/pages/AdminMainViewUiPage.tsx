@@ -869,9 +869,9 @@ function SyncOverlay({
 
   useEffect(() => {
     if (progress >= 100 && syncState === 'syncing') {
-      
+      onComplete();
     }
-  }, [progress, syncState]);
+  }, [onComplete, progress, syncState]);
 
   if (!isSyncing) return null;
 
@@ -1071,7 +1071,10 @@ export default function AdminMainViewUiPage() {
 
   const handleSyncComplete = useCallback(() => {
     setSyncState('ready');
-  }, []);
+    window.setTimeout(() => {
+      navigate('/admin-dashboard');
+    }, 420);
+  }, [navigate]);
 
   const handleBack = useCallback(() => {
     if (syncState !== 'idle') {
