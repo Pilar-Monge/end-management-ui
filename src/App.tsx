@@ -24,6 +24,7 @@ const ExpeditionsPage = lazy(() => import('./features/expeditions/pages/Expediti
 const ResourceMainViewPage = lazy(() => import('./features/resources/pages/ResourceMainViewPage'))
 const AdminDashboardPage = lazy(() => import('./features/admin-dashboard/pages/AdminDashboardPage').then(m => ({ default: m.default })))
 const AdminMainViewUiPage = lazy(() => import('./features/admin-main-view-ui/pages/AdminMainViewUiPage').then(m => ({ default: m.default })))
+const ExpedicionesUiPage = lazy(() => import('./features/expediciones-ui/pages/ExpedicionesUiPage'))
 const ResourceTypesPage = lazy(() => import('./features/catalogs/pages/ResourceTypesPage').then(m => ({ default: m.ResourceTypesPage })))
 const OccupationsPage = lazy(() => import('./features/catalogs/pages/OccupationsPage').then(m => ({ default: m.OccupationsPage })))
 const OccupationCriteriaPage = lazy(() => import('./features/catalogs/pages/OccupationCriteriaPage').then(m => ({ default: m.OccupationCriteriaPage })))
@@ -116,6 +117,7 @@ function App() {
       <Route path="/camps" element={<Suspense fallback={<LoadingSkeleton />}><CampsPage /></Suspense>} />
       <Route path="/persons" element={<Suspense fallback={<LoadingSkeleton />}><PersonsPage /></Suspense>} />
       <Route path="/expeditions" element={<Suspense fallback={<LoadingSkeleton />}><ExpeditionsPage /></Suspense>} />
+      <Route path="/expediciones-ui" element={<Suspense fallback={<LoadingSkeleton />}><ExpedicionesUiPage /></Suspense>} />
       <Route path="/resource-main-view" element={<Suspense fallback={<LoadingSkeleton />}><ResourceMainViewPage /></Suspense>} />
       <Route path="/admin-dashboard" element={<Suspense fallback={<LoadingSkeleton />}><AdminDashboardPage /></Suspense>} />
       <Route path="/admin-main-view-ui" element={<Suspense fallback={<LoadingSkeleton />}><AdminMainViewUiPage /></Suspense>} />
