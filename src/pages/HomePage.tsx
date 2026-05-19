@@ -235,7 +235,7 @@ export default function HomePage() {
             Ir a Vista Principal de Expediciones
           </button>
           <button
-            onClick={() => navigate('/expediciones-ui')}
+            onClick={() => navigate('/expeditions-ui')}
             type="button"
             style={{
               background: 'rgba(58, 106, 88, 0.16)',
@@ -259,7 +259,7 @@ export default function HomePage() {
               e.currentTarget.style.boxShadow = 'none'
             }}
           >
-            expediciones-ui
+            expeditions-ui
           </button>
         </div>
       </div>
