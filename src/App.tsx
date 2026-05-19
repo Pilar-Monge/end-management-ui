@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import LoginPage from './features/login/pages/LoginPage'
 import { GlobalOrientationWarning } from './shared/components/GlobalOrientationWarning'
+import { FullscreenButton } from './shared/components/FullscreenButton'
 
 const LoadingSkeleton = () => (
   <div className="flex items-center justify-center min-h-screen bg-black">
@@ -111,6 +112,7 @@ function App() {
   return (
     <>
       <GlobalOrientationWarning />
+      <FullscreenButton />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
