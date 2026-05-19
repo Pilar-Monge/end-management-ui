@@ -3,6 +3,7 @@ import { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import LoginPage from './features/login/pages/LoginPage'
+import { GlobalOrientationWarning } from './shared/components/GlobalOrientationWarning'
 
 const LoadingSkeleton = () => (
   <div className="flex items-center justify-center min-h-screen bg-black">
@@ -24,7 +25,7 @@ const ExpeditionsPage = lazy(() => import('./features/expeditions/pages/Expediti
 const ResourceMainViewPage = lazy(() => import('./features/resources/pages/ResourceMainViewPage'))
 const AdminDashboardPage = lazy(() => import('./features/admin-dashboard/pages/AdminDashboardPage').then(m => ({ default: m.default })))
 const AdminMainViewUiPage = lazy(() => import('./features/admin-main-view-ui/pages/AdminMainViewUiPage').then(m => ({ default: m.default })))
-const ExpedicionesUiPage = lazy(() => import('./features/expediciones-ui/pages/ExpedicionesUiPage'))
+const ExpeditionsUiPage = lazy(() => import('./features/expeditions-ui/pages/ExpeditionsUiPage'))
 const ResourceTypesPage = lazy(() => import('./features/catalogs/pages/ResourceTypesPage').then(m => ({ default: m.ResourceTypesPage })))
 const OccupationsPage = lazy(() => import('./features/catalogs/pages/OccupationsPage').then(m => ({ default: m.OccupationsPage })))
 const OccupationCriteriaPage = lazy(() => import('./features/catalogs/pages/OccupationCriteriaPage').then(m => ({ default: m.OccupationCriteriaPage })))
@@ -108,23 +109,26 @@ function App() {
   useSessionManager()
 
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/main-homepage" element={<Suspense fallback={<LoadingSkeleton />}><MainHomePage /></Suspense>} />
-      <Route path="/app" element={<Suspense fallback={<LoadingSkeleton />}><MainAppPage /></Suspense>} />
-      <Route path="/admission" element={<Suspense fallback={<LoadingSkeleton />}><AdmissionPage /></Suspense>} />
-      <Route path="/camps" element={<Suspense fallback={<LoadingSkeleton />}><CampsPage /></Suspense>} />
-      <Route path="/persons" element={<Suspense fallback={<LoadingSkeleton />}><PersonsPage /></Suspense>} />
-      <Route path="/expeditions" element={<Suspense fallback={<LoadingSkeleton />}><ExpeditionsPage /></Suspense>} />
-      <Route path="/expediciones-ui" element={<Suspense fallback={<LoadingSkeleton />}><ExpedicionesUiPage /></Suspense>} />
-      <Route path="/resource-main-view" element={<Suspense fallback={<LoadingSkeleton />}><ResourceMainViewPage /></Suspense>} />
-      <Route path="/admin-dashboard" element={<Suspense fallback={<LoadingSkeleton />}><AdminDashboardPage /></Suspense>} />
-      <Route path="/admin-main-view-ui" element={<Suspense fallback={<LoadingSkeleton />}><AdminMainViewUiPage /></Suspense>} />
-      <Route path="/dashboard" element={<Suspense fallback={<LoadingSkeleton />}><AdminDashboardPage /></Suspense>} />
-      <Route path="/catalogs" element={<CatalogsLayout />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <GlobalOrientationWarning />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/main-homepage" element={<Suspense fallback={<LoadingSkeleton />}><MainHomePage /></Suspense>} />
+        <Route path="/app" element={<Suspense fallback={<LoadingSkeleton />}><MainAppPage /></Suspense>} />
+        <Route path="/admission" element={<Suspense fallback={<LoadingSkeleton />}><AdmissionPage /></Suspense>} />
+        <Route path="/camps" element={<Suspense fallback={<LoadingSkeleton />}><CampsPage /></Suspense>} />
+        <Route path="/persons" element={<Suspense fallback={<LoadingSkeleton />}><PersonsPage /></Suspense>} />
+        <Route path="/expeditions" element={<Suspense fallback={<LoadingSkeleton />}><ExpeditionsPage /></Suspense>} />
+        <Route path="/expeditions-ui" element={<Suspense fallback={<LoadingSkeleton />}><ExpeditionsUiPage /></Suspense>} />
+        <Route path="/resource-main-view" element={<Suspense fallback={<LoadingSkeleton />}><ResourceMainViewPage /></Suspense>} />
+        <Route path="/admin-dashboard" element={<Suspense fallback={<LoadingSkeleton />}><AdminDashboardPage /></Suspense>} />
+        <Route path="/admin-main-view-ui" element={<Suspense fallback={<LoadingSkeleton />}><AdminMainViewUiPage /></Suspense>} />
+        <Route path="/dashboard" element={<Suspense fallback={<LoadingSkeleton />}><AdminDashboardPage /></Suspense>} />
+        <Route path="/catalogs" element={<CatalogsLayout />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }
 
