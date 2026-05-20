@@ -20,6 +20,35 @@ body {
   font-family: "Arial Narrow", "Bahnschrift", "Segoe UI Condensed", "Roboto Condensed", Arial, sans-serif;
 }
 
+@media (max-width: 1024px) and (orientation: portrait) {
+  html,
+  body,
+  #root {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  body {
+    pointer-events: none;
+  }
+
+  .game-screen-layout {
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    display: none;
+  }
+
+  .orientation-warning {
+    pointer-events: auto;
+    z-index: 999999;
+    opacity: 1;
+    visibility: visible;
+    display: flex;
+  }
+}
+
 .game-screen-layout,
 .game-screen-layout h1,
 .game-screen-layout h2,
@@ -2395,5 +2424,202 @@ button {
   }
   100% {
     transform: translateX(2px) scale(1);
+  }
+}
+
+
+@media (max-height: 600px) and (orientation: landscape) {
+  body {
+    overflow: hidden;
+  }
+
+  .game-screen-layout {
+    font-size: 12px;
+  }
+
+  .game-hud-header {
+    height: 36px;
+    padding-top: 4px;
+  }
+
+  .top-hud-btn {
+    padding: 0.08em 0.6em 0.1em 0.8em;
+    font-size: 8px;
+  }
+
+  .section-title-brush {
+    font-size: 14px;
+    padding: 0.1em 2em 0.15em 2em;
+  }
+
+  .main-area {
+    top: 36px;
+    bottom: 60px;
+    padding: 6px 8px 0 4px;
+  }
+
+  .bottom-dock {
+    height: 60px;
+    bottom: 0;
+  }
+
+  .dock-item {
+    padding: 4px;
+  }
+
+  .dock-item-icon {
+    font-size: 14px;
+  }
+
+  .dock-item-label {
+    font-size: 6px;
+    padding-top: 2px;
+  }
+
+  .inner-layout {
+    gap: 6px;
+  }
+
+  .inner-sidebar {
+    max-width: 120px;
+  }
+
+  .side-button {
+    padding: 0.4em 0.8em;
+    font-size: 8px;
+  }
+
+  .inner-content {
+    padding: 16px 20px 16px 16px;
+  }
+
+  .inner-content::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  .mission-card {
+    padding: 12px;
+    margin-bottom: 8px;
+  }
+
+  .mission-card-title {
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+
+  .mission-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mission-grid-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .v-kpi {
+    padding: 8px;
+  }
+
+  .v-kpi-value {
+    font-size: 16px;
+  }
+
+  .v-kpi-label {
+    font-size: 8px;
+  }
+
+  .v-table {
+    font-size: 8px;
+  }
+
+  .v-table th,
+  .v-table td {
+    padding: 6px 8px;
+  }
+
+  
+  .wm-dotted-container {
+    height: 100%;
+    width: 100%;
+    min-height: 300px;
+  }
+
+  .wm-dotted-overlay text {
+    font-size: 5px;
+  }
+
+  .wm-dotted-overlay circle {
+    r: 2 !important;
+  }
+
+  .wm-legend {
+    font-size: 7px;
+    bottom: 5px;
+    left: 5px;
+    right: 5px;
+  }
+
+  .wm-legend-item {
+    padding: 2px 4px;
+  }
+
+  .settings-inner {
+    padding: 12px 0 0 0 !important;
+  }
+
+  .section-header {
+    top: 2px;
+  }
+}
+
+
+@media (max-width: 480px) and (orientation: landscape) {
+  .inner-sidebar {
+    max-width: 100px;
+  }
+
+  .side-button {
+    font-size: 7px;
+    padding: 0.3em 0.6em;
+  }
+
+  .inner-content {
+    padding: 12px 14px 12px 12px;
+  }
+
+  .mission-card {
+    padding: 10px;
+  }
+
+  .mission-card-title {
+    font-size: 10px;
+  }
+
+  .v-table {
+    font-size: 7px;
+  }
+
+  .v-table th,
+  .v-table td {
+    padding: 4px 6px;
+  }
+
+  .top-hud-btn {
+    font-size: 7px;
+    padding: 0.06em 0.4em 0.08em 0.6em;
+  }
+}
+
+@media (max-width: 1024px) and (orientation: portrait) {
+  .game-screen-layout {
+    pointer-events: none;
+  }
+
+  .game-screen-layout > * {
+    pointer-events: none;
+  }
+
+  .orientation-warning,
+  .orientation-warning * {
+    pointer-events: auto;
   }
 }

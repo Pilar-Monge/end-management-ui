@@ -3,6 +3,8 @@ import { Suspense, lazy, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import LoginPage from './features/login/pages/LoginPage'
+import { GlobalOrientationWarning } from './shared/components/GlobalOrientationWarning'
+import { FullscreenButton } from './shared/components/FullscreenButton'
 import { useSessionManager } from './shared/hooks'
 
 const MainAppPage = lazy(() => import('./app/layout/MainAppPage'))
@@ -32,6 +34,9 @@ const OccupationCriteriaPage = lazy(() =>
 )
 const AchievementsPage = lazy(() =>
   import('./features/catalogs').then((m) => ({ default: m.AchievementsPage })),
+)
+const ExpeditionsUiPage = lazy(() =>
+  import('./features/expeditions-ui').then((m) => ({ default: m.ExpeditionsUiPage })),
 )
 
 const routeFallback = (
@@ -108,7 +113,7 @@ function CatalogsLayout() {
           Volver
         </button>
       </div>
-  <Suspense fallback={routeFallback}>
+      <Suspense fallback={routeFallback}>
         <ActiveComponent />
       </Suspense>
     </div>
@@ -119,22 +124,27 @@ function App() {
   useSessionManager()
 
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/login" element={<LoginPage />} />
-  <Route path="/main-homepage" element={withSuspense(<MainHomePage />)} />
-  <Route path="/app" element={withSuspense(<MainAppPage />)} />
-  <Route path="/admission" element={withSuspense(<AdmissionPage />)} />
-  <Route path="/camps" element={withSuspense(<CampsPage />)} />
-  <Route path="/persons" element={withSuspense(<PersonsPage />)} />
-  <Route path="/expeditions" element={withSuspense(<ExpeditionsPage />)} />
-  <Route path="/resource-main-view" element={withSuspense(<ResourceMainViewPage />)} />
-  <Route path="/admin-dashboard" element={withSuspense(<AdminDashboardPage />)} />
-  <Route path="/admin-main-view-ui" element={withSuspense(<AdminMainViewUiPage />)} />
-  <Route path="/dashboard" element={withSuspense(<AdminDashboardPage />)} />
-  <Route path="/catalogs" element={withSuspense(<CatalogsLayout />)} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <GlobalOrientationWarning />
+      <FullscreenButton />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/main-homepage" element={withSuspense(<MainHomePage />)} />
+        <Route path="/app" element={withSuspense(<MainAppPage />)} />
+        <Route path="/admission" element={withSuspense(<AdmissionPage />)} />
+        <Route path="/camps" element={withSuspense(<CampsPage />)} />
+        <Route path="/persons" element={withSuspense(<PersonsPage />)} />
+        <Route path="/expeditions" element={withSuspense(<ExpeditionsPage />)} />
+        <Route path="/expeditions-ui" element={withSuspense(<ExpeditionsUiPage />)} />
+        <Route path="/resource-main-view" element={withSuspense(<ResourceMainViewPage />)} />
+        <Route path="/admin-dashboard" element={withSuspense(<AdminDashboardPage />)} />
+        <Route path="/admin-main-view-ui" element={withSuspense(<AdminMainViewUiPage />)} />
+        <Route path="/dashboard" element={withSuspense(<AdminDashboardPage />)} />
+        <Route path="/catalogs" element={withSuspense(<CatalogsLayout />)} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }
 

@@ -1,8 +1,9 @@
-import "../expedicionesUi.css";
+import "../expeditionsUi.css";
 import { useState, useEffect, type ReactNode } from "react";
 import { ExpDashboard, ExpCrear, ExpLista, ExpDetalles, TrasladosVer, TrasladosCrear, PlaceholderView, PersonasView } from "../views/ExpedicionesViews";
 import { WorldMapDashboard } from "../views/WorldMapView";
 import { LoadingScreen } from "../components/LoadingScreen";
+import { OrientationWarning } from "../components/OrientationWarning";
 
 const NAVIGATION_DATA = [
   { id: "personas", label: "Personas", icon: <ProfileIcon />, subOptions: ["Lista de personas"] },
@@ -14,7 +15,7 @@ const NAVIGATION_DATA = [
   { id: "configuracion", label: "Configuración", icon: <RankIcon />, subOptions: ["Perfil", "Preferencias", "Usuarios"] },
 ];
 
-export default function ExpedicionesUiPage() {
+export default function ExpeditionsUiPage() {
   const [showLoading, setShowLoading] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasEntered, setHasEntered] = useState(false);
@@ -58,6 +59,7 @@ export default function ExpedicionesUiPage() {
     <div className="game-screen-layout text-[#A4C2C5]">
       <div className="holo-grid" />
 
+      <OrientationWarning />
       
       <LoadingScreen 
         show={showLoading} 
