@@ -63,6 +63,7 @@ import {
   summarizeAuditRecord,
   toDisplayDate,
 } from "../mappers/adminMappers";
+import { ExpeditionsPanel } from "../expeditions/ExpeditionsPanel";
 
 
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Permanent+Marker&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');`;
@@ -83,7 +84,17 @@ type NavSection =
 type PopulationViewMode = "stats" | "users" | "tempRoles";
 type AdmissionsViewMode = "queue" | "history";
 type InventoryViewMode = "summary" | "items" | "movements" | "alerts" | "collection";
-type ExpeditionsViewMode = "active" | "planning" | "history" | "participants" | "consumed" | "gained";
+type ExpeditionsViewMode =
+  | "active"
+  | "planning"
+  | "history"
+  | "participants"
+  | "consumed"
+  | "gained"
+  | "map"
+  | "create"
+  | "activeOps"
+  | "resources";
 type IntercampViewMode = "pending" | "history" | "send";
 type SecurityViewMode = "live" | "errors" | "system";
 type LogrosViewMode = "overview" | "progress";
@@ -3680,7 +3691,7 @@ export default function AdminDashboard() {
   const [populationViewMode, setPopulationViewMode] = useState<PopulationViewMode>("stats");
   const [admissionsViewMode, setAdmissionsViewMode] = useState<AdmissionsViewMode>("queue");
   const [inventoryViewMode, setInventoryViewMode] = useState<InventoryViewMode>("summary");
-  const [expeditionsViewMode, setExpeditionsViewMode] = useState<ExpeditionsViewMode>("active");
+  const [expeditionsViewMode, setExpeditionsViewMode] = useState<ExpeditionsViewMode>("map");
   const [intercampViewMode, setIntercampViewMode] = useState<IntercampViewMode>("pending");
   const [securityViewMode, setSecurityViewMode] = useState<SecurityViewMode>("live");
   const [logrosViewMode, setLogrosViewMode] = useState<LogrosViewMode>("overview");
@@ -3776,7 +3787,17 @@ export default function AdminDashboard() {
       case "POBLACIÓN": return <ViewPoblacion mode={populationViewMode} campId={currentCampId} />;
       case "ADMISIONES IA": return <ViewAdmisiones mode={admissionsViewMode} canReview={can("admissions.review")} campId={currentCampId} />;
       case "INVENTARIO": return <ViewInventario mode={inventoryViewMode} canAdjust={can("inventory.adjust")} campId={currentCampId} />;
-      case "EXPEDICIONES": return <ViewExpediciones mode={expeditionsViewMode} canForce={can("expeditions.force")} />;
+      case "EXPEDICIONES":
+        if (["active", "planning", "consumed", "gained"].includes(expeditionsViewMode)) {
+          return <ViewExpediciones mode={expeditionsViewMode} canForce={can("expeditions.force")} />;
+        }
+        return (
+          <ExpeditionsPanel
+            mode={expeditionsViewMode}
+            currentCampId={currentCampId}
+            onModeChange={(nextMode) => setExpeditionsViewMode(nextMode)}
+          />
+        );
       case "INTER-CAMPAMENTOS": return <ViewIntercamp mode={intercampViewMode} canApprove={can("intercamp.approve")} />;
       case "SEGURIDAD / LOGS": return <ViewSeguridad mode={securityViewMode} />;
       case "LOGROS": return <ViewLogros mode={logrosViewMode} />;
@@ -3815,7 +3836,7 @@ export default function AdminDashboard() {
     }
 
     if (target === "EXPEDICIONES") {
-      setExpeditionsViewMode("active");
+      setExpeditionsViewMode("map");
       setActiveNav(target);
       return;
     }
@@ -3973,29 +3994,29 @@ export default function AdminDashboard() {
 
                     {activeNav === "EXPEDICIONES" && (
                       <>
-                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "active" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("active")} style={{ color: expeditionsViewMode === "active" ? "#05070A" : "#B8C7DB" }}>
-                          <Activity size={14} />
-                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Activas y en curso</span>
-                        </button>
-                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "planning" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("planning")} style={{ color: expeditionsViewMode === "planning" ? "#05070A" : "#B8C7DB" }}>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "map" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("map")} style={{ color: expeditionsViewMode === "map" ? "#05070A" : "#B8C7DB" }}>
                           <Map size={14} />
-                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Planificación</span>
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Mapa operativo</span>
                         </button>
-                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("history")} style={{ color: expeditionsViewMode === "history" ? "#05070A" : "#B8C7DB" }}>
-                          <Trophy size={14} />
-                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Completadas</span>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "create" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("create")} style={{ color: expeditionsViewMode === "create" ? "#05070A" : "#B8C7DB" }}>
+                          <Map size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Nueva expedicion</span>
                         </button>
                         <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "participants" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("participants")} style={{ color: expeditionsViewMode === "participants" ? "#05070A" : "#B8C7DB" }}>
                           <Users size={14} />
                           <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Participantes</span>
                         </button>
-                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "consumed" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("consumed")} style={{ color: expeditionsViewMode === "consumed" ? "#05070A" : "#B8C7DB" }}>
-                          <TrendingDown size={14} />
-                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Recursos consumidos</span>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "activeOps" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("activeOps")} style={{ color: expeditionsViewMode === "activeOps" ? "#05070A" : "#B8C7DB" }}>
+                          <Activity size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Misiones activas</span>
                         </button>
-                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "gained" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("gained")} style={{ color: expeditionsViewMode === "gained" ? "#05070A" : "#B8C7DB" }}>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("history")} style={{ color: expeditionsViewMode === "history" ? "#05070A" : "#B8C7DB" }}>
+                          <Trophy size={14} />
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Historial</span>
+                        </button>
+                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "resources" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("resources")} style={{ color: expeditionsViewMode === "resources" ? "#05070A" : "#B8C7DB" }}>
                           <TrendingUp size={14} />
-                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Recursos obtenidos</span>
+                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Recursos</span>
                         </button>
                       </>
                     )}

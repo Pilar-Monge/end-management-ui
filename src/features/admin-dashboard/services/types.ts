@@ -74,6 +74,15 @@ export interface AdminExpeditionRecord {
   members?: string[]
 }
 
+export interface AdminCreateExpeditionRequest {
+  name: string
+  objective: string
+  sector: string
+  totalDays: number
+  campId: number
+  participantIds: number[]
+}
+
 export interface GeneralDashboardPayload {
   [key: string]: unknown
 }

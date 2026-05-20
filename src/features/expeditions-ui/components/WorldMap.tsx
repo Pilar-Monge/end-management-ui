@@ -29,6 +29,20 @@ const STATUS_COLORS: Record<string, string> = {
   ACTIVE: "#69BFB7",
 };
 
+function routeVisual(status: string | undefined) {
+  const normalized = (status ?? "").toUpperCase();
+  if (normalized.includes("PLAN")) {
+    return { dash: "4 5", width: 1.2, opacity: 0.7, speed: 14 };
+  }
+  if (normalized.includes("DELAY") || normalized.includes("RETRAS")) {
+    return { dash: "2 5", width: 1.4, opacity: 0.86, speed: 7 };
+  }
+  if (normalized.includes("COMPLETE") || normalized.includes("DONE")) {
+    return { dash: "0", width: 1.05, opacity: 0.5, speed: 0 };
+  }
+  return { dash: "0", width: 1.45, opacity: 0.88, speed: 10 };
+}
+
 export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: WorldMapProps) {
   const id = useId();
 
@@ -84,6 +98,8 @@ export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: Worl
           const startPoint = projectPoint(dot.start.lat, dot.start.lng);
           const endPoint = projectPoint(dot.end.lat, dot.end.lng);
           const color = dot.status ? (STATUS_COLORS[dot.status] || lineColor) : lineColor;
+          const route = routeVisual(dot.status);
+          const delay = 0.24 * i;
 
           return (
             <g key={`arc-${i}`}>
@@ -100,10 +116,35 @@ export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: Worl
                 d={createCurvedPath(startPoint, endPoint)}
                 fill="none"
                 stroke={color}
-                strokeWidth="1.2"
+                strokeWidth={route.width}
+                strokeDasharray={route.dash}
+                strokeLinecap="round"
                 initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: 1, opacity: 0.6 }}
-                transition={{ duration: 1.2, delay: 0.3 * i, ease: "easeOut" }}
+                animate={{ pathLength: 1, opacity: route.opacity }}
+                transition={{ duration: 1.2, delay, ease: "easeOut" }}
+              />
+
+              {route.speed > 0 && (
+                <motion.path
+                  d={createCurvedPath(startPoint, endPoint)}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={route.width + 0.2}
+                  strokeDasharray={route.dash === "0" ? "5 14" : route.dash}
+                  strokeLinecap="round"
+                  opacity="0.45"
+                  animate={{ strokeDashoffset: [0, -80] }}
+                  transition={{ repeat: Infinity, duration: route.speed, ease: "linear", delay }}
+                />
+              )}
+
+              <motion.path
+                d={createCurvedPath(startPoint, endPoint)}
+                fill="none"
+                stroke={color}
+                strokeWidth={route.width + 0.55}
+                opacity="0.16"
+                filter="url(#routeGlow)"
               />
             </g>
           );
@@ -137,9 +178,12 @@ export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: Worl
                 style={{ cursor: "pointer" }}
                 className="hover:opacity-80 transition-opacity"
               >
-                <circle cx={endPoint.x} cy={endPoint.y} r="6" fill={color} opacity="0.2">
+                <circle cx={endPoint.x} cy={endPoint.y} r="6" fill={color} opacity="0.24">
                   <animate attributeName="r" from="4" to="12" dur="2s" repeatCount="indefinite" />
                   <animate attributeName="opacity" from="0.4" to="0" dur="2s" repeatCount="indefinite" />
+                </circle>
+                <circle cx={endPoint.x} cy={endPoint.y} r="10" fill="none" stroke={color} strokeOpacity="0.3" strokeDasharray="2 3">
+                  <animate attributeName="transform" attributeType="XML" type="rotate" from={`0 ${endPoint.x} ${endPoint.y}`} to={`360 ${endPoint.x} ${endPoint.y}`} dur="7s" repeatCount="indefinite" />
                 </circle>
                 <circle cx={endPoint.x} cy={endPoint.y} r="4" fill={color} />
                 {dot.end.label && (
@@ -151,6 +195,16 @@ export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: Worl
             </g>
           );
         })}
+
+        <defs>
+          <filter id="routeGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
       </svg>
     </div>
   );
