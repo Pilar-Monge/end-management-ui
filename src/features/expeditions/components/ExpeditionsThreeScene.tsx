@@ -120,10 +120,12 @@ function SyncOverlay({
   onComplete: () => void 
 }) {
   const [progress, setProgress] = useState(0);
+  const completedRef = useRef(false);
 
   useEffect(() => {
     if (!isSyncing) {
       setProgress(0);
+      completedRef.current = false;
       return;
     }
 
@@ -139,6 +141,14 @@ function SyncOverlay({
 
     return () => clearInterval(interval);
   }, [isSyncing]);
+
+  useEffect(() => {
+    if (isSyncing && progress >= 100 && !completedRef.current) {
+      completedRef.current = true;
+      const timeout = window.setTimeout(onComplete, 500);
+      return () => window.clearTimeout(timeout);
+    }
+  }, [isSyncing, progress, onComplete]);
 
   if (!isSyncing) return null;
 
@@ -290,9 +300,10 @@ function InteractionStation({
 
 interface ExpeditionsThreeSceneProps {
   onExit?: () => void;
+  onSyncComplete?: () => void;
 }
 
-export default function ExpeditionsThreeScene({ onExit }: ExpeditionsThreeSceneProps) {
+export default function ExpeditionsThreeScene({ onExit, onSyncComplete }: ExpeditionsThreeSceneProps) {
   const modelRef = useRef<THREE.Group>(null);
   const [hoveredStation, setHoveredStation] = useState(false);
   const [hoveredMap, setHoveredMap] = useState(false);
@@ -353,7 +364,10 @@ export default function ExpeditionsThreeScene({ onExit }: ExpeditionsThreeSceneP
 
   const handleSyncComplete = useCallback(() => {
     setIsSyncing(false);
-  }, []);
+    if (onSyncComplete) {
+      onSyncComplete();
+    }
+  }, [onSyncComplete]);
 
   const handleBack = useCallback(() => {
     if (isSyncing) {

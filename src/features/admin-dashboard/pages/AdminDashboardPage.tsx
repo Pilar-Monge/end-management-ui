@@ -93,21 +93,21 @@ type AppRole = "SYSTEM_ADMIN" | "GESTION_RECURSOS" | "TRABAJADOR" | "ENCARGADO_V
 type HttpCode = 400 | 401 | 403 | 404;
 
 const UI_COLORS = {
-  bg: "#05070A",
-  panel: "#0B1118",
-  panelAlt: "#0A1016",
-  panelRaised: "#121B26",
-  border: "#2A3444",
-  borderSoft: "#1E2835",
-  textPrimary: "#EEF3FB",
-  textMuted: "#B8C7DB",
-  textFaint: "#7F93AC",
-  accent: "#7FB8FF",
+  bg: "#04090A",
+  panel: "#081213",
+  panelAlt: "#0A1718",
+  panelRaised: "#102023",
+  border: "#2B464B",
+  borderSoft: "#1A2F34",
+  textPrimary: "#EAF8F8",
+  textMuted: "#9EC3C2",
+  textFaint: "#6D8B8C",
+  accent: "#69BFB7",
   state: {
     critical: "#DC2626",
     warning: "#D4A65A",
-    info: "#4AAED2",
-    system: "#8FA6C0",
+    info: "#67ACA9",
+    system: "#89A9AA",
   },
 } as const;
 
@@ -3895,9 +3895,6 @@ export default function AdminDashboard() {
 
       <div className="admin-dashboard">
         <div className="admin-stage">
-          <video className="admin-texture" aria-hidden="true" autoPlay muted loop playsInline>
-            <source src="/videos/video_expeditions.mp4" type="video/mp4" />
-          </video>
           <div className="admin-hud" aria-hidden="true" />
 
           <div className="admin-layout">
@@ -4105,6 +4102,7 @@ export default function AdminDashboard() {
                       <ChevronLeft size={16} style={{ color: "#7FB8FF" }} />
                     </button>
                   </div>
+                  <div className="admin-top-title-badge">{activeNav}</div>
                   <div className="admin-profile admin-header-actions flex items-center gap-2">
                     <button onClick={() => setActiveNav("NOTIFICACIONES")} className="admin-icon-btn admin-header-icon-btn relative p-2.5 rounded-sm"
                       style={{ background: "transparent", border: "1px solid rgba(127, 184, 255, 0.32)", minWidth: 34, minHeight: 34 }}>

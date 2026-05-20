@@ -10,7 +10,10 @@ export default function ExpeditionsPage() {
   return (
     <main className="expeditions-page">
       <Suspense fallback={<div style={{ color: '#cfe7ff', padding: 16 }}>Cargando vista 3D...</div>}>
-        <ExpeditionsThreeScene onExit={() => navigate('/')} />
+        <ExpeditionsThreeScene
+          onExit={() => navigate('/')}
+          onSyncComplete={() => navigate('/expeditions-ui')}
+        />
       </Suspense>
     </main>
   )
