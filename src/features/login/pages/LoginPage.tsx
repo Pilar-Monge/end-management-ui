@@ -20,10 +20,9 @@ export default function LoginPage() {
   const [showLoginForm, setShowLoginForm] = useState(false)
   const [cinematicPulse, setCinematicPulse] = useState(0)
 
-  
   useEffect(() => {
     if (authState?.selectedCampId) {
-      setForm(prev => ({ ...prev, campId: authState.selectedCampId }))
+      setForm((prev) => ({ ...prev, campId: authState.selectedCampId }))
     }
   }, [authState?.selectedCampId])
 
@@ -39,7 +38,7 @@ export default function LoginPage() {
       nextErrors.password = 'Mínimo 6 caracteres'
 
     if (!form.campId) {
-      (nextErrors as any).campId = 'Debes seleccionar un campamento en el globo'
+      ;(nextErrors as any).campId = 'Debes seleccionar un campamento en el globo'
     }
 
     setErrors(nextErrors)
@@ -62,7 +61,7 @@ export default function LoginPage() {
       window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
       navigate('/app')
       localStorage.setItem('user', JSON.stringify(normalizedUser))
-      
+
       let redirectPath = '/app'
       if (normalizedUser.role === 'SYSTEM_ADMIN') {
         redirectPath = '/admin-main-view-ui'
