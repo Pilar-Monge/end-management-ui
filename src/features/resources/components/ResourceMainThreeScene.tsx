@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, useGLTF, Html, useProgress } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { LoadingScreen as ResourcePanelLoadingScreen } from './ResourcePanelLoadingScreen'
 
 const HANGAR_URL = 'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/polygon.glb'
 const MONITORING_STATION_URL = 'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorExpediciones/monitoring_station.glb'
@@ -163,72 +164,32 @@ function ResourceLoader() {
 function SyncOverlay({
   isSyncing,
   onCancel,
+  onEnter,
 }: {
   isSyncing: boolean
   onCancel: () => void
+  onEnter: () => void
 }) {
-  const [progress, setProgress] = useState(0)
+  const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
     if (!isSyncing) {
-      setProgress(0)
+      setIsLoaded(false)
       return
     }
 
-    const interval = window.setInterval(() => {
-      setProgress((value) => {
-        if (value >= 100) {
-          window.clearInterval(interval)
-          return 100
-        }
-        return value + 2
-      })
-    }, 35)
+    const timeout = window.setTimeout(() => setIsLoaded(true), 1500)
 
-    return () => window.clearInterval(interval)
+    return () => window.clearTimeout(timeout)
   }, [isSyncing])
 
-  if (!isSyncing) return null
-
   return (
-    <div className="resource-sync-overlay">
-      <div className="resource-sync-monitor-card">
-        <div className="resource-sync-progress-ring" style={{ '--pct': progress } as React.CSSProperties}>
-          <div className="resource-sync-progress-core">
-            <span className="resource-sync-progress-text">{progress}%</span>
-            <span className="resource-sync-code">Link_Sync</span>
-          </div>
-        </div>
-
-        <div className="resource-sync-copy">
-          <p className="resource-sync-title">Estación de Monitoreo</p>
-          <p className="resource-sync-subtitle">Estableciendo conexión segura...</p>
-          <div className="resource-sync-progress-bar-shell">
-            <div className="resource-sync-progress-bar" style={{ width: `${progress}%` }} />
-          </div>
-        </div>
-
-        <div className="resource-sync-actions">
-          <button
-            type="button"
-            className="resource-sync-brush-btn resource-sync-brush-btn-primary"
-            disabled={progress < 100}
-            onClick={onCancel}
-          >
-            <span className="resource-sync-brush-btn-bg" />
-            <span className="resource-sync-brush-btn-label">Acceder al Sistema</span>
-          </button>
-          <button
-            type="button"
-            className="resource-sync-brush-btn resource-sync-brush-btn-secondary"
-            onClick={onCancel}
-          >
-            <span className="resource-sync-brush-btn-bg" />
-            <span className="resource-sync-brush-btn-label">Volver al Hangar</span>
-          </button>
-        </div>
-      </div>
-    </div>
+    <ResourcePanelLoadingScreen
+      show={isSyncing}
+      isLoaded={isLoaded}
+      onEnter={onEnter}
+      onBack={onCancel}
+    />
   )
 }
 
@@ -478,9 +439,10 @@ function ResourceSceneContent({
 
 interface ResourceMainThreeSceneProps {
   onExit?: () => void
+  onOpenPanel?: () => void
 }
 
-export default function ResourceMainThreeScene({ onExit }: ResourceMainThreeSceneProps) {
+export default function ResourceMainThreeScene({ onExit, onOpenPanel }: ResourceMainThreeSceneProps) {
   const controlsRef = useRef(null)
   const [hoveredTarget, setHoveredTarget] = useState<{ type: Exclude<ResourceZoomTarget, null>, name: string, position: [number, number, number] } | null>(null)
   const [zoomedTarget, setZoomedTarget] = useState<ResourceZoomTarget>(null)
@@ -528,7 +490,14 @@ export default function ResourceMainThreeScene({ onExit }: ResourceMainThreeScen
     <div className="resource-scene-shell">
       <ResourceLoader />
 
-      <SyncOverlay isSyncing={isSyncing} onCancel={() => setIsSyncing(false)} />
+      <SyncOverlay
+        isSyncing={isSyncing}
+        onCancel={() => setIsSyncing(false)}
+        onEnter={() => {
+          setIsSyncing(false)
+          onOpenPanel?.()
+        }}
+      />
 
       <Canvas
         shadows={{ type: THREE.BasicShadowMap }}
