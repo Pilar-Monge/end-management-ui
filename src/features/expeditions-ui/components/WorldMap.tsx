@@ -20,6 +20,8 @@ interface WorldMapProps {
   onZoneClick?: (dot: Dot) => void;
 }
 
+let cachedSvgMap: string | null = null;
+
 const STATUS_COLORS: Record<string, string> = {
   IN_PROGRESS: "#69BFB7",
   PLANNED: "#67ACA9",
@@ -43,17 +45,36 @@ function routeVisual(status: string | undefined) {
   return { dash: "0", width: 1.45, opacity: 0.88, speed: 10 };
 }
 
-export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: WorldMapProps) {
+export function primeWorldMapCache() {
+  if (cachedSvgMap) return;
+  const map = new DottedMap({
+    width: 200,
+    height: 100,
+    grid: "diagonal",
+    projection: { name: "equirectangular" },
+    region: {
+      lat: { min: -90, max: 90 },
+      lng: { min: -180, max: 180 },
+    },
+  });
+  cachedSvgMap = map.getSVG({
+    radius: 0.22,
+    color: "rgba(103,172,169,0.35)",
+    shape: "circle",
+    backgroundColor: "transparent",
+  });
+}
+
+export function WorldMap({
+  dots = [],
+  lineColor = "#69BFB7",
+  onZoneClick,
+}: WorldMapProps) {
   const id = useId();
 
   const svgMap = useMemo(() => {
-    const map = new DottedMap({ height: 100, grid: "diagonal" });
-    return map.getSVG({
-      radius: 0.22,
-      color: "rgba(103,172,169,0.35)",
-      shape: "circle",
-      backgroundColor: "transparent",
-    });
+    primeWorldMapCache();
+    return cachedSvgMap ?? "";
   }, []);
 
   const projectPoint = (lat: number, lng: number) => {
@@ -174,7 +195,10 @@ export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: Worl
 
               
               <g 
-                onClick={() => onZoneClick?.(dot)} 
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onZoneClick?.(dot);
+                }} 
                 style={{ cursor: "pointer" }}
                 className="hover:opacity-80 transition-opacity"
               >

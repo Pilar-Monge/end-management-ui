@@ -1,5 +1,5 @@
 import { ApiHttpError, apiRequest } from '../../../shared/services/httpClient'
-import type { AdminCreateExpeditionRequest, AdminExpeditionRecord } from './types'
+import type { AdminExpeditionRecord } from './types'
 
 export async function listActiveExpeditions(): Promise<AdminExpeditionRecord[]> {
   try {
@@ -26,26 +26,6 @@ export async function completeExpedition(id: number): Promise<AdminExpeditionRec
 
   return apiRequest<AdminExpeditionRecord>(`/explorations/${id}/complete`, {
     method: 'POST',
-  })
-}
-
-export async function createExpedition(
-  payload: AdminCreateExpeditionRequest,
-): Promise<AdminExpeditionRecord> {
-  try {
-    return await apiRequest<AdminExpeditionRecord>('/expeditions', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
-  } catch (error) {
-    if (!(error instanceof ApiHttpError) || error.statusCode !== 404) {
-      throw error
-    }
-  }
-
-  return apiRequest<AdminExpeditionRecord>('/explorations', {
-    method: 'POST',
-    body: JSON.stringify(payload),
   })
 }
 

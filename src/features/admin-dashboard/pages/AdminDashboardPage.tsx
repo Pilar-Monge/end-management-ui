@@ -64,6 +64,8 @@ import {
   toDisplayDate,
 } from "../mappers/adminMappers";
 import { ExpeditionsPanel } from "../expeditions/ExpeditionsPanel";
+import { prefetchExpeditionsData } from "../expeditions/useExpeditionsState";
+import { prefetchExpeditionsWorldMap } from "../expeditions/components/ExpeditionsWorldMap";
 
 
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Permanent+Marker&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');`;
@@ -88,14 +90,12 @@ type ExpeditionsViewMode =
   | "active"
   | "planning"
   | "history"
-  | "participants"
   | "consumed"
   | "gained"
   | "map"
-  | "create"
   | "activeOps"
   | "resources";
-type IntercampViewMode = "pending" | "history" | "send";
+type IntercampViewMode = "pending" | "history";
 type SecurityViewMode = "live" | "errors" | "system";
 type LogrosViewMode = "overview" | "progress";
 type NotifsViewMode = "all" | "unread" | "critical";
@@ -2119,9 +2119,6 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
   const [consumedEntries, setConsumedEntries] = useState<ExpeditionResourceEntry[]>(INITIAL_EXP_CONSUMED);
   const [gainedEntries, setGainedEntries] = useState<ExpeditionResourceEntry[]>(INITIAL_EXP_GAINED);
   const [, setSelected] = useState<Expedition | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
-  const [newExp, setNewExp] = useState<Partial<Expedition>>({ name: "", objective: "", sector: "", total: 5, participants: [], status: "PROGRAMADA" });
-  const [participantInput, setParticipantInput] = useState("");
   const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorCode, setErrorCode] = useState<HttpCode | null>(null);
@@ -2146,15 +2143,6 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
   const showToast = (msg: string, color: string) => {
     setToast({ msg, color });
     setTimeout(() => setToast(null), 2500);
-  };
-
-  const handleCreate = () => {
-    if (!newExp.name) return;
-    const id = Math.max(...expeditions.map(e => e.id)) + 1;
-    setExpeditions(prev => [...prev, { ...newExp, id, day: 0 } as Expedition]);
-    setShowCreate(false);
-    setNewExp({ name: "", objective: "", sector: "", total: 5, participants: [], status: "PROGRAMADA" });
-    showToast("EXPEDICIÓN CREADA", "#0D9488");
   };
 
   const handleAdvanceDay = (id: number) => {
@@ -2188,12 +2176,6 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
   const handleForceStatus = (id: number, status: Expedition["status"]) => {
     setExpeditions(prev => prev.map(e => e.id === id ? { ...e, status } : e));
     showToast(`ESTADO FORZADO: ${status}`, "#7FB8FF");
-  };
-
-  const addParticipant = () => {
-    if (!participantInput) return;
-    setNewExp(prev => ({ ...prev, participants: [...(prev.participants ?? []), participantInput.toUpperCase().slice(0, 2)] }));
-    setParticipantInput("");
   };
 
   const active = expeditions.filter(e => e.status === "EN CURSO" || e.status === "REGRESANDO");
@@ -2231,10 +2213,6 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
           </Card>
         ))}
       </div>
-
-      {(mode === "planning" || mode === "active") && <div className="flex justify-end">
-        <ActionBtn label="+ NUEVA EXPEDICIÓN" color="#7FB8FF" onClick={() => setShowCreate(true)} />
-      </div>}
 
       {/* Expedition list */}
       {(["active", "planning", "history"] as ExpeditionsViewMode[]).includes(mode) && (
@@ -2294,27 +2272,6 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
         </div>
       )}
 
-      {mode === "participants" && (
-        <Card>
-          <SectionHeader title="PARTICIPANTES POR EXPEDICIÓN" />
-          <div className="admin-stack-sm">
-            {expeditions.map(exp => (
-              <div key={exp.id} className="p-3 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}` }}>
-                <div className="flex items-center justify-between mb-2">
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textPrimary }}>{exp.name}</span>
-                  <Badge label={exp.status} color={expColor(exp.status)} />
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {exp.participants.map((p, i) => (
-                    <span key={`${exp.id}-${i}`} className="px-2 py-1 rounded-sm" style={{ border: `1px solid ${UI_COLORS.border}`, fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textMuted }}>{p}</span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
       {mode === "consumed" && (
         <Card>
           <SectionHeader title="RECURSOS CONSUMIDOS EN EXPEDICIÓN" />
@@ -2365,61 +2322,12 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
         </Card>
       )}
 
-      <Modal
-        open={showCreate && mode !== "history"}
-        onClose={() => setShowCreate(false)}
-        title="CREAR NUEVA EXPEDICIÓN"
-        backgroundVideoSrc="/videos/video_expeditions.mp4"
-      >
-        <div className="admin-stack-md">
-          {[
-            { label: "NOMBRE DE LA MISIÓN", key: "name" },
-            { label: "OBJETIVO", key: "objective" },
-            { label: "SECTOR / DISTANCIA", key: "sector" },
-          ].map(({ label, key }) => (
-            <div key={key}>
-              <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{label}</label>
-              <input value={(newExp as any)[key] ?? ""} onChange={e => setNewExp(prev => ({ ...prev, [key]: e.target.value }))}
-                className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
-            </div>
-          ))}
-          <div>
-            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>DURACIÓN ESTIMADA (DÍAS)</label>
-            <input type="number" value={newExp.total ?? 5} onChange={e => setNewExp(prev => ({ ...prev, total: Number(e.target.value) }))}
-              className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-              style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
-          </div>
-          <div>
-            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>PARTICIPANTES (INICIALES)</label>
-            <div className="flex gap-2 mt-1">
-              <input value={participantInput} onChange={e => setParticipantInput(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && addParticipant()}
-                placeholder="ej. JR" className="flex-1 px-3 py-2 rounded-sm outline-none"
-                style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#EEF3FB" }} />
-              <ActionBtn label="AGREGAR" color="#7FB8FF" onClick={addParticipant} />
-            </div>
-            <div className="flex gap-1 flex-wrap mt-2">
-              {(newExp.participants ?? []).map((p, i) => (
-                <button key={i} onClick={() => setNewExp(prev => ({ ...prev, participants: prev.participants?.filter((_, j) => j !== i) }))}
-                  className="admin-chip-btn px-1.5 py-0.5 rounded-sm"
-                  style={{ background: "#121B26", border: "1px solid #2A3444", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>
-                  {p} x
-                </button>
-              ))}
-            </div>
-          </div>
-          <ActionBtn label="LANZAR EXPEDICIÓN" color="#7FB8FF" onClick={handleCreate} />
-        </div>
-      </Modal>
     </div>
   );
 }
 
 function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canApprove: boolean }) {
   const [requests, setRequests] = useState<IntercampRequest[]>(INITIAL_INTERCAMP);
-  const [showSend, setShowSend] = useState(false);
-  const [newReq, setNewReq] = useState({ to: "", text: "", type: "solicitud" });
   const [lookupId, setLookupId] = useState("");
   const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -2440,18 +2348,6 @@ function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canAppro
   const handleReject = (id: number) => {
     setRequests(prev => prev.map(r => r.id === id ? { ...r, status: "RECHAZADO" } : r));
     showToast("SOLICITUD RECHAZADA", "#DC2626");
-  };
-
-  const handleSend = () => {
-    if (!newReq.to || !newReq.text) return;
-    const id = Math.max(...requests.map(r => r.id)) + 1;
-    setRequests(prev => [...prev, {
-      id, from: "CAMPAMENTO ALFA", text: `→ ${newReq.to}: ${newReq.text}`,
-      time: "ahora", status: "CONFIRMADO", urgent: false, type: newReq.type as IntercampRequest["type"]
-    }]);
-    setShowSend(false);
-    setNewReq({ to: "", text: "", type: "solicitud" });
-    showToast("MENSAJE ENVIADO", "#0D9488");
   };
 
   const mergeRequest = (incoming: IntercampRequest) => {
@@ -2554,10 +2450,6 @@ function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canAppro
         ))}
       </div>
 
-      {(mode === "send" || mode === "pending") && <div className="flex justify-end">
-        <ActionBtn label="+ ENVIAR MENSAJE" color="#0D9488" onClick={() => setShowSend(true)} />
-      </div>}
-
       <Card>
         <div className="flex items-center gap-2 flex-wrap">
           <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>CONSULTA RÁPIDA POR ID</span>
@@ -2607,7 +2499,7 @@ function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canAppro
         </Card>
       )}
 
-      {(mode === "history" || mode === "send") && <Card>
+      {mode === "history" && <Card>
         <SectionHeader title="HISTORIAL DE COMUNICACIONES" />
         <div className="admin-stack-sm">
           {pagedActive.map(req => {
@@ -2635,37 +2527,6 @@ function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canAppro
           {others.length === 0 && <EmptyState title="SIN HISTORIAL" hint="No hay comunicaciones registradas" icon={Radio} />}
         </div>
       </Card>}
-
-      <Modal open={showSend || mode === "send"} onClose={() => setShowSend(false)} title="ENVIAR MENSAJE INTER-CAMPAMENTO">
-        <div className="admin-stack-md">
-          <div>
-            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>DESTINATARIO</label>
-            <select value={newReq.to} onChange={e => setNewReq(prev => ({ ...prev, to: e.target.value }))}
-              className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-              style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>
-              <option value="">-- SELECCIONAR --</option>
-              {campsList.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>TIPO</label>
-            <select value={newReq.type} onChange={e => setNewReq(prev => ({ ...prev, type: e.target.value }))}
-              className="w-full mt-1 px-3 py-2 rounded-sm outline-none"
-              style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>
-              <option value="solicitud">SOLICITUD</option>
-              <option value="oferta">OFERTA</option>
-              <option value="traslado">TRASLADO</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>MENSAJE</label>
-            <textarea value={newReq.text} onChange={e => setNewReq(prev => ({ ...prev, text: e.target.value }))} rows={3}
-              className="w-full mt-1 px-3 py-2 rounded-sm outline-none resize-none"
-              style={{ background: "#0B1118", border: "1px solid #2A3444", fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }} />
-          </div>
-          <ActionBtn label="ENVIAR MENSAJE" color="#0D9488" onClick={handleSend} />
-        </div>
-      </Modal>
     </div>
   );
 }
@@ -3710,6 +3571,11 @@ export default function AdminDashboard() {
   };
   const can = (permission: string) => ROLE_PERMISSIONS[currentRole].includes(permission);
 
+  const warmExpeditionsModule = () => {
+    void prefetchExpeditionsData(currentCampId);
+    prefetchExpeditionsWorldMap();
+  };
+
   const loadGlobalNotifications = async () => {
     try {
       const notifications = await listNotifications();
@@ -3730,6 +3596,18 @@ export default function AdminDashboard() {
   useEffect(() => {
     void loadGlobalNotifications();
   }, [currentCampId]);
+
+  useEffect(() => {
+    const prefetchTimer = window.setTimeout(() => {
+      warmExpeditionsModule();
+    }, 180);
+    return () => window.clearTimeout(prefetchTimer);
+  }, [currentCampId]);
+
+  useEffect(() => {
+    if (activeNav !== "EXPEDICIONES") return;
+    warmExpeditionsModule();
+  }, [activeNav, currentCampId]);
 
   useEffect(() => {
     const ttl = 20 * 60 * 1000;
@@ -3795,7 +3673,6 @@ export default function AdminDashboard() {
           <ExpeditionsPanel
             mode={expeditionsViewMode}
             currentCampId={currentCampId}
-            onModeChange={(nextMode) => setExpeditionsViewMode(nextMode)}
           />
         );
       case "INTER-CAMPAMENTOS": return <ViewIntercamp mode={intercampViewMode} canApprove={can("intercamp.approve")} />;
@@ -3836,6 +3713,7 @@ export default function AdminDashboard() {
     }
 
     if (target === "EXPEDICIONES") {
+      warmExpeditionsModule();
       setExpeditionsViewMode("map");
       setActiveNav(target);
       return;
@@ -3998,14 +3876,6 @@ export default function AdminDashboard() {
                           <Map size={14} />
                           <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Mapa operativo</span>
                         </button>
-                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "create" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("create")} style={{ color: expeditionsViewMode === "create" ? "#05070A" : "#B8C7DB" }}>
-                          <Map size={14} />
-                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Nueva expedicion</span>
-                        </button>
-                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "participants" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("participants")} style={{ color: expeditionsViewMode === "participants" ? "#05070A" : "#B8C7DB" }}>
-                          <Users size={14} />
-                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Participantes</span>
-                        </button>
                         <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${expeditionsViewMode === "activeOps" ? " admin-nav-button--active" : ""}`} onClick={() => setExpeditionsViewMode("activeOps")} style={{ color: expeditionsViewMode === "activeOps" ? "#05070A" : "#B8C7DB" }}>
                           <Activity size={14} />
                           <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Misiones activas</span>
@@ -4030,10 +3900,6 @@ export default function AdminDashboard() {
                         <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "history" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("history")} style={{ color: intercampViewMode === "history" ? "#05070A" : "#B8C7DB" }}>
                           <Radio size={14} />
                           <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Historial</span>
-                        </button>
-                        <button type="button" className={`admin-nav-button w-full flex items-center gap-2.5 px-3 py-2 mb-2 rounded-sm transition-all cursor-pointer${intercampViewMode === "send" ? " admin-nav-button--active" : ""}`} onClick={() => setIntercampViewMode("send")} style={{ color: intercampViewMode === "send" ? "#05070A" : "#B8C7DB" }}>
-                          <Bell size={14} />
-                          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", flex: 1, textAlign: "left" }}>Enviar mensaje</span>
                         </button>
                       </>
                     )}
@@ -4357,6 +4223,8 @@ export default function AdminDashboard() {
                       type="button"
                       className={`admin-dock-item${isActive ? " admin-dock-item--active" : ""}`}
                       onClick={() => handleDockNav(item.target)}
+                      onMouseEnter={item.target === "EXPEDICIONES" ? warmExpeditionsModule : undefined}
+                      onFocus={item.target === "EXPEDICIONES" ? warmExpeditionsModule : undefined}
                       aria-label={item.label}
                     >
                       <span className="admin-dock-label">{item.label}</span>

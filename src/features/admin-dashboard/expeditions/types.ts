@@ -5,8 +5,6 @@ export type ExpeditionStatus = 'PROGRAMADA' | 'EN CURSO' | 'REGRESANDO' | 'COMPL
 
 export type ExpeditionMode =
   | 'map'
-  | 'create'
-  | 'participants'
   | 'activeOps'
   | 'history'
   | 'resources'
@@ -17,6 +15,8 @@ export interface ExpeditionParticipant {
   roleLabel: string
   status: Person['status']
   age: number
+  profileImage: string
+  description: string
 }
 
 export interface ExpeditionRecord {
@@ -30,15 +30,6 @@ export interface ExpeditionRecord {
   campId: number
   participantIds: number[]
   createdLocally: boolean
-}
-
-export interface ExpeditionDraft {
-  name: string
-  objective: string
-  sector: string
-  total: number
-  campId: number
-  participantIds: number[]
 }
 
 export interface MappedCampPoint {

@@ -2,8 +2,6 @@ import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import './expeditions-panel.css'
 import { ExpeditionsWorldMap } from './components/ExpeditionsWorldMap'
-import { ExpeditionCreateWizard } from './components/ExpeditionCreateWizard'
-import { ParticipantSelector } from './components/ParticipantSelector'
 import { ActiveExpeditionDetail } from './components/ActiveExpeditionDetail'
 import { useExpeditionsState } from './useExpeditionsState'
 import type { ExpeditionMode } from './types'
@@ -11,35 +9,30 @@ import type { ExpeditionMode } from './types'
 type ExpeditionsPanelProps = {
   mode: string
   currentCampId: number
-  onModeChange: (mode: ExpeditionMode) => void
 }
 
 function normalizeMode(mode: string): ExpeditionMode {
-  if (mode === 'create') return 'create'
-  if (mode === 'participants') return 'participants'
   if (mode === 'activeOps') return 'activeOps'
   if (mode === 'history') return 'history'
   if (mode === 'resources') return 'resources'
   return 'map'
 }
 
-export function ExpeditionsPanel({ mode, currentCampId, onModeChange }: ExpeditionsPanelProps) {
+export function ExpeditionsPanel({ mode, currentCampId }: ExpeditionsPanelProps) {
   const [selectedCampId, setSelectedCampId] = useState<number | null>(null)
-  const [selectedParticipantIds, setSelectedParticipantIds] = useState<number[]>([])
   const [selectedActiveExpeditionId, setSelectedActiveExpeditionId] = useState<number | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   const {
     isLoading,
-    isSaving,
+    isUpdatingParticipants,
     loadError,
     mapPoints,
     participantsCatalog,
     activeParticipants,
-    injuredParticipants,
     activeExpeditions,
     historyExpeditions,
-    createExpeditionWithFallback,
+    updateExpeditionParticipants,
   } = useExpeditionsState({ currentCampId })
 
   const currentMode = normalizeMode(mode)
@@ -53,29 +46,6 @@ export function ExpeditionsPanel({ mode, currentCampId, onModeChange }: Expediti
     [activeExpeditions.length, activeParticipants.length, historyExpeditions.length],
   )
 
-  const handleExpeditionCreate = async (payload: {
-    name: string
-    objective: string
-    sector: string
-    total: number
-    campId: number
-    participantIds: number[]
-  }) => {
-    const result = await createExpeditionWithFallback(payload)
-    if (result.source === 'remote') {
-      setNotice(
-        result.participantAssignmentWarning
-          ? 'Expedicion creada en backend. Aviso: no se pudo confirmar asignacion de participantes.'
-          : 'Expedicion creada en backend correctamente.',
-      )
-    } else {
-      setNotice('Backend no disponible. Expedicion creada localmente como respaldo.')
-    }
-    setTimeout(() => setNotice(null), 3200)
-    setSelectedActiveExpeditionId(result.record.id)
-    onModeChange('activeOps')
-  }
-
   const resolvedSelectedActiveExpeditionId =
     selectedActiveExpeditionId && activeExpeditions.some((expedition) => expedition.id === selectedActiveExpeditionId)
       ? selectedActiveExpeditionId
@@ -83,6 +53,20 @@ export function ExpeditionsPanel({ mode, currentCampId, onModeChange }: Expediti
 
   const selectedActiveExpedition =
     activeExpeditions.find((expedition) => expedition.id === resolvedSelectedActiveExpeditionId) ?? null
+
+  const canEditParticipants = (status: string, day: number) => status === 'PROGRAMADA' && day <= 0
+
+  const handleParticipantsUpdate = async (expeditionId: number, participantIds: number[]) => {
+    const result = await updateExpeditionParticipants(expeditionId, participantIds)
+    if (result.source === 'remote') {
+      setNotice('Participantes actualizados y sincronizados con el backend.')
+    } else if (result.source === 'local') {
+      setNotice('Modo sin conexion: participantes actualizados de forma local.')
+    } else {
+      setNotice('No se encontro la expedicion para actualizar participantes.')
+    }
+    setTimeout(() => setNotice(null), 3200)
+  }
 
   return (
     <div className="expx-shell">
@@ -120,7 +104,7 @@ export function ExpeditionsPanel({ mode, currentCampId, onModeChange }: Expediti
           </div>
         </div>
       ) : null}
-      {isSaving ? <div className="expx-state">Guardando expedicion y sincronizando participantes...</div> : null}
+      {isUpdatingParticipants ? <div className="expx-state">Actualizando participantes de la expedicion...</div> : null}
       {loadError ? <div className="expx-state is-error">{loadError}</div> : null}
 
       <AnimatePresence mode="wait" initial={false}>
@@ -130,37 +114,6 @@ export function ExpeditionsPanel({ mode, currentCampId, onModeChange }: Expediti
               camps={mapPoints}
               selectedCampId={selectedCampId}
               onSelectCamp={setSelectedCampId}
-              onCreateFromCamp={(campId) => {
-                setSelectedCampId(campId)
-                onModeChange('create')
-              }}
-            />
-          </motion.div>
-        )}
-
-        {!isLoading && currentMode === 'create' && (
-          <motion.div key="create" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.24, ease: 'easeOut' }}>
-            <ExpeditionCreateWizard
-              key={selectedCampId ?? 0}
-              camps={mapPoints}
-              preselectedCampId={selectedCampId}
-              activeParticipants={activeParticipants}
-              injuredParticipants={injuredParticipants}
-              isSaving={isSaving}
-              onCancel={() => onModeChange('map')}
-              onCreate={handleExpeditionCreate}
-            />
-          </motion.div>
-        )}
-
-        {!isLoading && currentMode === 'participants' && (
-          <motion.div key="participants" className="expx-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.24, ease: 'easeOut' }}>
-            <h3>Seleccion operativa de participantes</h3>
-            <ParticipantSelector
-              activeParticipants={activeParticipants}
-              injuredParticipants={injuredParticipants}
-              selectedIds={selectedParticipantIds}
-              onChange={setSelectedParticipantIds}
             />
           </motion.div>
         )}
@@ -206,6 +159,14 @@ export function ExpeditionsPanel({ mode, currentCampId, onModeChange }: Expediti
                   expedition={selectedActiveExpedition}
                   camps={mapPoints}
                   participants={participantsCatalog}
+                  canManageParticipants={canEditParticipants(
+                    selectedActiveExpedition.status,
+                    selectedActiveExpedition.day,
+                  )}
+                  onUpdateParticipants={(participantIds) =>
+                    handleParticipantsUpdate(selectedActiveExpedition.id, participantIds)
+                  }
+                  isUpdatingParticipants={isUpdatingParticipants}
                 />
               </motion.div>
             ) : null}

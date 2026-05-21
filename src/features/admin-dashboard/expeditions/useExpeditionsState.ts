@@ -4,14 +4,12 @@ import { fetchPersons } from '../../persons/api/queries'
 import { fetchOccupations } from '../../catalogs/api/queries'
 import {
   assignExpeditionParticipants,
-  createExpedition,
   listActiveExpeditions,
 } from '../services'
 import type { Camp } from '../../camps/types'
 import type { Occupation } from '../../catalogs/types'
 import type { Person } from '../../persons/types'
 import type {
-  ExpeditionDraft,
   ExpeditionParticipant,
   ExpeditionRecord,
   ExpeditionStatus,
@@ -20,6 +18,15 @@ import type {
 
 type UseExpeditionsStateArgs = {
   currentCampId: number
+}
+
+type ExpeditionsSnapshot = {
+  camps: Camp[]
+  persons: Person[]
+  occupations: Occupation[]
+  remoteExpeditions: ExpeditionRecord[]
+  loadError: string | null
+  fetchedAt: number
 }
 
 const NOW = new Date().toISOString()
@@ -175,6 +182,10 @@ const DEFAULT_EXPEDITIONS: ExpeditionRecord[] = [
   },
 ]
 
+const CACHE_TTL_MS = 2 * 60 * 1000
+let expeditionsSnapshotCache: ExpeditionsSnapshot | null = null
+let expeditionsLoadPromise: Promise<ExpeditionsSnapshot> | null = null
+
 function mapExpeditionStatus(raw?: string): ExpeditionStatus {
   const normalized = (raw ?? '').toLowerCase()
   if (normalized.includes('complete') || normalized.includes('done')) return 'COMPLETADA'
@@ -189,78 +200,130 @@ function toParticipantLabel(person: Person): string {
   return fullName.length > 0 ? fullName : fallback
 }
 
+function hasValidSnapshot(snapshot: ExpeditionsSnapshot | null) {
+  if (!snapshot) return false
+  return Date.now() - snapshot.fetchedAt < CACHE_TTL_MS
+}
+
+function mapRemoteExpeditions(records: any[], currentCampId: number): ExpeditionRecord[] {
+  return records.map((expedition) => {
+    const dayValue = Number(expedition.day ?? expedition.currentDay ?? 0)
+    const totalValue = Number(expedition.total ?? expedition.totalDays ?? expedition.durationDays ?? 1)
+    return {
+      id: expedition.id,
+      name: expedition.name ?? expedition.title ?? `EXPEDICION #${expedition.id}`,
+      objective: expedition.objective ?? expedition.description ?? 'Objetivo sin detalle',
+      sector: expedition.sector ?? expedition.location ?? 'Sector no definido',
+      day: Number.isFinite(dayValue) ? dayValue : 0,
+      total: Number.isFinite(totalValue) && totalValue > 0 ? totalValue : 1,
+      status: mapExpeditionStatus(expedition.status ?? expedition.expeditionStatus),
+      campId: currentCampId,
+      participantIds: [],
+      createdLocally: false,
+    }
+  })
+}
+
+async function fetchExpeditionsSnapshot(currentCampId: number): Promise<ExpeditionsSnapshot> {
+  const [campsResult, personsResult, occupationsResult, activeExpeditionsResult] = await Promise.allSettled([
+    fetchCamps(),
+    fetchPersons(),
+    fetchOccupations(),
+    listActiveExpeditions().catch(() => []),
+  ])
+
+  const campsData =
+    campsResult.status === 'fulfilled' && campsResult.value.length > 0
+      ? campsResult.value
+      : DEFAULT_CAMPS
+  const personsData =
+    personsResult.status === 'fulfilled' && personsResult.value.length > 0
+      ? personsResult.value
+      : DEFAULT_PERSONS
+  const occupationsData =
+    occupationsResult.status === 'fulfilled' && occupationsResult.value.length > 0
+      ? occupationsResult.value
+      : DEFAULT_OCCUPATIONS
+
+  const activeExpeditions =
+    activeExpeditionsResult.status === 'fulfilled' ? activeExpeditionsResult.value : []
+
+  const hasOfflineFallback =
+    campsResult.status !== 'fulfilled' ||
+    personsResult.status !== 'fulfilled' ||
+    occupationsResult.status !== 'fulfilled' ||
+    activeExpeditionsResult.status !== 'fulfilled'
+
+  const remoteExpeditions = mapRemoteExpeditions(activeExpeditions, currentCampId)
+
+  const snapshot: ExpeditionsSnapshot = {
+    camps: campsData,
+    persons: personsData,
+    occupations: occupationsData,
+    remoteExpeditions: remoteExpeditions.length > 0 ? remoteExpeditions : DEFAULT_EXPEDITIONS,
+    loadError: hasOfflineFallback ? 'Modo sin conexion: mostrando datos locales de respaldo.' : null,
+    fetchedAt: Date.now(),
+  }
+
+  expeditionsSnapshotCache = snapshot
+  return snapshot
+}
+
+export async function prefetchExpeditionsData(currentCampId: number): Promise<void> {
+  if (hasValidSnapshot(expeditionsSnapshotCache)) return
+  if (!expeditionsLoadPromise) {
+    expeditionsLoadPromise = fetchExpeditionsSnapshot(currentCampId)
+  }
+
+  try {
+    await expeditionsLoadPromise
+  } finally {
+    expeditionsLoadPromise = null
+  }
+}
+
 export function useExpeditionsState({ currentCampId }: UseExpeditionsStateArgs) {
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [camps, setCamps] = useState<Camp[]>([])
-  const [persons, setPersons] = useState<Person[]>([])
-  const [occupations, setOccupations] = useState<Occupation[]>([])
-  const [remoteExpeditions, setRemoteExpeditions] = useState<ExpeditionRecord[]>([])
+  const [isLoading, setIsLoading] = useState(!hasValidSnapshot(expeditionsSnapshotCache))
+  const [isUpdatingParticipants, setIsUpdatingParticipants] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(expeditionsSnapshotCache?.loadError ?? null)
+  const [camps, setCamps] = useState<Camp[]>(expeditionsSnapshotCache?.camps ?? [])
+  const [persons, setPersons] = useState<Person[]>(expeditionsSnapshotCache?.persons ?? [])
+  const [occupations, setOccupations] = useState<Occupation[]>(expeditionsSnapshotCache?.occupations ?? [])
+  const [remoteExpeditions, setRemoteExpeditions] = useState<ExpeditionRecord[]>(
+    expeditionsSnapshotCache?.remoteExpeditions ?? [],
+  )
   const [localExpeditions, setLocalExpeditions] = useState<ExpeditionRecord[]>([])
 
   useEffect(() => {
     let mounted = true
 
+    if (hasValidSnapshot(expeditionsSnapshotCache)) {
+      setCamps(expeditionsSnapshotCache?.camps ?? [])
+      setPersons(expeditionsSnapshotCache?.persons ?? [])
+      setOccupations(expeditionsSnapshotCache?.occupations ?? [])
+      setRemoteExpeditions(expeditionsSnapshotCache?.remoteExpeditions ?? [])
+      setLoadError(expeditionsSnapshotCache?.loadError ?? null)
+      setIsLoading(false)
+    }
+
     const loadData = async () => {
-      setIsLoading(true)
-      setLoadError(null)
       try {
-        const [campsResult, personsResult, occupationsResult, activeExpeditionsResult] = await Promise.allSettled([
-          fetchCamps(),
-          fetchPersons(),
-          fetchOccupations(),
-          listActiveExpeditions().catch(() => []),
-        ])
+        if (!hasValidSnapshot(expeditionsSnapshotCache)) {
+          setIsLoading(true)
+        }
+
+        if (!expeditionsLoadPromise) {
+          expeditionsLoadPromise = fetchExpeditionsSnapshot(currentCampId)
+        }
+        const snapshot = await expeditionsLoadPromise
 
         if (!mounted) return
 
-        const campsData =
-          campsResult.status === 'fulfilled' && campsResult.value.length > 0
-            ? campsResult.value
-            : DEFAULT_CAMPS
-        const personsData =
-          personsResult.status === 'fulfilled' && personsResult.value.length > 0
-            ? personsResult.value
-            : DEFAULT_PERSONS
-        const occupationsData =
-          occupationsResult.status === 'fulfilled' && occupationsResult.value.length > 0
-            ? occupationsResult.value
-            : DEFAULT_OCCUPATIONS
-
-        const activeExpeditions =
-          activeExpeditionsResult.status === 'fulfilled' ? activeExpeditionsResult.value : []
-
-        const hasOfflineFallback =
-          campsResult.status !== 'fulfilled' ||
-          personsResult.status !== 'fulfilled' ||
-          occupationsResult.status !== 'fulfilled' ||
-          activeExpeditionsResult.status !== 'fulfilled'
-
-        setLoadError(hasOfflineFallback ? 'Modo sin conexion: mostrando datos locales de respaldo.' : null)
-
-        setCamps(campsData)
-        setPersons(personsData)
-        setOccupations(occupationsData)
-
-        const mappedRemote = activeExpeditions.map((expedition) => {
-            const dayValue = Number(expedition.day ?? expedition.currentDay ?? 0)
-            const totalValue = Number(expedition.total ?? expedition.totalDays ?? expedition.durationDays ?? 1)
-            return {
-              id: expedition.id,
-              name: expedition.name ?? expedition.title ?? `EXPEDICION #${expedition.id}`,
-              objective: expedition.objective ?? expedition.description ?? 'Objetivo sin detalle',
-              sector: expedition.sector ?? expedition.location ?? 'Sector no definido',
-              day: Number.isFinite(dayValue) ? dayValue : 0,
-              total: Number.isFinite(totalValue) && totalValue > 0 ? totalValue : 1,
-              status: mapExpeditionStatus(expedition.status ?? expedition.expeditionStatus),
-              campId: currentCampId,
-              participantIds: [],
-              createdLocally: false,
-            }
-          })
-
-        setRemoteExpeditions(mappedRemote.length > 0 ? mappedRemote : DEFAULT_EXPEDITIONS)
+        setCamps(snapshot.camps)
+        setPersons(snapshot.persons)
+        setOccupations(snapshot.occupations)
+        setRemoteExpeditions(snapshot.remoteExpeditions)
+        setLoadError(snapshot.loadError)
       } catch (error) {
         if (!mounted) return
         setLoadError('Modo sin conexion: mostrando datos locales de respaldo.')
@@ -270,6 +333,7 @@ export function useExpeditionsState({ currentCampId }: UseExpeditionsStateArgs) 
         setRemoteExpeditions(DEFAULT_EXPEDITIONS)
         console.error('Fallback expeditions mode', error)
       } finally {
+        expeditionsLoadPromise = null
         if (mounted) setIsLoading(false)
       }
     }
@@ -281,12 +345,15 @@ export function useExpeditionsState({ currentCampId }: UseExpeditionsStateArgs) 
   }, [currentCampId])
 
   const participantsCatalog = useMemo<ExpeditionParticipant[]>(() => {
+    const occupationsById = new Map(occupations.map((occupation) => [occupation.id, occupation.name]))
     return persons.map((person) => ({
       id: person.id,
       fullName: toParticipantLabel(person),
-      roleLabel: occupations.find((occupation) => occupation.id === person.occupationId)?.name ?? `Rol #${person.occupationId}`,
+      roleLabel: occupationsById.get(person.occupationId) ?? `Rol #${person.occupationId}`,
       status: person.status,
       age: person.age,
+      profileImage: `https://i.pravatar.cc/96?img=${(person.id % 69) + 1}`,
+      description: person.notes?.trim() || 'Sin descripcion registrada.',
     }))
   }, [occupations, persons])
 
@@ -329,83 +396,54 @@ export function useExpeditionsState({ currentCampId }: UseExpeditionsStateArgs) 
     [allExpeditions],
   )
 
-  const createLocalExpedition = (draft: ExpeditionDraft) => {
-    const nextId = Date.now()
-    const record: ExpeditionRecord = {
-      id: nextId,
-      name: draft.name,
-      objective: draft.objective,
-      sector: draft.sector,
-      day: 0,
-      total: draft.total,
-      status: 'PROGRAMADA',
-      campId: draft.campId,
-      participantIds: draft.participantIds,
-      createdLocally: true,
+  const updateExpeditionParticipants = async (expeditionId: number, participantIds: number[]) => {
+    const normalizedIds = Array.from(new Set(participantIds))
+
+    const existsInLocal = localExpeditions.some((record) => record.id === expeditionId)
+    if (existsInLocal) {
+      setLocalExpeditions((prev) =>
+        prev.map((record) =>
+          record.id === expeditionId
+            ? {
+                ...record,
+                participantIds: normalizedIds,
+              }
+            : record,
+        ),
+      )
+      return { source: 'local' as const }
     }
-    setLocalExpeditions((prev) => [record, ...prev])
-    return record
-  }
 
-  const createExpeditionWithFallback = async (draft: ExpeditionDraft) => {
-    setIsSaving(true)
+    const existsInRemote = remoteExpeditions.some((record) => record.id === expeditionId)
+    if (!existsInRemote) {
+      return { source: 'missing' as const }
+    }
+
+    setRemoteExpeditions((prev) =>
+      prev.map((record) =>
+        record.id === expeditionId
+          ? {
+              ...record,
+              participantIds: normalizedIds,
+            }
+          : record,
+      ),
+    )
+
+    setIsUpdatingParticipants(true)
     try {
-      const remoteRecord = await createExpedition({
-        name: draft.name,
-        objective: draft.objective,
-        sector: draft.sector,
-        totalDays: draft.total,
-        campId: draft.campId,
-        participantIds: draft.participantIds,
-      })
-
-      const dayValue = Number(remoteRecord.day ?? remoteRecord.currentDay ?? 0)
-      const totalValue = Number(remoteRecord.total ?? remoteRecord.totalDays ?? remoteRecord.durationDays ?? draft.total)
-
-      const mappedRecord: ExpeditionRecord = {
-        id: remoteRecord.id,
-        name: remoteRecord.name ?? remoteRecord.title ?? draft.name,
-        objective: remoteRecord.objective ?? remoteRecord.description ?? draft.objective,
-        sector: remoteRecord.sector ?? remoteRecord.location ?? draft.sector,
-        day: Number.isFinite(dayValue) ? dayValue : 0,
-        total: Number.isFinite(totalValue) && totalValue > 0 ? totalValue : draft.total,
-        status: mapExpeditionStatus(remoteRecord.status ?? remoteRecord.expeditionStatus),
-        campId: draft.campId,
-        participantIds: draft.participantIds,
-        createdLocally: false,
-      }
-
-      let participantAssignmentWarning = false
-      if (draft.participantIds.length > 0) {
-        try {
-          await assignExpeditionParticipants(remoteRecord.id, draft.participantIds)
-        } catch {
-          participantAssignmentWarning = true
-        }
-      }
-
-      setRemoteExpeditions((prev) => [mappedRecord, ...prev])
-
-      return {
-        record: mappedRecord,
-        source: 'remote' as const,
-        participantAssignmentWarning,
-      }
+      await assignExpeditionParticipants(expeditionId, normalizedIds)
+      return { source: 'remote' as const }
     } catch {
-      const localRecord = createLocalExpedition(draft)
-      return {
-        record: localRecord,
-        source: 'local' as const,
-        participantAssignmentWarning: false,
-      }
+      return { source: 'local' as const }
     } finally {
-      setIsSaving(false)
+      setIsUpdatingParticipants(false)
     }
   }
 
   return {
     isLoading,
-    isSaving,
+    isUpdatingParticipants,
     loadError,
     camps,
     mapPoints,
@@ -415,7 +453,6 @@ export function useExpeditionsState({ currentCampId }: UseExpeditionsStateArgs) 
     activeExpeditions,
     historyExpeditions,
     allExpeditions,
-    createLocalExpedition,
-    createExpeditionWithFallback,
+    updateExpeditionParticipants,
   }
 }

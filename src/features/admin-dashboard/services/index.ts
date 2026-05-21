@@ -23,7 +23,6 @@ export {
 export {
   listActiveExpeditions,
   completeExpedition,
-  createExpedition,
   assignExpeditionParticipants,
 } from './expeditions.service'
 
@@ -44,7 +43,6 @@ export {
 
 export type {
   AdminAdmissionRequest,
-  AdminCreateExpeditionRequest,
   AdminExpeditionRecord,
   AdminNotificationRecord,
   AuditRecord,

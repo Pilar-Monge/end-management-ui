@@ -1,13 +1,31 @@
-import { useMemo } from 'react'
+import { Suspense, lazy, useMemo } from 'react'
 import { AlertTriangle, MapPin, ShieldAlert, Users } from 'lucide-react'
-import { WorldMap } from '../../../expeditions-ui/components/WorldMap'
 import type { MappedCampPoint } from '../types'
+
+let worldMapModulePromise: Promise<typeof import('../../../expeditions-ui/components/WorldMap')> | null = null
+
+function loadWorldMapModule() {
+  if (!worldMapModulePromise) {
+    worldMapModulePromise = import('../../../expeditions-ui/components/WorldMap')
+  }
+  return worldMapModulePromise
+}
+
+export function prefetchExpeditionsWorldMap() {
+  void loadWorldMapModule().then((module) => {
+    module.primeWorldMapCache?.()
+  })
+}
+
+const LazyWorldMap = lazy(async () => {
+  const module = await loadWorldMapModule()
+  return { default: module.WorldMap }
+})
 
 type ExpeditionsWorldMapProps = {
   camps: MappedCampPoint[]
   selectedCampId: number | null
   onSelectCamp: (campId: number) => void
-  onCreateFromCamp: (campId: number) => void
 }
 
 type DotPath = {
@@ -33,7 +51,6 @@ export function ExpeditionsWorldMap({
   camps,
   selectedCampId,
   onSelectCamp,
-  onCreateFromCamp,
 }: ExpeditionsWorldMapProps) {
   const baseCamp = camps[0]
 
@@ -56,18 +73,26 @@ export function ExpeditionsWorldMap({
         <div className="expx-map-layer expx-map-layer--heat" aria-hidden="true" />
         <div className="expx-map-layer expx-map-layer--fog" aria-hidden="true" />
         <div className="expx-map-layer expx-map-layer--grid" aria-hidden="true" />
-        <WorldMap
-          dots={dots}
-          lineColor="#69BFB7"
-          onZoneClick={(dot) => {
-            const hit = camps.find(
-              (camp) =>
-                Math.abs(camp.latitude - dot.end.lat) < 0.0001 &&
-                Math.abs(camp.longitude - dot.end.lng) < 0.0001,
-            )
-            if (hit) onSelectCamp(hit.id)
-          }}
-        />
+        <Suspense
+          fallback={
+            <div className="expx-map-fallback">
+              <span>Cargando mapa operativo...</span>
+            </div>
+          }
+        >
+          <LazyWorldMap
+            dots={dots}
+            lineColor="#69BFB7"
+            onZoneClick={(dot) => {
+              const hit = camps.find(
+                (camp) =>
+                  Math.abs(camp.latitude - dot.end.lat) < 0.0001 &&
+                  Math.abs(camp.longitude - dot.end.lng) < 0.0001,
+              )
+              if (hit) onSelectCamp(hit.id)
+            }}
+          />
+        </Suspense>
 
         <div className="expx-map-legend2">
           <span><i className="is-active" /> Activa</span>
@@ -109,14 +134,11 @@ export function ExpeditionsWorldMap({
             <p className="expx-camp-mini-stats">
               <Users size={12} /> Ocupacion {Math.round((selectedCamp.currentPopulation / Math.max(1, selectedCamp.capacity)) * 100)}%
             </p>
-            <button type="button" className="expx-btn" onClick={() => onCreateFromCamp(selectedCamp.id)}>
-              Crear expedicion desde campamento
-            </button>
           </div>
         ) : (
           <div className="expx-warning">
             <ShieldAlert size={14} />
-            <span>Selecciona un campamento para iniciar una nueva expedicion.</span>
+            <span>Selecciona un campamento para revisar su estado operativo.</span>
           </div>
         )}
 
