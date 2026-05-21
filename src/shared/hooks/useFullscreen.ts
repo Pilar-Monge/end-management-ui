@@ -7,23 +7,23 @@ export function useFullscreen() {
     try {
       const elem = document.documentElement;
 
-      // Entrar en fullscreen
+     
       if (!isFullscreen) {
         if (elem.requestFullscreen) {
           await elem.requestFullscreen();
         } else if ((elem as any).webkitRequestFullscreen) {
-          // Safari y Android
+          
           await (elem as any).webkitRequestFullscreen();
         } else if ((elem as any).mozRequestFullScreen) {
-          // Firefox
+          
           await (elem as any).mozRequestFullScreen();
         } else if ((elem as any).msRequestFullscreen) {
-          // IE
+          
           await (elem as any).msRequestFullscreen();
         }
         setIsFullscreen(true);
       } else {
-        // Salir de fullscreen
+        
         if (document.fullscreenElement) {
           await document.exitFullscreen();
         } else if ((document as any).webkitFullscreenElement) {
