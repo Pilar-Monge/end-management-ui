@@ -131,7 +131,13 @@
       repeating-linear-gradient(0deg, rgba(102, 188, 218, 0.04) 0 1px, transparent 1px 5px),
       radial-gradient(ellipse at -2% 30%, rgba(0, 0, 0, 0.38) 0 3%, transparent 11%),
       radial-gradient(ellipse at 102% 88%, rgba(0, 0, 0, 0.4) 0 4%, transparent 13%),
-      linear-gradient(90deg, rgba(0, 0, 0, 0.2), transparent 14%, transparent 86%, rgba(0, 0, 0, 0.22));
+      linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 0.2),
+        transparent 14%,
+        transparent 86%,
+        rgba(0, 0, 0, 0.22)
+      );
     mix-blend-mode: multiply, screen, multiply, multiply, multiply;
   }
 
@@ -268,7 +274,12 @@
   }
 
   .bullet-hole {
-    background: radial-gradient(circle, #020304 0 18%, rgba(10, 15, 20, 0.78) 19% 35%, transparent 36%);
+    background: radial-gradient(
+      circle,
+      #020304 0 18%,
+      rgba(10, 15, 20, 0.78) 19% 35%,
+      transparent 36%
+    );
     border-radius: 999px;
     box-shadow:
       8px -5px 0 -6px rgba(10, 15, 20, 0.65),
@@ -713,7 +724,12 @@
   }
 
   .photo-drop::after {
-    background: linear-gradient(120deg, transparent 0 42%, rgba(127, 184, 255, 0.12) 48%, transparent 54% 100%);
+    background: linear-gradient(
+      120deg,
+      transparent 0 42%,
+      rgba(127, 184, 255, 0.12) 48%,
+      transparent 54% 100%
+    );
     content: '';
     inset: 0;
     opacity: 0;
@@ -1142,8 +1158,7 @@
 .admission-page input,
 .admission-page textarea,
 .admission-page button {
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 }
 
 .admission-page .classified-input,
@@ -1154,8 +1169,7 @@
 }
 
 .admission-page .submit-stamp {
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-size: 1.05rem;
   font-weight: 900;
   letter-spacing: 0.16em;
