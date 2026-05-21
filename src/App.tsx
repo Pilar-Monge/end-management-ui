@@ -23,6 +23,9 @@ const AdminDashboardPage = lazy(() =>
 const AdminMainViewUiPage = lazy(() =>
   import('./features/admin-main-view-ui').then((m) => ({ default: m.AdminMainViewUiPage })),
 )
+const AdminDashboardUiV2Page = lazy(() =>
+  import('./features/admin-dashboard-ui-v2').then((m) => ({ default: m.AdminDashboardUiV2Page })),
+)
 const ResourceTypesPage = lazy(() =>
   import('./features/catalogs').then((m) => ({ default: m.ResourceTypesPage })),
 )
@@ -139,6 +142,7 @@ function App() {
         <Route path="/expeditions-ui" element={withSuspense(<ExpeditionsUiPage />)} />
         <Route path="/resource-main-view" element={withSuspense(<ResourceMainViewPage />)} />
         <Route path="/admin-dashboard" element={withSuspense(<AdminDashboardPage />)} />
+        <Route path="/admin-dashboard-ui-v2" element={withSuspense(<AdminDashboardUiV2Page />)} />
         <Route path="/admin-main-view-ui" element={withSuspense(<AdminMainViewUiPage />)} />
         <Route path="/dashboard" element={withSuspense(<AdminDashboardPage />)} />
         <Route path="/catalogs" element={withSuspense(<CatalogsLayout />)} />
