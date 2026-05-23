@@ -208,13 +208,13 @@ export default function LandingPage({
             animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
             transition={{ duration: 0.2 }}
             key="audio-panel"
-            className="fixed min-w-[240px] z-50 flex flex-col gap-6 shadow-2xl bg-gradient-to-b from-blue-950/80 to-black/80 border border-blue-400/20 rounded p-8"
+            className="audio-panel-brush z-50 flex flex-col gap-4 shadow-2xl p-6 w-64"
             style={{
-              top: 'calc(1.25rem + 54px + 8px)',
+              top: 'calc(3.5rem + 24px)',
               right: '1.5rem',
             }}
           >
-            <div className="flex items-center justify-between mb-2 border-b border-white/10 pb-4">
+            <div className="relative z-10 flex items-center justify-between mb-2 border-b border-white/10 pb-4">
               <div className="flex flex-col">
                 <div className="text-[10px] uppercase tracking-[0.4em] font-mono text-white/40 underline decoration-blue-400/40">
                   Opciones Globales
@@ -237,7 +237,7 @@ export default function LandingPage({
               </button>
             </div>
 
-            <div className="flex items-center gap-6 px-1">
+            <div className="relative z-10 flex items-center gap-6 px-1">
               <button
                 onClick={() => setIsAudioEnabled(!isAudioEnabled)}
                 className={`transition-all hover:scale-110 ${isAudioEnabled ? 'text-blue-400' : 'text-white/40'}`}
@@ -286,7 +286,7 @@ export default function LandingPage({
               </div>
             </div>
             <div
-              className="text-[12px] font-bold text-center text-white/50 uppercase tracking-[0.4em]"
+              className="relative z-10 text-[12px] font-bold text-center text-white/50 uppercase tracking-[0.4em]"
               style={{ fontFamily: "'Oswald', sans-serif" }}
             >
               NIVEL: {volume}%
