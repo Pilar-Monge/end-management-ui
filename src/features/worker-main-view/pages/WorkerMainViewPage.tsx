@@ -5,7 +5,6 @@ type WorkerSectionId =
   | 'dashboard'
   | 'recoleccion'
   | 'notificaciones'
-  | 'ocupaciones'
   | 'cobertura'
   | 'tiempo'
 
@@ -25,7 +24,6 @@ const WORKER_NAV_DATA: WorkerSection[] = [
     id: 'dashboard',
     label: 'Dashboard personal',
     shortLabel: 'DB',
-    subOptions: ['Resumen general', 'Actividad reciente', 'Estado del turno'],
     allowedActions: ['Ver dashboard personal', 'Abrir resumen del turno', 'Revisar actividad reciente'],
     note: 'El worker solo tiene acceso a dashboard personal. No puede acceder a dashboard general, inventario ni expediciones.',
     icon: <DashboardIcon />,
@@ -34,7 +32,6 @@ const WORKER_NAV_DATA: WorkerSection[] = [
     id: 'recoleccion',
     label: 'Recoleccion diaria',
     shortLabel: 'RC',
-    subOptions: ['Ver detalle', 'Historial local', 'Observaciones'],
     allowedActions: ['Ver detalle de registro', 'Consultar historial', 'Inspeccionar observaciones'],
     deniedActions: ['Crear', 'Listar', 'Ajustar', 'Actualizar', 'Eliminar'],
     note: 'Según la matriz, worker solo puede ver el detalle del registro de recoleccion diaria.',
@@ -44,7 +41,6 @@ const WORKER_NAV_DATA: WorkerSection[] = [
     id: 'notificaciones',
     label: 'Notificaciones',
     shortLabel: 'NT',
-    subOptions: ['Listar', 'Ver detalle', 'Actualizar'],
     allowedActions: ['Listar notificaciones', 'Ver detalle', 'Actualizar notificacion'],
     note: 'Worker puede listar, ver detalle y actualizar notificaciones, pero no crearlas ni eliminarlas.',
     icon: <NotificationIcon />,
@@ -53,7 +49,6 @@ const WORKER_NAV_DATA: WorkerSection[] = [
     id: 'ocupaciones',
     label: 'Ocupaciones',
     shortLabel: 'OC',
-    subOptions: ['Listar', 'Ver detalle', 'Buscar por oficio'],
     allowedActions: ['Listar ocupaciones', 'Ver detalle de ocupacion', 'Buscar ocupacion'],
     note: 'El acceso a ocupaciones es de solo lectura para worker.',
     icon: <OccupationIcon />,
@@ -62,7 +57,6 @@ const WORKER_NAV_DATA: WorkerSection[] = [
     id: 'cobertura',
     label: 'Cobertura de oficio',
     shortLabel: 'CB',
-    subOptions: ['Por campamento', 'Por ocupacion', 'Criticas y riesgo'],
     allowedActions: [
       'Ver cobertura por campamento',
       'Ver cobertura por ocupacion',
@@ -78,7 +72,6 @@ const WORKER_NAV_DATA: WorkerSection[] = [
     id: 'tiempo',
     label: 'Tiempo del sistema',
     shortLabel: 'TS',
-    subOptions: ['Hora actual', 'Avance restringido', 'Offset restringido'],
     allowedActions: ['Obtener hora'],
     deniedActions: ['Avanzar tiempo', 'Desplazar tiempo'],
     note: 'El worker solo puede consultar la hora pública. Las acciones de avance o desplazamiento están restringidas.',
@@ -92,7 +85,6 @@ export function WorkerMainViewPage() {
   const [hasEntered, setHasEntered] = useState(false)
 
   const [activeSectionId, setActiveSectionId] = useState<WorkerSectionId>('dashboard')
-  const [activeSubOption, setActiveSubOption] = useState('Resumen general')
   const [selectedAction, setSelectedAction] = useState('Ver dashboard personal')
 
   useEffect(() => {
@@ -118,7 +110,6 @@ export function WorkerMainViewPage() {
   const handleSectionSelect = (id: WorkerSectionId) => {
     const nextSection = WORKER_NAV_DATA.find((item) => item.id === id)
     setActiveSectionId(id)
-    setActiveSubOption(nextSection?.subOptions[0] ?? '')
     setSelectedAction(nextSection?.allowedActions[0] ?? '')
   }
 
@@ -146,26 +137,9 @@ export function WorkerMainViewPage() {
             </div>
 
             <section className="worker-shell" aria-label="Panel de trabajador">
-              <aside className="worker-sidebar">
-                {activeSection.subOptions.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    className={`worker-side-btn ${activeSubOption === option ? 'is-active' : ''}`}
-                    onClick={() => {
-                      setActiveSubOption(option)
-                      setSelectedAction(activeSection.allowedActions[0] ?? '')
-                    }}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </aside>
-
               <div className="worker-content">
                 <GenericWorkerContent
                   section={activeSection}
-                  subsection={activeSubOption}
                   selectedAction={selectedAction}
                   onActionSelect={setSelectedAction}
                 />
@@ -224,22 +198,18 @@ function LoadingOverlay({
 
 function GenericWorkerContent({
   section,
-  subsection,
   selectedAction,
   onActionSelect,
 }: {
   section: WorkerSection
-  subsection: string
   selectedAction: string
   onActionSelect: (action: string) => void
 }) {
   return (
-    <div className="worker-content-grid">
+    <div className="worker-content-grid worker-content-grid-single">
       <article className="worker-card worker-card-highlight">
         <div className="worker-card-label">Modulo activo</div>
-        <h3>
-          {section.label} / {subsection}
-        </h3>
+        <h3>{section.label}</h3>
         <p>
           {section.note}
         </p>
@@ -265,48 +235,229 @@ function GenericWorkerContent({
         </div>
       </article>
 
-      <article className="worker-card worker-card-wide">
-        <div className="worker-card-label">Subopciones y restricciones</div>
-        <div className="worker-grid-two">
-          <div>
-            <h4>Subopciones disponibles</h4>
-            <ul className="worker-status-list">
-              {section.subOptions.map((option) => (
-                <li key={option}>
-                  <span>{option}</span>
-                  <strong>Habilitado</strong>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h4>Acciones no permitidas</h4>
-            <ul className="worker-status-list">
-              {(section.deniedActions?.length ? section.deniedActions : ['Sin restricciones adicionales']).map(
-                (action) => (
-                  <li key={action}>
-                    <span>{action}</span>
-                    <strong>{action === 'Sin restricciones adicionales' ? 'N/A' : 'Bloqueado'}</strong>
-                  </li>
-                ),
-              )}
-            </ul>
-          </div>
-        </div>
-      </article>
-
-      <article className="worker-card worker-card-wide">
-        <div className="worker-card-label">Accesos rapidos</div>
-        <div className="worker-quick-actions">
-          <button type="button" className="worker-quick-btn">Abrir detalle</button>
-          <button type="button" className="worker-quick-btn">Actualizar vista</button>
-          <button type="button" className="worker-quick-btn">Filtrar por estado</button>
-          <button type="button" className="worker-quick-btn worker-quick-btn-alt">Volver al panel</button>
-        </div>
-      </article>
+      {renderModuleDetails(section)}
     </div>
   )
+}
+
+function renderModuleDetails(section: WorkerSection) {
+  switch (section.id) {
+    case 'dashboard':
+      return (
+        <>
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Resumen completo</div>
+            <div className="worker-metric-grid">
+              <div>
+                <span>Turno</span>
+                <strong>Mañana</strong>
+              </div>
+              <div>
+                <span>Actividad</span>
+                <strong>12 eventos</strong>
+              </div>
+              <div>
+                <span>Estado</span>
+                <strong>Operativo</strong>
+              </div>
+              <div>
+                <span>Prioridad</span>
+                <strong>Media</strong>
+              </div>
+            </div>
+          </article>
+
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Actividad reciente</div>
+            <ul className="worker-status-list">
+              <li><span>08:45</span><strong>Validacion de equipo</strong></li>
+              <li><span>09:20</span><strong>Despacho de material</strong></li>
+              <li><span>10:05</span><strong>Recepcion de solicitud</strong></li>
+            </ul>
+          </article>
+
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Estado del turno</div>
+            <div className="worker-note-grid">
+              <div>
+                <h4>Inicio</h4>
+                <p>Registro de entrada completado y validado en sistema.</p>
+              </div>
+              <div>
+                <h4>Progreso</h4>
+                <p>Asignaciones procesadas sin incidencias y con sincronización estable.</p>
+              </div>
+              <div>
+                <h4>Cierre</h4>
+                <p>Listo para consolidación de fin de jornada cuando corresponda.</p>
+              </div>
+            </div>
+          </article>
+
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Accesos rapidos</div>
+            <div className="worker-quick-actions">
+              <button type="button" className="worker-quick-btn">Abrir panel completo</button>
+              <button type="button" className="worker-quick-btn">Actualizar vista</button>
+              <button type="button" className="worker-quick-btn">Exportar resumen</button>
+              <button type="button" className="worker-quick-btn worker-quick-btn-alt">Volver al panel</button>
+            </div>
+          </article>
+        </>
+      )
+
+    case 'recoleccion':
+      return (
+        <>
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Detalle de registro</div>
+            <div className="worker-note-grid">
+              <div>
+                <h4>Registro actual</h4>
+                <p>Recolección diaria #2048 asociada al campamento principal.</p>
+              </div>
+              <div>
+                <h4>Estado</h4>
+                <p>Verificado por supervisión, con observaciones menores registradas.</p>
+              </div>
+              <div>
+                <h4>Responsable</h4>
+                <p>Operador asignado: worker operativo turno A.</p>
+              </div>
+            </div>
+          </article>
+
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Historial y observaciones</div>
+            <ul className="worker-status-list">
+              <li><span>07:10</span><strong>Registro iniciado</strong></li>
+              <li><span>07:42</span><strong>Confirmacion parcial de insumos</strong></li>
+              <li><span>08:15</span><strong>Observacion: paquete pendiente de revisión</strong></li>
+            </ul>
+          </article>
+
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Restricciones aplicadas</div>
+            <p>Crear, listar, ajustar, actualizar y eliminar permanecen bloqueados para worker.</p>
+          </article>
+        </>
+      )
+
+    case 'notificaciones':
+      return (
+        <>
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Bandeja completa</div>
+            <ul className="worker-status-list">
+              <li><span>Critica</span><strong>Validar cambio de turno</strong></li>
+              <li><span>Media</span><strong>Actualizar confirmación de entrega</strong></li>
+              <li><span>Baja</span><strong>Recordatorio de reporte</strong></li>
+            </ul>
+          </article>
+
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Detalle y actualizacion</div>
+            <div className="worker-note-grid">
+              <div>
+                <h4>Seleccionada</h4>
+                <p>Notificación de validación operativa abierta en lectura.</p>
+              </div>
+              <div>
+                <h4>Accion permitida</h4>
+                <p>El worker puede actualizar el estado de la notificación desde esta misma pantalla.</p>
+              </div>
+            </div>
+          </article>
+        </>
+      )
+
+    case 'ocupaciones':
+      return (
+        <>
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Listado de ocupaciones</div>
+            <div className="worker-note-grid">
+              <div><h4>Guardian</h4><p>Cobertura activa y estable.</p></div>
+              <div><h4>Sanitario</h4><p>Requiere apoyo eventual.</p></div>
+              <div><h4>Logística</h4><p>Completa para el turno actual.</p></div>
+            </div>
+          </article>
+
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Detalle y búsqueda</div>
+            <div className="worker-note-grid">
+              <div>
+                <h4>Consulta actual</h4>
+                <p>Ficha de ocupación disponible sin edición ni cambios estructurales.</p>
+              </div>
+              <div>
+                <h4>Filtro</h4>
+                <p>Busqueda por oficio incluida en la misma pantalla para lectura rápida.</p>
+              </div>
+            </div>
+          </article>
+        </>
+      )
+
+    case 'cobertura':
+      return (
+        <>
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Cobertura por campamento</div>
+            <div className="worker-metric-grid worker-metric-grid-wide">
+              <div><span>Norte</span><strong>92%</strong></div>
+              <div><span>Central</span><strong>86%</strong></div>
+              <div><span>Este</span><strong>78%</strong></div>
+              <div><span>Reserva</span><strong>100%</strong></div>
+            </div>
+          </article>
+
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Cobertura por ocupacion</div>
+            <ul className="worker-status-list">
+              <li><span>Críticas</span><strong>2 ocupaciones</strong></li>
+              <li><span>En riesgo</span><strong>4 ocupaciones</strong></li>
+              <li><span>Reemplazo sugerido</span><strong>Automático disponible</strong></li>
+            </ul>
+          </article>
+
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Accion completa</div>
+            <p>La pantalla integra sugerencias y auto-asignación de reemplazo para operar sin navegar a subcategorías.</p>
+          </article>
+        </>
+      )
+
+    case 'tiempo':
+      return (
+        <>
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Hora actual</div>
+            <div className="worker-time-box">
+              <strong>14:32:18</strong>
+              <span>Consulta pública del sistema</span>
+            </div>
+          </article>
+
+          <article className="worker-card worker-card-wide">
+            <div className="worker-card-label">Permisos y restricciones</div>
+            <div className="worker-note-grid">
+              <div>
+                <h4>Permitido</h4>
+                <p>Obtener hora actual desde el endpoint público.</p>
+              </div>
+              <div>
+                <h4>Bloqueado</h4>
+                <p>Avanzar tiempo y desplazar tiempo permanecen exclusivos de SYSTEM_ADMIN.</p>
+              </div>
+            </div>
+          </article>
+        </>
+      )
+
+    default:
+      return null
+  }
 }
 
 function IconSvg({ children }: { children: ReactNode }) {
