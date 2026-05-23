@@ -13,6 +13,10 @@ export async function listActiveExpeditions(): Promise<AdminExpeditionRecord[]> 
   return apiRequest<AdminExpeditionRecord[]>('/explorations/active')
 }
 
+export async function listExpeditions(): Promise<AdminExpeditionRecord[]> {
+  return apiRequest<AdminExpeditionRecord[]>('/expeditions')
+}
+
 export async function completeExpedition(id: number): Promise<AdminExpeditionRecord> {
   try {
     return await apiRequest<AdminExpeditionRecord>(`/expeditions/${id}/complete`, {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Area,
   AreaChart,
@@ -29,9 +30,12 @@ import {
   getTransferById,
   getTransferHistoryById,
   getTransferPersonById,
-  listActiveExpeditions,
+  listExpeditions,
   listAdmissionRequests,
+  listIntercampRequests,
+  listInventoryMovements,
   listNotifications,
+  updateIntercampRequestStatus,
   updateAdmissionRequestStatus,
 } from "../../admin-dashboard/services";
 import {
@@ -118,6 +122,21 @@ interface DashboardKpi {
   outPopulation: number;
 }
 
+interface ResourceTrendPoint {
+  day: string;
+  food: number;
+  water: number;
+  ammo: number;
+}
+
+interface ResourceLedgerEntry {
+  id: number;
+  resource: string;
+  amount: number;
+  date: string;
+  notes: string;
+}
+
 interface SessionAdminUser {
   id?: number;
   username?: string;
@@ -185,27 +204,6 @@ const SECTION_DESCRIPTIONS: Record<AdminSectionId, string> = {
   configuracion: "Parámetros operativos y políticas del panel administrativo.",
 };
 
-const SAMPLE_INTERCAMP: UiIntercampRequest[] = [
-  {
-    id: 1001,
-    from: "CAMPAMENTO NORTE",
-    text: "Requieren traslado de 40kg de alimento deshidratado.",
-    time: "hace 2h",
-    status: "PENDIENTE",
-    urgent: true,
-    type: "solicitud",
-  },
-  {
-    id: 1002,
-    from: "CAMPAMENTO DELTA",
-    text: "Oferta de repuestos para módulo de agua.",
-    time: "hace 5h",
-    status: "CONFIRMADO",
-    urgent: false,
-    type: "oferta",
-  },
-];
-
 const INITIAL_DASHBOARD_KPI: DashboardKpi = {
   populationTotal: 0,
   criticalResources: 0,
@@ -217,123 +215,6 @@ const INITIAL_DASHBOARD_KPI: DashboardKpi = {
   outPopulation: 0,
 };
 
-const RESOURCE_TREND_DATA = [
-  { day: "D-6", food: 85, water: 72, ammo: 90 },
-  { day: "D-5", food: 80, water: 68, ammo: 85 },
-  { day: "D-4", food: 74, water: 55, ammo: 82 },
-  { day: "D-3", food: 65, water: 40, ammo: 78 },
-  { day: "D-2", food: 53, water: 25, ammo: 70 },
-  { day: "D-1", food: 38, water: 15, ammo: 68 },
-  { day: "HOY", food: 23, water: 8, ammo: 67 },
-];
-
-const FALLBACK_NOTIFICATIONS: UiNotification[] = [
-  { id: 1, title: "ALERTA CRÍTICA: Agua potable", body: "Stock de agua bajo el umbral operativo.", time: "hace 30min", read: false, level: "critical" },
-  { id: 2, title: "Admisión pendiente", body: "Perfil requiere revisión de seguridad.", time: "hace 45min", read: false, level: "warning" },
-  { id: 3, title: "Expedición activa", body: "Grupo en curso sin novedades reportadas.", time: "hace 2h", read: false, level: "info" },
-];
-
-const SIMULATED_EXPEDITION_POINTS: MappedCampPoint[] = [
-  {
-    id: 9001,
-    name: "Base Alfa",
-    latitude: 9.9281,
-    longitude: -84.0907,
-    status: "ACTIVE",
-    currentPopulation: 247,
-    capacity: 320,
-  },
-  {
-    id: 9002,
-    name: "Hospital Norte",
-    latitude: 10.0206,
-    longitude: -84.2141,
-    status: "COMPROMISED",
-    currentPopulation: 0,
-    capacity: 80,
-  },
-  {
-    id: 9003,
-    name: "Bodega Industrial",
-    latitude: 9.9988,
-    longitude: -84.1198,
-    status: "ACTIVE",
-    currentPopulation: 0,
-    capacity: 50,
-  },
-  {
-    id: 9004,
-    name: "Pozo Este",
-    latitude: 9.8845,
-    longitude: -83.9437,
-    status: "UNDER_CONSTRUCTION",
-    currentPopulation: 0,
-    capacity: 40,
-  },
-  {
-    id: 9005,
-    name: "Sector Sur",
-    latitude: 9.7489,
-    longitude: -84.1043,
-    status: "ABANDONED",
-    currentPopulation: 0,
-    capacity: 60,
-  },
-];
-
-const SIMULATED_EXPEDITIONS: UiExpedition[] = [
-  {
-    id: 101,
-    name: "Expedición Norte",
-    day: 3,
-    total: 5,
-    participants: ["JR", "MA", "PC", "LS"],
-    status: "EN CURSO",
-    objective: "Buscar suministros médicos en el hospital abandonado del sector norte.",
-    sector: "Hospital Norte",
-  },
-  {
-    id: 102,
-    name: "Ruta de Agua Este",
-    day: 1,
-    total: 4,
-    participants: ["AN", "RV", "KT"],
-    status: "EN CURSO",
-    objective: "Verificar pozo este, instalar filtros temporales y recuperar bidones.",
-    sector: "Pozo Este",
-  },
-  {
-    id: 103,
-    name: "Retorno Grupo Delta",
-    day: 4,
-    total: 5,
-    participants: ["CA", "MT", "PB", "RQ"],
-    status: "REGRESANDO",
-    objective: "Regresar con piezas eléctricas recuperadas de una bodega industrial.",
-    sector: "Bodega Industrial",
-  },
-  {
-    id: 104,
-    name: "Exploración Sector Sur",
-    day: 0,
-    total: 3,
-    participants: ["DN", "AS", "FG"],
-    status: "PROGRAMADA",
-    objective: "Reconocer una posible ruta segura hacia el sector sur.",
-    sector: "Sector Sur",
-  },
-  {
-    id: 105,
-    name: "Misión Generadores",
-    day: 5,
-    total: 5,
-    participants: ["WN", "SK", "LR", "PR"],
-    status: "COMPLETADA",
-    objective: "Recuperar generadores portátiles y baterías de respaldo.",
-    sector: "Bodega Industrial",
-  },
-];
-
 function expeditionRouteStatus(status: UiExpedition["status"]): string {
   if (status === "PROGRAMADA") return "PLANNED";
   if (status === "REGRESANDO") return "DELAYED";
@@ -342,9 +223,11 @@ function expeditionRouteStatus(status: UiExpedition["status"]): string {
 }
 
 function buildExpeditionRoute(expedition: UiExpedition, points: MappedCampPoint[]) {
-  const base = points[0] ?? SIMULATED_EXPEDITION_POINTS[0];
+  const base = points[0];
+  if (!base) return null;
   const destinations = points.filter((point) => point.id !== base.id);
-  const destination = destinations[expedition.id % Math.max(1, destinations.length)] ?? SIMULATED_EXPEDITION_POINTS[1];
+  const destination = destinations[expedition.id % Math.max(1, destinations.length)];
+  if (!destination) return null;
 
   return {
     start: { lat: base.latitude, lng: base.longitude, label: "Base" },
@@ -354,6 +237,127 @@ function buildExpeditionRoute(expedition: UiExpedition, points: MappedCampPoint[
 }
 
 const INITIAL_TEMP_ASSIGNMENTS: TempRoleAssignment[] = [];
+
+function buildResourceTrendData(records: Array<Record<string, unknown>>): ResourceTrendPoint[] {
+  const byDay = new Map<string, ResourceTrendPoint>();
+
+  const bucketFromResource = (resourceValue: string): keyof Omit<ResourceTrendPoint, "day"> => {
+    const normalized = resourceValue.toLowerCase();
+    if (normalized.includes("agua")) return "water";
+    if (normalized.includes("mun") || normalized.includes("ammo")) return "ammo";
+    return "food";
+  };
+
+  for (const record of records) {
+    const dateValue =
+      typeof record.createdAt === "string"
+        ? record.createdAt
+        : typeof record.date === "string"
+          ? record.date
+          : "";
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) continue;
+
+    const key = date.toISOString().slice(0, 10);
+    const dayLabel = date.toLocaleDateString("es-CR", { day: "2-digit", month: "2-digit" });
+    const quantityRaw =
+      typeof record.quantity === "number"
+        ? record.quantity
+        : typeof record.amount === "number"
+          ? record.amount
+          : 0;
+    const quantity = Number.isFinite(quantityRaw) ? Math.max(0, Math.abs(quantityRaw)) : 0;
+    const resource =
+      typeof record.resourceName === "string"
+        ? record.resourceName
+        : typeof record.resourceTypeName === "string"
+          ? record.resourceTypeName
+          : typeof record.resource === "string"
+            ? record.resource
+            : "recurso";
+    const movementType =
+      typeof record.movementType === "string"
+        ? record.movementType.toUpperCase()
+        : typeof record.type === "string"
+          ? record.type.toUpperCase()
+          : "";
+    const signedValue = movementType.includes("OUT") || movementType.includes("EGRES") ? -quantity : quantity;
+
+    const point = byDay.get(key) ?? { day: dayLabel, food: 0, water: 0, ammo: 0 };
+    const bucket = bucketFromResource(resource);
+    point[bucket] += signedValue;
+    byDay.set(key, point);
+  }
+
+  return Array.from(byDay.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(-7)
+    .map(([, value]) => value);
+}
+
+function buildResourceLedger(records: Array<Record<string, unknown>>): { consumed: ResourceLedgerEntry[]; gained: ResourceLedgerEntry[] } {
+  const rows = records
+    .map((record, index) => {
+      const movementType =
+        typeof record.movementType === "string"
+          ? record.movementType.toUpperCase()
+          : typeof record.type === "string"
+            ? record.type.toUpperCase()
+            : "";
+      const amountRaw =
+        typeof record.quantity === "number"
+          ? record.quantity
+          : typeof record.amount === "number"
+            ? record.amount
+            : 0;
+      const amount = Number.isFinite(amountRaw) ? Math.abs(amountRaw) : 0;
+      const resource =
+        typeof record.resourceName === "string"
+          ? record.resourceName
+          : typeof record.resourceTypeName === "string"
+            ? record.resourceTypeName
+            : typeof record.resource === "string"
+              ? record.resource
+              : "Recurso";
+      const dateValue =
+        typeof record.createdAt === "string"
+          ? record.createdAt
+          : typeof record.date === "string"
+            ? record.date
+            : "";
+      const parsedDate = new Date(dateValue);
+      const date = Number.isNaN(parsedDate.getTime())
+        ? "Sin fecha"
+        : parsedDate.toLocaleString("es-CR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+      return {
+        id: typeof record.id === "number" ? record.id : Date.now() + index,
+        movementType,
+        amount,
+        resource,
+        date,
+        notes:
+          typeof record.reason === "string"
+            ? record.reason
+            : typeof record.description === "string"
+              ? record.description
+              : "Sin detalle",
+      };
+    })
+    .filter((item) => item.amount > 0)
+    .slice(0, 80);
+
+  const consumed = rows
+    .filter((item) => item.movementType.includes("OUT") || item.movementType.includes("EGRES"))
+    .slice(0, 8)
+    .map(({ id, resource, amount, date, notes }) => ({ id, resource, amount, date, notes }));
+  const gained = rows
+    .filter((item) => item.movementType.includes("IN") || item.movementType.includes("INGRES"))
+    .slice(0, 8)
+    .map(({ id, resource, amount, date, notes }) => ({ id, resource, amount, date, notes }));
+
+  return { consumed, gained };
+}
 
 function normalizeStatusLabel(status: Person["status"]): string {
   if (status === "ACTIVE") return "Activo";
@@ -444,11 +448,13 @@ export default function AdminDashboardUiV2Page() {
   const [occupations, setOccupations] = useState<Occupation[]>([]);
   const [admissions, setAdmissions] = useState<UiAdmission[]>([]);
   const [expeditions, setExpeditions] = useState<UiExpedition[]>([]);
-  const [intercampRequests, setIntercampRequests] = useState<UiIntercampRequest[]>(SAMPLE_INTERCAMP);
+  const [intercampRequests, setIntercampRequests] = useState<UiIntercampRequest[]>([]);
   const [dashboardKpi, setDashboardKpi] = useState<DashboardKpi>(INITIAL_DASHBOARD_KPI);
-  const [notifications, setNotifications] = useState<UiNotification[]>(FALLBACK_NOTIFICATIONS);
-  const [countdown, setCountdown] = useState({ h: 3, m: 28, s: 0 });
-  const [threatLevel, setThreatLevel] = useState(72);
+  const [notifications, setNotifications] = useState<UiNotification[]>([]);
+  const [resourceTrendData, setResourceTrendData] = useState<ResourceTrendPoint[]>([]);
+  const [consumedResources, setConsumedResources] = useState<ResourceLedgerEntry[]>([]);
+  const [gainedResources, setGainedResources] = useState<ResourceLedgerEntry[]>([]);
+  const [countdown, setCountdown] = useState({ h: 0, m: 0, s: 0 });
   const [lookupId, setLookupId] = useState("");
   const [sessionState, setSessionState] = useState<"ACTIVA" | "INACTIVA">("INACTIVA");
   const [lastActivityAt, setLastActivityAt] = useState(Date.now());
@@ -457,46 +463,59 @@ export default function AdminDashboardUiV2Page() {
     setIsDataLoading(true);
     setDataError(null);
     try {
-      const [
-        personsData,
-        campsData,
-        occupationsData,
-        admissionsData,
-        expeditionsData,
-        generalDashboard,
-        inventoryDashboard,
-        expeditionsDashboard,
-        notificationRecords,
-      ] = await Promise.all([
+      const results = await Promise.allSettled([
         fetchPersons(),
         fetchCamps(),
         fetchOccupations(),
         listAdmissionRequests(),
-        listActiveExpeditions(),
+        listExpeditions(),
+        listIntercampRequests(),
         getGeneralDashboard(),
         getInventoryDashboard(),
         getExpeditionsDashboard(),
         listNotifications(),
+        listInventoryMovements(),
       ]);
+
+      const personsData = results[0].status === "fulfilled" ? results[0].value : [];
+      const campsData = results[1].status === "fulfilled" ? results[1].value : [];
+      const occupationsData = results[2].status === "fulfilled" ? results[2].value : [];
+      const admissionsData = results[3].status === "fulfilled" ? results[3].value : [];
+      const expeditionsData = results[4].status === "fulfilled" ? results[4].value : [];
+      const intercampData = results[5].status === "fulfilled" ? results[5].value : [];
+      const generalDashboard = results[6].status === "fulfilled" ? results[6].value : {};
+      const inventoryDashboard = results[7].status === "fulfilled" ? results[7].value : {};
+      const expeditionsDashboard = results[8].status === "fulfilled" ? results[8].value : {};
+      const notificationRecords = results[9].status === "fulfilled" ? results[9].value : [];
+      const inventoryMovements = results[10].status === "fulfilled" ? results[10].value : [];
+
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+      if (failedCount > 0) {
+        setDataError(`Se cargaron datos parciales: ${failedCount} modulo(s) fallaron en backend.`);
+      }
 
       setPersons(personsData);
       setCamps(campsData);
       setOccupations(occupationsData);
       setAdmissions(admissionsData.map((item) => mapAdmissionFromApi(item) as UiAdmission));
       setExpeditions(expeditionsData.map((item) => mapExpeditionFromApi(item) as UiExpedition));
+      setIntercampRequests(intercampData.map((item) => mapIntercampFromApi(item) as UiIntercampRequest));
+      setNotifications(notificationRecords.map((item) => mapNotificationFromApi(item) as UiNotification));
+      const inventoryMovementRecords = inventoryMovements as unknown as Array<Record<string, unknown>>;
+      setResourceTrendData(buildResourceTrendData(inventoryMovementRecords));
+      const ledger = buildResourceLedger(inventoryMovementRecords);
+      setConsumedResources(ledger.consumed);
+      setGainedResources(ledger.gained);
       setDashboardKpi({
         populationTotal: extractNumberByHint(generalDashboard, ["population", "persons", "totalpeople", "total"], personsData.length),
         criticalResources: extractNumberByHint(inventoryDashboard, ["critical", "alert", "low"], 0),
         activeExpeditions: extractNumberByHint(expeditionsDashboard, ["active", "ongoing"], expeditionsData.length),
-        pendingIntercamp: extractNumberByHint(generalDashboard, ["intercamp", "transfer", "pending"], SAMPLE_INTERCAMP.length),
+        pendingIntercamp: extractNumberByHint(generalDashboard, ["intercamp", "transfer", "pending"], intercampData.length),
         activePopulation: extractNumberByHint(generalDashboard, ["active", "healthy"], personsData.filter((person) => person.status === "ACTIVE").length),
         injuredPopulation: extractNumberByHint(generalDashboard, ["injured"], personsData.filter((person) => person.status === "INJURED").length),
         sickPopulation: extractNumberByHint(generalDashboard, ["sick", "ill"], 0),
         outPopulation: extractNumberByHint(generalDashboard, ["missing", "outside", "out"], personsData.filter((person) => person.status === "MISSING").length),
       });
-      if (notificationRecords.length > 0) {
-        setNotifications(notificationRecords.map((item) => mapNotificationFromApi(item) as UiNotification));
-      }
     } catch (error) {
       setDataError(error instanceof Error ? error.message : "No se pudo cargar la data inicial");
     } finally {
@@ -511,21 +530,19 @@ export default function AdminDashboardUiV2Page() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setCountdown((prev) => {
-        const { h, m, s } = prev;
-        if (s > 0) return { h, m, s: s - 1 };
-        if (m > 0) return { h, m: m - 1, s: 59 };
-        if (h > 0) return { h: h - 1, m: 59, s: 59 };
-        return { h: 0, m: 0, s: 0 };
-      });
+      const now = new Date();
+      const target = new Date(now);
+      target.setHours(18, 0, 0, 0);
+      if (target.getTime() <= now.getTime()) {
+        target.setDate(target.getDate() + 1);
+      }
+      const remainingMs = Math.max(0, target.getTime() - now.getTime());
+      const totalSeconds = Math.floor(remainingMs / 1000);
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      setCountdown({ h, m, s });
     }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setThreatLevel((prev) => Math.min(95, Math.max(38, prev + Math.floor(Math.random() * 7) - 3)));
-    }, 4500);
     return () => clearInterval(timer);
   }, []);
 
@@ -589,7 +606,7 @@ export default function AdminDashboardUiV2Page() {
 
   const adminProfile = useMemo<AdminProfileSummary>(() => {
     const sessionUser = readSessionAdminUser();
-    const matchedPerson = typeof sessionUser.id === "number" ? persons.find((person) => person.id === sessionUser.id) : null;
+    const matchedPerson = typeof sessionUser.id === "number" ? (persons.find((person) => person.id === sessionUser.id) ?? null) : null;
     const displayName = matchedPerson ? personFullName(matchedPerson) : sessionUser.username ?? "Administrador";
     const occupation = matchedPerson ? occupationNameById.get(matchedPerson.occupationId) ?? `Ocupación #${matchedPerson.occupationId}` : "No disponible";
     const campId = matchedPerson?.campId ?? sessionUser.campId;
@@ -672,6 +689,19 @@ export default function AdminDashboardUiV2Page() {
     setDataError("No se encontró un registro inter-campamento con ese ID");
   };
 
+  const handleIntercampDecision = async (id: number, status: "APROBADO" | "RECHAZADO") => {
+    const backendStatus = status === "APROBADO" ? "APPROVED" : "REJECTED";
+    try {
+      const updated = await updateIntercampRequestStatus(id, backendStatus);
+      const mapped = mapIntercampFromApi(updated) as UiIntercampRequest;
+      setIntercampRequests((prev) => prev.map((item) => (item.id === id ? mapped : item)));
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : "No se pudo actualizar la solicitud inter-campamento");
+    }
+  };
+
+  const threatLevel = Math.max(0, Math.min(100, Math.round((dashboardKpi.criticalResources * 15) + (admissionsQueue.length * 8) + (intercampRequests.filter((item) => item.status === "PENDIENTE").length * 7) + (notifications.filter((item) => !item.read).length * 5))));
+
   return (
     <div className="game-screen-layout text-[#A4C2C5]">
       <div className="holo-grid" />
@@ -703,6 +733,8 @@ export default function AdminDashboardUiV2Page() {
                       admissionsQueue={admissionsQueue}
                       admissionsHistory={admissionsHistory}
                       expeditions={expeditions}
+                      consumedResources={consumedResources}
+                      gainedResources={gainedResources}
                       intercampRequests={intercampRequests}
                       lookupId={lookupId}
                       setLookupId={setLookupId}
@@ -712,9 +744,10 @@ export default function AdminDashboardUiV2Page() {
                       occupationNameById={occupationNameById}
                       onAdmissionDecision={handleAdmissionDecision}
                       onCompleteExpedition={handleCompleteExpedition}
-                      onUpdateIntercampStatus={setIntercampRequests}
+                      onIntercampDecision={handleIntercampDecision}
                       onPopulationReload={loadCoreData}
                       onDashboardReload={loadCoreData}
+                      resourceTrendData={resourceTrendData}
                       onQuickNav={handleNavClick}
                       onSetDataError={setDataError}
                     />
@@ -741,6 +774,8 @@ export default function AdminDashboardUiV2Page() {
                         admissionsQueue={admissionsQueue}
                         admissionsHistory={admissionsHistory}
                         expeditions={expeditions}
+                        consumedResources={consumedResources}
+                        gainedResources={gainedResources}
                         intercampRequests={intercampRequests}
                         lookupId={lookupId}
                         setLookupId={setLookupId}
@@ -750,9 +785,10 @@ export default function AdminDashboardUiV2Page() {
                         occupationNameById={occupationNameById}
                         onAdmissionDecision={handleAdmissionDecision}
                         onCompleteExpedition={handleCompleteExpedition}
-                        onUpdateIntercampStatus={setIntercampRequests}
+                        onIntercampDecision={handleIntercampDecision}
                         onPopulationReload={loadCoreData}
                         onDashboardReload={loadCoreData}
+                        resourceTrendData={resourceTrendData}
                         onQuickNav={handleNavClick}
                         onSetDataError={setDataError}
                       />
@@ -800,6 +836,19 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
       window.removeEventListener("touchstart", handleOutside);
     };
   }, [isProfileOpen]);
+
+  useEffect(() => {
+    if (!isProfilePreviewOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsProfilePreviewOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isProfilePreviewOpen]);
 
   return (
     <header className="game-hud-header pointer-events-none flex items-center justify-between px-3 pt-3 pb-2 text-[10px] font-black uppercase tracking-[-0.02em] text-[#A4C2C5]/80">
@@ -858,13 +907,36 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
         )}
       </div>
 
-      {isProfilePreviewOpen && (
-        <div className="admin-ui-v2-photo-preview-overlay pointer-events-auto" role="dialog" aria-label="Foto de perfil ampliada" onClick={() => setIsProfilePreviewOpen(false)}>
-          <div className="admin-ui-v2-photo-preview-card" onClick={(event) => event.stopPropagation()}>
-            <img src={profile.avatarUrl} alt={`Perfil ampliado de ${profile.displayName}`} />
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {isProfilePreviewOpen && (
+          <motion.div
+            className="admin-ui-v2-photo-preview-overlay pointer-events-auto"
+            role="dialog"
+            aria-label="Foto de perfil ampliada"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+          >
+            <motion.div
+              className="admin-ui-v2-photo-preview-card"
+              initial={{ opacity: 0, scale: 0.9, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 8 }}
+              transition={{ duration: 0.24, ease: "easeOut" }}
+            >
+              <button
+                className="admin-ui-v2-photo-preview-close"
+                type="button"
+                onClick={() => setIsProfilePreviewOpen(false)}
+              >
+                CERRAR
+              </button>
+              <img src={profile.avatarUrl} alt={`Perfil ampliado de ${profile.displayName}`} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }
@@ -918,11 +990,14 @@ function ContentArea({
   notifications,
   countdown,
   threatLevel,
+  resourceTrendData,
   populationStats,
   admissions,
   admissionsQueue,
   admissionsHistory,
   expeditions,
+  consumedResources,
+  gainedResources,
   intercampRequests,
   lookupId,
   setLookupId,
@@ -932,7 +1007,7 @@ function ContentArea({
   occupationNameById,
   onAdmissionDecision,
   onCompleteExpedition,
-  onUpdateIntercampStatus,
+  onIntercampDecision,
   onPopulationReload,
   onDashboardReload,
   onQuickNav,
@@ -947,11 +1022,14 @@ function ContentArea({
   notifications: UiNotification[];
   countdown: { h: number; m: number; s: number };
   threatLevel: number;
+  resourceTrendData: ResourceTrendPoint[];
   populationStats: { total: number; active: number; injured: number; missing: number };
   admissions: UiAdmission[];
   admissionsQueue: UiAdmission[];
   admissionsHistory: UiAdmission[];
   expeditions: UiExpedition[];
+  consumedResources: ResourceLedgerEntry[];
+  gainedResources: ResourceLedgerEntry[];
   intercampRequests: UiIntercampRequest[];
   lookupId: string;
   setLookupId: (value: string) => void;
@@ -961,7 +1039,7 @@ function ContentArea({
   occupationNameById: Map<number, string>;
   onAdmissionDecision: (id: number, decision: "approved" | "rejected") => Promise<void>;
   onCompleteExpedition: (id: number) => Promise<void>;
-  onUpdateIntercampStatus: (callback: (prev: UiIntercampRequest[]) => UiIntercampRequest[]) => void;
+  onIntercampDecision: (id: number, status: "APROBADO" | "RECHAZADO") => Promise<void>;
   onPopulationReload: () => Promise<void>;
   onDashboardReload: () => Promise<void>;
   onQuickNav: (id: AdminSectionId) => void;
@@ -988,6 +1066,7 @@ function ContentArea({
           notifications={notifications}
           countdown={countdown}
           threatLevel={threatLevel}
+          resourceTrendData={resourceTrendData}
           onReload={onDashboardReload}
           onQuickNav={onQuickNav}
         />
@@ -1019,6 +1098,8 @@ function ContentArea({
           sub={sub}
           expeditions={expeditions}
           campCatalog={campCatalog}
+          consumedResources={consumedResources}
+          gainedResources={gainedResources}
           onCompleteExpedition={onCompleteExpedition}
         />
       )}
@@ -1061,18 +1142,18 @@ function ContentArea({
                     <td>
                       {request.status === "PENDIENTE" ? (
                         <div className="admin-ui-v2-actions">
-                          <button
-                            className="admin-ui-v2-btn is-ok"
-                            onClick={() => onUpdateIntercampStatus((prev) => prev.map((item) => (item.id === request.id ? { ...item, status: "APROBADO" } : item)))}
-                          >
-                            Aprobar
-                          </button>
-                          <button
-                            className="admin-ui-v2-btn is-danger"
-                            onClick={() => onUpdateIntercampStatus((prev) => prev.map((item) => (item.id === request.id ? { ...item, status: "RECHAZADO" } : item)))}
-                          >
-                            Rechazar
-                          </button>
+                            <button
+                              className="admin-ui-v2-btn is-ok"
+                              onClick={() => void onIntercampDecision(request.id, "APROBADO")}
+                            >
+                              Aprobar
+                            </button>
+                            <button
+                              className="admin-ui-v2-btn is-danger"
+                              onClick={() => void onIntercampDecision(request.id, "RECHAZADO")}
+                            >
+                              Rechazar
+                            </button>
                         </div>
                       ) : (
                         <span className="admin-ui-v2-muted">Sin acción</span>
@@ -1104,6 +1185,7 @@ function DashboardModule({
   notifications,
   countdown,
   threatLevel,
+  resourceTrendData,
   onReload,
   onQuickNav,
 }: {
@@ -1115,6 +1197,7 @@ function DashboardModule({
   notifications: UiNotification[];
   countdown: { h: number; m: number; s: number };
   threatLevel: number;
+  resourceTrendData: ResourceTrendPoint[];
   onReload: () => Promise<void>;
   onQuickNav: (id: AdminSectionId) => void;
 }) {
@@ -1131,6 +1214,14 @@ function DashboardModule({
   ];
   const liveAlerts = notifications.filter((notification) => !notification.read).slice(0, 3);
   const threatTone = threatLevel >= 80 ? "danger" : threatLevel >= 65 ? "warn" : "ok";
+  const healthScore = Math.max(0, Math.min(100, Math.round(100 - kpi.criticalResources * 8 - admissionsQueue * 4 - liveAlerts.length * 7)));
+  const healthTone = healthScore < 45 ? "danger" : healthScore < 70 ? "warn" : "ok";
+  const immediateEvents = [
+    { name: "Reposicion de agua", impact: "Alto", eta: "35 min", action: "Ir a inventario" },
+    { name: "Revision admisiones IA", impact: admissionsQueue > 3 ? "Alto" : "Medio", eta: "50 min", action: "Ir a admisiones" },
+    { name: "Sincronizacion intercamp", impact: intercampCount > 0 ? "Medio" : "Bajo", eta: "80 min", action: "Ir a intercamp" },
+    { name: "Cierre de expedicion", impact: activeExpeditions > 1 ? "Alto" : "Medio", eta: "120 min", action: "Ir a expediciones" },
+  ];
   const moduleStatus = [
     { name: "Admisiones IA", status: admissionsQueue > 0 ? "Pendiente" : "Estable", note: `${admissionsQueue} en cola`, tone: admissionsQueue > 0 ? "warn" : "ok" },
     { name: "Inventario", status: kpi.criticalResources > 0 ? "Alerta" : "Estable", note: `${kpi.criticalResources} recursos críticos`, tone: kpi.criticalResources > 0 ? "danger" : "ok" },
@@ -1140,51 +1231,34 @@ function DashboardModule({
 
   return (
     <div className="admin-ui-v2-dashboard">
-      <div className="admin-ui-v2-grid admin-ui-v2-grid-4">
-        <DashboardMetricCard label="Población total" value={populationTotal} detail={`${activePopulation} activos`} tone="info" />
-        <DashboardMetricCard label="Recursos críticos" value={kpi.criticalResources} detail={kpi.criticalResources > 0 ? "Atención inmediata" : "Sin alertas"} tone={kpi.criticalResources > 0 ? "danger" : "ok"} />
-        <DashboardMetricCard label="Expediciones activas" value={kpi.activeExpeditions || activeExpeditions} detail={`${outPopulation} fuera del campamento`} tone="info" />
-        <DashboardMetricCard label="Solicitudes intercamp" value={kpi.pendingIntercamp || intercampCount} detail="Pendientes de coordinación" tone="warn" />
-      </div>
+      <div className="admin-ui-v2-overview-band">
+        <div className="admin-ui-v2-grid admin-ui-v2-grid-4">
+          <DashboardMetricCard label="Población total" value={populationTotal} detail={`${activePopulation} activos`} tone="info" />
+          <DashboardMetricCard label="Recursos críticos" value={kpi.criticalResources} detail={kpi.criticalResources > 0 ? "Atención inmediata" : "Sin alertas"} tone={kpi.criticalResources > 0 ? "danger" : "ok"} />
+          <DashboardMetricCard label="Expediciones activas" value={kpi.activeExpeditions || activeExpeditions} detail={`${outPopulation} fuera del campamento`} tone="info" />
+          <DashboardMetricCard label="Solicitudes intercamp" value={kpi.pendingIntercamp || intercampCount} detail="Pendientes de coordinación" tone="warn" />
+        </div>
 
-      <div className="admin-ui-v2-module-card admin-ui-v2-command-row">
-        <div>
-          <h3>Centro de mando operativo</h3>
-          <p>Estado general del campamento, prioridades activas y rutas de respuesta inmediata.</p>
-        </div>
-        <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
-          <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void onReload()}>Actualizar</button>
-          <button className="admin-ui-v2-btn is-info" type="button" onClick={() => onQuickNav("admisiones")}>Admisiones</button>
-          <button className="admin-ui-v2-btn" type="button" onClick={() => onQuickNav("inventario")}>Inventario</button>
-          <button className="admin-ui-v2-btn" type="button" onClick={() => onQuickNav("expediciones")}>Expediciones</button>
-        </div>
-      </div>
-
-      <div className="admin-ui-v2-module-card admin-ui-v2-priority-card">
-        <div className="admin-ui-v2-section-head">
-          <span>Crisis del día</span>
-          <span className={`admin-ui-v2-pill is-${threatTone}`}>Amenaza {threatLevel}%</span>
-        </div>
-        <div className="admin-ui-v2-priority-layout">
+        <div className="admin-ui-v2-module-card admin-ui-v2-briefing-card">
           <div>
-            <h3>Riesgo de abastecimiento</h3>
-            <p>Si el agua cae por debajo del umbral crítico, habrá penalización de moral y productividad.</p>
+            <h3>Centro de mando operativo</h3>
+            <p>Estado general del campamento, prioridades activas y rutas de respuesta inmediata.</p>
           </div>
-          <div className="admin-ui-v2-threat-meter">
-            <div className="admin-ui-v2-threat-value">{threatLevel}%</div>
-            <div className="admin-ui-v2-threat-track">
-              <span className={`is-${threatTone}`} style={{ width: `${threatLevel}%` }} />
-            </div>
+          <div className="admin-ui-v2-briefing-status">
+            <small>Salud operativa</small>
+            <strong>{healthScore}%</strong>
+            <span className={`admin-ui-v2-pill is-${healthTone}`}>{healthScore < 45 ? "Comprometido" : healthScore < 70 ? "Inestable" : "Estable"}</span>
           </div>
-        </div>
-        <div className="admin-ui-v2-grid admin-ui-v2-grid-3">
-          <SignalTile label="-12% eficiencia de tareas" tone="danger" />
-          <SignalTile label="+18% riesgo médico" tone="warn" />
-          <SignalTile label="IA recomienda expedición de agua" tone="info" />
+          <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
+            <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void onReload()}>Actualizar</button>
+            <button className="admin-ui-v2-btn is-info" type="button" onClick={() => onQuickNav("admisiones")}>Admisiones</button>
+            <button className="admin-ui-v2-btn" type="button" onClick={() => onQuickNav("inventario")}>Inventario</button>
+            <button className="admin-ui-v2-btn" type="button" onClick={() => onQuickNav("expediciones")}>Expediciones</button>
+          </div>
         </div>
       </div>
 
-      <div className="admin-ui-v2-dashboard-main-grid">
+      <div className="admin-ui-v2-analytics-band">
         <div className="admin-ui-v2-module-card">
           <div className="admin-ui-v2-section-head">
             <span>Tendencia de recursos</span>
@@ -1192,7 +1266,7 @@ function DashboardModule({
           </div>
           <div className="admin-ui-v2-chart">
             <ResponsiveContainer width="100%" height={210}>
-              <AreaChart data={RESOURCE_TREND_DATA} margin={{ top: 10, right: 8, left: -20, bottom: 0 }}>
+              <AreaChart data={resourceTrendData} margin={{ top: 10, right: 8, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="v2Food" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#efc16e" stopOpacity={0.35} />
@@ -1239,10 +1313,34 @@ function DashboardModule({
             ))}
           </div>
         </div>
+
+        <div className="admin-ui-v2-module-card admin-ui-v2-priority-card">
+          <div className="admin-ui-v2-section-head">
+            <span>Crisis del día</span>
+            <span className={`admin-ui-v2-pill is-${threatTone}`}>Amenaza {threatLevel}%</span>
+          </div>
+          <div className="admin-ui-v2-priority-layout">
+            <div>
+              <h3>Riesgo de abastecimiento</h3>
+              <p>Si el agua cae por debajo del umbral crítico, habrá penalización de moral y productividad.</p>
+            </div>
+            <div className="admin-ui-v2-threat-meter">
+              <div className="admin-ui-v2-threat-value">{threatLevel}%</div>
+              <div className="admin-ui-v2-threat-track">
+                <span className={`is-${threatTone}`} style={{ width: `${threatLevel}%` }} />
+              </div>
+            </div>
+          </div>
+          <div className="admin-ui-v2-grid admin-ui-v2-grid-3">
+            <SignalTile label="-12% eficiencia de tareas" tone="danger" />
+            <SignalTile label="+18% riesgo médico" tone="warn" />
+            <SignalTile label="IA recomienda expedición de agua" tone="info" />
+          </div>
+        </div>
       </div>
 
-      <div className="admin-ui-v2-dashboard-main-grid">
-        <div className="admin-ui-v2-module-card">
+      <div className="admin-ui-v2-artifacts-band">
+        <div className="admin-ui-v2-module-card admin-ui-v2-artifact-card">
           <div className="admin-ui-v2-section-head">
             <span>Alertas vivas</span>
             <span>Top 3</span>
@@ -1261,7 +1359,7 @@ function DashboardModule({
           </div>
         </div>
 
-        <div className="admin-ui-v2-module-card">
+        <div className="admin-ui-v2-module-card admin-ui-v2-artifact-card">
           <div className="admin-ui-v2-section-head">
             <span>Estado operativo</span>
             <span>Resumen</span>
@@ -1277,6 +1375,33 @@ function DashboardModule({
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="admin-ui-v2-module-card admin-ui-v2-artifact-card">
+          <div className="admin-ui-v2-section-head">
+            <span>Eventos inmediatos</span>
+            <span>Top 4</span>
+          </div>
+          <table className="v-table admin-ui-v2-table admin-ui-v2-events-table">
+            <thead>
+              <tr>
+                <th>Evento</th>
+                <th>Impacto</th>
+                <th>ETA</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {immediateEvents.map((eventItem) => (
+                <tr key={eventItem.name}>
+                  <td>{eventItem.name}</td>
+                  <td>{eventItem.impact}</td>
+                  <td>{eventItem.eta}</td>
+                  <td>{eventItem.action}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -2016,35 +2141,42 @@ function ExpeditionsModule({
   sub,
   expeditions,
   campCatalog,
+  consumedResources,
+  gainedResources,
   onCompleteExpedition,
 }: {
   sub: string;
   expeditions: UiExpedition[];
   campCatalog: Camp[];
+  consumedResources: ResourceLedgerEntry[];
+  gainedResources: ResourceLedgerEntry[];
   onCompleteExpedition: (id: number) => Promise<void>;
 }) {
   const [selectedCampId, setSelectedCampId] = useState<number | null>(null);
   const [selectedExpeditionId, setSelectedExpeditionId] = useState<number | null>(null);
   const [completingId, setCompletingId] = useState<number | null>(null);
-  const effectiveExpeditions = expeditions.length > 0 ? expeditions : SIMULATED_EXPEDITIONS;
+  const effectiveExpeditions = expeditions;
 
   const mappedCamps = useMemo<MappedCampPoint[]>(() => {
     const backendPoints = campCatalog
-      .filter((camp) => Number.isFinite(camp.location.latitude) && Number.isFinite(camp.location.longitude))
+      .filter(
+        (camp) =>
+          camp.location &&
+          Number.isFinite(camp.location.latitude) &&
+          Number.isFinite(camp.location.longitude),
+      )
       .map((camp) => ({
         id: camp.id,
         name: camp.name,
-        latitude: camp.location.latitude,
-        longitude: camp.location.longitude,
+        latitude: camp.location!.latitude,
+        longitude: camp.location!.longitude,
         status: camp.status,
         currentPopulation: camp.currentPopulation,
         capacity: camp.capacity,
       }));
 
-    return backendPoints.length > 1 ? backendPoints : SIMULATED_EXPEDITION_POINTS;
+    return backendPoints;
   }, [campCatalog]);
-
-  const isSimulatedMap = mappedCamps === SIMULATED_EXPEDITION_POINTS;
 
   useEffect(() => {
     if (mappedCamps.length === 0) {
@@ -2061,16 +2193,6 @@ function ExpeditionsModule({
   const plannedExpeditions = effectiveExpeditions.filter((item) => item.status === "PROGRAMADA");
   const historyExpeditions = effectiveExpeditions.filter((item) => item.status === "COMPLETADA");
   const returningExpeditions = effectiveExpeditions.filter((item) => item.status === "REGRESANDO");
-  const consumedResources = [
-    { id: 1, resource: "Agua potable", amount: 35, date: "D-47 09:00", notes: "Raciones de salida" },
-    { id: 2, resource: "Combustible", amount: 18, date: "D-47 07:30", notes: "Recorrido largo" },
-    { id: 3, resource: "Raciones", amount: 24, date: "D-47 12:20", notes: "Equipo norte" },
-  ];
-  const gainedResources = [
-    { id: 1, resource: "Medicamentos", amount: 42, date: "D-47 14:20", notes: "Hospital norte" },
-    { id: 2, resource: "Baterías", amount: 26, date: "D-46 18:10", notes: "Bodega industrial" },
-    { id: 3, resource: "Filtros de agua", amount: 12, date: "D-47 15:10", notes: "Puesto abandonado" },
-  ];
 
   const visibleExpeditions = useMemo(() => {
     if (sub === "Misiones activas") return activeExpeditions;
@@ -2129,11 +2251,6 @@ function ExpeditionsModule({
       {sub === "Mapa operativo" && (
         mappedCamps.length > 1 ? (
           <div className="admin-ui-v2-map-shell">
-            {isSimulatedMap && (
-              <div className="admin-ui-v2-map-sim-banner">
-                Datos simulados de rutas por coordenadas hasta recibir ubicaciones reales de expedición.
-              </div>
-            )}
             <ExpeditionsWorldMap camps={mappedCamps} selectedCampId={selectedCampId} onSelectCamp={setSelectedCampId} />
           </div>
         ) : (
@@ -2245,7 +2362,7 @@ function ExpeditionsModule({
                 <div className="admin-ui-v2-expedition-route-card">
                   <span>Ruta estimada</span>
                   <strong>Base alfa &gt; {selectedExpedition.sector}</strong>
-                  <p>Visualización simulada por coordenadas para validar dirección y trazado operativo.</p>
+                  <p>Ruta calculada con la ubicación real de campamentos registrados en el backend.</p>
                 </div>
                 {selectedExpedition.participants.length > 0 && (
                   <div className="admin-ui-v2-adm-skills">

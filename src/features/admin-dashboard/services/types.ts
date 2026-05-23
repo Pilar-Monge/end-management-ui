@@ -103,6 +103,22 @@ export interface IntercampRecord {
   updatedAt?: string
 }
 
+export interface InventoryMovementRecord {
+  id: number
+  resourceTypeId?: number
+  resourceTypeName?: string
+  resourceName?: string
+  resource?: string
+  quantity?: number
+  amount?: number
+  movementType?: string
+  type?: string
+  reason?: string
+  description?: string
+  createdAt?: string
+  date?: string
+}
+
 export interface AuditRecord {
   id: number
   [key: string]: unknown

@@ -21,12 +21,15 @@ export {
 } from './notifications.service'
 
 export {
+  listExpeditions,
   listActiveExpeditions,
   completeExpedition,
   assignExpeditionParticipants,
 } from './expeditions.service'
 
 export {
+  listIntercampRequests,
+  updateIntercampRequestStatus,
   getIntercampRequestById,
   getTransferById,
   getTransferHistoryById,
@@ -35,6 +38,7 @@ export {
 } from './intercamp.service'
 
 export {
+  listInventoryMovements,
   getInventoryMovementById,
   getNotificationById,
   getPersonStatusHistoryById,
@@ -51,4 +55,5 @@ export type {
   GeneralDashboardPayload,
   InventoryDashboardPayload,
   IntercampRecord,
+  InventoryMovementRecord,
 } from './types'

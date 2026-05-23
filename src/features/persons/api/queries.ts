@@ -11,10 +11,29 @@ function buildHeaders() {
   }
 }
 
+function unwrapPayload<T>(payload: unknown): T {
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    return (payload as { data: T }).data
+  }
+  return payload as T
+}
+
+function unwrapList<T>(payload: unknown): T[] {
+  const data = unwrapPayload<unknown>(payload)
+  if (Array.isArray(data)) return data as T[]
+  if (data && typeof data === 'object') {
+    const objectData = data as Record<string, unknown>
+    if (Array.isArray(objectData.items)) return objectData.items as T[]
+    if (Array.isArray(objectData.results)) return objectData.results as T[]
+  }
+  return []
+}
+
 export async function fetchPersons(): Promise<Person[]> {
   const res = await fetch(ENDPOINTS.persons, { headers: buildHeaders() })
   if (!res.ok) throw new Error('Failed to fetch persons')
-  return res.json()
+  const payload = await res.json()
+  return unwrapList<Person>(payload)
 }
 
 export function usePersons(
@@ -30,7 +49,8 @@ export function usePersons(
 export async function fetchPersonById(id: number): Promise<PersonWithStats> {
   const res = await fetch(`${ENDPOINTS.persons}/${id}`, { headers: buildHeaders() })
   if (!res.ok) throw new Error('Failed to fetch person')
-  return res.json()
+  const payload = await res.json()
+  return unwrapPayload<PersonWithStats>(payload)
 }
 
 export function usePersonById(
@@ -48,7 +68,8 @@ export function usePersonById(
 export async function fetchPersonsStats(): Promise<PersonsStats> {
   const res = await fetch(ENDPOINTS.personsStats, { headers: buildHeaders() })
   if (!res.ok) throw new Error('Failed to fetch persons stats')
-  return res.json()
+  const payload = await res.json()
+  return unwrapPayload<PersonsStats>(payload)
 }
 
 export function usePersonsStats(

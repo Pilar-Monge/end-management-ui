@@ -22,6 +22,26 @@
   gap: 12px;
 }
 
+.admin-ui-v2-overview-band,
+.admin-ui-v2-analytics-band,
+.admin-ui-v2-artifacts-band {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-ui-v2-overview-band {
+  grid-template-columns: minmax(0, 1.8fr) minmax(320px, 1fr);
+  align-items: stretch;
+}
+
+.admin-ui-v2-analytics-band {
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.95fr);
+}
+
+.admin-ui-v2-artifacts-band {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .admin-ui-v2-command-row {
   display: flex;
   align-items: center;
@@ -32,6 +52,49 @@
 .admin-ui-v2-actions-wrap {
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.admin-ui-v2-briefing-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
+  gap: 10px;
+}
+
+.admin-ui-v2-briefing-status {
+  border: 1px solid rgba(103, 172, 169, 0.26);
+  background: rgba(3, 10, 10, 0.45);
+  padding: 10px;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-ui-v2-briefing-status small {
+  color: rgba(164, 194, 197, 0.76);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.admin-ui-v2-briefing-status strong {
+  color: #f0fafa;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.admin-ui-v2-artifact-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-ui-v2-events-table td,
+.admin-ui-v2-events-table th {
+  font-size: 10px;
 }
 
 .admin-ui-v2-priority-card {
@@ -478,34 +541,47 @@
   position: fixed;
   inset: 0;
   z-index: 120;
-  background: rgba(3, 8, 8, 0.78);
+  background: rgba(3, 7, 12, 0.74);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: grid;
   place-items: center;
   padding: 16px;
 }
 
 .admin-ui-v2-photo-preview-card {
-  border: 1px solid rgba(105, 191, 183, 0.42);
-  background: rgba(4, 12, 12, 0.96);
-  padding: 10px;
-  width: min(50vw, 720px);
-  min-width: min(92vw, 420px);
+  width: min(420px, calc(100vw - 32px));
+  border: 1px solid rgba(127, 184, 255, 0.32);
+  background: #0b1118;
   box-shadow: 0 22px 44px rgba(0, 0, 0, 0.46);
+  overflow: hidden;
+  position: relative;
+}
+
+.admin-ui-v2-photo-preview-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 1px solid rgba(127, 184, 255, 0.45);
+  background: rgba(8, 18, 28, 0.78);
+  color: #eef3fb;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.admin-ui-v2-photo-preview-close:hover {
+  background: rgba(14, 30, 44, 0.9);
 }
 
 .admin-ui-v2-photo-preview-card img {
   width: 100%;
-  max-height: 72vh;
-  object-fit: cover;
   height: auto;
   display: block;
-}
-
-@media (max-width: 900px) {
-  .admin-ui-v2-photo-preview-card {
-    width: min(92vw, 520px);
-    min-width: 0;
-  }
+  max-height: 72vh;
+  object-fit: cover;
 }
 
 .admin-ui-v2-profile-avatar {
@@ -1447,6 +1523,12 @@
   .admin-ui-v2-grid-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .admin-ui-v2-overview-band,
+  .admin-ui-v2-analytics-band,
+  .admin-ui-v2-artifacts-band {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {
@@ -1463,7 +1545,10 @@
   .admin-ui-v2-grid-2,
   .admin-ui-v2-grid-roles,
   .admin-ui-v2-expeditions-grid,
-  .admin-ui-v2-dashboard-main-grid {
+  .admin-ui-v2-dashboard-main-grid,
+  .admin-ui-v2-overview-band,
+  .admin-ui-v2-analytics-band,
+  .admin-ui-v2-artifacts-band {
     grid-template-columns: 1fr;
   }
 

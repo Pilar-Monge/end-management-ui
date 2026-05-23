@@ -1,5 +1,9 @@
 import { apiRequest } from '../../../shared/services/httpClient'
-import type { AuditRecord } from './types'
+import type { AuditRecord, InventoryMovementRecord } from './types'
+
+export async function listInventoryMovements(): Promise<InventoryMovementRecord[]> {
+  return apiRequest<InventoryMovementRecord[]>('/inventory-movements')
+}
 
 export async function getInventoryMovementById(id: number): Promise<AuditRecord> {
   return apiRequest<AuditRecord>(`/inventory-movements/${id}`)
