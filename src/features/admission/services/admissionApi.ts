@@ -2,7 +2,7 @@ import type { AdmissionRequest, ProcessAIPayload, ReviewAdmissionPayload } from 
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
 
-const getToken = (): string | null => localStorage.getItem('token')
+const getToken = (): string | null => localStorage.getItem('token') ?? localStorage.getItem('accessToken')
 
 const getHeaders = (): HeadersInit => ({
   'Content-Type': 'application/json',

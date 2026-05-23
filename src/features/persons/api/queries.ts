@@ -1,8 +1,8 @@
 import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
-import type { ApiError, Person, PersonWithStats, PersonsStats } from '../types'
+import type { ApiError, Person, PersonStatus, PersonWithStats, PersonsStats } from '../types'
 import { ENDPOINTS, personsKeys } from './keys'
 
-const getToken = () => localStorage.getItem('token')
+const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('accessToken')
 
 function buildHeaders() {
   return {
@@ -29,11 +29,42 @@ function unwrapList<T>(payload: unknown): T[] {
   return []
 }
 
+function normalizePersonStatus(value: unknown): PersonStatus {
+  const normalized = String(value ?? '').toUpperCase()
+  if (normalized === 'ACTIVE') return 'ACTIVE'
+  if (normalized === 'SICK') return 'SICK'
+  if (normalized === 'INJURED') return 'INJURED'
+  if (normalized === 'ON_EXPEDITION') return 'ON_EXPEDITION'
+  if (normalized === 'OUTSIDE_CAMP') return 'OUTSIDE_CAMP'
+  if (normalized === 'INACTIVE') return 'INACTIVE'
+  return 'INACTIVE'
+}
+
+function mapPersonRecord(record: unknown): Person {
+  const source = record as Record<string, unknown>
+  const statusValue = source.status ?? source.currentStatus
+  const admissionDateValue =
+    source.admissionDate
+    ?? source.joinedAt
+    ?? source.joinDate
+    ?? source.createdAt
+    ?? new Date().toISOString()
+  return {
+    ...(record as Person),
+    status: normalizePersonStatus(statusValue),
+    currentStatus: normalizePersonStatus(statusValue),
+    firstName: String(source.firstName ?? ''),
+    lastName: String(source.lastName ?? ''),
+    admissionDate: String(admissionDateValue),
+    notes: typeof source.notes === 'string' ? source.notes : undefined,
+  }
+}
+
 export async function fetchPersons(): Promise<Person[]> {
   const res = await fetch(ENDPOINTS.persons, { headers: buildHeaders() })
   if (!res.ok) throw new Error('Failed to fetch persons')
   const payload = await res.json()
-  return unwrapList<Person>(payload)
+  return unwrapList<Person>(payload).map((item) => mapPersonRecord(item))
 }
 
 export function usePersons(
@@ -50,7 +81,11 @@ export async function fetchPersonById(id: number): Promise<PersonWithStats> {
   const res = await fetch(`${ENDPOINTS.persons}/${id}`, { headers: buildHeaders() })
   if (!res.ok) throw new Error('Failed to fetch person')
   const payload = await res.json()
-  return unwrapPayload<PersonWithStats>(payload)
+  const data = unwrapPayload<PersonWithStats>(payload)
+  return {
+    ...data,
+    ...mapPersonRecord(data),
+  }
 }
 
 export function usePersonById(

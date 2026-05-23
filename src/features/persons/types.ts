@@ -1,4 +1,12 @@
-export type PersonStatus = 'ACTIVE' | 'INJURED' | 'MISSING' | 'DECEASED'
+export type PersonStatus =
+  | 'ACTIVE'
+  | 'SICK'
+  | 'INJURED'
+  | 'ON_EXPEDITION'
+  | 'OUTSIDE_CAMP'
+  | 'INACTIVE'
+
+export type AccountStatus = 'ACTIVE' | 'BLOCKED' | 'INACTIVE'
 
 export interface Person {
   id: number
@@ -7,6 +15,7 @@ export interface Person {
   alias?: string
   age: number
   status: PersonStatus
+  currentStatus?: PersonStatus
   campId: number
   occupationId: number
   achievementIds: number[]
@@ -14,6 +23,7 @@ export interface Person {
   notes?: string
   createdAt: string
   updatedAt: string
+  accountStatus?: AccountStatus
 }
 
 export interface PersonWithStats extends Person {
@@ -42,6 +52,8 @@ export interface CreatePersonRequest {
 
 export interface UpdatePersonRequest extends Partial<CreatePersonRequest> {
   status?: PersonStatus
+  currentStatus?: PersonStatus
+  accountStatus?: AccountStatus
 }
 
 export interface PersonStatusUpdateRequest {

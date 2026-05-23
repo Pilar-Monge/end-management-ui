@@ -24,6 +24,8 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom'
 import { MEDIA_URLS } from '../config/mediaUrls'
 import { loginRequest } from '../../login/services/authApi'
+import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
+import { getPostLoginRoute, normalizeUserRole } from '../../../shared/services/postLoginRouting'
 import type { LoginErrors, LoginForm } from '../../login/types'
 import { useAuthDispatch } from '../../../shared/context/AuthContext'
 
@@ -535,12 +537,20 @@ export function MainHomePage() {
   const authDispatch = useAuthDispatch()
   const containerRef = useRef<HTMLDivElement>(null)
   const initialAppState = (location.state as { initialAppState?: appState } | null)?.initialAppState
+  const sessionMessage = (location.state as { sessionMessage?: string } | null)?.sessionMessage
 
   const [appState, setAppState] = useState<appState>(initialAppState ?? 'landing')
   const [selectedCamp, setSelectedCamp] = useState<any>(null)
   const [currentMode, setCurrentMode] = useState<Mode>('Storm')
   const [storyIndex, setStoryIndex] = useState(-1)
   const [isTransitioning, setIsTransitioning] = useState(false)
+
+  useEffect(() => {
+    if (sessionMessage) {
+      setAppState('login')
+      setAuthErrors((prev) => ({ ...prev, general: sessionMessage }))
+    }
+  }, [sessionMessage])
 
   useEffect(() => {
     if (appState === 'intro') {
@@ -690,19 +700,29 @@ export function MainHomePage() {
 
     try {
       const response = await loginRequest(authForm)
-      const normalizedUser = { ...response.user, role: response.user.rol }
-      localStorage.setItem('token', response.token)
+      const normalizedUser = {
+        ...response.user,
+        role: normalizeUserRole(response.user.rol),
+      }
+      const token = response.token ?? response.accessToken
+      const savedPath = localStorage.getItem('last_secure_path')
+
+      if (!token) {
+        throw new Error('No se recibio token de acceso')
+      }
+
+      localStorage.setItem('token', token)
+      localStorage.setItem('accessToken', token)
+      window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
       localStorage.setItem('user', JSON.stringify(normalizedUser))
 
-      let redirectPath = '/app'
-      if (normalizedUser.role === 'SYSTEM_ADMIN') {
-        redirectPath = '/admin-main-view-ui'
-      } else if (normalizedUser.role === 'RESOURCE_MANAGEMENT') {
-        redirectPath = '/resource-main-view'
-      } else if (normalizedUser.role === 'TRAVEL_MANAGER') {
-        redirectPath = '/expeditions'
-      }
-      navigate(redirectPath)
+      const defaultRoute = getPostLoginRoute(normalizedUser.role)
+      const redirectPath =
+        normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard-ui-v2')
+          ? savedPath
+          : defaultRoute
+      localStorage.removeItem('last_secure_path')
+      navigate(redirectPath, { replace: true })
     } catch (error) {
       setAuthErrors({
         general:

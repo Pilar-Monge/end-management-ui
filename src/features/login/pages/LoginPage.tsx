@@ -6,6 +6,7 @@ import { LandingGhosts } from '../components/LandingGhosts'
 import { HudCorners, Scanlines } from '../components/BackgroundEffects'
 import { loginRequest } from '../services/authApi'
 import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
+import { getPostLoginRoute, normalizeUserRole } from '../../../shared/services/postLoginRouting'
 import { useAuthState } from '../../../shared/context/AuthContext'
 import type { LoginErrors, LoginForm } from '../types'
 
@@ -54,23 +55,29 @@ export default function LoginPage() {
 
     try {
       const response = await loginRequest(form)
-      const normalizedUser = { ...response.user, role: response.user.rol }
-
-      localStorage.setItem('token', response.token)
-      localStorage.setItem('user', JSON.stringify(response.user))
-      window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
-      navigate('/app')
-      localStorage.setItem('user', JSON.stringify(normalizedUser))
-
-      let redirectPath = '/app'
-      if (normalizedUser.role === 'SYSTEM_ADMIN') {
-        redirectPath = '/admin-main-view-ui'
-      } else if (normalizedUser.role === 'RESOURCE_MANAGEMENT') {
-        redirectPath = '/resource-main-view'
-      } else if (normalizedUser.role === 'TRAVEL_MANAGER') {
-        redirectPath = '/expeditions'
+      const normalizedUser = {
+        ...response.user,
+        role: normalizeUserRole(response.user.rol),
       }
-      navigate(redirectPath)
+      const token = response.token ?? response.accessToken
+      const savedPath = localStorage.getItem('last_secure_path')
+
+      if (!token) {
+        throw new Error('No se recibió token de acceso')
+      }
+
+      localStorage.setItem('token', token)
+      localStorage.setItem('accessToken', token)
+      localStorage.setItem('user', JSON.stringify(normalizedUser))
+      window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
+
+      const defaultRoute = getPostLoginRoute(normalizedUser.role)
+      const redirectPath =
+        normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard-ui-v2')
+          ? savedPath
+          : defaultRoute
+      localStorage.removeItem('last_secure_path')
+      navigate(redirectPath, { replace: true })
     } catch (error) {
       setErrors({
         general:

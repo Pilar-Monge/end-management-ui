@@ -1,15 +1,44 @@
 import { useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { SESSION_TOKEN_CHANGED_EVENT, sessionService } from '../services/sessionService'
+
+const PUBLIC_PATHS = new Set(['/', '/login', '/main-homepage', '/admission'])
+const LAST_SECURE_PATH_KEY = 'last_secure_path'
 
 export function useSessionManager() {
   const navigate = useNavigate()
+  const location = useLocation()
   const isInitializedRef = useRef(false)
 
   useEffect(() => {
+    const token = localStorage.getItem('token') ?? localStorage.getItem('accessToken')
+    const isPublicPath = PUBLIC_PATHS.has(location.pathname)
+
+    if (!token && !isPublicPath) {
+      navigate('/main-homepage', {
+        replace: true,
+        state: {
+          initialAppState: 'login',
+          sessionMessage: 'Sesion inactiva. Inicia sesion para continuar.',
+        },
+      })
+      return
+    }
+
+    if (token && !isPublicPath) {
+      localStorage.setItem(LAST_SECURE_PATH_KEY, location.pathname)
+    }
+  }, [location.pathname, navigate])
+
+  useEffect(() => {
     const handleSessionExpired = () => {
-      console.log('Session expired, redirecting to login')
-      navigate('/', { replace: true })
+      navigate('/main-homepage', {
+        replace: true,
+        state: {
+          initialAppState: 'login',
+          sessionMessage: 'Sesion inactiva. Inicia sesion para continuar.',
+        },
+      })
     }
 
     const handleTokenRefreshed = () => {
@@ -17,7 +46,7 @@ export function useSessionManager() {
     }
 
     const syncSessionManager = () => {
-      const token = localStorage.getItem('token')
+      const token = localStorage.getItem('token') ?? localStorage.getItem('accessToken')
 
       if (!token) {
         sessionService.stop()

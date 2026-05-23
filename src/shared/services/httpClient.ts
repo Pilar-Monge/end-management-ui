@@ -31,7 +31,7 @@ interface RequestOptions extends Omit<RequestInit, 'headers'> {
 }
 
 function getToken(): string | null {
-  return localStorage.getItem('token')
+  return localStorage.getItem('token') ?? localStorage.getItem('accessToken')
 }
 
 function normalizePath(path: string): string {
