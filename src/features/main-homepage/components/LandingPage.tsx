@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 
@@ -165,108 +166,17 @@ export default function LandingPage({
 
       {}
       <div
-        className={`absolute top-5 right-6 flex items-center gap-5 z-20 transition-all duration-1000 ${
+        className={`absolute top-5 right-6 flex items-start gap-5 z-20 transition-all duration-1000 ${
           showUI ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
         }`}
       >
-        <div className="relative group">
-          <button
-            onClick={() => setShowVolumePanel(!showVolumePanel)}
-            className="p-3 transition-all text-white cursor-pointer icon-btn flex items-center justify-center min-w-[54px]"
-            title="Audio"
-          >
-            <SoundWave isActive={isAudioEnabled} />
-          </button>
-
-          <AnimatePresence>
-            {showVolumePanel && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 10, x: -10 }}
-                animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 10, x: -10 }}
-                className="absolute top-full right-0 mt-2 p-8 panel-brush min-w-[240px] z-50 flex flex-col gap-6 shadow-2xl"
-              >
-                <div className="flex items-center justify-between mb-2 border-b border-white/10 pb-4">
-                  <div className="flex flex-col">
-                    <div className="text-[10px] uppercase tracking-[0.4em] font-mono text-white/40 underline decoration-blue-400/40">
-                      Opciones Globales
-                    </div>
-                    <span
-                      className="text-[16px] font-black tracking-[0.3em] text-white italic uppercase"
-                      style={{ fontFamily: "'Oswald', sans-serif" }}
-                    >
-                      SISTEMA DE AUDIO
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => setShowVolumePanel(false)}
-                    className="p-2 transition-all duration-300 text-white/60 hover:text-blue-400 hover:rotate-90 hover:scale-110 active:scale-95 flex items-center justify-center"
-                  >
-                    <div className="relative w-5 h-5 flex items-center justify-center">
-                      <div className="absolute w-full h-0.5 bg-current rotate-45" />
-                      <div className="absolute w-full h-0.5 bg-current -rotate-45" />
-                    </div>
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-6 px-1">
-                  <button
-                    onClick={() => setIsAudioEnabled(!isAudioEnabled)}
-                    className={`transition-all hover:scale-110 ${isAudioEnabled ? 'text-blue-400' : 'text-white/40'}`}
-                  >
-                    {isAudioEnabled ? (
-                      <svg
-                        width="22"
-                        height="22"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M11 5L6 9H2v6h4l5 4V5z" />
-                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                      </svg>
-                    ) : (
-                      <svg
-                        width="22"
-                        height="22"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M11 5L6 9H2v6h4l5 4V5z" />
-                        <line x1="23" y1="9" x2="17" y2="15" />
-                        <line x1="17" y1="9" x2="23" y2="15" />
-                      </svg>
-                    )}
-                  </button>
-                  <div className="flex-1 h-2 flex items-center">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={volume}
-                      onChange={(e) => setVolume(parseInt(e.target.value))}
-                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-all"
-                    />
-                  </div>
-                </div>
-                <div
-                  className="text-[12px] font-bold text-center text-white/50 uppercase tracking-[0.4em]"
-                  style={{ fontFamily: "'Oswald', sans-serif" }}
-                >
-                  NIVEL: {volume}%
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        <button
+          onClick={() => setShowVolumePanel(!showVolumePanel)}
+          className="p-3 transition-all text-white cursor-pointer icon-btn flex items-center justify-center min-w-[54px]"
+          title="Audio"
+        >
+          <SoundWave isActive={isAudioEnabled} />
+        </button>
 
         <button
           onClick={onExit}
@@ -291,7 +201,99 @@ export default function LandingPage({
         </button>
       </div>
 
-      {}
+      {showVolumePanel &&
+        createPortal(
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 10, x: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+            transition={{ duration: 0.2 }}
+            key="audio-panel"
+            className="fixed min-w-[240px] z-50 flex flex-col gap-6 shadow-2xl bg-gradient-to-b from-blue-950/80 to-black/80 border border-blue-400/20 rounded p-8"
+            style={{
+              top: 'calc(1.25rem + 54px + 8px)',
+              right: '1.5rem',
+            }}
+          >
+            <div className="flex items-center justify-between mb-2 border-b border-white/10 pb-4">
+              <div className="flex flex-col">
+                <div className="text-[10px] uppercase tracking-[0.4em] font-mono text-white/40 underline decoration-blue-400/40">
+                  Opciones Globales
+                </div>
+                <span
+                  className="text-[16px] font-black tracking-[0.3em] text-white italic uppercase"
+                  style={{ fontFamily: "'Oswald', sans-serif" }}
+                >
+                  SISTEMA DE AUDIO
+                </span>
+              </div>
+              <button
+                onClick={() => setShowVolumePanel(false)}
+                className="p-2 transition-all duration-300 text-white/60 hover:text-blue-400 hover:rotate-90 hover:scale-110 active:scale-95 flex items-center justify-center"
+              >
+                <div className="relative w-5 h-5 flex items-center justify-center">
+                  <div className="absolute w-full h-0.5 bg-current rotate-45" />
+                  <div className="absolute w-full h-0.5 bg-current -rotate-45" />
+                </div>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-6 px-1">
+              <button
+                onClick={() => setIsAudioEnabled(!isAudioEnabled)}
+                className={`transition-all hover:scale-110 ${isAudioEnabled ? 'text-blue-400' : 'text-white/40'}`}
+              >
+                {isAudioEnabled ? (
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                  </svg>
+                ) : (
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                    <line x1="23" y1="9" x2="17" y2="15" />
+                    <line x1="17" y1="9" x2="23" y2="15" />
+                  </svg>
+                )}
+              </button>
+              <div className="flex-1 h-2 flex items-center">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={volume}
+                  onChange={(e) => setVolume(parseInt(e.target.value))}
+                  className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-all"
+                />
+              </div>
+            </div>
+            <div
+              className="text-[12px] font-bold text-center text-white/50 uppercase tracking-[0.4em]"
+              style={{ fontFamily: "'Oswald', sans-serif" }}
+            >
+              NIVEL: {volume}%
+            </div>
+          </motion.div>,
+          document.body
+        )}
       <div
         className="absolute top-[5%] left-[3.5%] z-20"
         style={{ fontFamily: "'Oswald', sans-serif" }}
