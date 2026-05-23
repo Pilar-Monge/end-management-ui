@@ -1,0 +1,1 @@
+export { WorkerMainViewPage } from './pages/WorkerMainViewPage'
