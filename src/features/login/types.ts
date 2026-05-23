@@ -21,7 +21,8 @@ export interface LoggedUser {
 }
 
 export interface LoginApiResponse {
-  token: string
+  token?: string
+  accessToken?: string
   user: {
     id: number
     username: string

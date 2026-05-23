@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Area,
@@ -44,6 +44,7 @@ import {
 import { ExpeditionsWorldMap } from "../../admin-dashboard/expeditions/components/ExpeditionsWorldMap";
 import type { MappedCampPoint } from "../../admin-dashboard/expeditions/types";
 import { SESSION_TOKEN_CHANGED_EVENT } from "../../../shared/services/sessionService";
+import { ApiHttpError } from "../../../shared/services/httpClient";
 import "../../expeditions-ui/expeditionsUi.css";
 import "../../admin-dashboard/expeditions/expeditions-panel.css";
 import "./admin-dashboard-ui-v2.css";
@@ -141,6 +142,7 @@ interface AdminProfileSummary {
 }
 
 const SESSION_TIMEOUT_MS = 20 * 60 * 1000;
+const ADMIN_VIEW_STATE_KEY = 'admin_dashboard_ui_v2_state';
 
 interface TempRoleAssignment {
   id: number;
@@ -357,15 +359,21 @@ const INITIAL_TEMP_ASSIGNMENTS: TempRoleAssignment[] = [];
 
 function normalizeStatusLabel(status: Person["status"]): string {
   if (status === "ACTIVE") return "Activo";
+  if (status === "SICK") return "Enfermo";
   if (status === "INJURED") return "Herido";
-  if (status === "MISSING") return "Desaparecido";
-  return "Fallecido";
+  if (status === "ON_EXPEDITION") return "En expedicion";
+  if (status === "OUTSIDE_CAMP") return "Fuera del campamento";
+  return "Inactivo";
 }
 
-function legacyPopulationStatus(status: Person["status"]): "Activo" | "Herido" | "Enfermo" | "Fuera" {
+function legacyPopulationStatus(status: Person["status"]): "Activo" | "Herido" | "Enfermo" | "Expedicion" | "Fuera del campamento" | "Inactivo" {
   if (status === "ACTIVE") return "Activo";
+  if (status === "SICK") return "Enfermo";
   if (status === "INJURED") return "Herido";
-  return "Fuera";
+  if (status === "ON_EXPEDITION") return "Expedicion";
+  if (status === "OUTSIDE_CAMP") return "Fuera del campamento";
+  if (status === "INACTIVE") return "Inactivo";
+  return "Inactivo";
 }
 
 function expeditionPillClass(status: UiExpedition["status"]): string {
@@ -384,6 +392,13 @@ function intercampPillClass(status: UiIntercampRequest["status"]): string {
 
 function personFullName(person: Person): string {
   return `${person.firstName} ${person.lastName}`.trim();
+}
+
+function formatAdmissionDate(value: string | undefined): string {
+  if (!value) return "Sin fecha";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Sin fecha";
+  return parsed.toLocaleDateString("es-CR");
 }
 
 function readSessionAdminUser(): SessionAdminUser {
@@ -430,11 +445,24 @@ function resolveAdminProfileImage(sessionUser: SessionAdminUser, matchedPerson: 
 
 export default function AdminDashboardUiV2Page() {
   const navigate = useNavigate();
+  const savedAdminViewState = useMemo(() => {
+    try {
+      const raw = localStorage.getItem(ADMIN_VIEW_STATE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { activeNav?: AdminSectionId; activeSub?: string };
+      return parsed;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const [hasEntered] = useState(true);
 
-  const [activeNav, setActiveNav] = useState<AdminSectionId>("centro");
-  const [activeSub, setActiveSub] = useState<string>(NAVIGATION_DATA.find((item) => item.id === "centro")?.subOptions[0] ?? "Resumen táctico");
+  const [activeNav, setActiveNav] = useState<AdminSectionId>(savedAdminViewState?.activeNav ?? "centro");
+  const [activeSub, setActiveSub] = useState<string>(() => {
+    const defaultSub = NAVIGATION_DATA.find((item) => item.id === "centro")?.subOptions[0] ?? "Resumen táctico";
+    return savedAdminViewState?.activeSub ?? defaultSub;
+  });
 
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -446,12 +474,11 @@ export default function AdminDashboardUiV2Page() {
   const [expeditions, setExpeditions] = useState<UiExpedition[]>([]);
   const [intercampRequests, setIntercampRequests] = useState<UiIntercampRequest[]>(SAMPLE_INTERCAMP);
   const [dashboardKpi, setDashboardKpi] = useState<DashboardKpi>(INITIAL_DASHBOARD_KPI);
-  const [notifications, setNotifications] = useState<UiNotification[]>(FALLBACK_NOTIFICATIONS);
-  const [countdown, setCountdown] = useState({ h: 3, m: 28, s: 0 });
-  const [threatLevel, setThreatLevel] = useState(72);
+  const [notifications, setNotifications] = useState<UiNotification[]>([]);
   const [lookupId, setLookupId] = useState("");
   const [sessionState, setSessionState] = useState<"ACTIVA" | "INACTIVA">("INACTIVA");
-  const [lastActivityAt, setLastActivityAt] = useState(Date.now());
+  const lastActivityAtRef = useRef(Date.now());
+  const lastActivityCommitRef = useRef(0);
 
   const loadCoreData = useCallback(async () => {
     setIsDataLoading(true);
@@ -510,27 +537,12 @@ export default function AdminDashboardUiV2Page() {
   }, [hasEntered, loadCoreData]);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        const { h, m, s } = prev;
-        if (s > 0) return { h, m, s: s - 1 };
-        if (m > 0) return { h, m: m - 1, s: 59 };
-        if (h > 0) return { h: h - 1, m: 59, s: 59 };
-        return { h: 0, m: 0, s: 0 };
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setThreatLevel((prev) => Math.min(95, Math.max(38, prev + Math.floor(Math.random() * 7) - 3)));
-    }, 4500);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const markActivity = () => setLastActivityAt(Date.now());
+    const markActivity = () => {
+      const now = Date.now();
+      if (now - lastActivityCommitRef.current < 800) return;
+      lastActivityCommitRef.current = now;
+      lastActivityAtRef.current = now;
+    };
     const events: Array<keyof WindowEventMap> = ["mousemove", "mousedown", "click", "keydown", "touchstart", "scroll"];
     events.forEach((eventName) => window.addEventListener(eventName, markActivity, { passive: true }));
     return () => events.forEach((eventName) => window.removeEventListener(eventName, markActivity));
@@ -544,13 +556,14 @@ export default function AdminDashboardUiV2Page() {
         return;
       }
 
-      const idleMs = Date.now() - lastActivityAt;
-      setSessionState(idleMs >= SESSION_TIMEOUT_MS ? "INACTIVA" : "ACTIVA");
+      const idleMs = Date.now() - lastActivityAtRef.current;
+      const nextState = idleMs >= SESSION_TIMEOUT_MS ? "INACTIVA" : "ACTIVA";
+      setSessionState((prev) => (prev === nextState ? prev : nextState));
     };
 
     evaluateSession();
 
-    const interval = setInterval(evaluateSession, 1000);
+    const interval = setInterval(evaluateSession, 5000);
     const onTokenChanged = () => evaluateSession();
     window.addEventListener(SESSION_TOKEN_CHANGED_EVENT, onTokenChanged);
 
@@ -558,22 +571,23 @@ export default function AdminDashboardUiV2Page() {
       clearInterval(interval);
       window.removeEventListener(SESSION_TOKEN_CHANGED_EVENT, onTokenChanged);
     };
-  }, [lastActivityAt]);
+  }, []);
 
-  const handleNavClick = (navId: AdminSectionId) => {
+  const handleNavClick = useCallback((navId: AdminSectionId) => {
     const nextNavId: AdminSectionId = activeNav === navId ? "centro" : navId;
     const navItem = NAVIGATION_DATA.find((item) => item.id === nextNavId);
     if (!navItem) return;
     setActiveNav(nextNavId);
     setActiveSub(navItem.subOptions[0]);
-  };
+  }, [activeNav]);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem("token");
+    localStorage.removeItem("accessToken");
     localStorage.removeItem("user");
     window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT));
     navigate("/");
-  };
+  }, [navigate]);
 
   const campNameById = useMemo(() => {
     const map = new Map<number, string>();
@@ -617,11 +631,44 @@ export default function AdminDashboardUiV2Page() {
     return { total, active, injured, missing };
   }, [persons]);
 
-  const admissionsQueue = admissions.filter((admission) => admission.status === "pending");
-  const admissionsHistory = admissions.filter((admission) => admission.status !== "pending");
+  const admissionsQueue = useMemo(() => admissions.filter((admission) => admission.status === "pending"), [admissions]);
+  const admissionsHistory = useMemo(() => admissions.filter((admission) => admission.status !== "pending"), [admissions]);
+  const pendingIntercampCount = useMemo(
+    () => intercampRequests.filter((item) => item.status === "PENDIENTE").length,
+    [intercampRequests],
+  );
+  const unreadNotificationsCount = useMemo(
+    () => notifications.filter((item) => !item.read).length,
+    [notifications],
+  );
+  const threatLevel = useMemo(
+    () => Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(
+          dashboardKpi.criticalResources * 15
+            + admissionsQueue.length * 8
+            + pendingIntercampCount * 7
+            + unreadNotificationsCount * 5,
+        ),
+      ),
+    ),
+    [dashboardKpi.criticalResources, admissionsQueue.length, pendingIntercampCount, unreadNotificationsCount],
+  );
 
   const activeNavData = NAVIGATION_DATA.find((item) => item.id === activeNav) ?? NAVIGATION_DATA[0];
   const isDashboardView = activeNav === "centro";
+
+  useEffect(() => {
+    if (!activeNavData.subOptions.includes(activeSub)) {
+      setActiveSub(activeNavData.subOptions[0]);
+    }
+  }, [activeNavData, activeSub]);
+
+  useEffect(() => {
+    localStorage.setItem(ADMIN_VIEW_STATE_KEY, JSON.stringify({ activeNav, activeSub }));
+  }, [activeNav, activeSub]);
 
   const handleAdmissionDecision = async (id: number, decision: "approved" | "rejected") => {
     try {
@@ -696,7 +743,6 @@ export default function AdminDashboardUiV2Page() {
                       persons={persons}
                       dashboardKpi={dashboardKpi}
                       notifications={notifications}
-                      countdown={countdown}
                       threatLevel={threatLevel}
                       populationStats={populationStats}
                       admissions={admissions}
@@ -734,7 +780,6 @@ export default function AdminDashboardUiV2Page() {
                         persons={persons}
                         dashboardKpi={dashboardKpi}
                         notifications={notifications}
-                        countdown={countdown}
                         threatLevel={threatLevel}
                         populationStats={populationStats}
                         admissions={admissions}
@@ -908,6 +953,11 @@ function SideMenu({ items, activeItem, onSelect }: { items: string[]; activeItem
   );
 }
 
+const MemoDashboardModule = memo(DashboardModule);
+const MemoPopulationModule = memo(PopulationModule);
+const MemoAdmissionsModule = memo(AdmissionsModule);
+const MemoExpeditionsModule = memo(ExpeditionsModule);
+
 function ContentArea({
   section,
   sub,
@@ -916,7 +966,6 @@ function ContentArea({
   persons,
   dashboardKpi,
   notifications,
-  countdown,
   threatLevel,
   populationStats,
   admissions,
@@ -945,7 +994,6 @@ function ContentArea({
   persons: Person[];
   dashboardKpi: DashboardKpi;
   notifications: UiNotification[];
-  countdown: { h: number; m: number; s: number };
   threatLevel: number;
   populationStats: { total: number; active: number; injured: number; missing: number };
   admissions: UiAdmission[];
@@ -967,6 +1015,15 @@ function ContentArea({
   onQuickNav: (id: AdminSectionId) => void;
   onSetDataError: (message: string | null) => void;
 }) {
+  const activeExpeditionsCount = useMemo(
+    () => expeditions.filter((item) => item.status !== "COMPLETADA").length,
+    [expeditions],
+  );
+  const filteredIntercampRequests = useMemo(
+    () => intercampRequests.filter((request) => (sub === "Pendientes" ? request.status === "PENDIENTE" : request.status !== "PENDIENTE")),
+    [intercampRequests, sub],
+  );
+
   return (
     <div className="admin-ui-v2-content">
       <div className="admin-ui-v2-meta">
@@ -979,14 +1036,13 @@ function ContentArea({
       {dataError && <PanelMessage label={dataError} type="error" />}
 
       {section === "centro" && (
-        <DashboardModule
+        <MemoDashboardModule
           kpi={dashboardKpi}
           populationStats={populationStats}
           admissionsQueue={admissionsQueue.length}
-          activeExpeditions={expeditions.filter((item) => item.status !== "COMPLETADA").length}
+          activeExpeditions={activeExpeditionsCount}
           intercampCount={intercampRequests.length}
           notifications={notifications}
-          countdown={countdown}
           threatLevel={threatLevel}
           onReload={onDashboardReload}
           onQuickNav={onQuickNav}
@@ -994,7 +1050,7 @@ function ContentArea({
       )}
 
       {section === "poblacion" && (
-        <PopulationModule
+        <MemoPopulationModule
           sub={sub}
           persons={persons}
           camps={campNameById}
@@ -1005,7 +1061,7 @@ function ContentArea({
       )}
 
       {section === "admisiones" && (
-        <AdmissionsModule
+        <MemoAdmissionsModule
           sub={sub}
           admissions={admissions}
           admissionsQueue={admissionsQueue}
@@ -1015,7 +1071,7 @@ function ContentArea({
       )}
 
       {section === "expediciones" && (
-        <ExpeditionsModule
+        <MemoExpeditionsModule
           sub={sub}
           expeditions={expeditions}
           campCatalog={campCatalog}
@@ -1049,9 +1105,7 @@ function ContentArea({
               </tr>
             </thead>
             <tbody>
-              {intercampRequests
-                .filter((request) => (sub === "Pendientes" ? request.status === "PENDIENTE" : request.status !== "PENDIENTE"))
-                .map((request) => (
+              {filteredIntercampRequests.map((request) => (
                   <tr key={request.id}>
                     <td>#{request.id}</td>
                     <td>{request.from}</td>
@@ -1102,7 +1156,6 @@ function DashboardModule({
   activeExpeditions,
   intercampCount,
   notifications,
-  countdown,
   threatLevel,
   onReload,
   onQuickNav,
@@ -1113,11 +1166,33 @@ function DashboardModule({
   activeExpeditions: number;
   intercampCount: number;
   notifications: UiNotification[];
-  countdown: { h: number; m: number; s: number };
   threatLevel: number;
   onReload: () => Promise<void>;
   onQuickNav: (id: AdminSectionId) => void;
 }) {
+  const [countdown, setCountdown] = useState({ h: 0, m: 0, s: 0 });
+
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const target = new Date(now);
+      target.setHours(18, 0, 0, 0);
+      if (target.getTime() <= now.getTime()) {
+        target.setDate(target.getDate() + 1);
+      }
+      const remainingMs = Math.max(0, target.getTime() - now.getTime());
+      const totalSeconds = Math.floor(remainingMs / 1000);
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      setCountdown((prev) => (prev.h === h && prev.m === m && prev.s === s ? prev : { h, m, s }));
+    };
+
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const populationTotal = kpi.populationTotal || populationStats.total;
   const activePopulation = kpi.activePopulation || populationStats.active;
   const injuredPopulation = kpi.injuredPopulation || populationStats.injured;
@@ -1334,12 +1409,13 @@ function PopulationModule({
   onError: (message: string | null) => void;
 }) {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"Todos" | "Activo" | "Herido" | "Desaparecido" | "Fallecido">("Todos");
+  const [statusFilter, setStatusFilter] = useState<"Todos" | "Activo" | "Herido" | "Enfermo" | "Expedicion" | "Fuera del campamento" | "Inactivo">("Todos");
   const [userPage, setUserPage] = useState(1);
   const usersPerPage = 8;
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     firstName: "",
     lastName: "",
@@ -1348,6 +1424,7 @@ function PopulationModule({
     campId: 0,
     occupationId: 0,
     notes: "",
+    accountStatus: "ACTIVE" as "ACTIVE" | "BLOCKED" | "INACTIVE",
   });
 
   const [assignments, setAssignments] = useState<TempRoleAssignment[]>(INITIAL_TEMP_ASSIGNMENTS);
@@ -1424,7 +1501,7 @@ function PopulationModule({
         acc[label] += 1;
         return acc;
       },
-      { Activo: 0, Herido: 0, Enfermo: 0, Fuera: 0 },
+      { Activo: 0, Herido: 0, Enfermo: 0, Expedicion: 0, "Fuera del campamento": 0, Inactivo: 0 },
     );
   }, [persons]);
 
@@ -1442,13 +1519,14 @@ function PopulationModule({
     setSelectedPerson(person);
     setIsEditMode(editMode);
     setEditForm({
-      firstName: person.firstName,
-      lastName: person.lastName,
+      firstName: person.firstName ?? "",
+      lastName: person.lastName ?? "",
       age: person.age,
       status: person.status,
       campId: person.campId,
       occupationId: person.occupationId,
       notes: person.notes ?? "",
+      accountStatus: person.accountStatus ?? "ACTIVE",
     });
   };
 
@@ -1456,6 +1534,7 @@ function PopulationModule({
     if (isSaving) return;
     setSelectedPerson(null);
     setIsEditMode(false);
+    setSaveMessage(null);
   };
 
   const handleDeletePerson = async (personId: number) => {
@@ -1477,20 +1556,60 @@ function PopulationModule({
     if (!selectedPerson) return;
 
     setIsSaving(true);
+    setSaveMessage(null);
     onError(null);
     try {
-      await updatePerson(selectedPerson.id, {
-        firstName: editForm.firstName.trim(),
-        lastName: editForm.lastName.trim(),
+      const normalizedFirstName = String(editForm.firstName ?? "").trim();
+      const normalizedLastName = String(editForm.lastName ?? "").trim();
+      const normalizedNotes = String(editForm.notes ?? "").trim();
+
+      if (!normalizedFirstName || !normalizedLastName) {
+        setSaveMessage("Nombre y apellido son obligatorios.");
+        return;
+      }
+
+      const payload = {
+        firstName: normalizedFirstName,
+        lastName: normalizedLastName,
         age: Number(editForm.age),
         status: editForm.status,
+        currentStatus: editForm.status,
         campId: Number(editForm.campId),
         occupationId: Number(editForm.occupationId),
-        notes: editForm.notes.trim() || undefined,
-      });
+        notes: normalizedNotes || undefined,
+      };
+
+      try {
+        await updatePerson(selectedPerson.id, {
+          ...payload,
+          accountStatus: editForm.accountStatus,
+        });
+      } catch (error) {
+        if (!(error instanceof ApiHttpError) || error.statusCode !== 400) {
+          throw error;
+        }
+
+        await updatePerson(selectedPerson.id, payload);
+      }
+
       await onReload();
+      setSaveMessage("Cambios guardados correctamente.");
       setIsEditMode(false);
-      setSelectedPerson(null);
+      setSelectedPerson((prev) =>
+        prev
+          ? {
+              ...prev,
+              firstName: payload.firstName,
+              lastName: payload.lastName,
+              age: payload.age,
+              status: payload.status,
+              campId: payload.campId,
+              occupationId: payload.occupationId,
+              notes: payload.notes,
+              accountStatus: editForm.accountStatus,
+            }
+          : prev,
+      );
     } catch (error) {
       onError(error instanceof Error ? error.message : "No se pudo actualizar la persona");
     } finally {
@@ -1531,24 +1650,32 @@ function PopulationModule({
     );
   };
 
-  const legacyFilterFromStatus = (value: typeof statusFilter): "Todos" | "Activo" | "Herido" | "Enfermo" | "Fuera" => {
+  const legacyFilterFromStatus = (value: typeof statusFilter): "Todos" | "Activo" | "Herido" | "Enfermo" | "Expedicion" | "Fuera del campamento" | "Inactivo" => {
     if (value === "Todos") return "Todos";
     if (value === "Activo") return "Activo";
     if (value === "Herido") return "Herido";
-    return "Fuera";
+    if (value === "Enfermo") return "Enfermo";
+    if (value === "Expedicion") return "Expedicion";
+    if (value === "Inactivo") return "Inactivo";
+    return "Fuera del campamento";
   };
 
-  const legacyToStatusFilter = (value: "Todos" | "Activo" | "Herido" | "Enfermo" | "Fuera"): typeof statusFilter => {
+  const legacyToStatusFilter = (value: "Todos" | "Activo" | "Herido" | "Enfermo" | "Expedicion" | "Fuera del campamento" | "Inactivo"): typeof statusFilter => {
     if (value === "Todos") return "Todos";
     if (value === "Activo") return "Activo";
     if (value === "Herido") return "Herido";
-    return "Desaparecido";
+    if (value === "Enfermo") return "Enfermo";
+    if (value === "Expedicion") return "Expedicion";
+    if (value === "Inactivo") return "Inactivo";
+    return "Fuera del campamento";
   };
 
-  const statusPillFromLegacy = (value: "Activo" | "Herido" | "Enfermo" | "Fuera") => {
+  const statusPillFromLegacy = (value: "Activo" | "Herido" | "Enfermo" | "Expedicion" | "Fuera del campamento" | "Inactivo") => {
     if (value === "Activo") return "is-ok";
     if (value === "Herido") return "is-warn";
     if (value === "Enfermo") return "is-warn";
+    if (value === "Expedicion") return "is-info";
+    if (value === "Inactivo") return "is-neutral";
     return "is-danger";
   };
 
@@ -1560,7 +1687,12 @@ function PopulationModule({
             <MetricCard label="Activo" value={legacyCounts.Activo} tone="ok" />
             <MetricCard label="Herido" value={legacyCounts.Herido} tone="warn" />
             <MetricCard label="Enfermo" value={legacyCounts.Enfermo} tone="warn" />
-            <MetricCard label="Fuera" value={legacyCounts.Fuera} tone="danger" />
+            <MetricCard label="Expedición" value={legacyCounts.Expedicion} tone="info" />
+          </div>
+
+          <div className="admin-ui-v2-grid admin-ui-v2-grid-2">
+            <MetricCard label="Fuera del campamento" value={legacyCounts["Fuera del campamento"]} tone="danger" />
+            <MetricCard label="Inactivo" value={legacyCounts.Inactivo} tone="danger" />
           </div>
 
           <div className="admin-ui-v2-grid admin-ui-v2-grid-2">
@@ -1603,7 +1735,7 @@ function PopulationModule({
               onChange={(event) => setSearch(event.target.value)}
             />
             <div className="admin-ui-v2-filter-group">
-              {(["Todos", "Activo", "Herido", "Enfermo", "Fuera"] as const).map((legacyFilter) => (
+              {(["Todos", "Activo", "Herido", "Enfermo", "Expedicion", "Fuera del campamento", "Inactivo"] as const).map((legacyFilter) => (
                 <button
                   key={legacyFilter}
                   className={`admin-ui-v2-btn ${legacyFilterFromStatus(statusFilter) === legacyFilter ? "is-info" : ""}`}
@@ -1622,6 +1754,7 @@ function PopulationModule({
                 <th>Nombre</th>
                 <th>Rol</th>
                 <th>Estado</th>
+                <th>Cuenta</th>
                 <th>Edad</th>
                 <th>Sector</th>
                 <th>Ingreso</th>
@@ -1647,9 +1780,14 @@ function PopulationModule({
                       {legacyPopulationStatus(person.status)}
                     </span>
                   </td>
+                  <td>
+                    <span className={`admin-ui-v2-pill ${person.accountStatus === "ACTIVE" ? "is-ok" : person.accountStatus === "BLOCKED" ? "is-warn" : "is-danger"}`}>
+                      {person.accountStatus ?? "ACTIVE"}
+                    </span>
+                  </td>
                   <td>{person.age}</td>
                   <td>{camps.get(person.campId) ?? `Camp #${person.campId}`}</td>
-                  <td>{new Date(person.admissionDate).toLocaleDateString("es-CR")}</td>
+                  <td>{formatAdmissionDate(person.admissionDate)}</td>
                   <td>
                     <div className="admin-ui-v2-actions">
                       <button className="admin-ui-v2-btn" onClick={() => openPersonModal(person, false)} type="button">Ver</button>
@@ -1661,7 +1799,7 @@ function PopulationModule({
               ))}
               {filteredPersons.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="admin-ui-v2-empty-cell">No hay personas para mostrar con esos filtros.</td>
+                    <td colSpan={8} className="admin-ui-v2-empty-cell">No hay personas para mostrar con esos filtros.</td>
                 </tr>
               )}
             </tbody>
@@ -1793,14 +1931,22 @@ function PopulationModule({
 
             {isEditMode ? (
               <div className="admin-ui-v2-form-grid">
+                {saveMessage && <div className="admin-ui-v2-pill is-ok">{saveMessage}</div>}
                 <input className="v-input" value={editForm.firstName} onChange={(event) => setEditForm((prev) => ({ ...prev, firstName: event.target.value }))} placeholder="Nombre" />
                 <input className="v-input" value={editForm.lastName} onChange={(event) => setEditForm((prev) => ({ ...prev, lastName: event.target.value }))} placeholder="Apellido" />
                 <input className="v-input" type="number" value={editForm.age} onChange={(event) => setEditForm((prev) => ({ ...prev, age: Number(event.target.value) }))} placeholder="Edad" />
                 <select className="v-select" value={editForm.status} onChange={(event) => setEditForm((prev) => ({ ...prev, status: event.target.value as Person["status"] }))}>
                   <option value="ACTIVE">Activo</option>
+                  <option value="SICK">Enfermo</option>
                   <option value="INJURED">Herido</option>
-                  <option value="MISSING">Desaparecido</option>
-                  <option value="DECEASED">Fallecido</option>
+                  <option value="ON_EXPEDITION">En expedición</option>
+                  <option value="OUTSIDE_CAMP">Fuera del campamento</option>
+                  <option value="INACTIVE">Inactivo</option>
+                </select>
+                <select className="v-select" value={editForm.accountStatus} onChange={(event) => setEditForm((prev) => ({ ...prev, accountStatus: event.target.value as "ACTIVE" | "BLOCKED" | "INACTIVE" }))}>
+                  <option value="ACTIVE">Cuenta activa</option>
+                  <option value="BLOCKED">Cuenta bloqueada</option>
+                  <option value="INACTIVE">Cuenta inactiva</option>
                 </select>
                 <select className="v-select" value={editForm.campId} onChange={(event) => setEditForm((prev) => ({ ...prev, campId: Number(event.target.value) }))}>
                   {Array.from(camps.entries()).map(([id, name]) => (
@@ -1823,9 +1969,10 @@ function PopulationModule({
                 <div><strong>Nombre:</strong> {personFullName(selectedPerson)}</div>
                 <div><strong>Edad:</strong> {selectedPerson.age}</div>
                 <div><strong>Estado:</strong> {normalizeStatusLabel(selectedPerson.status)}</div>
+                <div><strong>Estado de cuenta:</strong> {selectedPerson.accountStatus ?? "ACTIVE"}</div>
                 <div><strong>Rol:</strong> {occupations.get(selectedPerson.occupationId) ?? `Ocupación #${selectedPerson.occupationId}`}</div>
                 <div><strong>Sector:</strong> {camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}</div>
-                <div><strong>Ingreso:</strong> {new Date(selectedPerson.admissionDate).toLocaleDateString("es-CR")}</div>
+                <div><strong>Ingreso:</strong> {formatAdmissionDate(selectedPerson.admissionDate)}</div>
                 <div><strong>Notas:</strong> {selectedPerson.notes || "Sin notas"}</div>
                 <div className="admin-ui-v2-actions">
                   <button className="admin-ui-v2-btn is-info" onClick={() => setIsEditMode(true)} type="button">Editar</button>

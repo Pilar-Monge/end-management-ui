@@ -24,5 +24,15 @@ export async function loginRequest(form: LoginForm): Promise<LoginApiResponse> {
   const data = await res.json()
   if (!res.ok) throw new Error(data.message || 'Error al iniciar sesión')
 
-  return data.data
+  const payload = data.data as LoginApiResponse
+  const token = payload.token ?? payload.accessToken
+  if (!token) {
+    throw new Error('Respuesta de login sin token de acceso')
+  }
+
+  return {
+    ...payload,
+    token,
+    accessToken: token,
+  }
 }

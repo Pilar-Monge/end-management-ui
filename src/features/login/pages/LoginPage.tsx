@@ -59,11 +59,25 @@ export default function LoginPage() {
         ...response.user,
         role: normalizeUserRole(response.user.rol),
       }
+      const token = response.token ?? response.accessToken
+      const savedPath = localStorage.getItem('last_secure_path')
 
-      localStorage.setItem('token', response.token)
+      if (!token) {
+        throw new Error('No se recibió token de acceso')
+      }
+
+      localStorage.setItem('token', token)
+      localStorage.setItem('accessToken', token)
       localStorage.setItem('user', JSON.stringify(normalizedUser))
       window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
-      navigate(getPostLoginRoute(normalizedUser.role), { replace: true })
+
+      const defaultRoute = getPostLoginRoute(normalizedUser.role)
+      const redirectPath =
+        normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard-ui-v2')
+          ? savedPath
+          : defaultRoute
+      localStorage.removeItem('last_secure_path')
+      navigate(redirectPath, { replace: true })
     } catch (error) {
       setErrors({
         general:

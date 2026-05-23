@@ -537,12 +537,20 @@ export function MainHomePage() {
   const authDispatch = useAuthDispatch()
   const containerRef = useRef<HTMLDivElement>(null)
   const initialAppState = (location.state as { initialAppState?: appState } | null)?.initialAppState
+  const sessionMessage = (location.state as { sessionMessage?: string } | null)?.sessionMessage
 
   const [appState, setAppState] = useState<appState>(initialAppState ?? 'landing')
   const [selectedCamp, setSelectedCamp] = useState<any>(null)
   const [currentMode, setCurrentMode] = useState<Mode>('Storm')
   const [storyIndex, setStoryIndex] = useState(-1)
   const [isTransitioning, setIsTransitioning] = useState(false)
+
+  useEffect(() => {
+    if (sessionMessage) {
+      setAppState('login')
+      setAuthErrors((prev) => ({ ...prev, general: sessionMessage }))
+    }
+  }, [sessionMessage])
 
   useEffect(() => {
     if (appState === 'intro') {
@@ -696,10 +704,25 @@ export function MainHomePage() {
         ...response.user,
         role: normalizeUserRole(response.user.rol),
       }
-      localStorage.setItem('token', response.token)
-      localStorage.setItem('user', JSON.stringify(normalizedUser))
+      const token = response.token ?? response.accessToken
+      const savedPath = localStorage.getItem('last_secure_path')
+
+      if (!token) {
+        throw new Error('No se recibio token de acceso')
+      }
+
+      localStorage.setItem('token', token)
+      localStorage.setItem('accessToken', token)
       window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
-      navigate(getPostLoginRoute(normalizedUser.role), { replace: true })
+      localStorage.setItem('user', JSON.stringify(normalizedUser))
+
+      const defaultRoute = getPostLoginRoute(normalizedUser.role)
+      const redirectPath =
+        normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard-ui-v2')
+          ? savedPath
+          : defaultRoute
+      localStorage.removeItem('last_secure_path')
+      navigate(redirectPath, { replace: true })
     } catch (error) {
       setAuthErrors({
         general:

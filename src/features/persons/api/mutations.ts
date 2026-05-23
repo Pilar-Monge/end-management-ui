@@ -8,13 +8,20 @@ import type {
 } from '../types'
 import { ENDPOINTS, personsKeys } from './keys'
 
-const getToken = () => localStorage.getItem('token')
+const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('accessToken')
 
 function buildHeaders() {
   return {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${getToken()}`,
   }
+}
+
+function unwrapPayload<T>(payload: unknown): T {
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    return (payload as { data: T }).data
+  }
+  return payload as T
 }
 
 export async function createPerson(data: CreatePersonRequest): Promise<Person> {
@@ -25,7 +32,8 @@ export async function createPerson(data: CreatePersonRequest): Promise<Person> {
   })
 
   if (!res.ok) throw new Error('Failed to create person')
-  return res.json()
+  const payload = await res.json()
+  return unwrapPayload<Person>(payload)
 }
 
 export function useCreatePerson(
@@ -51,7 +59,8 @@ export async function updatePerson(id: number, data: UpdatePersonRequest): Promi
   })
 
   if (!res.ok) throw new Error('Failed to update person')
-  return res.json()
+  const payload = await res.json()
+  return unwrapPayload<Person>(payload)
 }
 
 export function useUpdatePerson(
@@ -109,7 +118,8 @@ export async function updatePersonStatus(
   })
 
   if (!res.ok) throw new Error('Failed to update person status')
-  return res.json()
+  const payload = await res.json()
+  return unwrapPayload<Person>(payload)
 }
 
 export function useUpdatePersonStatus(
