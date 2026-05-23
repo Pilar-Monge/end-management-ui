@@ -3,13 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"
+    />
     <meta name="orientation" content="landscape" />
     <meta name="screen-orientation" content="landscape" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="END Management" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no"
+    />
     <title>END MANAGEMENT — Survival System</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -53,20 +59,22 @@
   <body>
     <div id="root"></div>
     <script>
-      (function() {
+      ;(function () {
         function lockOrientation() {
-          const isMobile = /iPhone|iPad|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-          if (!isMobile) return;
-          
+          const isMobile = /iPhone|iPad|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
+            navigator.userAgent,
+          )
+          if (!isMobile) return
+
           if (window.screen?.orientation?.lock) {
-            window.screen.orientation.lock('landscape').catch(() => {});
+            window.screen.orientation.lock('landscape').catch(() => {})
           }
         }
-        
-        lockOrientation();
-        
-        window.addEventListener('orientationchange', lockOrientation);
-      })();
+
+        lockOrientation()
+
+        window.addEventListener('orientationchange', lockOrientation)
+      })()
     </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>

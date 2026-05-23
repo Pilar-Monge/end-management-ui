@@ -1,34 +1,34 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react'
 
-export type ResourceZoomTarget = 'station' | 'meat' | 'beer' | null;
+export type ResourceZoomTarget = 'station' | 'meat' | 'beer' | null
 export function useResourceCamera() {
-  const [zoomedTarget, setZoomedTarget] = useState<ResourceZoomTarget>(null);
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [zoomedTarget, setZoomedTarget] = useState<ResourceZoomTarget>(null)
+  const [isAnimating, setIsAnimating] = useState(false)
 
   const zoomToStation = useCallback(() => {
-    setIsAnimating(true);
-    setZoomedTarget('station');
-  }, []);
+    setIsAnimating(true)
+    setZoomedTarget('station')
+  }, [])
 
   const zoomToMeat = useCallback(() => {
-    setIsAnimating(true);
-    setZoomedTarget('meat');
-  }, []);
+    setIsAnimating(true)
+    setZoomedTarget('meat')
+  }, [])
 
   const zoomToBeer = useCallback(() => {
-    setIsAnimating(true);
-    setZoomedTarget('beer');
-  }, []);
+    setIsAnimating(true)
+    setZoomedTarget('beer')
+  }, [])
 
   const resetCamera = useCallback(() => {
-    setIsAnimating(true);
-    setZoomedTarget(null);
-  }, []);
+    setIsAnimating(true)
+    setZoomedTarget(null)
+  }, [])
 
   const cancelZoom = useCallback(() => {
-    setIsAnimating(false);
-    setZoomedTarget(null);
-  }, []);
+    setIsAnimating(false)
+    setZoomedTarget(null)
+  }, [])
 
   return {
     zoomedTarget,
@@ -38,5 +38,5 @@ export function useResourceCamera() {
     zoomToBeer,
     resetCamera,
     cancelZoom,
-  };
+  }
 }

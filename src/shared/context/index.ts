@@ -6,4 +6,4 @@ export {
   type User,
   type AuthState,
   type AuthAction,
-} from './AuthContext';
+} from './AuthContext'

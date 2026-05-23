@@ -70,18 +70,19 @@ import { prefetchExpeditionsWorldMap } from "../expeditions/components/Expeditio
 
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Permanent+Marker&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');`;
 
+const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Permanent+Marker&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');`
 
 type NavSection =
-  | "CENTRO DE MANDO"
-  | "POBLACIÓN"
-  | "ADMISIONES IA"
-  | "INVENTARIO"
-  | "EXPEDICIONES"
-  | "INTER-CAMPAMENTOS"
-  | "SEGURIDAD / LOGS"
-  | "LOGROS"
-  | "NOTIFICACIONES"
-  | "CONFIGURACIÓN";
+  | 'CENTRO DE MANDO'
+  | 'POBLACIÓN'
+  | 'ADMISIONES IA'
+  | 'INVENTARIO'
+  | 'EXPEDICIONES'
+  | 'INTER-CAMPAMENTOS'
+  | 'SEGURIDAD / LOGS'
+  | 'LOGROS'
+  | 'NOTIFICACIONES'
+  | 'CONFIGURACIÓN'
 
 type PopulationViewMode = "stats" | "users" | "tempRoles";
 type AdmissionsViewMode = "queue" | "history";
@@ -120,7 +121,7 @@ const UI_COLORS = {
     info: "#67ACA9",
     system: "#89A9AA",
   },
-} as const;
+} as const
 
 const MOTION = {
   fast: { duration: 0.16, ease: "easeOut" as const },
@@ -160,24 +161,24 @@ interface Person {
 }
 
 interface Admission {
-  id: number;
-  name: string;
-  profession: string;
-  score: number;
-  badge: string | null;
-  status: "pending" | "approved" | "rejected";
-  skills: string[];
-  reason: string;
+  id: number
+  name: string
+  profession: string
+  score: number
+  badge: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  skills: string[]
+  reason: string
 }
 
 interface InventoryItem {
-  id: number;
-  name: string;
-  category: string;
-  pct: number;
-  units: number;
-  max: number;
-  status: "CRÍTICO" | "BAJO" | "NORMAL" | "OK";
+  id: number
+  name: string
+  category: string
+  pct: number
+  units: number
+  max: number
+  status: 'CRÍTICO' | 'BAJO' | 'NORMAL' | 'OK'
 }
 
 interface TempOccupationAssignment {
@@ -219,41 +220,41 @@ interface DailyCollection {
 }
 
 interface Expedition {
-  id: number;
-  name: string;
-  day: number;
-  total: number;
-  participants: string[];
-  status: "EN CURSO" | "PROGRAMADA" | "REGRESANDO" | "COMPLETADA";
-  objective: string;
-  sector: string;
+  id: number
+  name: string
+  day: number
+  total: number
+  participants: string[]
+  status: 'EN CURSO' | 'PROGRAMADA' | 'REGRESANDO' | 'COMPLETADA'
+  objective: string
+  sector: string
 }
 
 interface IntercampRequest {
-  id: number;
-  from: string;
-  text: string;
-  time: string;
-  status: "PENDIENTE" | "APROBADO" | "RECHAZADO" | "CONFIRMADO";
-  urgent: boolean;
-  type: "solicitud" | "traslado" | "oferta";
+  id: number
+  from: string
+  text: string
+  time: string
+  status: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | 'CONFIRMADO'
+  urgent: boolean
+  type: 'solicitud' | 'traslado' | 'oferta'
 }
 
 interface LogEntry {
-  id: number;
-  time: string;
-  level: "info" | "warn" | "error" | "system";
-  user: string;
-  action: string;
+  id: number
+  time: string
+  level: 'info' | 'warn' | 'error' | 'system'
+  user: string
+  action: string
 }
 
 interface Notification {
-  id: number;
-  title: string;
-  body: string;
-  time: string;
-  read: boolean;
-  level: "critical" | "warning" | "info";
+  id: number
+  title: string
+  body: string
+  time: string
+  read: boolean
+  level: 'critical' | 'warning' | 'info'
 }
 
 const INVENTORY_CATEGORY_MAP: Record<BackendResourceType["category"], string> = {
@@ -306,22 +307,90 @@ const INITIAL_PERSONS: Person[] = [
 ];
 
 const INITIAL_ADMISSIONS: Admission[] = [
-  { id: 1, name: "María González", profession: "Médica", score: 94, badge: null, status: "pending", skills: ["Cirugía", "Primeros Auxilios", "Farmacología"], reason: "Encontrada en sector norte, documentos verificados." },
-  { id: 2, name: "Roberto Soto", profession: "Mecánico", score: 78, badge: null, status: "pending", skills: ["Motores", "Soldadura", "Electricidad"], reason: "Grupo de 3 personas, referenciado por Expedición Norte." },
-  { id: 3, name: "Unnamed", profession: "Desconocido", score: 12, badge: "SOSPECHOSO", status: "pending", skills: [], reason: "Sin documentos. Comportamiento errático. Revisión IA: posible infección." },
-  { id: 4, name: "Luis Mora", profession: "Agricultor", score: 67, badge: null, status: "pending", skills: ["Cultivos", "Riego", "Conservas"], reason: "Llega con semillas y herramientas propias." },
-];
+  {
+    id: 1,
+    name: 'María González',
+    profession: 'Médica',
+    score: 94,
+    badge: null,
+    status: 'pending',
+    skills: ['Cirugía', 'Primeros Auxilios', 'Farmacología'],
+    reason: 'Encontrada en sector norte, documentos verificados.',
+  },
+  {
+    id: 2,
+    name: 'Roberto Soto',
+    profession: 'Mecánico',
+    score: 78,
+    badge: null,
+    status: 'pending',
+    skills: ['Motores', 'Soldadura', 'Electricidad'],
+    reason: 'Grupo de 3 personas, referenciado por Expedición Norte.',
+  },
+  {
+    id: 3,
+    name: 'Unnamed',
+    profession: 'Desconocido',
+    score: 12,
+    badge: 'SOSPECHOSO',
+    status: 'pending',
+    skills: [],
+    reason: 'Sin documentos. Comportamiento errático. Revisión IA: posible infección.',
+  },
+  {
+    id: 4,
+    name: 'Luis Mora',
+    profession: 'Agricultor',
+    score: 67,
+    badge: null,
+    status: 'pending',
+    skills: ['Cultivos', 'Riego', 'Conservas'],
+    reason: 'Llega con semillas y herramientas propias.',
+  },
+]
 
 const INITIAL_INVENTORY: InventoryItem[] = [
-  { id: 1, name: "Agua potable", category: "Esencial", pct: 8, units: 240, max: 3000, status: "CRÍTICO" },
-  { id: 2, name: "Raciones de comida", category: "Esencial", pct: 23, units: 690, max: 3000, status: "BAJO" },
-  { id: 3, name: "Medicamentos", category: "Médico", pct: 15, units: 150, max: 1000, status: "CRÍTICO" },
-  { id: 4, name: "Munición", category: "Defensa", pct: 67, units: 2010, max: 3000, status: "OK" },
-  { id: 5, name: "Baterías", category: "Energía", pct: 45, units: 360, max: 800, status: "NORMAL" },
-  { id: 6, name: "Higiene", category: "Bienestar", pct: 31, units: 248, max: 800, status: "BAJO" },
-  { id: 7, name: "Combustible", category: "Energía", pct: 52, units: 520, max: 1000, status: "NORMAL" },
-  { id: 8, name: "Semillas", category: "Agricultura", pct: 75, units: 300, max: 400, status: "OK" },
-];
+  {
+    id: 1,
+    name: 'Agua potable',
+    category: 'Esencial',
+    pct: 8,
+    units: 240,
+    max: 3000,
+    status: 'CRÍTICO',
+  },
+  {
+    id: 2,
+    name: 'Raciones de comida',
+    category: 'Esencial',
+    pct: 23,
+    units: 690,
+    max: 3000,
+    status: 'BAJO',
+  },
+  {
+    id: 3,
+    name: 'Medicamentos',
+    category: 'Médico',
+    pct: 15,
+    units: 150,
+    max: 1000,
+    status: 'CRÍTICO',
+  },
+  { id: 4, name: 'Munición', category: 'Defensa', pct: 67, units: 2010, max: 3000, status: 'OK' },
+  { id: 5, name: 'Baterías', category: 'Energía', pct: 45, units: 360, max: 800, status: 'NORMAL' },
+  { id: 6, name: 'Higiene', category: 'Bienestar', pct: 31, units: 248, max: 800, status: 'BAJO' },
+  {
+    id: 7,
+    name: 'Combustible',
+    category: 'Energía',
+    pct: 52,
+    units: 520,
+    max: 1000,
+    status: 'NORMAL',
+  },
+  { id: 8, name: 'Semillas', category: 'Agricultura', pct: 75, units: 300, max: 400, status: 'OK' },
+]
 
 const INITIAL_TEMP_ASSIGNMENTS: TempOccupationAssignment[] = [
   {
@@ -370,11 +439,47 @@ const INITIAL_COLLECTIONS: DailyCollection[] = [
 
 //  INITIAL DATA 
 const INITIAL_EXPEDITIONS: Expedition[] = [
-  { id: 1, name: "EXPEDICIÓN NORTE", day: 3, total: 5, participants: ["JR", "MA", "PC", "LS", "KT"], status: "EN CURSO", objective: "Buscar suministros médicos en hospital abandonado.", sector: "Sector Norte — 12km" },
-  { id: 2, name: "EXPLORACIÓN SECTOR 7", day: 0, total: 5, participants: ["DN", "AS", "FG", "JL"], status: "PROGRAMADA", objective: "Reconocimiento de rutas alternativas.", sector: "Sector Este — 8km" },
-  { id: 3, name: "RETORNO GRUPO DELTA", day: 4, total: 5, participants: ["CA", "MT", "PB", "RQ", "EV"], status: "REGRESANDO", objective: "Recolección de agua y filtros.", sector: "Sector Sur — 5km" },
-  { id: 4, name: "MISIÓN SUMINISTROS", day: 5, total: 5, participants: ["WN", "SK", "LR", "PR", "YU"], status: "COMPLETADA", objective: "Recuperar generadores.", sector: "Sector Oeste — 15km" },
-];
+  {
+    id: 1,
+    name: 'EXPEDICIÓN NORTE',
+    day: 3,
+    total: 5,
+    participants: ['JR', 'MA', 'PC', 'LS', 'KT'],
+    status: 'EN CURSO',
+    objective: 'Buscar suministros médicos en hospital abandonado.',
+    sector: 'Sector Norte — 12km',
+  },
+  {
+    id: 2,
+    name: 'EXPLORACIÓN SECTOR 7',
+    day: 0,
+    total: 5,
+    participants: ['DN', 'AS', 'FG', 'JL'],
+    status: 'PROGRAMADA',
+    objective: 'Reconocimiento de rutas alternativas.',
+    sector: 'Sector Este — 8km',
+  },
+  {
+    id: 3,
+    name: 'RETORNO GRUPO DELTA',
+    day: 4,
+    total: 5,
+    participants: ['CA', 'MT', 'PB', 'RQ', 'EV'],
+    status: 'REGRESANDO',
+    objective: 'Recolección de agua y filtros.',
+    sector: 'Sector Sur — 5km',
+  },
+  {
+    id: 4,
+    name: 'MISIÓN SUMINISTROS',
+    day: 5,
+    total: 5,
+    participants: ['WN', 'SK', 'LR', 'PR', 'YU'],
+    status: 'COMPLETADA',
+    objective: 'Recuperar generadores.',
+    sector: 'Sector Oeste — 15km',
+  },
+]
 
 const INITIAL_EXP_CONSUMED: ExpeditionResourceEntry[] = [
   { id: 1, expeditionId: 1, resource: "Agua potable", amount: 35, date: "D-47 09:00", notes: "Raciones de salida" },
@@ -387,46 +492,194 @@ const INITIAL_EXP_GAINED: ExpeditionResourceEntry[] = [
 ];
 
 const INITIAL_INTERCAMP: IntercampRequest[] = [
-  { id: 1, from: "CAMPAMENTO BETA", text: "Solicita 50 raciones de comida urgente", time: "hace 2h", status: "PENDIENTE", urgent: true, type: "solicitud" },
-  { id: 2, from: "CAMPAMENTO GAMMA", text: "Envía 3 personas especializadas (médicos)", time: "hace 1d", status: "APROBADO", urgent: false, type: "oferta" },
-  { id: 3, from: "CAMPAMENTO DELTA", text: "Solicita 10 médicos para brote de infección", time: "hace 3h", status: "PENDIENTE", urgent: false, type: "solicitud" },
-  { id: 4, from: "CAMPAMENTO BETA", text: "Traslado programado — BETA a ALFA", time: "Mañana 08:00", status: "CONFIRMADO", urgent: false, type: "traslado" },
-  { id: 5, from: "CAMPAMENTO ÉPSILON", text: "Ofrece intercambio: munición por agua", time: "hace 5h", status: "PENDIENTE", urgent: false, type: "solicitud" },
-];
+  {
+    id: 1,
+    from: 'CAMPAMENTO BETA',
+    text: 'Solicita 50 raciones de comida urgente',
+    time: 'hace 2h',
+    status: 'PENDIENTE',
+    urgent: true,
+    type: 'solicitud',
+  },
+  {
+    id: 2,
+    from: 'CAMPAMENTO GAMMA',
+    text: 'Envía 3 personas especializadas (médicos)',
+    time: 'hace 1d',
+    status: 'APROBADO',
+    urgent: false,
+    type: 'oferta',
+  },
+  {
+    id: 3,
+    from: 'CAMPAMENTO DELTA',
+    text: 'Solicita 10 médicos para brote de infección',
+    time: 'hace 3h',
+    status: 'PENDIENTE',
+    urgent: false,
+    type: 'solicitud',
+  },
+  {
+    id: 4,
+    from: 'CAMPAMENTO BETA',
+    text: 'Traslado programado — BETA a ALFA',
+    time: 'Mañana 08:00',
+    status: 'CONFIRMADO',
+    urgent: false,
+    type: 'traslado',
+  },
+  {
+    id: 5,
+    from: 'CAMPAMENTO ÉPSILON',
+    text: 'Ofrece intercambio: munición por agua',
+    time: 'hace 5h',
+    status: 'PENDIENTE',
+    urgent: false,
+    type: 'solicitud',
+  },
+]
 
 const INITIAL_LOGS: LogEntry[] = [
-  { id: 1, time: "14:32", level: "info", user: "Admin Edicson", action: "LOGIN exitoso desde 192.168.1.1" },
-  { id: 2, time: "14:28", level: "info", user: "GestorRecursos_Ana", action: "INVENTARIO_EDIT — Agua potable: +50 unidades" },
-  { id: 3, time: "13:55", level: "info", user: "Trabajador_Jose", action: "BODEGA_CONSULTA — Sección Médicos" },
-  { id: 4, time: "13:30", level: "error", user: "Intento fallido", action: "LOGIN FALLIDO — IP: 192.168.1.45 (3 intentos)" },
-  { id: 5, time: "12:00", level: "info", user: "Encargado_Viajes", action: "EXPEDICION_CREAR — Exploración Sector 7" },
-  { id: 6, time: "11:45", level: "system", user: "SISTEMA", action: "CONSUMO_DIARIO_AUTO — -30 raciones, -10 agua" },
-  { id: 7, time: "10:15", level: "warn", user: "SISTEMA", action: "ALERTA_INVENTARIO — Medicamentos por debajo del 20%" },
-  { id: 8, time: "09:30", level: "info", user: "Admin Edicson", action: "ADMISION_APROBADA — María González" },
-  { id: 9, time: "08:00", level: "system", user: "SISTEMA", action: "REPORTE_NOCTURNO_ENVIADO — Día 47 del apocalipsis" },
-  { id: 10, time: "07:45", level: "warn", user: "SISTEMA", action: "ALERTA_EXPEDICION — Retorno Grupo Delta con 1h de retraso" },
-];
+  {
+    id: 1,
+    time: '14:32',
+    level: 'info',
+    user: 'Admin Edicson',
+    action: 'LOGIN exitoso desde 192.168.1.1',
+  },
+  {
+    id: 2,
+    time: '14:28',
+    level: 'info',
+    user: 'GestorRecursos_Ana',
+    action: 'INVENTARIO_EDIT — Agua potable: +50 unidades',
+  },
+  {
+    id: 3,
+    time: '13:55',
+    level: 'info',
+    user: 'Trabajador_Jose',
+    action: 'BODEGA_CONSULTA — Sección Médicos',
+  },
+  {
+    id: 4,
+    time: '13:30',
+    level: 'error',
+    user: 'Intento fallido',
+    action: 'LOGIN FALLIDO — IP: 192.168.1.45 (3 intentos)',
+  },
+  {
+    id: 5,
+    time: '12:00',
+    level: 'info',
+    user: 'Encargado_Viajes',
+    action: 'EXPEDICION_CREAR — Exploración Sector 7',
+  },
+  {
+    id: 6,
+    time: '11:45',
+    level: 'system',
+    user: 'SISTEMA',
+    action: 'CONSUMO_DIARIO_AUTO — -30 raciones, -10 agua',
+  },
+  {
+    id: 7,
+    time: '10:15',
+    level: 'warn',
+    user: 'SISTEMA',
+    action: 'ALERTA_INVENTARIO — Medicamentos por debajo del 20%',
+  },
+  {
+    id: 8,
+    time: '09:30',
+    level: 'info',
+    user: 'Admin Edicson',
+    action: 'ADMISION_APROBADA — María González',
+  },
+  {
+    id: 9,
+    time: '08:00',
+    level: 'system',
+    user: 'SISTEMA',
+    action: 'REPORTE_NOCTURNO_ENVIADO — Día 47 del apocalipsis',
+  },
+  {
+    id: 10,
+    time: '07:45',
+    level: 'warn',
+    user: 'SISTEMA',
+    action: 'ALERTA_EXPEDICION — Retorno Grupo Delta con 1h de retraso',
+  },
+]
 
 const INITIAL_NOTIFICATIONS: Notification[] = [
-  { id: 1, title: "ALERTA CRÍTICA: Agua potable", body: "Stock de agua al 8%. Acción inmediata requerida.", time: "hace 30min", read: false, level: "critical" },
-  { id: 2, title: "Admisión pendiente", body: "'Unnamed' con score 12 — revisión de seguridad necesaria.", time: "hace 45min", read: false, level: "critical" },
-  { id: 3, title: "Expedición Norte: Día 3/5", body: "Grupo en curso sin novedades reportadas.", time: "hace 2h", read: false, level: "info" },
-  { id: 4, title: "Solicitud inter-campamento urgente", body: "Campamento Beta solicita 50 raciones de comida.", time: "hace 2h", read: false, level: "warning" },
-  { id: 5, title: "Medicamentos al 15%", body: "Nivel crítico. Expedición de reabastecimiento sugerida.", time: "hace 3h", read: true, level: "critical" },
-  { id: 6, title: "Nuevo logro desbloqueado", body: "¡7 días sin bajas de vida completado!", time: "hace 1d", read: true, level: "info" },
-  { id: 7, title: "Intento de acceso no autorizado", body: "IP 192.168.1.45 — 3 intentos fallidos. Bloqueado.", time: "hace 1h", read: false, level: "warning" },
-];
+  {
+    id: 1,
+    title: 'ALERTA CRÍTICA: Agua potable',
+    body: 'Stock de agua al 8%. Acción inmediata requerida.',
+    time: 'hace 30min',
+    read: false,
+    level: 'critical',
+  },
+  {
+    id: 2,
+    title: 'Admisión pendiente',
+    body: "'Unnamed' con score 12 — revisión de seguridad necesaria.",
+    time: 'hace 45min',
+    read: false,
+    level: 'critical',
+  },
+  {
+    id: 3,
+    title: 'Expedición Norte: Día 3/5',
+    body: 'Grupo en curso sin novedades reportadas.',
+    time: 'hace 2h',
+    read: false,
+    level: 'info',
+  },
+  {
+    id: 4,
+    title: 'Solicitud inter-campamento urgente',
+    body: 'Campamento Beta solicita 50 raciones de comida.',
+    time: 'hace 2h',
+    read: false,
+    level: 'warning',
+  },
+  {
+    id: 5,
+    title: 'Medicamentos al 15%',
+    body: 'Nivel crítico. Expedición de reabastecimiento sugerida.',
+    time: 'hace 3h',
+    read: true,
+    level: 'critical',
+  },
+  {
+    id: 6,
+    title: 'Nuevo logro desbloqueado',
+    body: '¡7 días sin bajas de vida completado!',
+    time: 'hace 1d',
+    read: true,
+    level: 'info',
+  },
+  {
+    id: 7,
+    title: 'Intento de acceso no autorizado',
+    body: 'IP 192.168.1.45 — 3 intentos fallidos. Bloqueado.',
+    time: 'hace 1h',
+    read: false,
+    level: 'warning',
+  },
+]
 
 const resourceTrendData = [
-  { day: "D-6", food: 85, water: 72, ammo: 90 },
-  { day: "D-5", food: 80, water: 68, ammo: 85 },
-  { day: "D-4", food: 74, water: 55, ammo: 82 },
-  { day: "D-3", food: 65, water: 40, ammo: 78 },
-  { day: "D-2", food: 53, water: 25, ammo: 70 },
-  { day: "D-1", food: 38, water: 15, ammo: 68 },
-  { day: "HOY", food: 23, water: 8, ammo: 67 },
-];
-
+  { day: 'D-6', food: 85, water: 72, ammo: 90 },
+  { day: 'D-5', food: 80, water: 68, ammo: 85 },
+  { day: 'D-4', food: 74, water: 55, ammo: 82 },
+  { day: 'D-3', food: 65, water: 40, ammo: 78 },
+  { day: 'D-2', food: 53, water: 25, ammo: 70 },
+  { day: 'D-1', food: 38, water: 15, ammo: 68 },
+  { day: 'HOY', food: 23, water: 8, ammo: 67 },
+]
 
 function scoreColor(s: number) {
   if (s < 50) return "#DC2626";
@@ -460,36 +713,65 @@ function intercampColor(s: string) {
   return "#B8C7DB";
 }
 function logLevelColor(l: string) {
-  if (l === "error") return UI_COLORS.state.critical;
-  if (l === "warn") return UI_COLORS.state.warning;
-  if (l === "system") return UI_COLORS.state.system;
-  return UI_COLORS.state.info;
+  if (l === 'error') return UI_COLORS.state.critical
+  if (l === 'warn') return UI_COLORS.state.warning
+  if (l === 'system') return UI_COLORS.state.system
+  return UI_COLORS.state.info
 }
 function notifColor(l: string) {
-  if (l === "critical") return UI_COLORS.state.critical;
-  if (l === "warning") return UI_COLORS.state.warning;
-  return UI_COLORS.state.info;
+  if (l === 'critical') return UI_COLORS.state.critical
+  if (l === 'warning') return UI_COLORS.state.warning
+  return UI_COLORS.state.info
 }
 
-
-function Card({ children, className = "", glow = "" }: { children: React.ReactNode; className?: string; glow?: string }) {
+function Card({
+  children,
+  className = '',
+  glow = '',
+}: {
+  children: React.ReactNode
+  className?: string
+  glow?: string
+}) {
   return (
     <div
       className={`admin-card relative rounded-sm card-soft p-4 ${className}`}
-      style={{ background: UI_COLORS.panel, border: `1px solid ${glow || UI_COLORS.border}`, boxShadow: glow ? `0 0 12px 1px ${glow}22` : `inset 0 0 0 1px ${UI_COLORS.borderSoft}` }}
+      style={{
+        background: UI_COLORS.panel,
+        border: `1px solid ${glow || UI_COLORS.border}`,
+        boxShadow: glow ? `0 0 12px 1px ${glow}22` : `inset 0 0 0 1px ${UI_COLORS.borderSoft}`,
+      }}
     >
       {children}
     </div>
-  );
+  )
 }
 
 function SectionHeader({ title, accent = true }: { title: string; accent?: boolean }) {
   return (
     <div className="admin-section-header mb-3">
-      <h3 style={{ fontFamily: "'Share Tech Mono', monospace", color: UI_COLORS.textPrimary, fontSize: 12, letterSpacing: "0.12em" }} className="admin-title-brush uppercase">{title}</h3>
-      {accent && <div style={{ height: 1, background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`, marginTop: 4 }} />}
+      <h3
+        style={{
+          fontFamily: "'Share Tech Mono', monospace",
+          color: UI_COLORS.textPrimary,
+          fontSize: 12,
+          letterSpacing: '0.12em',
+        }}
+        className="admin-title-brush uppercase"
+      >
+        {title}
+      </h3>
+      {accent && (
+        <div
+          style={{
+            height: 1,
+            background: `linear-gradient(90deg, ${UI_COLORS.accent} 0%, transparent 100%)`,
+            marginTop: 4,
+          }}
+        />
+      )}
     </div>
-  );
+  )
 }
 
 function Toggle({ active, onChange }: { active: boolean; onChange?: () => void }) {
@@ -501,26 +783,54 @@ function Toggle({ active, onChange }: { active: boolean; onChange?: () => void }
     >
       <div className="admin-toggle-knob" style={{ width: 12, height: 12, borderRadius: "50%", background: "#EEF3FB", position: "absolute", left: active ? 16 : 2, transition: "left 0.2s" }} />
     </button>
-  );
+  )
 }
 
 function Badge({ label, color }: { label: string; color: string }) {
   return (
-    <span className="admin-badge px-1.5 py-0.5 rounded-sm"
-      style={{ background: `${color}22`, border: `1px solid ${color}`, fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color }}>
+    <span
+      className="admin-badge px-1.5 py-0.5 rounded-sm"
+      style={{
+        background: `${color}22`,
+        border: `1px solid ${color}`,
+        fontFamily: "'Share Tech Mono', monospace",
+        fontSize: 9,
+        color,
+      }}
+    >
       {label}
     </span>
-  );
+  )
 }
 
-function EmptyState({ title, hint, icon: Icon }: { title: string; hint: string; icon: React.ElementType }) {
+function EmptyState({
+  title,
+  hint,
+  icon: Icon,
+}: {
+  title: string
+  hint: string
+  icon: React.ElementType
+}) {
   return (
     <div className="text-center py-8">
-      <Icon size={30} style={{ color: UI_COLORS.border, margin: "0 auto 8px" }} />
-      <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: UI_COLORS.textMuted }}>{title}</div>
-      <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textFaint }}>{hint}</div>
+      <Icon size={30} style={{ color: UI_COLORS.border, margin: '0 auto 8px' }} />
+      <div
+        style={{
+          fontFamily: "'Share Tech Mono', monospace",
+          fontSize: 11,
+          color: UI_COLORS.textMuted,
+        }}
+      >
+        {title}
+      </div>
+      <div
+        style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: UI_COLORS.textFaint }}
+      >
+        {hint}
+      </div>
     </div>
-  );
+  )
 }
 
 interface ExpeditionResourceEntry {
@@ -567,31 +877,54 @@ function PaginationBar({
 
 function SearchBar({ value, onChange, placeholder = "BUSCAR..." }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
-    <div className="admin-search flex items-center gap-2 px-3 py-1.5 rounded-sm" style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, flex: 1 }}>
+    <div
+      className="admin-search flex items-center gap-2 px-3 py-1.5 rounded-sm"
+      style={{ background: UI_COLORS.panelAlt, border: `1px solid ${UI_COLORS.border}`, flex: 1 }}
+    >
       <Search size={11} style={{ color: UI_COLORS.textFaint }} />
       <input
         value={value}
-        onChange={e => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className="admin-input flex-1 bg-transparent outline-none"
-        style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textPrimary }}
+        style={{
+          fontFamily: "'Share Tech Mono', monospace",
+          fontSize: 10,
+          color: UI_COLORS.textPrimary,
+        }}
       />
     </div>
-  );
+  )
 }
 
-function ActionBtn({ label, color, onClick, small = false }: { label: string; color: string; onClick?: () => void; small?: boolean }) {
-  const isCritical = color === UI_COLORS.state.critical;
-  const toneBg = isCritical ? `${color}2A` : `${color}20`;
+function ActionBtn({
+  label,
+  color,
+  onClick,
+  small = false,
+}: {
+  label: string
+  color: string
+  onClick?: () => void
+  small?: boolean
+}) {
+  const isCritical = color === UI_COLORS.state.critical
+  const toneBg = isCritical ? `${color}2A` : `${color}20`
   return (
     <button
       onClick={onClick}
-      className={`admin-btn px-2 py-1 rounded-sm cursor-pointer${small ? " admin-btn--small" : ""}`}
-      style={{ background: toneBg, border: `1px solid ${color}`, fontFamily: "'Share Tech Mono', monospace", fontSize: small ? 9 : 10, color: isCritical ? "#FFD8D8" : color }}
+      className={`admin-btn px-2 py-1 rounded-sm cursor-pointer${small ? ' admin-btn--small' : ''}`}
+      style={{
+        background: toneBg,
+        border: `1px solid ${color}`,
+        fontFamily: "'Share Tech Mono', monospace",
+        fontSize: small ? 9 : 10,
+        color: isCritical ? '#FFD8D8' : color,
+      }}
     >
       {label}
     </button>
-  );
+  )
 }
 
 function Modal({
@@ -616,7 +949,7 @@ function Modal({
         exit={{ opacity: 0 }}
         transition={MOTION.base}
         className="admin-modal fixed inset-0 z-50 flex items-center justify-center p-4"
-        style={{ background: "rgba(0,0,0,0.7)" }}
+        style={{ background: 'rgba(0,0,0,0.7)' }}
         onClick={onClose}
       >
         <motion.div
@@ -658,7 +991,7 @@ function Modal({
         </motion.div>
       </motion.div>
     </AnimatePresence>
-  );
+  )
 }
 
 function DonutCenter({ cx, cy, total }: { cx?: number; cy?: number; total: number }) {
@@ -667,7 +1000,7 @@ function DonutCenter({ cx, cy, total }: { cx?: number; cy?: number; total: numbe
       <tspan x={cx} dy="-8" style={{ fontFamily: "'Orbitron', monospace", fill: "#EEF3FB", fontSize: 22, fontWeight: 900 }}>{total}</tspan>
       <tspan x={cx} dy="18" style={{ fontFamily: "'Share Tech Mono', monospace", fill: "#B8C7DB", fontSize: 9 }}>TOTAL</tspan>
     </text>
-  );
+  )
 }
 
 
@@ -732,12 +1065,14 @@ function ViewPoblacion({ mode, campId }: { mode: PopulationViewMode; campId?: nu
     }
   };
 
-  const statuses = ["Todos", "Activo", "Herido", "Enfermo", "Fuera"];
-  const filtered = persons.filter(p => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.role.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = filterStatus === "Todos" || p.status === filterStatus;
-    return matchSearch && matchStatus;
-  });
+  const statuses = ['Todos', 'Activo', 'Herido', 'Enfermo', 'Fuera']
+  const filtered = persons.filter((p) => {
+    const matchSearch =
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.role.toLowerCase().includes(search.toLowerCase())
+    const matchStatus = filterStatus === 'Todos' || p.status === filterStatus
+    return matchSearch && matchStatus
+  })
 
   const counts = {
     Activo: persons.filter(p => p.status === "Activo").length,
@@ -1439,7 +1774,7 @@ function ViewPoblacion({ mode, campId }: { mode: PopulationViewMode; campId?: nu
         document.body
       )}
     </div>
-  );
+  )
 }
 
 function ViewAdmisiones({ mode, canReview, campId }: { mode: AdmissionsViewMode; canReview: boolean; campId?: number }) {
@@ -1452,9 +1787,9 @@ function ViewAdmisiones({ mode, canReview, campId }: { mode: AdmissionsViewMode;
   const limit = Number(new URLSearchParams(window.location.search).get("adm_limit") ?? "6") || 6;
 
   const showToast = (msg: string, color: string) => {
-    setToast({ msg, color });
-    setTimeout(() => setToast(null), 2500);
-  };
+    setToast({ msg, color })
+    setTimeout(() => setToast(null), 2500)
+  }
 
   const loadAdmissions = async () => {
     setIsLoading(true);
@@ -1552,7 +1887,7 @@ function ViewAdmisiones({ mode, canReview, campId }: { mode: AdmissionsViewMode;
         )}
       </AnimatePresence>
 
-      {(mode === "queue" || mode === "history") && (
+      {(mode === 'queue' || mode === 'history') && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
             { label: "PENDIENTES", value: pending.length, color: "#4AAED2" },
@@ -1595,40 +1930,78 @@ function ViewAdmisiones({ mode, canReview, campId }: { mode: AdmissionsViewMode;
                     <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{a.profession}</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div style={{ fontFamily: "'Orbitron', monospace", fontSize: 20, fontWeight: 900, color: scoreColor(a.score) }}>{a.score}</div>
-                  <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>SCORE IA /100</div>
+                {/* Score bar */}
+                <div
+                  className="admin-bar h-1.5 rounded-sm overflow-hidden mb-2"
+                  style={{ background: '#2D2A24' }}
+                >
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${a.score}%` }}
+                    transition={MOTION.progress}
+                    className="admin-bar-fill"
+                    style={{ height: '100%', background: scoreColor(a.score), borderRadius: 2 }}
+                  />
+                </div>
+                <p
+                  style={{
+                    fontFamily: "'Rajdhani', sans-serif",
+                    fontSize: 11,
+                    color: '#8B8070',
+                    marginBottom: 8,
+                  }}
+                >
+                  {a.reason}
+                </p>
+                {a.skills.length > 0 && (
+                  <div className="flex gap-1 flex-wrap mb-2">
+                    {a.skills.map((s) => (
+                      <Badge key={s} label={s} color="#D97706" />
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2 items-center">
+                  <ActionBtn
+                    label="VER DETALLE"
+                    color="#8B8070"
+                    small
+                    onClick={() => setSelected(a)}
+                  />
+                  <ActionBtn
+                    label="APROBAR"
+                    color="#0D9488"
+                    small
+                    onClick={() => handleApprove(a.id)}
+                  />
+                  <ActionBtn
+                    label="RECHAZAR"
+                    color="#DC2626"
+                    small
+                    onClick={() => handleReject(a.id)}
+                  />
                 </div>
               </div>
-              {/* Score bar */}
-              <div className="admin-bar h-1.5 rounded-sm overflow-hidden mb-2" style={{ background: "#2A3444" }}>
-                <motion.div initial={{ width: 0 }} animate={{ width: `${a.score}%` }} transition={MOTION.progress}
-                  className="admin-bar-fill" style={{ height: "100%", background: scoreColor(a.score), borderRadius: 2 }} />
-              </div>
-              <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#B8C7DB", marginBottom: 8 }}>{a.reason}</p>
-              {a.skills.length > 0 && (
-                <div className="flex gap-1 flex-wrap mb-2">
-                  {a.skills.map(s => <Badge key={s} label={s} color="#7FB8FF" />)}
-                </div>
-              )}
-              <div className="flex gap-2 items-center">
-                <ActionBtn label="VER DETALLE" color="#B8C7DB" small onClick={() => setSelected(a)} />
-                <SecuredActionBtn allowed={canReview} reason="Requiere permiso de revisión de admisiones" label="APROBAR" color="#0D9488" small onClick={() => confirmAction("¿Aprobar esta admisión?", () => handleApprove(a.id))} />
-                <SecuredActionBtn allowed={canReview} reason="Requiere permiso de revisión de admisiones" label="RECHAZAR" color="#DC2626" small onClick={() => confirmAction("¿Rechazar esta admisión?", () => handleReject(a.id))} />
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            ))}
           {pending.length === 0 && (
             <div className="text-center py-8">
-              <CheckCircle size={32} style={{ color: "#0D9488", margin: "0 auto 8px" }} />
-              <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#B8C7DB" }}>SIN PENDIENTES — COLA LIMPIA</div>
+              <CheckCircle size={32} style={{ color: '#0D9488', margin: '0 auto 8px' }} />
+              <div
+                style={{
+                  fontFamily: "'Share Tech Mono', monospace",
+                  fontSize: 10,
+                  color: '#8B8070',
+                }}
+              >
+                SIN PENDIENTES — COLA LIMPIA
+              </div>
             </div>
           )}
           {pending.length > 0 && <PaginationBar page={safePage} totalPages={totalPages} totalItems={pending.length} onPageChange={setPage} />}
         </div>
       </Card>}
 
-      {mode === "history" && resolved.length > 0 && (
+      {mode === 'history' && resolved.length > 0 && (
         <Card>
           <SectionHeader title="PROCESADAS RECIENTEMENTE" />
           <div className="admin-stack-sm">
@@ -1640,7 +2013,10 @@ function ViewAdmisiones({ mode, canReview, campId }: { mode: AdmissionsViewMode;
                   <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>{a.name}</span>
                   <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{a.profession}</span>
                 </div>
-                <Badge label={a.status === "approved" ? "APROBADO" : "RECHAZADO"} color={a.status === "approved" ? "#0D9488" : "#DC2626"} />
+                <Badge
+                  label={a.status === 'approved' ? 'APROBADO' : 'RECHAZADO'}
+                  color={a.status === 'approved' ? '#0D9488' : '#DC2626'}
+                />
               </div>
             ))}
             {resolved.length > 0 && <PaginationBar page={safePage} totalPages={totalPages} totalItems={resolved.length} onPageChange={setPage} />}
@@ -1677,7 +2053,16 @@ function ViewAdmisiones({ mode, canReview, campId }: { mode: AdmissionsViewMode;
             </div>
             {selected.skills.length > 0 && (
               <div>
-                <div style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: UI_COLORS.textFaint, marginBottom: 6 }}>HABILIDADES VERIFICADAS</div>
+                <div
+                  style={{
+                    fontFamily: "'Share Tech Mono', monospace",
+                    fontSize: 10,
+                    color: UI_COLORS.textFaint,
+                    marginBottom: 6,
+                  }}
+                >
+                  HABILIDADES VERIFICADAS
+                </div>
                 <div className="flex gap-1 flex-wrap">
                   {selected.skills.map(s => <Badge key={s} label={s} color="#7FB8FF" />)}
                 </div>
@@ -1691,7 +2076,7 @@ function ViewAdmisiones({ mode, canReview, campId }: { mode: AdmissionsViewMode;
         )}
       </Modal>
     </div>
-  );
+  )
 }
 
 function ViewInventario({ mode, canAdjust, campId }: { mode: InventoryViewMode; canAdjust: boolean; campId?: number }) {
@@ -1714,16 +2099,16 @@ function ViewInventario({ mode, canAdjust, campId }: { mode: InventoryViewMode; 
   const activeCampId = campId ?? 1;
 
   const showToast = (msg: string, color: string) => {
-    setToast({ msg, color });
-    setTimeout(() => setToast(null), 2500);
-  };
+    setToast({ msg, color })
+    setTimeout(() => setToast(null), 2500)
+  }
 
-  const computeStatus = (pct: number): InventoryItem["status"] => {
-    if (pct < 20) return "CRÍTICO";
-    if (pct < 40) return "BAJO";
-    if (pct < 70) return "NORMAL";
-    return "OK";
-  };
+  const computeStatus = (pct: number): InventoryItem['status'] => {
+    if (pct < 20) return 'CRÍTICO'
+    if (pct < 40) return 'BAJO'
+    if (pct < 70) return 'NORMAL'
+    return 'OK'
+  }
 
   const loadInventory = async () => {
     setIsLoading(true);
@@ -1901,7 +2286,10 @@ function ViewInventario({ mode, canAdjust, campId }: { mode: InventoryViewMode; 
       {errorCode && <HttpStatusNotice code={errorCode} />}
       <AnimatePresence>
         {toast && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
             className="fixed top-16 right-4 z-50 px-4 py-2 rounded-sm"
             style={{ background: toast.color, fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#EEF3FB" }}>
             {toast.msg}
@@ -2096,8 +2484,8 @@ function ViewInventario({ mode, canAdjust, campId }: { mode: InventoryViewMode; 
           </div>
           <div className="grid grid-cols-2 gap-2">
             {[
-              { label: "UNIDADES ACTUALES", key: "units" },
-              { label: "CAPACIDAD MÁXIMA", key: "max" },
+              { label: 'UNIDADES ACTUALES', key: 'units' },
+              { label: 'CAPACIDAD MÁXIMA', key: 'max' },
             ].map(({ label, key }) => (
               <div key={key}>
                 <label style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB" }}>{label}</label>
@@ -2111,7 +2499,7 @@ function ViewInventario({ mode, canAdjust, campId }: { mode: InventoryViewMode; 
         </div>
       </Modal>
     </div>
-  );
+  )
 }
 
 function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canForce: boolean }) {
@@ -2141,18 +2529,20 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
   };
 
   const showToast = (msg: string, color: string) => {
-    setToast({ msg, color });
-    setTimeout(() => setToast(null), 2500);
-  };
+    setToast({ msg, color })
+    setTimeout(() => setToast(null), 2500)
+  }
 
   const handleAdvanceDay = (id: number) => {
-    setExpeditions(prev => prev.map(e => {
-      if (e.id !== id) return e;
-      const newDay = e.day + 1;
-      const newStatus = newDay >= e.total ? "REGRESANDO" : e.status;
-      return { ...e, day: newDay, status: newStatus };
-    }));
-  };
+    setExpeditions((prev) =>
+      prev.map((e) => {
+        if (e.id !== id) return e
+        const newDay = e.day + 1
+        const newStatus = newDay >= e.total ? 'REGRESANDO' : e.status
+        return { ...e, day: newDay, status: newStatus }
+      }),
+    )
+  }
 
   const handleComplete = (id: number) => {
     setIsLoading(true);
@@ -2178,9 +2568,9 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
     showToast(`ESTADO FORZADO: ${status}`, "#7FB8FF");
   };
 
-  const active = expeditions.filter(e => e.status === "EN CURSO" || e.status === "REGRESANDO");
-  const scheduled = expeditions.filter(e => e.status === "PROGRAMADA");
-  const completed = expeditions.filter(e => e.status === "COMPLETADA");
+  const active = expeditions.filter((e) => e.status === 'EN CURSO' || e.status === 'REGRESANDO')
+  const scheduled = expeditions.filter((e) => e.status === 'PROGRAMADA')
+  const completed = expeditions.filter((e) => e.status === 'COMPLETADA')
 
   useEffect(() => {
     void loadExpeditions();
@@ -2193,7 +2583,10 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
       {errorCode && <HttpStatusNotice code={errorCode} />}
       <AnimatePresence>
         {toast && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
             className="fixed top-16 right-4 z-50 px-4 py-2 rounded-sm"
             style={{ background: toast.color, fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#EEF3FB" }}>
             {toast.msg}
@@ -2323,7 +2716,7 @@ function ViewExpediciones({ mode, canForce }: { mode: ExpeditionsViewMode; canFo
       )}
 
     </div>
-  );
+  )
 }
 
 function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canApprove: boolean }) {
@@ -2336,19 +2729,19 @@ function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canAppro
   const limit = Number(new URLSearchParams(window.location.search).get("ic_limit") ?? "6") || 6;
 
   const showToast = (msg: string, color: string) => {
-    setToast({ msg, color });
-    setTimeout(() => setToast(null), 2500);
-  };
+    setToast({ msg, color })
+    setTimeout(() => setToast(null), 2500)
+  }
 
   const handleApprove = (id: number) => {
-    setRequests(prev => prev.map(r => r.id === id ? { ...r, status: "APROBADO" } : r));
-    showToast("SOLICITUD APROBADA", "#0D9488");
-  };
+    setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'APROBADO' } : r)))
+    showToast('SOLICITUD APROBADA', '#0D9488')
+  }
 
   const handleReject = (id: number) => {
-    setRequests(prev => prev.map(r => r.id === id ? { ...r, status: "RECHAZADO" } : r));
-    showToast("SOLICITUD RECHAZADA", "#DC2626");
-  };
+    setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'RECHAZADO' } : r)))
+    showToast('SOLICITUD RECHAZADA', '#DC2626')
+  }
 
   const mergeRequest = (incoming: IntercampRequest) => {
     setRequests((prev) => {
@@ -2408,7 +2801,12 @@ function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canAppro
   const safePage = Math.min(page, totalPages);
   const pagedActive = activeList.slice((safePage - 1) * limit, safePage * limit);
 
-  const campsList = ["CAMPAMENTO BETA", "CAMPAMENTO GAMMA", "CAMPAMENTO DELTA", "CAMPAMENTO ÉPSILON"];
+  const campsList = [
+    'CAMPAMENTO BETA',
+    'CAMPAMENTO GAMMA',
+    'CAMPAMENTO DELTA',
+    'CAMPAMENTO ÉPSILON',
+  ]
 
   useEffect(() => {
     setPage(1);
@@ -2429,7 +2827,10 @@ function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canAppro
       {errorCode && <HttpStatusNotice code={errorCode} />}
       <AnimatePresence>
         {toast && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
             className="fixed top-16 right-4 z-50 px-4 py-2 rounded-sm"
             style={{ background: toast.color, fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#EEF3FB" }}>
             {toast.msg}
@@ -2464,7 +2865,7 @@ function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canAppro
         </div>
       </Card>
 
-      {mode === "pending" && pending.length > 0 && (
+      {mode === 'pending' && pending.length > 0 && (
         <Card glow="#EA580C">
           <SectionHeader title="SOLICITUDES PENDIENTES — ACCIÓN REQUERIDA" />
           <div className="admin-stack-sm">
@@ -2474,13 +2875,30 @@ function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canAppro
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <Radio size={11} style={{ color: "#EA580C" }} />
-                      <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#EA580C" }}>{req.from}</span>
+                      <Radio size={11} style={{ color: '#EA580C' }} />
+                      <span
+                        style={{
+                          fontFamily: "'Share Tech Mono', monospace",
+                          fontSize: 9,
+                          color: '#EA580C',
+                        }}
+                      >
+                        {req.from}
+                      </span>
                       {req.urgent && <Badge label="URGENTE" color="#DC2626" />}
                     </div>
                     <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB" }}>{req.text}</span>
                   </div>
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, whiteSpace: "nowrap" }}>{req.time}</span>
+                  <span
+                    style={{
+                      fontFamily: "'Share Tech Mono', monospace",
+                      fontSize: 9,
+                      color: UI_COLORS.textFaint,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {req.time}
+                  </span>
                 </div>
                 <div className="flex gap-2">
                   <SecuredActionBtn allowed={canApprove} reason="Requiere permiso de aprobación inter-campamento" label="APROBAR" color="#0D9488" small onClick={() => confirmAction("¿Aprobar esta solicitud inter-campamento?", () => handleApprove(req.id))} />
@@ -2528,7 +2946,7 @@ function ViewIntercamp({ mode, canApprove }: { mode: IntercampViewMode; canAppro
         </div>
       </Card>}
     </div>
-  );
+  )
 }
 
 function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
@@ -2584,44 +3002,51 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
   };
 
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh) return
     const t = setInterval(() => {
-      const now = new Date().toLocaleTimeString("es-CR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+      const now = new Date().toLocaleTimeString('es-CR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      })
       const systemEvents = [
-        "HEARTBEAT — Servidor activo",
-        "SESION_CHECK — Sin anomalías",
-        "PERIMETRO_OK — Sensores normales",
-      ];
+        'HEARTBEAT — Servidor activo',
+        'SESION_CHECK — Sin anomalías',
+        'PERIMETRO_OK — Sensores normales',
+      ]
       const newLog: LogEntry = {
         id: Date.now(),
         time: now,
-        level: "system",
-        user: "SISTEMA",
+        level: 'system',
+        user: 'SISTEMA',
         action: systemEvents[Math.floor(Math.random() * systemEvents.length)],
-      };
-      setLogs(prev => [newLog, ...prev.slice(0, 24)]);
-    }, 8000);
-    return () => clearInterval(t);
-  }, [autoRefresh]);
+      }
+      setLogs((prev) => [newLog, ...prev.slice(0, 24)])
+    }, 8000)
+    return () => clearInterval(t)
+  }, [autoRefresh])
 
-  const levels = ["todos", "info", "warn", "error", "system"];
-  const baseFiltered = logs.filter(l => {
-    const matchLevel = filterLevel === "todos" || l.level === filterLevel;
-    const matchSearch = l.user.toLowerCase().includes(search.toLowerCase()) || l.action.toLowerCase().includes(search.toLowerCase());
-    return matchLevel && matchSearch;
-  });
-  const filtered = baseFiltered.filter(l => {
-    if (mode === "errors") return l.level === "error" || l.level === "warn";
-    if (mode === "system") return l.level === "system";
-    return true;
-  });
+  const levels = ['todos', 'info', 'warn', 'error', 'system']
+  const baseFiltered = logs.filter((l) => {
+    const matchLevel = filterLevel === 'todos' || l.level === filterLevel
+    const matchSearch =
+      l.user.toLowerCase().includes(search.toLowerCase()) ||
+      l.action.toLowerCase().includes(search.toLowerCase())
+    return matchLevel && matchSearch
+  })
+  const filtered = baseFiltered.filter((l) => {
+    if (mode === 'errors') return l.level === 'error' || l.level === 'warn'
+    if (mode === 'system') return l.level === 'system'
+    return true
+  })
 
   const counts = {
-    error: logs.filter(l => l.level === "error").length,
-    warn: logs.filter(l => l.level === "warn").length,
-    info: logs.filter(l => l.level === "info").length,
-    system: logs.filter(l => l.level === "system").length,
-  };
+    error: logs.filter((l) => l.level === 'error').length,
+    warn: logs.filter((l) => l.level === 'warn').length,
+    info: logs.filter((l) => l.level === 'info').length,
+    system: logs.filter((l) => l.level === 'system').length,
+  }
 
   return (
     <div className="admin-stack-lg">
@@ -2679,27 +3104,48 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
         {autoRefresh && (
           <div className="flex items-center gap-1.5 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
-            <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#0D9488" }}>MONITOREANDO EN TIEMPO REAL</span>
+            <span
+              style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: '#0D9488' }}
+            >
+              MONITOREANDO EN TIEMPO REAL
+            </span>
           </div>
         )}
 
         <div className="admin-stack-sm notifs-list">
           <AnimatePresence initial={false}>
-            {filtered.map(log => {
-              const lc = logLevelColor(log.level);
+            {filtered.map((log) => {
+              const lc = logLevelColor(log.level)
               return (
                 <motion.div
                   key={log.id}
                   initial={{ opacity: 0, x: -10, height: 0 }}
-                  animate={{ opacity: 1, x: 0, height: "auto" }}
+                  animate={{ opacity: 1, x: 0, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={MOTION.base}
                   className="flex items-start gap-3 px-3 py-2 rounded-sm"
                   style={{ background: "#0B1118", borderLeft: `2px solid ${lc}` }}
                 >
-                  <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint, flexShrink: 0, paddingTop: 2 }}>[{log.time}]</span>
-                  <span className="px-1.5 py-0.5 rounded-sm flex-shrink-0"
-                    style={{ background: `${lc}22`, fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: lc }}>
+                  <span
+                    style={{
+                      fontFamily: "'Share Tech Mono', monospace",
+                      fontSize: 9,
+                      color: UI_COLORS.textFaint,
+                      flexShrink: 0,
+                      paddingTop: 2,
+                    }}
+                  >
+                    [{log.time}]
+                  </span>
+                  <span
+                    className="px-1.5 py-0.5 rounded-sm flex-shrink-0"
+                    style={{
+                      background: `${lc}22`,
+                      fontFamily: "'Share Tech Mono', monospace",
+                      fontSize: 9,
+                      color: lc,
+                    }}
+                  >
                     {log.level.toUpperCase()}
                   </span>
                   <div className="flex-1 min-w-0">
@@ -2707,14 +3153,20 @@ function ViewSeguridad({ mode }: { mode: SecurityViewMode }) {
                     <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: "#B8C7DB", marginLeft: 8 }}>— {log.action}</span>
                   </div>
                 </motion.div>
-              );
+              )
             })}
           </AnimatePresence>
-          {filtered.length === 0 && <EmptyState title="SIN REGISTROS" hint="Ajusta los filtros o espera nuevos eventos" icon={Shield} />}
+          {filtered.length === 0 && (
+            <EmptyState
+              title="SIN REGISTROS"
+              hint="Ajusta los filtros o espera nuevos eventos"
+              icon={Shield}
+            />
+          )}
         </div>
       </Card>
     </div>
-  );
+  )
 }
 
 function ViewLogros({ mode }: { mode: LogrosViewMode }) {
@@ -2729,9 +3181,9 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
     { name: "INVENTARIO SEGURO", desc: "Todos los recursos sobre 50%", unlocked: false, pct: 15, color: "#4AAED2", xp: 400, category: "Logística" },
   ];
 
-  const categories = [...new Set(achievements.map(a => a.category))];
-  const totalXP = achievements.filter(a => a.unlocked).reduce((acc, a) => acc + a.xp, 0);
-  const nextLevelXP = 3000;
+  const categories = [...new Set(achievements.map((a) => a.category))]
+  const totalXP = achievements.filter((a) => a.unlocked).reduce((acc, a) => acc + a.xp, 0)
+  const nextLevelXP = 3000
 
   return (
     <div className="admin-stack-lg">
@@ -2771,7 +3223,7 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
       )}
 
       {/* Achievements by category */}
-      {categories.map(cat => (
+      {categories.map((cat) => (
         <div key={cat}>
           <div className="mb-2 flex items-center gap-2">
             <div style={{ height: 1, flex: 1, background: "#2A3444" }} />
@@ -2804,13 +3256,13 @@ function ViewLogros({ mode }: { mode: LogrosViewMode }) {
                     )}
                   </div>
                 </div>
-              </Card>
-            ))}
+                </Card>
+              ))}
           </div>
         </div>
       ))}
     </div>
-  );
+  )
 }
 
 function ViewNotificaciones({ mode, notifs, setNotifs }: { mode: NotifsViewMode; notifs: Notification[]; setNotifs: React.Dispatch<React.SetStateAction<Notification[]>> }) {
@@ -2955,12 +3407,18 @@ function ViewNotificaciones({ mode, notifs, setNotifs }: { mode: NotifsViewMode;
                       <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{n.time}</span>
                     </div>
                     <div className="flex gap-1">
-                      {!n.read && <button onClick={() => markRead(n.id)} className="admin-icon-btn"><CheckCircle size={12} style={{ color: "#0D9488" }} /></button>}
-                      <button onClick={() => dismiss(n.id)} className="admin-icon-btn"><X size={12} style={{ color: UI_COLORS.textFaint }} /></button>
+                      {!n.read && (
+                        <button onClick={() => markRead(n.id)} className="admin-icon-btn">
+                          <CheckCircle size={12} style={{ color: '#0D9488' }} />
+                        </button>
+                      )}
+                      <button onClick={() => dismiss(n.id)} className="admin-icon-btn">
+                        <X size={12} style={{ color: UI_COLORS.textFaint }} />
+                      </button>
                     </div>
                   </div>
                 </motion.div>
-              );
+              )
             })}
           </AnimatePresence>
           {!isLoading && !errorCode && filtered.length === 0 && <EmptyState title="SIN NOTIFICACIONES" hint="No hay eventos para este filtro" icon={Bell} />}
@@ -2968,7 +3426,7 @@ function ViewNotificaciones({ mode, notifs, setNotifs }: { mode: NotifsViewMode;
         <PaginationBar page={safePage} totalPages={totalPages} totalItems={filtered.length} onPageChange={setPage} />
       </Card>
     </div>
-  );
+  )
 }
 
 function HttpStatusNotice({ code }: { code: HttpCode }) {
@@ -3003,30 +3461,33 @@ function SecuredActionBtn({
 
 function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
   const [settings, setSettings] = useState({
-    campName: "CAMPAMENTO ALFA",
-    adminName: "Edicson Vargas",
+    campName: 'CAMPAMENTO ALFA',
+    adminName: 'Edicson Vargas',
     day: 47,
     alertThreshold: 20,
     autoBackup: true,
     soundAlerts: true,
     nightReport: true,
     dailyConsumption: true,
-    language: "es",
-    timezone: "America/Costa_Rica",
+    language: 'es',
+    timezone: 'America/Costa_Rica',
     sessionTimeout: 60,
-  });
-  const [saved, setSaved] = useState(false);
+  })
+  const [saved, setSaved] = useState(false)
 
   const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
 
   return (
     <div className="admin-stack-lg">
       <AnimatePresence>
         {saved && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
             className="fixed top-16 right-4 z-50 px-4 py-2 rounded-sm"
             style={{ background: "#0D9488", fontFamily: "'Share Tech Mono', monospace", fontSize: 10, color: "#EEF3FB" }}>
             CONFIGURACIÓN GUARDADA
@@ -3066,7 +3527,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
           </Card>
         )}
 
-        {mode === "system" && (
+        {mode === 'camp' && (
           <Card>
             <SectionHeader title="SISTEMA" />
             <div className="admin-stack-md">
@@ -3099,7 +3560,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
           </Card>
         )}
 
-        {mode === "system" && (
+        {mode === 'system' && (
           <Card>
             <SectionHeader title="INFORMACIÓN DEL SISTEMA" />
             <div className="admin-stack-sm">
@@ -3126,7 +3587,7 @@ function ViewConfiguracion({ mode }: { mode: ConfigViewMode }) {
         <ActionBtn label="RESTABLECER VALORES" color="#B8C7DB" onClick={() => { }} />
       </div>
     </div>
-  );
+  )
 }
 
 
@@ -3146,11 +3607,11 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
     outPopulation: 17,
   });
   const [automations] = useState([
-    { ok: true, name: "Consumo diario de raciones", time: "Ejecutado 06:00", active: true },
-    { ok: true, name: "Colecta de recursos", time: "Ejecutado 06:00", active: true },
-    { ok: false, name: "Alerta de inventario", time: "3 alertas activas", active: true },
-    { ok: true, name: "Reporte nocturno", time: "Enviado 00:00", active: true },
-  ]);
+    { ok: true, name: 'Consumo diario de raciones', time: 'Ejecutado 06:00', active: true },
+    { ok: true, name: 'Colecta de recursos', time: 'Ejecutado 06:00', active: true },
+    { ok: false, name: 'Alerta de inventario', time: '3 alertas activas', active: true },
+    { ok: true, name: 'Reporte nocturno', time: 'Enviado 00:00', active: true },
+  ])
 
   const refreshDashboard = async () => {
     setIsLoading(true);
@@ -3217,26 +3678,26 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
 
   useEffect(() => {
     const t = setInterval(() => {
-      setCountdown(prev => {
-        const { h, m, s } = prev;
-        if (s > 0) return { h, m, s: s - 1 };
-        if (m > 0) return { h, m: m - 1, s: 59 };
-        if (h > 0) return { h: h - 1, m: 59, s: 59 };
-        return { h: 0, m: 0, s: 0 };
-      });
-    }, 1000);
-    return () => clearInterval(t);
-  }, []);
+      setCountdown((prev) => {
+        const { h, m, s } = prev
+        if (s > 0) return { h, m, s: s - 1 }
+        if (m > 0) return { h, m: m - 1, s: 59 }
+        if (h > 0) return { h: h - 1, m: 59, s: 59 }
+        return { h: 0, m: 0, s: 0 }
+      })
+    }, 1000)
+    return () => clearInterval(t)
+  }, [])
 
   useEffect(() => {
     const t = setInterval(() => {
-      setThreatLevel(prev => {
-        const jitter = Math.floor(Math.random() * 7) - 3;
-        return Math.min(95, Math.max(38, prev + jitter));
-      });
-    }, 4500);
-    return () => clearInterval(t);
-  }, []);
+      setThreatLevel((prev) => {
+        const jitter = Math.floor(Math.random() * 7) - 3
+        return Math.min(95, Math.max(38, prev + jitter))
+      })
+    }, 4500)
+    return () => clearInterval(t)
+  }, [])
 
   useEffect(() => {
     void refreshDashboard();
@@ -3252,19 +3713,23 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
   const liveAlerts = notifs.filter(n => !n.read).slice(0, 5);
 
   const crisisToday = {
-    title: "CRISIS DEL DÍA: RIESGO DE ABASTECIMIENTO",
-    subtitle: "Si el agua cae por debajo del 6%, habrá penalización de moral y productividad.",
-    impact: ["-12% eficiencia de tareas", "+18% riesgo médico", "IA recomienda expedición de agua en < 2h"],
-    urgency: "VENTANA SEGURA: 01:45:00",
-  };
+    title: 'CRISIS DEL DÍA: RIESGO DE ABASTECIMIENTO',
+    subtitle: 'Si el agua cae por debajo del 6%, habrá penalización de moral y productividad.',
+    impact: [
+      '-12% eficiencia de tareas',
+      '+18% riesgo médico',
+      'IA recomienda expedición de agua en < 2h',
+    ],
+    urgency: 'VENTANA SEGURA: 01:45:00',
+  }
   const rowVariants = {
     hidden: { opacity: 0, y: 10 },
     show: { opacity: 1, y: 0, transition: { ...MOTION.base, staggerChildren: 0.07 } },
-  };
+  }
   const cardVariants = {
     hidden: { opacity: 0, y: 8, scale: 0.99 },
     show: { opacity: 1, y: 0, scale: 1, transition: MOTION.base },
-  };
+  }
 
   const levelTone = (level: Notification["level"]) => {
     if (level === "critical") return { color: "#DC2626", label: "CRÍTICA", bg: "#DC262622" };
@@ -3287,8 +3752,9 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
             transition={MOTION.alert}
             className="pointer-events-none absolute inset-0"
             style={{
-              background: "radial-gradient(circle at 50% 0%, rgba(220,38,38,0.18) 0%, rgba(220,38,38,0) 60%)",
-              border: "1px solid rgba(220,38,38,0.22)",
+              background:
+                'radial-gradient(circle at 50% 0%, rgba(220,38,38,0.18) 0%, rgba(220,38,38,0) 60%)',
+              border: '1px solid rgba(220,38,38,0.22)',
               zIndex: 0,
             }}
           />
@@ -3296,7 +3762,12 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
       </AnimatePresence>
 
       {/* KPI row (top priority, as original flow) */}
-      <motion.div variants={rowVariants} initial="hidden" animate="show" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+      <motion.div
+        variants={rowVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3"
+      >
         {[
           { icon: Users, color: "#0D9488", value: String(kpi.populationTotal), label: "POBLACIÓN TOTAL", sub: `${kpi.activePopulation} ACTIVOS`, subColor: "#0D9488", subIcon: TrendingUp },
           { icon: Package, color: "#DC2626", value: String(kpi.criticalResources), label: "RECURSOS CRÍTICOS", sub: "CRÍTICO", subColor: "#DC2626", subIcon: TrendingDown, pulse: kpi.criticalResources > 0 },
@@ -3306,12 +3777,20 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
           <motion.div key={label} variants={cardVariants}>
             <Card glow={color}>
               <div className="flex items-start justify-between mb-2">
-                <div className={`p-2 rounded-sm ${pulse ? "animate-pulse" : ""}`} style={{ background: `${color}22` }}>
+                <div
+                  className={`p-2 rounded-sm ${pulse ? 'animate-pulse' : ''}`}
+                  style={{ background: `${color}22` }}
+                >
                   <Icon size={20} style={{ color }} />
                 </div>
                 <div className="flex items-center gap-1">
                   <SubIcon size={10} style={{ color: subColor }} />
-                  <span className="admin-text-micro" style={{ fontFamily: "'Share Tech Mono', monospace", color: subColor }}>{sub}</span>
+                  <span
+                    className="admin-text-micro"
+                    style={{ fontFamily: "'Share Tech Mono', monospace", color: subColor }}
+                  >
+                    {sub}
+                  </span>
                 </div>
               </div>
               <div className="admin-kpi-value" style={{ fontFamily: "'Orbitron', monospace", fontWeight: 900, color: "#EEF3FB" }}>{value}</div>
@@ -3339,14 +3818,20 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
           <div
             className="p-3 rounded-sm admin-stack-md"
             style={{
-              background: "radial-gradient(circle at 0% 0%, rgba(220,38,38,0.25) 0%, rgba(220,38,38,0.08) 42%, rgba(13,13,16,1) 100%)",
-              border: "1px solid #7F1D1D",
+              background:
+                'radial-gradient(circle at 0% 0%, rgba(220,38,38,0.25) 0%, rgba(220,38,38,0.08) 42%, rgba(13,13,16,1) 100%)',
+              border: '1px solid #7F1D1D',
             }}
           >
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
-                <AlertTriangle size={12} style={{ color: "#DC2626" }} />
-                <span className="admin-text-micro" style={{ fontFamily: "'Share Tech Mono', monospace", color: "#FCA5A5" }}>{crisisToday.title}</span>
+                <AlertTriangle size={12} style={{ color: '#DC2626' }} />
+                <span
+                  className="admin-text-micro"
+                  style={{ fontFamily: "'Share Tech Mono', monospace", color: '#FCA5A5' }}
+                >
+                  {crisisToday.title}
+                </span>
               </div>
               <Badge label="MISIÓN PRIORITARIA" color="#DC2626" />
             </div>
@@ -3377,7 +3862,10 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
           <Card>
             <SectionHeader title="TENDENCIA DE RECURSOS — ÚLTIMOS 7 DÍAS" />
             <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={resourceTrendData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <AreaChart
+                data={resourceTrendData}
+                margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
+              >
                 <defs>
                   {[["gFood", "#4AAED2"], ["gWater", "#0D9488"], ["gAmmo", "#DC2626"]].map(([id, color]) => (
                     <linearGradient key={id} id={id} x1="0" y1="0" x2="0" y2="1">
@@ -3403,14 +3891,24 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
             <SectionHeader title="ESTADO DE LA POBLACIÓN" />
             <ResponsiveContainer width="100%" height={150}>
               <PieChart>
-                <Pie data={populationData} cx="50%" cy="50%" innerRadius={45} outerRadius={65} dataKey="value" strokeWidth={0}>
-                  {populationData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                <Pie
+                  data={populationData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={45}
+                  outerRadius={65}
+                  dataKey="value"
+                  strokeWidth={0}
+                >
+                  {populationData.map((entry, index) => (
+                    <Cell key={index} fill={entry.color} />
+                  ))}
                   <DonutCenter total={totalPop} />
                 </Pie>
               </PieChart>
             </ResponsiveContainer>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-1">
-              {populationData.map(d => (
+              {populationData.map((d) => (
                 <div key={d.name} className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: d.color }} />
                   <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "#B8C7DB" }}>{d.name}: </span>
@@ -3429,7 +3927,7 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
             <SectionHeader title="ALERTAS VIVAS — TOP 3" />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               {liveAlerts.slice(0, 3).map((alert, index) => {
-                const tone = levelTone(alert.level);
+                const tone = levelTone(alert.level)
                 return (
                   <motion.div
                     key={alert.id}
@@ -3442,14 +3940,24 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 12, color: "#EEF3FB", fontWeight: 700 }}>{alert.title}</span>
                       <span
-                        className={alert.level === "critical" ? "animate-pulse" : ""}
+                        style={{
+                          fontFamily: "'Rajdhani', sans-serif",
+                          fontSize: 12,
+                          color: '#F5F0E8',
+                          fontWeight: 700,
+                        }}
+                      >
+                        {alert.title}
+                      </span>
+                      <span
+                        className={alert.level === 'critical' ? 'animate-pulse' : ''}
                         style={{
                           fontFamily: "'Share Tech Mono', monospace",
                           fontSize: 9,
                           color: tone.color,
                           background: tone.bg,
                           border: `1px solid ${tone.color}44`,
-                          padding: "1px 4px",
+                          padding: '1px 4px',
                           borderRadius: 2,
                           flexShrink: 0,
                         }}
@@ -3460,7 +3968,7 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
                     <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: 11, color: "#B8C7DB", marginBottom: 4 }}>{alert.body}</p>
                     <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 9, color: UI_COLORS.textFaint }}>{alert.time}</span>
                   </motion.div>
-                );
+                )
               })}
             </div>
           </Card>
@@ -3481,7 +3989,10 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
                       <module.icon size={11} style={{ color: module.color }} />
                       <span className="admin-text-micro" style={{ fontFamily: "'Share Tech Mono', monospace", color: "#EEF3FB" }}>{module.name}</span>
                     </div>
-                    <span className={`admin-text-micro ${module.status === "BLOQUEADO" ? "animate-pulse" : ""}`} style={{ fontFamily: "'Share Tech Mono', monospace", color: module.color }}>
+                    <span
+                      className={`admin-text-micro ${module.status === 'BLOQUEADO' ? 'animate-pulse' : ''}`}
+                      style={{ fontFamily: "'Share Tech Mono', monospace", color: module.color }}
+                    >
                       {module.status}
                     </span>
                   </div>
@@ -3516,9 +4027,8 @@ function ViewDashboard({ onQuickNav, notifs }: { onQuickNav?: (target: NavSectio
         </Card>
       </div>
     </div>
-  );
+  )
 }
-
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -3589,9 +4099,9 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    const t = setInterval(() => setServerTime(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
+    const t = setInterval(() => setServerTime(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
 
   useEffect(() => {
     void loadGlobalNotifications();
@@ -3637,12 +4147,12 @@ export default function AdminDashboard() {
   }, [sessionPanelOpen]);
 
   const quickAccess: { icon: React.ElementType; label: string; target: NavSection }[] = [
-    { icon: Users, label: "Poblacion", target: "POBLACIÓN" },
-    { icon: UserPlus, label: "Admisiones", target: "ADMISIONES IA" },
-    { icon: Package, label: "Inventario", target: "INVENTARIO" },
-    { icon: Map, label: "Expediciones", target: "EXPEDICIONES" },
-    { icon: Radio, label: "Intercamp", target: "INTER-CAMPAMENTOS" },
-  ];
+    { icon: Users, label: 'Poblacion', target: 'POBLACIÓN' },
+    { icon: UserPlus, label: 'Admisiones', target: 'ADMISIONES IA' },
+    { icon: Package, label: 'Inventario', target: 'INVENTARIO' },
+    { icon: Map, label: 'Expediciones', target: 'EXPEDICIONES' },
+    { icon: Radio, label: 'Intercamp', target: 'INTER-CAMPAMENTOS' },
+  ]
 
   const navWithSidebar: NavSection[] = [
     "POBLACIÓN",
@@ -3658,7 +4168,12 @@ export default function AdminDashboard() {
   const hasSidebar = navWithSidebar.includes(activeNav);
 
   const fmtTime = (d: Date) =>
-    d.toLocaleTimeString("es-CR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+    d.toLocaleTimeString('es-CR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    })
 
   const renderSection = () => {
     switch (activeNav) {
@@ -3682,34 +4197,34 @@ export default function AdminDashboard() {
       case "CONFIGURACIÓN": return <ViewConfiguracion mode={configViewMode} />;
       default: return <ViewDashboard onQuickNav={setActiveNav} notifs={notifs} />;
     }
-  };
+  }
 
   const handleDockNav = (target: NavSection) => {
     if (activeNav === target) {
-      if (target === "POBLACIÓN") {
-        setActiveNav("CENTRO DE MANDO");
-        return;
+      if (target === 'POBLACIÓN') {
+        setActiveNav('CENTRO DE MANDO')
+        return
       }
-      setActiveNav("CENTRO DE MANDO");
-      return;
+      setActiveNav('CENTRO DE MANDO')
+      return
     }
 
-    if (target === "POBLACIÓN") {
-      setPopulationViewMode("stats");
-      setActiveNav("POBLACIÓN");
-      return;
+    if (target === 'POBLACIÓN') {
+      setPopulationViewMode('stats')
+      setActiveNav('POBLACIÓN')
+      return
     }
 
-    if (target === "ADMISIONES IA") {
-      setAdmissionsViewMode("queue");
-      setActiveNav(target);
-      return;
+    if (target === 'ADMISIONES IA') {
+      setAdmissionsViewMode('queue')
+      setActiveNav(target)
+      return
     }
 
-    if (target === "INVENTARIO") {
-      setInventoryViewMode("summary");
-      setActiveNav(target);
-      return;
+    if (target === 'INVENTARIO') {
+      setInventoryViewMode('summary')
+      setActiveNav(target)
+      return
     }
 
     if (target === "EXPEDICIONES") {
@@ -3719,38 +4234,38 @@ export default function AdminDashboard() {
       return;
     }
 
-    if (target === "INTER-CAMPAMENTOS") {
-      setIntercampViewMode("pending");
-      setActiveNav(target);
-      return;
+    if (target === 'INTER-CAMPAMENTOS') {
+      setIntercampViewMode('pending')
+      setActiveNav(target)
+      return
     }
 
-    if (target === "SEGURIDAD / LOGS") {
-      setSecurityViewMode("live");
-      setActiveNav(target);
-      return;
+    if (target === 'SEGURIDAD / LOGS') {
+      setSecurityViewMode('live')
+      setActiveNav(target)
+      return
     }
 
-    if (target === "LOGROS") {
-      setLogrosViewMode("overview");
-      setActiveNav(target);
-      return;
+    if (target === 'LOGROS') {
+      setLogrosViewMode('overview')
+      setActiveNav(target)
+      return
     }
 
-    if (target === "NOTIFICACIONES") {
-      setNotifsViewMode("all");
-      setActiveNav(target);
-      return;
+    if (target === 'NOTIFICACIONES') {
+      setNotifsViewMode('all')
+      setActiveNav(target)
+      return
     }
 
-    if (target === "CONFIGURACIÓN") {
-      setConfigViewMode("camp");
-      setActiveNav(target);
-      return;
+    if (target === 'CONFIGURACIÓN') {
+      setConfigViewMode('camp')
+      setActiveNav(target)
+      return
     }
 
-    setActiveNav(target);
-  };
+    setActiveNav(target)
+  }
 
   return (
     <>
@@ -3974,7 +4489,10 @@ export default function AdminDashboard() {
               )}
 
             {/* MAIN */}
-            <div className="admin-main flex-1 flex flex-col overflow-hidden" style={{ position: "relative", zIndex: 1 }}>
+            <div
+              className="admin-main flex-1 flex flex-col overflow-hidden"
+              style={{ position: 'relative', zIndex: 1 }}
+            >
               {/* Header */}
               <header className="admin-header relative flex-shrink-0 px-4 py-3"
                 style={{ background: "transparent", borderBottom: "none" }}>
@@ -4215,13 +4733,13 @@ export default function AdminDashboard() {
               </main>
               <footer className={`admin-dock${hasSidebar ? " admin-dock--sidebar-offset" : ""}`} aria-label="Acceso rapido">
                 {quickAccess.map((item) => {
-                  const isActive = activeNav === item.target;
-                  const Icon = item.icon;
+                  const isActive = activeNav === item.target
+                  const Icon = item.icon
                   return (
                     <button
                       key={item.target}
                       type="button"
-                      className={`admin-dock-item${isActive ? " admin-dock-item--active" : ""}`}
+                      className={`admin-dock-item${isActive ? ' admin-dock-item--active' : ''}`}
                       onClick={() => handleDockNav(item.target)}
                       onMouseEnter={item.target === "EXPEDICIONES" ? warmExpeditionsModule : undefined}
                       onFocus={item.target === "EXPEDICIONES" ? warmExpeditionsModule : undefined}
@@ -4230,7 +4748,7 @@ export default function AdminDashboard() {
                       <span className="admin-dock-label">{item.label}</span>
                       <Icon size={16} />
                     </button>
-                  );
+                  )
                 })}
               </footer>
             </div>
@@ -4238,5 +4756,5 @@ export default function AdminDashboard() {
         </div>
       </div>
     </>
-  );
+  )
 }

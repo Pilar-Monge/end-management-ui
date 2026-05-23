@@ -1,15 +1,15 @@
-import { useOrientation } from '../../../shared/hooks/useOrientation';
-import './OrientationWarning.css';
+import { useOrientation } from '../../../shared/hooks/useOrientation'
+import './OrientationWarning.css'
 
 export function OrientationWarning() {
-  const orientation = useOrientation();
+  const orientation = useOrientation()
 
-  const isMobileDevice = /iPhone|iPad|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  
+  const isMobileDevice = /iPhone|iPad|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent,
+  )
 
-  const isPortrait = orientation === 'portrait';
-  const shouldShowWarning = isMobileDevice && isPortrait;
-
+  const isPortrait = orientation === 'portrait'
+  const shouldShowWarning = isMobileDevice && isPortrait
 
   return (
     <>
@@ -19,10 +19,12 @@ export function OrientationWarning() {
             <div className="orientation-warning-icon">⟲</div>
             <h2>Gira tu dispositivo</h2>
             <p>Esta aplicación SOLO funciona en modo horizontal</p>
-            <p className="orientation-warning-subtitle">Por favor, gira tu dispositivo para continuar</p>
+            <p className="orientation-warning-subtitle">
+              Por favor, gira tu dispositivo para continuar
+            </p>
           </div>
         </div>
       )}
     </>
-  );
+  )
 }

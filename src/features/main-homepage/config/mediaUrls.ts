@@ -1,10 +1,9 @@
-
-const MEDIA_BASE_URL = "https://tuieldonbxswmopvyryx.supabase.co/storage/v1/object/public/";
+const MEDIA_BASE_URL = 'https://tuieldonbxswmopvyryx.supabase.co/storage/v1/object/public/'
 
 export const MEDIA_URLS = {
   images: {
-    earthDark: "https://unpkg.com/three-globe/example/img/earth-dark.jpg",
-    earthTopology: "https://unpkg.com/three-globe/example/img/earth-topology.png",
+    earthDark: 'https://unpkg.com/three-globe/example/img/earth-dark.jpg',
+    earthTopology: 'https://unpkg.com/three-globe/example/img/earth-topology.png',
     characters: {
       principal: `${MEDIA_BASE_URL}1.principal/1.principal.webp`,
       mecanico: `${MEDIA_BASE_URL}1.principal/2.mecanico.webp`,
@@ -15,17 +14,13 @@ export const MEDIA_URLS = {
     run: `${MEDIA_BASE_URL}fondo/persona%20corriendo.mp4`,
     transition: `${MEDIA_BASE_URL}fondo/fondo_transicion.mp4`,
   },
-  models: {
-    
-  },
-  sounds: {
-   
-  },
+  models: {},
+  sounds: {},
   textures: {
-    noise: "https://grainy-gradients.vercel.app/noise.svg",
+    noise: 'https://grainy-gradients.vercel.app/noise.svg',
   },
   branding: {
     logo: `${MEDIA_BASE_URL}1.principal/logo_pentadev.webp`,
-    background: "/images/bg2.jpg",
-  }
-};
+    background: '/images/bg2.jpg',
+  },
+}
