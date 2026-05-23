@@ -24,6 +24,8 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom'
 import { MEDIA_URLS } from '../config/mediaUrls'
 import { loginRequest } from '../../login/services/authApi'
+import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
+import { getPostLoginRoute, normalizeUserRole } from '../../../shared/services/postLoginRouting'
 import type { LoginErrors, LoginForm } from '../../login/types'
 import { useAuthDispatch } from '../../../shared/context/AuthContext'
 
@@ -690,19 +692,14 @@ export function MainHomePage() {
 
     try {
       const response = await loginRequest(authForm)
-      const normalizedUser = { ...response.user, role: response.user.rol }
+      const normalizedUser = {
+        ...response.user,
+        role: normalizeUserRole(response.user.rol),
+      }
       localStorage.setItem('token', response.token)
       localStorage.setItem('user', JSON.stringify(normalizedUser))
-
-      let redirectPath = '/app'
-      if (normalizedUser.role === 'SYSTEM_ADMIN') {
-        redirectPath = '/admin-main-view-ui'
-      } else if (normalizedUser.role === 'RESOURCE_MANAGEMENT') {
-        redirectPath = '/resource-main-view'
-      } else if (normalizedUser.role === 'TRAVEL_MANAGER') {
-        redirectPath = '/expeditions'
-      }
-      navigate(redirectPath)
+      window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
+      navigate(getPostLoginRoute(normalizedUser.role), { replace: true })
     } catch (error) {
       setAuthErrors({
         general:
