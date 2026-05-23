@@ -68,8 +68,6 @@ import { prefetchExpeditionsData } from "../expeditions/useExpeditionsState";
 import { prefetchExpeditionsWorldMap } from "../expeditions/components/ExpeditionsWorldMap";
 
 
-const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Permanent+Marker&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');`;
-
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Permanent+Marker&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');`
 
 type NavSection =

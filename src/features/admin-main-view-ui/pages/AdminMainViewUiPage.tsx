@@ -1066,7 +1066,7 @@ export default function AdminMainViewUiPage() {
   const handleSyncComplete = useCallback(() => {
     setSyncState('ready');
     window.setTimeout(() => {
-      navigate('/admin-dashboard');
+      navigate('/admin-dashboard-ui-v2');
     }, 420);
   }, [navigate]);
 
