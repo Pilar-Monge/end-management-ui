@@ -5,16 +5,11 @@ type WorkerSectionId =
   | 'dashboard'
   | 'recoleccion'
   | 'notificaciones'
-  | 'cobertura'
-  | 'tiempo'
 
 type WorkerSection = {
   id: WorkerSectionId
   label: string
   shortLabel: string
-  subOptions: string[]
-  allowedActions: string[]
-  deniedActions?: string[]
   note: string
   icon: ReactNode
 }
@@ -24,7 +19,6 @@ const WORKER_NAV_DATA: WorkerSection[] = [
     id: 'dashboard',
     label: 'Dashboard personal',
     shortLabel: 'DB',
-    allowedActions: ['Ver dashboard personal', 'Abrir resumen del turno', 'Revisar actividad reciente'],
     note: 'El worker solo tiene acceso a dashboard personal. No puede acceder a dashboard general, inventario ni expediciones.',
     icon: <DashboardIcon />,
   },
@@ -32,8 +26,6 @@ const WORKER_NAV_DATA: WorkerSection[] = [
     id: 'recoleccion',
     label: 'Recoleccion diaria',
     shortLabel: 'RC',
-    allowedActions: ['Ver detalle de registro', 'Consultar historial', 'Inspeccionar observaciones'],
-    deniedActions: ['Crear', 'Listar', 'Ajustar', 'Actualizar', 'Eliminar'],
     note: 'Según la matriz, worker solo puede ver el detalle del registro de recoleccion diaria.',
     icon: <CollectionIcon />,
   },
@@ -41,7 +33,6 @@ const WORKER_NAV_DATA: WorkerSection[] = [
     id: 'notificaciones',
     label: 'Notificaciones',
     shortLabel: 'NT',
-    allowedActions: ['Listar notificaciones', 'Ver detalle', 'Actualizar notificacion'],
     note: 'Worker puede listar, ver detalle y actualizar notificaciones, pero no crearlas ni eliminarlas.',
     icon: <NotificationIcon />,
   },
@@ -49,7 +40,6 @@ const WORKER_NAV_DATA: WorkerSection[] = [
     id: 'ocupaciones',
     label: 'Ocupaciones',
     shortLabel: 'OC',
-    allowedActions: ['Listar ocupaciones', 'Ver detalle de ocupacion', 'Buscar ocupacion'],
     note: 'El acceso a ocupaciones es de solo lectura para worker.',
     icon: <OccupationIcon />,
   },
@@ -57,25 +47,8 @@ const WORKER_NAV_DATA: WorkerSection[] = [
     id: 'cobertura',
     label: 'Cobertura de oficio',
     shortLabel: 'CB',
-    allowedActions: [
-      'Ver cobertura por campamento',
-      'Ver cobertura por ocupacion',
-      'Ver ocupaciones criticas',
-      'Ver ocupaciones en riesgo',
-      'Ver sugerencias de reemplazo',
-      'Auto asignar reemplazo',
-    ],
     note: 'Este es uno de los pocos módulos donde worker conserva el conjunto completo de acciones.',
     icon: <CoverageIcon />,
-  },
-  {
-    id: 'tiempo',
-    label: 'Tiempo del sistema',
-    shortLabel: 'TS',
-    allowedActions: ['Obtener hora'],
-    deniedActions: ['Avanzar tiempo', 'Desplazar tiempo'],
-    note: 'El worker solo puede consultar la hora pública. Las acciones de avance o desplazamiento están restringidas.',
-    icon: <ClockIcon />,
   },
 ]
 
@@ -85,7 +58,6 @@ export function WorkerMainViewPage() {
   const [hasEntered, setHasEntered] = useState(false)
 
   const [activeSectionId, setActiveSectionId] = useState<WorkerSectionId>('dashboard')
-  const [selectedAction, setSelectedAction] = useState('Ver dashboard personal')
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -108,9 +80,7 @@ export function WorkerMainViewPage() {
   }
 
   const handleSectionSelect = (id: WorkerSectionId) => {
-    const nextSection = WORKER_NAV_DATA.find((item) => item.id === id)
     setActiveSectionId(id)
-    setSelectedAction(nextSection?.allowedActions[0] ?? '')
   }
 
   return (
@@ -140,8 +110,6 @@ export function WorkerMainViewPage() {
               <div className="worker-content">
                 <GenericWorkerContent
                   section={activeSection}
-                  selectedAction={selectedAction}
-                  onActionSelect={setSelectedAction}
                 />
               </div>
             </section>
@@ -198,12 +166,8 @@ function LoadingOverlay({
 
 function GenericWorkerContent({
   section,
-  selectedAction,
-  onActionSelect,
 }: {
   section: WorkerSection
-  selectedAction: string
-  onActionSelect: (action: string) => void
 }) {
   return (
     <div className="worker-content-grid worker-content-grid-single">
@@ -213,26 +177,6 @@ function GenericWorkerContent({
         <p>
           {section.note}
         </p>
-      </article>
-
-      <article className="worker-card">
-        <div className="worker-card-label">Acciones permitidas</div>
-        <div className="worker-action-strip">
-          {section.allowedActions.map((action) => (
-            <button
-              key={action}
-              type="button"
-              className={`worker-action-btn ${selectedAction === action ? 'is-active' : ''}`}
-              onClick={() => onActionSelect(action)}
-            >
-              {action}
-            </button>
-          ))}
-        </div>
-        <div className="worker-action-summary">
-          <span>Accion activa</span>
-          <strong>{selectedAction || 'Sin seleccionar'}</strong>
-        </div>
       </article>
 
       {renderModuleDetails(section)}
@@ -428,33 +372,6 @@ function renderModuleDetails(section: WorkerSection) {
         </>
       )
 
-    case 'tiempo':
-      return (
-        <>
-          <article className="worker-card worker-card-wide">
-            <div className="worker-card-label">Hora actual</div>
-            <div className="worker-time-box">
-              <strong>14:32:18</strong>
-              <span>Consulta pública del sistema</span>
-            </div>
-          </article>
-
-          <article className="worker-card worker-card-wide">
-            <div className="worker-card-label">Permisos y restricciones</div>
-            <div className="worker-note-grid">
-              <div>
-                <h4>Permitido</h4>
-                <p>Obtener hora actual desde el endpoint público.</p>
-              </div>
-              <div>
-                <h4>Bloqueado</h4>
-                <p>Avanzar tiempo y desplazar tiempo permanecen exclusivos de SYSTEM_ADMIN.</p>
-              </div>
-            </div>
-          </article>
-        </>
-      )
-
     default:
       return null
   }
@@ -465,15 +382,6 @@ function IconSvg({ children }: { children: ReactNode }) {
     <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" className="worker-svg-icon">
       {children}
     </svg>
-  )
-}
-
-function ClockIcon() {
-  return (
-    <IconSvg>
-      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.7" />
-      <path d="M12 8v4l2.5 1.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-    </IconSvg>
   )
 }
 
