@@ -46,9 +46,7 @@ export default function LoginPage() {
         setForm((prev) => ({ ...prev, campId: parsed.campId }))
         localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(parsed.campId))
       }
-    } catch {
-      // Ignore malformed cached user
-    }
+    } catch {    }
   }, [authState?.selectedCampId])
 
   function validate(): boolean {

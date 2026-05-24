@@ -868,12 +868,14 @@ function CoverageSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser
 
         if (!isMounted) return
 
-        setOccupationOptions(occupations.items)
-        setCoverageRows(coverage)
-        setCriticalRows(critical)
-        setAtRiskRows(atRisk)
+        setOccupationOptions(occupations.items ?? [])
+        setCoverageRows(coverage ?? [])
+        setCriticalRows(critical ?? [])
+        setAtRiskRows(atRisk ?? [])
 
-        setSelectedOccupationId((current) => current ?? atRisk[0]?.occupationId ?? occupations.items[0]?.id ?? null)
+        setSelectedOccupationId((current) =>
+          current ?? atRisk?.[0]?.occupationId ?? occupations.items?.[0]?.id ?? null,
+        )
       } catch (fetchError) {
         if (isMounted) setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar la cobertura')
       } finally {
@@ -908,8 +910,8 @@ function CoverageSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser
 
         if (!isMounted) return
 
-        setSelectedCoverage(coverage)
-        setSuggestions(replacementSuggestions)
+        setSelectedCoverage(coverage ?? null)
+        setSuggestions(replacementSuggestions ?? [])
       } catch (fetchError) {
         if (isMounted) setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar la cobertura seleccionada')
       } finally {
