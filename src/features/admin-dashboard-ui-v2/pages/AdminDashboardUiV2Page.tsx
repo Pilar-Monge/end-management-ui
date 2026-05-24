@@ -79,8 +79,12 @@ interface UiAdmission {
   score: number;
   badge: string | null;
   status: "pending" | "approved" | "rejected";
+  workflowStatus: "PENDING_AI" | "PENDING_ADMIN" | "APPROVED" | "REJECTED";
   skills: string[];
   reason: string;
+  suggestedOccupationId?: number;
+  finalOccupationId?: number;
+  rejectionReason?: string;
 }
 
 interface UiExpedition {
@@ -661,15 +665,21 @@ export default function AdminDashboardUiV2Page() {
     return { total, active, injured, missing };
   }, [persons]);
 
-  const admissionsQueue = admissions.filter((admission) => admission.status === "pending");
-  const admissionsHistory = admissions.filter((admission) => admission.status !== "pending");
+  const admissionsQueue = admissions.filter((admission) => admission.workflowStatus === "PENDING_ADMIN");
+  const admissionsHistory = admissions.filter(
+    (admission) => admission.workflowStatus === "APPROVED" || admission.workflowStatus === "REJECTED",
+  );
 
   const activeNavData = NAVIGATION_DATA.find((item) => item.id === activeNav) ?? NAVIGATION_DATA[0];
   const isDashboardView = activeNav === "centro";
 
-  const handleAdmissionDecision = async (id: number, decision: "approved" | "rejected") => {
+  const handleAdmissionDecision = async (
+    id: number,
+    decision: "approved" | "rejected",
+    options?: { finalOccupationId?: number; finalRole?: string; rejectionReason?: string },
+  ) => {
     try {
-      await updateAdmissionRequestStatus(id, decision);
+      await updateAdmissionRequestStatus(id, decision, options);
       setAdmissions((prev) => prev.map((admission) => (admission.id === id ? { ...admission, status: decision } : admission)));
       notifyModule(
         "admisiones",
@@ -1085,7 +1095,11 @@ function ContentArea({
   campCatalog: Camp[];
   campNameById: Map<number, string>;
   occupationNameById: Map<number, string>;
-  onAdmissionDecision: (id: number, decision: "approved" | "rejected") => Promise<void>;
+  onAdmissionDecision: (
+    id: number,
+    decision: "approved" | "rejected",
+    options?: { finalOccupationId?: number; finalRole?: string; rejectionReason?: string },
+  ) => Promise<void>;
   onCompleteExpedition: (id: number) => Promise<void>;
   onIntercampDecision: (id: number, status: "APROBADO" | "RECHAZADO") => Promise<void>;
   onPopulationReload: () => Promise<void>;
@@ -1239,6 +1253,7 @@ function ContentArea({
           admissions={admissions}
           admissionsQueue={admissionsQueue}
           admissionsHistory={admissionsHistory}
+          occupations={occupationNameById}
           onAdmissionDecision={onAdmissionDecision}
         />
       )}
@@ -2156,15 +2171,27 @@ function AdmissionsModule({
   admissions,
   admissionsQueue,
   admissionsHistory,
+  occupations,
   onAdmissionDecision,
 }: {
   sub: string;
   admissions: UiAdmission[];
   admissionsQueue: UiAdmission[];
   admissionsHistory: UiAdmission[];
-  onAdmissionDecision: (id: number, decision: "approved" | "rejected") => Promise<void>;
+  occupations: Map<number, string>;
+  onAdmissionDecision: (
+    id: number,
+    decision: "approved" | "rejected",
+    options?: { finalOccupationId?: number; finalRole?: string; rejectionReason?: string },
+  ) => Promise<void>;
 }) {
   const [selectedAdmission, setSelectedAdmission] = useState<UiAdmission | null>(null);
+  const [reviewForm, setReviewForm] = useState({
+    finalOccupationId: 0,
+    finalRole: "",
+    rejectionReason: "",
+  });
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [page, setPage] = useState(1);
   const limit = 6;
 
@@ -2176,16 +2203,58 @@ function AdmissionsModule({
   const safePage = Math.min(page, totalPages);
   const pagedList = activeList.slice((safePage - 1) * limit, safePage * limit);
 
-  const scoreTone = (score: number) => {
-    if (score < 30) return "danger";
-    if (score < 70) return "warn";
-    return "ok";
-  };
-
   const statusLabel = (status: UiAdmission["status"]) => {
     if (status === "pending") return "Pendiente";
     if (status === "approved") return "Aprobada";
     return "Rechazada";
+  };
+
+  const workflowStatusLabel = (status: UiAdmission["workflowStatus"]) => {
+    if (status === "PENDING_AI") return "Pendiente IA";
+    if (status === "PENDING_ADMIN") return "Pendiente admin";
+    if (status === "APPROVED") return "Aprobada";
+    return "Rechazada";
+  };
+
+  const iaTone = (score: number) => {
+    if (score < 40) return "danger";
+    if (score < 70) return "warn";
+    return "ok";
+  };
+
+  const openAdmissionDetail = (admission: UiAdmission) => {
+    setSelectedAdmission(admission);
+    setReviewForm({
+      finalOccupationId: admission.finalOccupationId ?? admission.suggestedOccupationId ?? 0,
+      finalRole: "WORKER",
+      rejectionReason: admission.rejectionReason ?? "",
+    });
+  };
+
+  const canReviewSelected = selectedAdmission?.workflowStatus === "PENDING_ADMIN";
+
+  const submitAdmissionReview = async (decision: "approved" | "rejected") => {
+    if (!selectedAdmission || reviewSubmitting || !canReviewSelected) return;
+
+    if (decision === "approved") {
+      if (!reviewForm.finalOccupationId || !reviewForm.finalRole.trim()) return;
+    }
+
+    if (decision === "rejected") {
+      if (!reviewForm.rejectionReason.trim()) return;
+    }
+
+    setReviewSubmitting(true);
+    try {
+      await onAdmissionDecision(selectedAdmission.id, decision, {
+        finalOccupationId: decision === "approved" ? reviewForm.finalOccupationId : undefined,
+        finalRole: decision === "approved" ? reviewForm.finalRole : undefined,
+        rejectionReason: decision === "rejected" ? reviewForm.rejectionReason : undefined,
+      });
+      setSelectedAdmission(null);
+    } finally {
+      setReviewSubmitting(false);
+    }
   };
 
   return (
@@ -2205,16 +2274,19 @@ function AdmissionsModule({
                   <div className="admin-ui-v2-adm-name">
                     {admission.name}
                     {admission.badge && <span className="admin-ui-v2-pill is-danger">{admission.badge}</span>}
+                    <span className={`admin-ui-v2-pill ${admission.workflowStatus === "PENDING_ADMIN" ? "is-warn" : admission.workflowStatus === "PENDING_AI" ? "is-neutral" : admission.workflowStatus === "APPROVED" ? "is-ok" : "is-danger"}`}>
+                      {workflowStatusLabel(admission.workflowStatus)}
+                    </span>
                   </div>
                   <div className="admin-ui-v2-adm-prof">{admission.profession}</div>
                 </div>
-                <div className={`admin-ui-v2-adm-score ${scoreTone(admission.score)}`}>
+                <div className={`admin-ui-v2-adm-score ${iaTone(admission.score)}`}>
                   {admission.score}
                 </div>
               </div>
 
               <div className="admin-ui-v2-adm-bar">
-                <div className={`admin-ui-v2-adm-bar-fill ${scoreTone(admission.score)}`} style={{ width: `${Math.max(0, Math.min(100, admission.score))}%` }} />
+                <div className={`admin-ui-v2-adm-bar-fill ${iaTone(admission.score)}`} style={{ width: `${Math.max(0, Math.min(100, admission.score))}%` }} />
               </div>
 
               <p className="admin-ui-v2-adm-reason">{admission.reason}</p>
@@ -2228,9 +2300,15 @@ function AdmissionsModule({
               )}
 
               <div className="admin-ui-v2-actions">
-                <button className="admin-ui-v2-btn" type="button" onClick={() => setSelectedAdmission(admission)}>Ver detalle</button>
-                <button className="admin-ui-v2-btn is-ok" type="button" onClick={() => void onAdmissionDecision(admission.id, "approved")}>Aprobar</button>
-                <button className="admin-ui-v2-btn is-danger" type="button" onClick={() => void onAdmissionDecision(admission.id, "rejected")}>Rechazar</button>
+                <button className="admin-ui-v2-btn" type="button" onClick={() => openAdmissionDetail(admission)}>Ver detalle</button>
+                {admission.workflowStatus === "PENDING_ADMIN" ? (
+                  <>
+                    <button className="admin-ui-v2-btn is-ok" type="button" onClick={() => openAdmissionDetail(admission)}>Revisar y aprobar</button>
+                    <button className="admin-ui-v2-btn is-danger" type="button" onClick={() => openAdmissionDetail(admission)}>Revisar y rechazar</button>
+                  </>
+                ) : (
+                  <span className="admin-ui-v2-muted">Pendiente de IA o ya procesada</span>
+                )}
               </div>
             </div>
           ))}
@@ -2254,12 +2332,12 @@ function AdmissionsModule({
                 <td>{admission.profession}</td>
                 <td>{admission.score}</td>
                 <td>
-                  <span className={`admin-ui-v2-pill ${admission.status === "approved" ? "is-ok" : "is-danger"}`}>
-                    {statusLabel(admission.status)}
+                  <span className={`admin-ui-v2-pill ${admission.workflowStatus === "APPROVED" ? "is-ok" : admission.workflowStatus === "REJECTED" ? "is-danger" : "is-warn"}`}>
+                    {workflowStatusLabel(admission.workflowStatus)}
                   </span>
                 </td>
                 <td>
-                  <button className="admin-ui-v2-btn" type="button" onClick={() => setSelectedAdmission(admission)}>
+                  <button className="admin-ui-v2-btn" type="button" onClick={() => openAdmissionDetail(admission)}>
                     Ver detalle
                   </button>
                 </td>
@@ -2300,6 +2378,9 @@ function AdmissionsModule({
               <div><strong>Profesión:</strong> {selectedAdmission.profession}</div>
               <div><strong>Score IA:</strong> {selectedAdmission.score}/100</div>
               <div><strong>Estado:</strong> {statusLabel(selectedAdmission.status)}</div>
+              <div><strong>Flujo:</strong> {workflowStatusLabel(selectedAdmission.workflowStatus)}</div>
+              <div><strong>Oficio sugerido IA:</strong> {typeof selectedAdmission.suggestedOccupationId === "number" ? occupations.get(selectedAdmission.suggestedOccupationId) ?? `Ocupación #${selectedAdmission.suggestedOccupationId}` : "No definido"}</div>
+              <div><strong>Oficio final:</strong> {typeof selectedAdmission.finalOccupationId === "number" ? occupations.get(selectedAdmission.finalOccupationId) ?? `Ocupación #${selectedAdmission.finalOccupationId}` : "Sin asignar"}</div>
               <div><strong>Razón:</strong> {selectedAdmission.reason}</div>
               {selectedAdmission.skills.length > 0 && (
                 <div className="admin-ui-v2-adm-skills">
@@ -2309,11 +2390,69 @@ function AdmissionsModule({
                 </div>
               )}
 
-              {selectedAdmission.status === "pending" && (
-                <div className="admin-ui-v2-actions">
-                  <button className="admin-ui-v2-btn is-ok" type="button" onClick={() => void onAdmissionDecision(selectedAdmission.id, "approved")}>Aprobar admisión</button>
-                  <button className="admin-ui-v2-btn is-danger" type="button" onClick={() => void onAdmissionDecision(selectedAdmission.id, "rejected")}>Rechazar</button>
-                </div>
+              {canReviewSelected ? (
+                <>
+                  <div className="admin-ui-v2-form-grid">
+                    <label className="admin-ui-v2-muted">Oficio final (requerido para aprobar)</label>
+                    <select
+                      className="v-select"
+                      value={reviewForm.finalOccupationId}
+                      onChange={(event) => setReviewForm((prev) => ({ ...prev, finalOccupationId: Number(event.target.value) }))}
+                    >
+                      <option value={0}>Selecciona oficio final</option>
+                      {Array.from(occupations.entries()).map(([id, name]) => (
+                        <option key={id} value={id}>{name}</option>
+                      ))}
+                    </select>
+
+                    <label className="admin-ui-v2-muted">Rol de sistema (requerido para aprobar)</label>
+                    <select
+                      className="v-select"
+                      value={reviewForm.finalRole}
+                      onChange={(event) => setReviewForm((prev) => ({ ...prev, finalRole: event.target.value }))}
+                    >
+                      <option value="">Selecciona rol final</option>
+                      <option value="WORKER">WORKER</option>
+                      <option value="TRAVEL_MANAGER">TRAVEL_MANAGER</option>
+                      <option value="RESOURCE_MANAGEMENT">RESOURCE_MANAGEMENT</option>
+                    </select>
+
+                    <label className="admin-ui-v2-muted">Motivo de rechazo (obligatorio al rechazar)</label>
+                    <textarea
+                      className="v-textarea"
+                      value={reviewForm.rejectionReason}
+                      onChange={(event) => setReviewForm((prev) => ({ ...prev, rejectionReason: event.target.value }))}
+                      placeholder="Motivo documentado para auditoria"
+                    />
+                  </div>
+
+                  <div className="admin-ui-v2-actions">
+                    <button
+                      className="admin-ui-v2-btn is-ok"
+                      type="button"
+                      disabled={reviewSubmitting || !reviewForm.finalOccupationId || !reviewForm.finalRole.trim()}
+                      onClick={() => void submitAdmissionReview("approved")}
+                    >
+                      {reviewSubmitting ? "Procesando..." : "Aprobar admisión"}
+                    </button>
+                    <button
+                      className="admin-ui-v2-btn is-danger"
+                      type="button"
+                      disabled={reviewSubmitting || !reviewForm.rejectionReason.trim()}
+                      onClick={() => void submitAdmissionReview("rejected")}
+                    >
+                      {reviewSubmitting ? "Procesando..." : "Rechazar"}
+                    </button>
+                  </div>
+
+                  <p className="admin-ui-v2-muted">
+                    Al aprobar, se crea automaticamente la persona y su cuenta de acceso.
+                  </p>
+                </>
+              ) : (
+                <p className="admin-ui-v2-muted">
+                  Esta solicitud no esta lista para revision administrativa. Solo se puede revisar en estado PENDING_ADMIN.
+                </p>
               )}
             </div>
           </div>
