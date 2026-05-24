@@ -349,6 +349,30 @@
   z-index: 0;
 }
 
+.audio-panel-brush {
+  position: fixed;
+  background: linear-gradient(135deg, rgba(8, 18, 50, 0.98), rgba(0, 0, 0, 0.98));
+  clip-path: polygon(
+    1% 2%,
+    98% 0%,
+    100% 4%,
+    99% 15%,
+    100% 30%,
+    98% 45%,
+    100% 60%,
+    99% 75%,
+    100% 90%,
+    97% 100%,
+    2% 98%,
+    0% 85%,
+    1% 70%,
+    0% 55%,
+    1% 40%,
+    0% 25%,
+    1% 10%
+  );
+}
+
 .panel-contrast-accent {
   box-shadow: 0 0 40px rgba(56, 189, 248, 0.1);
 }

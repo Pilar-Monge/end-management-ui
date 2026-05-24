@@ -1,8 +1,8 @@
-import { Suspense, lazy, type ReactNode } from 'react'
+import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import LoginPage from './features/login/pages/LoginPage'
-import { GlobalOrientationWarning } from './shared/components/GlobalOrientationWarning'
+import { MobileOrientationView } from './shared/components/MobileOrientationView'
 import { FullscreenButton } from './shared/components/FullscreenButton'
 import { useSessionManager } from './shared/hooks'
 
@@ -123,11 +123,68 @@ function CatalogsLayout() {
 }
 
 function App() {
+  const [isPortrait, setIsPortrait] = useState(true)
+
+  const isMobileDevice = 
+    /iPhone|iPad|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    (typeof screen !== 'undefined' && (screen.availWidth < 600 || screen.availHeight < 600)) ||
+    (typeof window !== 'undefined' && window.innerWidth < 600)
+
+  useEffect(() => {
+    const handleNavigation = () => {
+      const currentPath = window.location.pathname
+      if (
+        currentPath !== '/login' &&
+        currentPath !== '/' &&
+        !currentPath.includes('main-homepage')
+      ) {
+        localStorage.setItem('previousRoute', currentPath)
+      }
+    }
+
+    window.addEventListener('popstate', handleNavigation)
+    handleNavigation()
+
+    return () => {
+      window.removeEventListener('popstate', handleNavigation)
+    }
+  }, [])
+
+  useEffect(() => {
+    const checkOrientation = () => {
+      setIsPortrait(window.matchMedia('(orientation: portrait)').matches)
+    }
+
+    checkOrientation()
+
+    const mediaQuery = window.matchMedia('(orientation: portrait)')
+    const handler = (e: MediaQueryListEvent) => setIsPortrait(e.matches)
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handler)
+    } else {
+      window.addEventListener('resize', checkOrientation)
+      window.addEventListener('orientationchange', checkOrientation)
+    }
+
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', handler)
+      } else {
+        window.removeEventListener('resize', checkOrientation)
+        window.removeEventListener('orientationchange', checkOrientation)
+      }
+    }
+  }, [])
+
   useSessionManager()
+
+  if (isMobileDevice && isPortrait) {
+    return <MobileOrientationView />
+  }
 
   return (
     <>
-      <GlobalOrientationWarning />
       <FullscreenButton />
       <Routes>
         <Route path="/" element={<HomePage />} />
