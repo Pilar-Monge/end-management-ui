@@ -48,6 +48,8 @@ import {
 import { ExpeditionsWorldMap } from "../../admin-dashboard/expeditions/components/ExpeditionsWorldMap";
 import type { MappedCampPoint } from "../../admin-dashboard/expeditions/types";
 import { SESSION_TOKEN_CHANGED_EVENT } from "../../../shared/services/sessionService";
+import { ApiHttpError } from "../../../shared/services/httpClient";
+import { getErrorMessage } from "../../../shared/services/errorMessages";
 import "../../expeditions-ui/expeditionsUi.css";
 import "../../admin-dashboard/expeditions/expeditions-panel.css";
 import "./admin-dashboard-ui-v2.css";
@@ -120,6 +122,15 @@ interface DashboardKpi {
   injuredPopulation: number;
   sickPopulation: number;
   outPopulation: number;
+}
+
+type ModuleMessageType = "info" | "warning" | "error" | "success";
+
+interface ModuleFeedback {
+  section: AdminSectionId | "global";
+  message: string;
+  type: ModuleMessageType;
+  id: number;
 }
 
 interface ResourceTrendPoint {
@@ -458,6 +469,20 @@ export default function AdminDashboardUiV2Page() {
   const [lookupId, setLookupId] = useState("");
   const [sessionState, setSessionState] = useState<"ACTIVA" | "INACTIVA">("INACTIVA");
   const [lastActivityAt, setLastActivityAt] = useState(Date.now());
+  const [moduleFeedback, setModuleFeedback] = useState<ModuleFeedback | null>(null);
+
+  const notifyModule = useCallback(
+    (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => {
+      setModuleFeedback({ section, type, message, id: Date.now() });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!moduleFeedback) return;
+    const timeout = window.setTimeout(() => setModuleFeedback(null), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [moduleFeedback]);
 
   const loadCoreData = useCallback(async () => {
     setIsDataLoading(true);
@@ -491,7 +516,7 @@ export default function AdminDashboardUiV2Page() {
 
       const failedCount = results.filter((result) => result.status === "rejected").length;
       if (failedCount > 0) {
-        setDataError(`Se cargaron datos parciales: ${failedCount} modulo(s) fallaron en backend.`);
+        notifyModule("global", "warning", `Se cargaron datos parciales: ${failedCount} modulo(s) fallaron en backend.`);
       }
 
       setPersons(personsData);
@@ -517,11 +542,12 @@ export default function AdminDashboardUiV2Page() {
         outPopulation: extractNumberByHint(generalDashboard, ["missing", "outside", "out"], personsData.filter((person) => person.status === "MISSING").length),
       });
     } catch (error) {
-      setDataError(error instanceof Error ? error.message : "No se pudo cargar la data inicial");
+      setDataError(getErrorMessage(error, "load_dashboard"));
+      notifyModule("global", "error", "No se logro completar la sincronizacion general de modulos.");
     } finally {
       setIsDataLoading(false);
     }
-  }, []);
+  }, [notifyModule]);
 
   useEffect(() => {
     if (!hasEntered) return;
@@ -555,7 +581,7 @@ export default function AdminDashboardUiV2Page() {
 
   useEffect(() => {
     const evaluateSession = () => {
-      const hasToken = Boolean(localStorage.getItem("token"));
+      const hasToken = Boolean(localStorage.getItem("token") ?? localStorage.getItem("accessToken"));
       if (!hasToken) {
         setSessionState("INACTIVA");
         return;
@@ -587,6 +613,7 @@ export default function AdminDashboardUiV2Page() {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("accessToken");
     localStorage.removeItem("user");
     window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT));
     navigate("/");
@@ -644,8 +671,13 @@ export default function AdminDashboardUiV2Page() {
     try {
       await updateAdmissionRequestStatus(id, decision);
       setAdmissions((prev) => prev.map((admission) => (admission.id === id ? { ...admission, status: decision } : admission)));
+      notifyModule(
+        "admisiones",
+        "success",
+        decision === "approved" ? "Admision aprobada correctamente." : "Admision rechazada correctamente.",
+      );
     } catch (error) {
-      setDataError(error instanceof Error ? error.message : "No se pudo actualizar la admisión");
+      setDataError(getErrorMessage(error, "update_admission"));
     }
   };
 
@@ -653,15 +685,16 @@ export default function AdminDashboardUiV2Page() {
     try {
       await completeExpedition(id);
       setExpeditions((prev) => prev.map((expedition) => (expedition.id === id ? { ...expedition, status: "COMPLETADA" } : expedition)));
+      notifyModule("expediciones", "success", `Expedicion #${id} marcada como completada.`);
     } catch (error) {
-      setDataError(error instanceof Error ? error.message : "No se pudo completar la expedición");
+      setDataError(getErrorMessage(error, "complete_expedition"));
     }
   };
 
   const handleLookupIntercamp = async () => {
     const id = Number(lookupId);
     if (!Number.isFinite(id) || id <= 0) {
-      setDataError("Ingresa un ID válido para buscar registros inter-campamento");
+      notifyModule("intercamp", "warning", "Ingresa un ID valido para buscar registros inter-campamento.");
       return;
     }
 
@@ -680,13 +713,14 @@ export default function AdminDashboardUiV2Page() {
         const record = await load();
         const mapped = mapIntercampFromApi(record) as UiIntercampRequest;
         setIntercampRequests((prev) => [mapped, ...prev.filter((item) => item.id !== mapped.id)]);
+        notifyModule("intercamp", "success", `Registro inter-campamento #${mapped.id} sincronizado.`);
         return;
       } catch {
         // Keep trying remaining endpoints
       }
     }
 
-    setDataError("No se encontró un registro inter-campamento con ese ID");
+    notifyModule("intercamp", "warning", "No se encontro un registro inter-campamento con ese ID.");
   };
 
   const handleIntercampDecision = async (id: number, status: "APROBADO" | "RECHAZADO") => {
@@ -695,8 +729,15 @@ export default function AdminDashboardUiV2Page() {
       const updated = await updateIntercampRequestStatus(id, backendStatus);
       const mapped = mapIntercampFromApi(updated) as UiIntercampRequest;
       setIntercampRequests((prev) => prev.map((item) => (item.id === id ? mapped : item)));
+      notifyModule(
+        "intercamp",
+        "success",
+        status === "APROBADO"
+          ? `Solicitud #${id} aprobada correctamente.`
+          : `Solicitud #${id} rechazada correctamente.`,
+      );
     } catch (error) {
-      setDataError(error instanceof Error ? error.message : "No se pudo actualizar la solicitud inter-campamento");
+      setDataError(getErrorMessage(error, "update_intercamp"));
     }
   };
 
@@ -723,6 +764,7 @@ export default function AdminDashboardUiV2Page() {
                       sub={activeSub}
                       isDataLoading={isDataLoading}
                       dataError={dataError}
+                      moduleFeedback={moduleFeedback}
                       persons={persons}
                       dashboardKpi={dashboardKpi}
                       notifications={notifications}
@@ -750,6 +792,7 @@ export default function AdminDashboardUiV2Page() {
                       resourceTrendData={resourceTrendData}
                       onQuickNav={handleNavClick}
                       onSetDataError={setDataError}
+                      onSetModuleFeedback={notifyModule}
                     />
                   </div>
                 ) : (
@@ -764,6 +807,7 @@ export default function AdminDashboardUiV2Page() {
                         sub={activeSub}
                         isDataLoading={isDataLoading}
                         dataError={dataError}
+                        moduleFeedback={moduleFeedback}
                         persons={persons}
                         dashboardKpi={dashboardKpi}
                         notifications={notifications}
@@ -791,6 +835,7 @@ export default function AdminDashboardUiV2Page() {
                         resourceTrendData={resourceTrendData}
                         onQuickNav={handleNavClick}
                         onSetDataError={setDataError}
+                        onSetModuleFeedback={notifyModule}
                       />
                     </div>
                   </div>
@@ -985,6 +1030,7 @@ function ContentArea({
   sub,
   isDataLoading,
   dataError,
+  moduleFeedback,
   persons,
   dashboardKpi,
   notifications,
@@ -1012,11 +1058,13 @@ function ContentArea({
   onDashboardReload,
   onQuickNav,
   onSetDataError,
+  onSetModuleFeedback,
 }: {
   section: AdminSectionId;
   sub: string;
   isDataLoading: boolean;
   dataError: string | null;
+  moduleFeedback: ModuleFeedback | null;
   persons: Person[];
   dashboardKpi: DashboardKpi;
   notifications: UiNotification[];
@@ -1044,7 +1092,102 @@ function ContentArea({
   onDashboardReload: () => Promise<void>;
   onQuickNav: (id: AdminSectionId) => void;
   onSetDataError: (message: string | null) => void;
+  onSetModuleFeedback: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
 }) {
+  const unreadNotificationsCount = useMemo(
+    () => notifications.filter((item) => !item.read).length,
+    [notifications],
+  );
+  const criticalUnreadCount = useMemo(
+    () => notifications.filter((item) => !item.read && item.level === "critical").length,
+    [notifications],
+  );
+  const activeExpeditionsCount = useMemo(
+    () => expeditions.filter((item) => item.status !== "COMPLETADA").length,
+    [expeditions],
+  );
+  const pendingIntercampCount = useMemo(
+    () => intercampRequests.filter((item) => item.status === "PENDIENTE").length,
+    [intercampRequests],
+  );
+
+  const moduleWarnings = useMemo(() => {
+    if (section === "centro") {
+      if (threatLevel >= 80) {
+        return ["Riesgo operativo alto: prioriza inventario, admisiones e inter-campamento."];
+      }
+      if (criticalUnreadCount > 0) {
+        return [`Hay ${criticalUnreadCount} alerta(s) critica(s) sin atender.`];
+      }
+      return [];
+    }
+
+    if (section === "poblacion") {
+      if (persons.length === 0) {
+        return ["No hay registros de población cargados en este momento."];
+      }
+      return [];
+    }
+
+    if (section === "admisiones") {
+      if (admissionsQueue.length > 0) {
+        return [`Hay ${admissionsQueue.length} admision(es) pendiente(s) de decision.`];
+      }
+      return [];
+    }
+
+    if (section === "inventario") {
+      if (dashboardKpi.criticalResources > 0) {
+        return [`Se detectaron ${dashboardKpi.criticalResources} recurso(s) en estado critico.`];
+      }
+      return [];
+    }
+
+    if (section === "expediciones") {
+      if (activeExpeditionsCount === 0) {
+        return ["No hay expediciones activas. Valida si necesitas programar una operacion."];
+      }
+      return [];
+    }
+
+    if (section === "intercamp") {
+      if (pendingIntercampCount > 0) {
+        return [`Hay ${pendingIntercampCount} solicitud(es) inter-campamento pendiente(s).`];
+      }
+      return [];
+    }
+
+    if (section === "seguridad") {
+      if (criticalUnreadCount > 0) {
+        return ["Existen alertas criticas sin cierre en el sistema."];
+      }
+      return [];
+    }
+
+    if (section === "notificaciones") {
+      if (unreadNotificationsCount > 0) {
+        return [`Tienes ${unreadNotificationsCount} notificacion(es) sin leer.`];
+      }
+      return [];
+    }
+
+    if (section === "configuracion") {
+      return ["Los cambios de configuracion pueden impactar toda la operacion del sistema."];
+    }
+
+    return [];
+  }, [
+    section,
+    threatLevel,
+    criticalUnreadCount,
+    persons.length,
+    admissionsQueue.length,
+    dashboardKpi.criticalResources,
+    activeExpeditionsCount,
+    pendingIntercampCount,
+    unreadNotificationsCount,
+  ]);
+
   return (
     <div className="admin-ui-v2-content">
       <div className="admin-ui-v2-meta">
@@ -1055,6 +1198,12 @@ function ContentArea({
 
       {isDataLoading && <PanelMessage label="Sincronizando datos del backend..." type="info" />}
       {dataError && <PanelMessage label={dataError} type="error" />}
+      {moduleFeedback && (moduleFeedback.section === "global" || moduleFeedback.section === section) && (
+        <PanelMessage key={moduleFeedback.id} label={moduleFeedback.message} type={moduleFeedback.type} />
+      )}
+      {moduleWarnings.map((warningMessage) => (
+        <PanelMessage key={warningMessage} label={warningMessage} type="warning" />
+      ))}
 
       {section === "centro" && (
         <DashboardModule
@@ -1080,6 +1229,7 @@ function ContentArea({
           occupations={occupationNameById}
           onReload={onPopulationReload}
           onError={onSetDataError}
+          onNotice={onSetModuleFeedback}
         />
       )}
 
@@ -1450,6 +1600,7 @@ function PopulationModule({
   occupations,
   onReload,
   onError,
+  onNotice,
 }: {
   sub: string;
   persons: Person[];
@@ -1457,6 +1608,7 @@ function PopulationModule({
   occupations: Map<number, string>;
   onReload: () => Promise<void>;
   onError: (message: string | null) => void;
+  onNotice: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"Todos" | "Activo" | "Herido" | "Desaparecido" | "Fallecido">("Todos");
@@ -1473,6 +1625,7 @@ function PopulationModule({
     campId: 0,
     occupationId: 0,
     notes: "",
+    accountStatus: "ACTIVE" as "ACTIVE" | "BLOCKED" | "INACTIVE",
   });
 
   const [assignments, setAssignments] = useState<TempRoleAssignment[]>(INITIAL_TEMP_ASSIGNMENTS);
@@ -1574,6 +1727,7 @@ function PopulationModule({
       campId: person.campId,
       occupationId: person.occupationId,
       notes: person.notes ?? "",
+      accountStatus: person.accountStatus ?? "ACTIVE",
     });
   };
 
@@ -1591,8 +1745,9 @@ function PopulationModule({
       await deletePerson(personId);
       await onReload();
       setSelectedPerson(null);
+      onNotice("poblacion", "success", "Registro de persona eliminado correctamente.");
     } catch (error) {
-      onError(error instanceof Error ? error.message : "No se pudo eliminar la persona");
+      onError(getErrorMessage(error, "delete_person"));
     } finally {
       setIsSaving(false);
     }
@@ -1604,20 +1759,39 @@ function PopulationModule({
     setIsSaving(true);
     onError(null);
     try {
-      await updatePerson(selectedPerson.id, {
-        firstName: editForm.firstName.trim(),
-        lastName: editForm.lastName.trim(),
+      const normalizedFirstName = String(editForm.firstName ?? "").trim();
+      const normalizedLastName = String(editForm.lastName ?? "").trim();
+      const normalizedNotes = String(editForm.notes ?? "").trim();
+
+      const payload = {
+        firstName: normalizedFirstName,
+        lastName: normalizedLastName,
         age: Number(editForm.age),
         status: editForm.status,
+        currentStatus: editForm.status,
         campId: Number(editForm.campId),
         occupationId: Number(editForm.occupationId),
-        notes: editForm.notes.trim() || undefined,
-      });
+        notes: normalizedNotes || undefined,
+      };
+
+      try {
+        await updatePerson(selectedPerson.id, {
+          ...payload,
+          accountStatus: editForm.accountStatus,
+        });
+      } catch (error) {
+        if (!(error instanceof ApiHttpError) || error.statusCode !== 400) {
+          throw error;
+        }
+
+        await updatePerson(selectedPerson.id, payload);
+      }
       await onReload();
       setIsEditMode(false);
       setSelectedPerson(null);
+      onNotice("poblacion", "success", "Datos de persona actualizados correctamente.");
     } catch (error) {
-      onError(error instanceof Error ? error.message : "No se pudo actualizar la persona");
+      onError(getErrorMessage(error, "update_person"));
     } finally {
       setIsSaving(false);
     }
@@ -1747,6 +1921,7 @@ function PopulationModule({
                 <th>Nombre</th>
                 <th>Rol</th>
                 <th>Estado</th>
+                <th>Cuenta</th>
                 <th>Edad</th>
                 <th>Sector</th>
                 <th>Ingreso</th>
@@ -1772,6 +1947,11 @@ function PopulationModule({
                       {legacyPopulationStatus(person.status)}
                     </span>
                   </td>
+                  <td>
+                    <span className={`admin-ui-v2-pill ${person.accountStatus === "ACTIVE" ? "is-ok" : person.accountStatus === "BLOCKED" ? "is-warn" : "is-danger"}`}>
+                      {person.accountStatus ?? "ACTIVE"}
+                    </span>
+                  </td>
                   <td>{person.age}</td>
                   <td>{camps.get(person.campId) ?? `Camp #${person.campId}`}</td>
                   <td>{new Date(person.admissionDate).toLocaleDateString("es-CR")}</td>
@@ -1786,7 +1966,7 @@ function PopulationModule({
               ))}
               {filteredPersons.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="admin-ui-v2-empty-cell">No hay personas para mostrar con esos filtros.</td>
+                  <td colSpan={8} className="admin-ui-v2-empty-cell">No hay personas para mostrar con esos filtros.</td>
                 </tr>
               )}
             </tbody>
@@ -1927,6 +2107,11 @@ function PopulationModule({
                   <option value="MISSING">Desaparecido</option>
                   <option value="DECEASED">Fallecido</option>
                 </select>
+                <select className="v-select" value={editForm.accountStatus} onChange={(event) => setEditForm((prev) => ({ ...prev, accountStatus: event.target.value as "ACTIVE" | "BLOCKED" | "INACTIVE" }))}>
+                  <option value="ACTIVE">Cuenta activa</option>
+                  <option value="BLOCKED">Cuenta bloqueada</option>
+                  <option value="INACTIVE">Cuenta inactiva</option>
+                </select>
                 <select className="v-select" value={editForm.campId} onChange={(event) => setEditForm((prev) => ({ ...prev, campId: Number(event.target.value) }))}>
                   {Array.from(camps.entries()).map(([id, name]) => (
                     <option key={id} value={id}>{name}</option>
@@ -1948,6 +2133,7 @@ function PopulationModule({
                 <div><strong>Nombre:</strong> {personFullName(selectedPerson)}</div>
                 <div><strong>Edad:</strong> {selectedPerson.age}</div>
                 <div><strong>Estado:</strong> {normalizeStatusLabel(selectedPerson.status)}</div>
+                <div><strong>Estado de cuenta:</strong> {selectedPerson.accountStatus ?? "ACTIVE"}</div>
                 <div><strong>Rol:</strong> {occupations.get(selectedPerson.occupationId) ?? `Ocupación #${selectedPerson.occupationId}`}</div>
                 <div><strong>Sector:</strong> {camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}</div>
                 <div><strong>Ingreso:</strong> {new Date(selectedPerson.admissionDate).toLocaleDateString("es-CR")}</div>
@@ -2426,7 +2612,7 @@ function MetricCard({ label, value, tone }: { label: string; value: number; tone
   );
 }
 
-function PanelMessage({ label, type }: { label: string; type: "info" | "error" }) {
+function PanelMessage({ label, type }: { label: string; type: "info" | "warning" | "error" | "success" }) {
   return <div className={`admin-ui-v2-message ${type}`}>{label}</div>;
 }
 

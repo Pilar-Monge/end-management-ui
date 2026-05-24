@@ -4035,7 +4035,7 @@ export default function AdminDashboard() {
   const parsedUser = (() => {
     if (!storedUserRaw) return null;
     try {
-      const value = JSON.parse(storedUserRaw) as { username?: string; rol?: string; campId?: number };
+      const value = JSON.parse(storedUserRaw) as { username?: string; role?: string; rol?: string; campId?: number };
       return value;
     } catch {
       return null;
@@ -4043,7 +4043,7 @@ export default function AdminDashboard() {
   })();
 
   const mapBackendRoleToAppRole = (role?: string): AppRole => {
-    if (!role) return "SYSTEM_ADMIN";
+    if (!role) return "TRABAJADOR";
     if (role === "SYSTEM_ADMIN") return "SYSTEM_ADMIN";
     if (role === "RESOURCE_MANAGEMENT" || role === "GESTION_RECURSOS") return "GESTION_RECURSOS";
     if (role === "WORKER" || role === "TRABAJADOR") return "TRABAJADOR";
@@ -4051,7 +4051,7 @@ export default function AdminDashboard() {
     return "TRABAJADOR";
   };
 
-  const currentRole: AppRole = mapBackendRoleToAppRole(parsedUser?.rol);
+  const currentRole: AppRole = mapBackendRoleToAppRole(parsedUser?.role ?? parsedUser?.rol);
   const currentCampId = typeof parsedUser?.campId === "number" ? parsedUser.campId : 1;
   const [sessionPanelOpen, setSessionPanelOpen] = useState(false);
   const [profilePreviewOpen, setProfilePreviewOpen] = useState(false);

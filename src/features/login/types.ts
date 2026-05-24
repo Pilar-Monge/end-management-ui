@@ -30,4 +30,9 @@ export interface LoginApiResponse {
     campId: number
   }
 }
-export type LoginErrors = Partial<LoginForm & { general: string }>
+export type LoginErrors = Partial<{
+  username: string
+  password: string
+  campId: string
+  general: string
+}>

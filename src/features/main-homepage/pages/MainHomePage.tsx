@@ -26,6 +26,7 @@ import { MEDIA_URLS } from '../config/mediaUrls'
 import { loginRequest } from '../../login/services/authApi'
 import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
 import { getPostLoginRoute, normalizeUserRole } from '../../../shared/services/postLoginRouting'
+import { getErrorMessage } from '../../../shared/services/errorMessages'
 import type { LoginErrors, LoginForm } from '../../login/types'
 import { useAuthDispatch } from '../../../shared/context/AuthContext'
 
@@ -531,6 +532,8 @@ type appState =
   | 'global-map'
   | 'camp-detail'
 
+const LAST_SELECTED_CAMP_ID_KEY = 'last_selected_camp_id'
+
 export function MainHomePage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -538,6 +541,16 @@ export function MainHomePage() {
   const containerRef = useRef<HTMLDivElement>(null)
   const initialAppState = (location.state as { initialAppState?: appState } | null)?.initialAppState
   const sessionMessage = (location.state as { sessionMessage?: string } | null)?.sessionMessage
+
+  const readPersistedCampId = useCallback((): number | null => {
+    const fromLocation = (location.state as { campId?: number } | null)?.campId
+    if (typeof fromLocation === 'number' && fromLocation > 0) return fromLocation
+
+    const fromStorage = localStorage.getItem(LAST_SELECTED_CAMP_ID_KEY)
+    if (!fromStorage) return null
+    const parsed = Number(fromStorage)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+  }, [location.state])
 
   const [appState, setAppState] = useState<appState>(initialAppState ?? 'landing')
   const [selectedCamp, setSelectedCamp] = useState<any>(null)
@@ -551,6 +564,12 @@ export function MainHomePage() {
       setAuthErrors((prev) => ({ ...prev, general: sessionMessage }))
     }
   }, [sessionMessage])
+
+  useEffect(() => {
+    const campId = readPersistedCampId()
+    if (!campId) return
+    setAuthForm((prev) => (prev.campId === campId ? prev : { ...prev, campId }))
+  }, [readPersistedCampId])
 
   useEffect(() => {
     if (appState === 'intro') {
@@ -613,7 +632,7 @@ export function MainHomePage() {
   const [authForm, setAuthForm] = useState<LoginForm>({
     username: '',
     password: '',
-    campId: null as any,
+    campId: null,
   })
   const [authErrors, setAuthErrors] = useState<LoginErrors>({})
   const [isAuthenticating, setIsAuthenticating] = useState(false)
@@ -671,6 +690,15 @@ export function MainHomePage() {
     if (authForm.password.length > 0 && authForm.password.length < 6)
       nextErrors.password = 'Minimo 6 caracteres'
 
+    if (!authForm.campId || authForm.campId <= 0) {
+      nextErrors.campId = 'Debes seleccionar un campamento en el globo'
+    }
+
+    if (!authForm.campId || authForm.campId <= 0) {
+      ;(nextErrors as LoginErrors & { campId?: string }).campId =
+        'Debes seleccionar un campamento antes de iniciar sesion.'
+    }
+
     setAuthErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -715,6 +743,7 @@ export function MainHomePage() {
       localStorage.setItem('accessToken', token)
       window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
       localStorage.setItem('user', JSON.stringify(normalizedUser))
+      localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(response.user.campId))
 
       const defaultRoute = getPostLoginRoute(normalizedUser.role)
       const redirectPath =
@@ -725,8 +754,7 @@ export function MainHomePage() {
       navigate(redirectPath, { replace: true })
     } catch (error) {
       setAuthErrors({
-        general:
-          error instanceof Error ? error.message : 'No se pudo iniciar sesion contra el backend',
+        general: getErrorMessage(error, 'login'),
       })
     } finally {
       setIsAuthenticating(false)
@@ -2350,6 +2378,33 @@ export function MainHomePage() {
                       )}
                     </div>
 
+                    {appState === 'login' && (
+                      <div className="space-y-3 w-full max-w-[260px]">
+                        <label className="text-[11px] uppercase font-bold tracking-[0.2em] text-white block">
+                          Campamento
+                        </label>
+                        <div className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-2.5 text-white font-mono text-xs flex items-center justify-between gap-2">
+                          <span>
+                            {authForm.campId && authForm.campId > 0
+                              ? `Campamento #${authForm.campId}`
+                              : 'No seleccionado'}
+                          </span>
+                          <button
+                            type="button"
+                            className="text-[10px] uppercase tracking-[0.12em] text-blue-300 hover:text-blue-200"
+                            onClick={() => setAppState('global-map')}
+                          >
+                            {authForm.campId && authForm.campId > 0 ? 'Cambiar' : 'Seleccionar'}
+                          </button>
+                        </div>
+                        {authErrors.campId && (
+                          <p className="text-[10px] text-red-400 uppercase tracking-[0.08em]">
+                            {authErrors.campId}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     {appState === 'register' && (
                       <div className="space-y-3 w-full max-w-[260px]">
                         <label className="text-[11px] uppercase font-bold tracking-[0.2em] text-white block">
@@ -2565,6 +2620,7 @@ export function MainHomePage() {
                     if (campId > 0) {
                       authDispatch({ type: 'SELECT_CAMP', payload: campId })
                       setAuthForm((prev) => ({ ...prev, campId }))
+                      localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(campId))
                     }
                   }}
                 />

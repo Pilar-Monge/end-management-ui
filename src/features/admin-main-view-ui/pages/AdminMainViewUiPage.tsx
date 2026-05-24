@@ -1167,6 +1167,7 @@ export default function AdminMainViewUiPage() {
               label="Cerrar sesiÃ³n"
               onClick={() => {
                 window.localStorage.removeItem('token')
+                window.localStorage.removeItem('accessToken')
                 window.localStorage.removeItem('user')
                 window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
                 navigate('/')

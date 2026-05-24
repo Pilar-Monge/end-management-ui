@@ -62,9 +62,16 @@ export function useSessionManager() {
 
     syncSessionManager()
     window.addEventListener(SESSION_TOKEN_CHANGED_EVENT, syncSessionManager)
+    const onStorageChange = (event: StorageEvent) => {
+      if (!event.key) return
+      if (event.key !== 'token' && event.key !== 'accessToken' && event.key !== 'user') return
+      syncSessionManager()
+    }
+    window.addEventListener('storage', onStorageChange)
 
     return () => {
       window.removeEventListener(SESSION_TOKEN_CHANGED_EVENT, syncSessionManager)
+      window.removeEventListener('storage', onStorageChange)
       sessionService.stop()
       isInitializedRef.current = false
     }

@@ -749,10 +749,22 @@
   background: rgba(105, 191, 183, 0.1);
 }
 
+.admin-ui-v2-message.warning {
+  color: #fbd38d;
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.16);
+}
+
 .admin-ui-v2-message.error {
   color: #f3a8a8;
   border-color: rgba(239, 68, 68, 0.4);
   background: rgba(239, 68, 68, 0.12);
+}
+
+.admin-ui-v2-message.success {
+  color: #8ef0bb;
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(52, 211, 153, 0.14);
 }
 
 .admin-ui-v2-table {
