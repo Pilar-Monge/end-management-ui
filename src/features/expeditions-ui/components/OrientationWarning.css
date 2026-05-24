@@ -1,0 +1,112 @@
+.orientation-warning {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 14, 0.98);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+
+.orientation-warning.orientation-warning-active {
+  background: rgba(10, 14, 14, 1);
+  z-index: 99999;
+  pointer-events: auto !important;
+}
+
+.orientation-warning * {
+  pointer-events: auto;
+}
+
+.orientation-warning-content {
+  text-align: center;
+  color: #a4c2c5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 40px 20px;
+  max-width: 90vw;
+}
+
+.orientation-warning-icon {
+  font-size: 72px;
+  animation: rotate-warning 2s linear infinite;
+  color: #69bfb7;
+  filter: drop-shadow(0 0 8px rgba(105, 191, 183, 0.6));
+}
+
+.orientation-warning-content h2 {
+  font-size: 36px;
+  color: #f0fafa;
+  margin: 0;
+  font-family:
+    'Arial Narrow', 'Bahnschrift', 'Segoe UI Condensed', 'Roboto Condensed', Arial, sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -1px;
+  line-height: 1.2;
+}
+
+.orientation-warning-content p {
+  font-size: 18px;
+  margin: 0;
+  color: #67aca9;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.orientation-warning-content .orientation-warning-subtitle {
+  font-size: 14px;
+  color: #a4c2c5;
+  opacity: 0.8;
+  font-weight: 400;
+}
+
+@keyframes rotate-warning {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+body.orientation-portrait {
+  overflow: hidden !important;
+  height: 100vh !important;
+  width: 100vw !important;
+}
+
+@media (max-height: 300px) {
+  .orientation-warning-content {
+    gap: 12px;
+    padding: 20px 15px;
+  }
+
+  .orientation-warning-icon {
+    font-size: 48px;
+  }
+
+  .orientation-warning-content h2 {
+    font-size: 24px;
+  }
+
+  .orientation-warning-content p {
+    font-size: 14px;
+  }
+}
+
+@media (orientation: portrait) {
+  .game-screen-layout {
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .orientation-warning {
+    pointer-events: auto;
+    z-index: 999999;
+  }
+}

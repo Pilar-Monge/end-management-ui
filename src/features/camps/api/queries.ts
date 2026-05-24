@@ -1,18 +1,37 @@
 import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
-import type { Camp, CampWithStats, ApiError } from '../types'
+import type { Camp, CampWithStats, CampsStats, CampResourceItem, ApiError } from '../types'
 import { campsKeys, ENDPOINTS } from './keys'
 
-const getToken = () => localStorage.getItem('token')
+const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('accessToken')
 
 const getHeaders = (): HeadersInit => ({
   'Content-Type': 'application/json',
   Authorization: `Bearer ${getToken() || ''}`,
 })
 
+function unwrapPayload<T>(payload: unknown): T {
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    return (payload as { data: T }).data
+  }
+  return payload as T
+}
+
+function unwrapList<T>(payload: unknown): T[] {
+  const data = unwrapPayload<unknown>(payload)
+  if (Array.isArray(data)) return data as T[]
+  if (data && typeof data === 'object') {
+    const objectData = data as Record<string, unknown>
+    if (Array.isArray(objectData.items)) return objectData.items as T[]
+    if (Array.isArray(objectData.results)) return objectData.results as T[]
+  }
+  return []
+}
+
 export async function fetchCamps(): Promise<Camp[]> {
   const res = await fetch(ENDPOINTS.camps, { headers: getHeaders() })
   if (!res.ok) throw new Error('Failed to fetch camps')
-  return res.json()
+  const payload = await res.json()
+  return unwrapList<Camp>(payload)
 }
 
 export function useCamps(
@@ -28,7 +47,8 @@ export function useCamps(
 export async function fetchCampById(id: number): Promise<CampWithStats> {
   const res = await fetch(`${ENDPOINTS.camps}/${id}`, { headers: getHeaders() })
   if (!res.ok) throw new Error('Failed to fetch camp')
-  return res.json()
+  const payload = await res.json()
+  return unwrapPayload<CampWithStats>(payload)
 }
 
 export function useCampById(
@@ -42,33 +62,35 @@ export function useCampById(
   })
 }
 
-export async function fetchCampStats(): Promise<any> {
+export async function fetchCampStats(): Promise<CampsStats> {
   const res = await fetch(ENDPOINTS.campStats, { headers: getHeaders() })
   if (!res.ok) throw new Error('Failed to fetch camp stats')
-  return res.json()
+  const payload = await res.json()
+  return unwrapPayload<CampsStats>(payload)
 }
 
 export function useCampStats(
-  options?: Omit<UseQueryOptions<any, ApiError>, 'queryKey' | 'queryFn'>,
+  options?: Omit<UseQueryOptions<CampsStats, ApiError>, 'queryKey' | 'queryFn'>,
 ) {
-  return useQuery({
+  return useQuery<CampsStats, ApiError>({
     queryKey: campsKeys.stats(),
     queryFn: fetchCampStats,
     ...options,
   })
 }
 
-export async function fetchCampResources(campId: number): Promise<any[]> {
+export async function fetchCampResources(campId: number): Promise<CampResourceItem[]> {
   const res = await fetch(`${ENDPOINTS.campResources}?campId=${campId}`, { headers: getHeaders() })
   if (!res.ok) throw new Error('Failed to fetch camp resources')
-  return res.json()
+  const payload = await res.json()
+  return unwrapList<CampResourceItem>(payload)
 }
 
 export function useCampResources(
   campId: number,
-  options?: Omit<UseQueryOptions<any[], ApiError>, 'queryKey' | 'queryFn'>,
+  options?: Omit<UseQueryOptions<CampResourceItem[], ApiError>, 'queryKey' | 'queryFn'>,
 ) {
-  return useQuery({
+  return useQuery<CampResourceItem[], ApiError>({
     queryKey: campsKeys.resourcesByCamp(campId),
     queryFn: () => fetchCampResources(campId),
     enabled: !!campId,

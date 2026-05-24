@@ -1,35 +1,111 @@
-
-import { Suspense, lazy } from 'react'
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import LoginPage from './features/login/pages/LoginPage'
+import { MobileOrientationView } from './shared/components/MobileOrientationView'
+import { FullscreenButton } from './shared/components/FullscreenButton'
+import { useSessionManager } from './shared/hooks'
 
-const LoadingSkeleton = () => (
-  <div className="flex items-center justify-center min-h-screen bg-black">
-    <div className="text-center">
-      <div className="animate-pulse mb-4">
-        <div className="h-12 w-12 bg-gray-700 rounded-full mx-auto"></div>
-      </div>
-      <p className="text-gray-400 text-sm">Cargando...</p>
-    </div>
+const MainAppPage = lazy(() => import('./app/layout/MainAppPage'))
+const AdmissionPage = lazy(() => import('./features/admission').then((m) => ({ default: m.AdmissionPage })))
+const MainHomePage = lazy(() => import('./features/main-homepage').then((m) => ({ default: m.MainHomePage })))
+
+const CampsPage = lazy(() => import('./features/camps').then((m) => ({ default: m.CampsPage })))
+const PersonsPage = lazy(() => import('./features/persons').then((m) => ({ default: m.PersonsPage })))
+const ExpeditionsPage = lazy(() => import('./features/expeditions').then((m) => ({ default: m.ExpeditionsPage })))
+const ResourceMainViewPage = lazy(() =>
+  import('./features/resources').then((m) => ({ default: m.ResourceMainViewPage })),
+)
+const AdminDashboardPage = lazy(() =>
+  import('./features/admin-dashboard').then((m) => ({ default: m.AdminDashboardPage })),
+)
+const AdminMainViewUiPage = lazy(() =>
+  import('./features/admin-main-view-ui').then((m) => ({ default: m.AdminMainViewUiPage })),
+)
+const AdminDashboardUiV2Page = lazy(() =>
+  import('./features/admin-dashboard-ui-v2').then((m) => ({ default: m.AdminDashboardUiV2Page })),
+)
+const ResourceTypesPage = lazy(() =>
+  import('./features/catalogs').then((m) => ({ default: m.ResourceTypesPage })),
+)
+const OccupationsPage = lazy(() =>
+  import('./features/catalogs').then((m) => ({ default: m.OccupationsPage })),
+)
+const OccupationCriteriaPage = lazy(() =>
+  import('./features/catalogs').then((m) => ({ default: m.OccupationCriteriaPage })),
+)
+const AchievementsPage = lazy(() =>
+  import('./features/catalogs').then((m) => ({ default: m.AchievementsPage })),
+)
+const ExpeditionsUiPage = lazy(() =>
+  import('./features/expeditions-ui').then((m) => ({ default: m.ExpeditionsUiPage })),
+)
+
+const routeFallback = (
+  <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#060a04', color: '#7ddb50' }}>
+    Cargando modulo...
   </div>
 )
 
-const MainAppPage = lazy(() => import('./app/layout/MainAppPage'))
-const AdmissionPage = lazy(() => import('./features/admission/pages/AdmissionPage'))
-const MainHomePage = lazy(() => import('./features/main-homepage/pages/MainHomePage').then(m => ({ default: m.MainHomePage })))
-const CampsPage = lazy(() => import('./features/camps/pages/CampsPage').then(m => ({ default: m.CampsPage })))
-const PersonsPage = lazy(() => import('./features/persons/pages/PersonsPage').then(m => ({ default: m.PersonsPage })))
-const ExpeditionsPage = lazy(() => import('./features/expeditions/pages/ExpeditionsPage'))
-const ResourceMainViewPage = lazy(() => import('./features/resources/pages/ResourceMainViewPage'))
-const AdminDashboardPage = lazy(() => import('./features/admin-dashboard/pages/AdminDashboardPage').then(m => ({ default: m.default })))
-const AdminMainViewUiPage = lazy(() => import('./features/admin-main-view-ui/pages/AdminMainViewUiPage').then(m => ({ default: m.default })))
-const WorkerMainViewPage = lazy(() => import('./features/worker-main-view/pages/WorkerMainViewPage').then(m => ({ default: m.WorkerMainViewPage })))
-const ResourceTypesPage = lazy(() => import('./features/catalogs/pages/ResourceTypesPage').then(m => ({ default: m.ResourceTypesPage })))
-const OccupationsPage = lazy(() => import('./features/catalogs/pages/OccupationsPage').then(m => ({ default: m.OccupationsPage })))
-const OccupationCriteriaPage = lazy(() => import('./features/catalogs/pages/OccupationCriteriaPage').then(m => ({ default: m.OccupationCriteriaPage })))
-const AchievementsPage = lazy(() => import('./features/catalogs/pages/AchievementsPage').then(m => ({ default: m.AchievementsPage })))
-import { useSessionManager } from './shared/hooks'
+const withSuspense = (node: ReactNode) => <Suspense fallback={routeFallback}>{node}</Suspense>
+
+function getSessionToken(): string | null {
+  return localStorage.getItem('token') ?? localStorage.getItem('accessToken')
+}
+
+function normalizeRole(role: string | null | undefined): string {
+  const normalized = (role ?? '').trim().toUpperCase()
+  if (normalized === 'GESTION_RECURSOS') return 'RESOURCE_MANAGEMENT'
+  if (normalized === 'ENCARGADO_VIAJES') return 'TRAVEL_MANAGER'
+  if (normalized === 'TRABAJADOR') return 'WORKER'
+  return normalized
+}
+
+function getCurrentUserRole(): string | null {
+  const rawUser = localStorage.getItem('user')
+  if (!rawUser) return null
+
+  try {
+    const parsed = JSON.parse(rawUser) as { role?: string; rol?: string }
+    return normalizeRole(parsed.role ?? parsed.rol)
+  } catch {
+    return null
+  }
+}
+
+function ProtectedRoute({
+  children,
+  allowedRoles,
+}: {
+  children: ReactNode
+  allowedRoles?: string[]
+}) {
+  const location = useLocation()
+  const token = getSessionToken()
+
+  if (!token) {
+    return (
+      <Navigate
+        to="/main-homepage"
+        replace
+        state={{
+          initialAppState: 'login',
+          sessionMessage: 'Sesion inactiva. Inicia sesion para continuar.',
+        }}
+      />
+    )
+  }
+
+  if (allowedRoles && allowedRoles.length > 0) {
+    const userRole = getCurrentUserRole()
+    const normalizedAllowedRoles = allowedRoles.map((role) => normalizeRole(role))
+    if (!userRole || !normalizedAllowedRoles.includes(userRole)) {
+      return <Navigate to="/app" replace state={{ unauthorized: true, from: location.pathname }} />
+    }
+  }
+
+  return <>{children}</>
+}
 
 function CatalogsLayout() {
   const navigate = useNavigate()
@@ -97,7 +173,7 @@ function CatalogsLayout() {
           Volver
         </button>
       </div>
-      <Suspense fallback={<LoadingSkeleton />}>
+      <Suspense fallback={routeFallback}>
         <ActiveComponent />
       </Suspense>
     </div>
@@ -105,26 +181,161 @@ function CatalogsLayout() {
 }
 
 function App() {
+  const [isPortrait, setIsPortrait] = useState(true)
+
+  const isMobileDevice = 
+    /iPhone|iPad|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    (typeof screen !== 'undefined' && (screen.availWidth < 600 || screen.availHeight < 600)) ||
+    (typeof window !== 'undefined' && window.innerWidth < 600)
+
+  useEffect(() => {
+    const handleNavigation = () => {
+      const currentPath = window.location.pathname
+      if (
+        currentPath !== '/login' &&
+        currentPath !== '/' &&
+        !currentPath.includes('main-homepage')
+      ) {
+        localStorage.setItem('previousRoute', currentPath)
+      }
+    }
+
+    window.addEventListener('popstate', handleNavigation)
+    handleNavigation()
+
+    return () => {
+      window.removeEventListener('popstate', handleNavigation)
+    }
+  }, [])
+
+  useEffect(() => {
+    const checkOrientation = () => {
+      setIsPortrait(window.matchMedia('(orientation: portrait)').matches)
+    }
+
+    checkOrientation()
+
+    const mediaQuery = window.matchMedia('(orientation: portrait)')
+    const handler = (e: MediaQueryListEvent) => setIsPortrait(e.matches)
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handler)
+    } else {
+      window.addEventListener('resize', checkOrientation)
+      window.addEventListener('orientationchange', checkOrientation)
+    }
+
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', handler)
+      } else {
+        window.removeEventListener('resize', checkOrientation)
+        window.removeEventListener('orientationchange', checkOrientation)
+      }
+    }
+  }, [])
+
   useSessionManager()
 
+  if (isMobileDevice && isPortrait) {
+    return <MobileOrientationView />
+  }
+
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/main-homepage" element={<Suspense fallback={<LoadingSkeleton />}><MainHomePage /></Suspense>} />
-      <Route path="/app" element={<Suspense fallback={<LoadingSkeleton />}><MainAppPage /></Suspense>} />
-      <Route path="/admission" element={<Suspense fallback={<LoadingSkeleton />}><AdmissionPage /></Suspense>} />
-      <Route path="/camps" element={<Suspense fallback={<LoadingSkeleton />}><CampsPage /></Suspense>} />
-      <Route path="/persons" element={<Suspense fallback={<LoadingSkeleton />}><PersonsPage /></Suspense>} />
-      <Route path="/expeditions" element={<Suspense fallback={<LoadingSkeleton />}><ExpeditionsPage /></Suspense>} />
-      <Route path="/resource-main-view" element={<Suspense fallback={<LoadingSkeleton />}><ResourceMainViewPage /></Suspense>} />
-      <Route path="/admin-dashboard" element={<Suspense fallback={<LoadingSkeleton />}><AdminDashboardPage /></Suspense>} />
-      <Route path="/admin-main-view-ui" element={<Suspense fallback={<LoadingSkeleton />}><AdminMainViewUiPage /></Suspense>} />
-      <Route path="/worker-main-view" element={<Suspense fallback={<LoadingSkeleton />}><WorkerMainViewPage /></Suspense>} />
-      <Route path="/dashboard" element={<Suspense fallback={<LoadingSkeleton />}><AdminDashboardPage /></Suspense>} />
-      <Route path="/catalogs" element={<CatalogsLayout />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <FullscreenButton />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/main-homepage" element={withSuspense(<MainHomePage />)} />
+        <Route
+          path="/app"
+          element={<ProtectedRoute>{withSuspense(<MainAppPage />)}</ProtectedRoute>}
+        />
+        <Route path="/admission" element={withSuspense(<AdmissionPage />)} />
+        <Route
+          path="/camps"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN']}>
+              {withSuspense(<CampsPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/persons"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN']}>
+              {withSuspense(<PersonsPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/expeditions"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'TRAVEL_MANAGER']}>
+              {withSuspense(<ExpeditionsPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/expeditions-ui"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'TRAVEL_MANAGER']}>
+              {withSuspense(<ExpeditionsUiPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/resource-main-view"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'RESOURCE_MANAGEMENT']}>
+              {withSuspense(<ResourceMainViewPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin-dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'RESOURCE_MANAGEMENT']}>
+              {withSuspense(<AdminDashboardPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin-dashboard-ui-v2"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'RESOURCE_MANAGEMENT']}>
+              {withSuspense(<AdminDashboardUiV2Page />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin-main-view-ui"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN']}>
+              {withSuspense(<AdminMainViewUiPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'RESOURCE_MANAGEMENT']}>
+              {withSuspense(<AdminDashboardPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/catalogs"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN']}>
+              {withSuspense(<CatalogsLayout />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }
 

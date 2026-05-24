@@ -74,6 +74,7 @@ export default function MainAppPage() {
         <button
           onClick={() => {
             localStorage.removeItem('token')
+            localStorage.removeItem('accessToken')
             localStorage.removeItem('user')
             window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
             navigate('/')

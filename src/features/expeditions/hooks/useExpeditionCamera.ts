@@ -1,31 +1,30 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react'
 
-export type ExpeditionZoomTarget = 'station' | 'map' | null;
-
+export type ExpeditionZoomTarget = 'station' | 'map' | null
 
 export function useExpeditionCamera() {
-  const [zoomedTarget, setZoomedTarget] = useState<ExpeditionZoomTarget>(null);
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [zoomedTarget, setZoomedTarget] = useState<ExpeditionZoomTarget>(null)
+  const [isAnimating, setIsAnimating] = useState(false)
 
   const zoomToStation = useCallback(() => {
-    setIsAnimating(true);
-    setZoomedTarget('station');
-  }, []);
+    setIsAnimating(true)
+    setZoomedTarget('station')
+  }, [])
 
   const zoomToMap = useCallback(() => {
-    setIsAnimating(true);
-    setZoomedTarget('map');
-  }, []);
+    setIsAnimating(true)
+    setZoomedTarget('map')
+  }, [])
 
   const resetCamera = useCallback(() => {
-    setIsAnimating(true);
-    setZoomedTarget(null);
-  }, []);
+    setIsAnimating(true)
+    setZoomedTarget(null)
+  }, [])
 
   const cancelZoom = useCallback(() => {
-    setIsAnimating(false);
-    setZoomedTarget(null);
-  }, []);
+    setIsAnimating(false)
+    setZoomedTarget(null)
+  }, [])
 
   return {
     zoomedTarget,
@@ -34,5 +33,5 @@ export function useExpeditionCamera() {
     zoomToMap,
     resetCamera,
     cancelZoom,
-  };
+  }
 }

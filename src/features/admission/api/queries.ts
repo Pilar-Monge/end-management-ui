@@ -5,11 +5,7 @@ import {
   type UseQueryOptions,
   type UseMutationOptions,
 } from '@tanstack/react-query'
-import type {
-  AdmissionRequest,
-  ProcessAIPayload,
-  ReviewAdmissionPayload,
-} from '../types'
+import type { AdmissionRequest, ProcessAIPayload, ReviewAdmissionPayload } from '../types'
 import {
   fetchPendingAdmissions,
   fetchAdmissionRequestById,
@@ -21,10 +17,7 @@ import { admissionKeys } from './keys'
 
 export function usePendingAdmissions(
   campId: number,
-  options?: Omit<
-    UseQueryOptions<AdmissionRequest[], Error>,
-    'queryKey' | 'queryFn'
-  >,
+  options?: Omit<UseQueryOptions<AdmissionRequest[], Error>, 'queryKey' | 'queryFn'>,
 ) {
   return useQuery<AdmissionRequest[], Error>({
     queryKey: admissionKeys.pending(campId),
@@ -35,10 +28,7 @@ export function usePendingAdmissions(
 
 export function useAdmissionRequest(
   id: number,
-  options?: Omit<
-    UseQueryOptions<AdmissionRequest, Error>,
-    'queryKey' | 'queryFn'
-  >,
+  options?: Omit<UseQueryOptions<AdmissionRequest, Error>, 'queryKey' | 'queryFn'>,
 ) {
   return useQuery<AdmissionRequest, Error>({
     queryKey: admissionKeys.detail(id),
@@ -46,7 +36,6 @@ export function useAdmissionRequest(
     ...options,
   })
 }
-
 
 export function useCreateAdmissionRequest(
   options?: Omit<
@@ -66,27 +55,15 @@ export function useCreateAdmissionRequest(
 
 export function useProcessAIAdmission(
   options?: Omit<
-    UseMutationOptions<
-      AdmissionRequest,
-      Error,
-      { id: number; payload: ProcessAIPayload }
-    >,
+    UseMutationOptions<AdmissionRequest, Error, { id: number; payload: ProcessAIPayload }>,
     'mutationFn'
   >,
 ) {
   const queryClient = useQueryClient()
-  return useMutation<
-    AdmissionRequest,
-    Error,
-    { id: number; payload: ProcessAIPayload }
-  >({
-    mutationFn: ({ id, payload }) =>
-      processAdmissionWithAI(id, payload),
+  return useMutation<AdmissionRequest, Error, { id: number; payload: ProcessAIPayload }>({
+    mutationFn: ({ id, payload }) => processAdmissionWithAI(id, payload),
     onSuccess: (data) => {
-      queryClient.setQueryData(
-        admissionKeys.detail(data.id),
-        data,
-      )
+      queryClient.setQueryData(admissionKeys.detail(data.id), data)
       queryClient.invalidateQueries({
         queryKey: admissionKeys.all,
       })
@@ -97,27 +74,15 @@ export function useProcessAIAdmission(
 
 export function useReviewAdmission(
   options?: Omit<
-    UseMutationOptions<
-      AdmissionRequest,
-      Error,
-      { id: number; payload: ReviewAdmissionPayload }
-    >,
+    UseMutationOptions<AdmissionRequest, Error, { id: number; payload: ReviewAdmissionPayload }>,
     'mutationFn'
   >,
 ) {
   const queryClient = useQueryClient()
-  return useMutation<
-    AdmissionRequest,
-    Error,
-    { id: number; payload: ReviewAdmissionPayload }
-  >({
-    mutationFn: ({ id, payload }) =>
-      reviewAdmissionRequest(id, payload),
+  return useMutation<AdmissionRequest, Error, { id: number; payload: ReviewAdmissionPayload }>({
+    mutationFn: ({ id, payload }) => reviewAdmissionRequest(id, payload),
     onSuccess: (data) => {
-      queryClient.setQueryData(
-        admissionKeys.detail(data.id),
-        data,
-      )
+      queryClient.setQueryData(admissionKeys.detail(data.id), data)
       queryClient.invalidateQueries({
         queryKey: admissionKeys.all,
       })

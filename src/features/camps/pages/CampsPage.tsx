@@ -220,7 +220,7 @@ export function CampsPage() {
                 fontWeight: 'bold',
               }}
             >
-              {(stats as any).totalCamps || 0}
+              {stats?.totalCamps || 0}
             </div>
           </div>
           <div
@@ -250,7 +250,7 @@ export function CampsPage() {
                 fontWeight: 'bold',
               }}
             >
-              {(stats as any).activeCamps || 0}
+              {stats?.activeCamps || 0}
             </div>
           </div>
           <div
@@ -280,7 +280,7 @@ export function CampsPage() {
                 fontWeight: 'bold',
               }}
             >
-              {(stats as any).totalPopulation || 0}
+              {stats?.totalPopulation || 0}
             </div>
           </div>
         </motion.div>

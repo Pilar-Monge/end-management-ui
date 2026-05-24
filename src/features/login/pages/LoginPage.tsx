@@ -6,8 +6,12 @@ import { LandingGhosts } from '../components/LandingGhosts'
 import { HudCorners, Scanlines } from '../components/BackgroundEffects'
 import { loginRequest } from '../services/authApi'
 import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
+import { getPostLoginRoute, normalizeUserRole } from '../../../shared/services/postLoginRouting'
+import { getErrorMessage } from '../../../shared/services/errorMessages'
 import { useAuthState } from '../../../shared/context/AuthContext'
 import type { LoginErrors, LoginForm } from '../types'
+
+const LAST_SELECTED_CAMP_ID_KEY = 'last_selected_camp_id'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -20,10 +24,30 @@ export default function LoginPage() {
   const [showLoginForm, setShowLoginForm] = useState(false)
   const [cinematicPulse, setCinematicPulse] = useState(0)
 
-  
   useEffect(() => {
-    if (authState?.selectedCampId) {
-      setForm(prev => ({ ...prev, campId: authState.selectedCampId }))
+    if (authState?.selectedCampId && authState.selectedCampId > 0) {
+      setForm((prev) => ({ ...prev, campId: authState.selectedCampId }))
+      localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(authState.selectedCampId))
+      return
+    }
+
+    const storedCampIdRaw = localStorage.getItem(LAST_SELECTED_CAMP_ID_KEY)
+    const storedCampId = storedCampIdRaw ? Number(storedCampIdRaw) : NaN
+    if (Number.isFinite(storedCampId) && storedCampId > 0) {
+      setForm((prev) => ({ ...prev, campId: storedCampId }))
+      return
+    }
+
+    const rawUser = localStorage.getItem('user')
+    if (!rawUser) return
+    try {
+      const parsed = JSON.parse(rawUser) as { campId?: number }
+      if (typeof parsed.campId === 'number' && parsed.campId > 0) {
+        setForm((prev) => ({ ...prev, campId: parsed.campId }))
+        localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(parsed.campId))
+      }
+    } catch {
+      // Ignore malformed cached user
     }
   }, [authState?.selectedCampId])
 
@@ -38,9 +62,7 @@ export default function LoginPage() {
     if (form.password.length > 0 && form.password.length < 6)
       nextErrors.password = 'Mínimo 6 caracteres'
 
-    if (!form.campId) {
-      (nextErrors as any).campId = 'Debes seleccionar un campamento en el globo'
-    }
+    if (!form.campId || form.campId <= 0) nextErrors.general = 'Debes seleccionar un campamento antes de iniciar sesion'
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -55,27 +77,33 @@ export default function LoginPage() {
 
     try {
       const response = await loginRequest(form)
-      const normalizedUser = { ...response.user, role: response.user.rol }
-
-      localStorage.setItem('token', response.token)
-      localStorage.setItem('user', JSON.stringify(response.user))
-      window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
-      navigate('/app')
-      localStorage.setItem('user', JSON.stringify(normalizedUser))
-      
-      let redirectPath = '/app'
-      if (normalizedUser.role === 'SYSTEM_ADMIN') {
-        redirectPath = '/admin-main-view-ui'
-      } else if (normalizedUser.role === 'RESOURCE_MANAGEMENT') {
-        redirectPath = '/resource-main-view'
-      } else if (normalizedUser.role === 'TRAVEL_MANAGER') {
-        redirectPath = '/expeditions'
+      const normalizedUser = {
+        ...response.user,
+        role: normalizeUserRole(response.user.rol),
       }
-      navigate(redirectPath)
+      const token = response.token ?? response.accessToken
+      const savedPath = localStorage.getItem('last_secure_path')
+
+      if (!token) {
+        throw new Error('No se recibió token de acceso')
+      }
+
+      localStorage.setItem('token', token)
+      localStorage.setItem('accessToken', token)
+      localStorage.setItem('user', JSON.stringify(normalizedUser))
+      localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(response.user.campId))
+      window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
+
+      const defaultRoute = getPostLoginRoute(normalizedUser.role)
+      const redirectPath =
+        normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard-ui-v2')
+          ? savedPath
+          : defaultRoute
+      localStorage.removeItem('last_secure_path')
+      navigate(redirectPath, { replace: true })
     } catch (error) {
       setErrors({
-        general:
-          error instanceof Error ? error.message : 'No se pudo iniciar sesión contra el backend',
+        general: getErrorMessage(error, 'login'),
       })
     } finally {
       setLoading(false)
@@ -279,6 +307,54 @@ export default function LoginPage() {
                       }}
                     >
                       {showPassword ? 'Ocultar' : 'Mostrar'} contraseña
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      border: '1px solid rgba(74,138,48,0.25)',
+                      borderRadius: 4,
+                      padding: '10px 12px',
+                      background: 'rgba(74,138,48,0.06)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 10,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: "'Courier New', monospace",
+                        fontSize: 10,
+                        letterSpacing: '1px',
+                        color: '#9ccf78',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {form.campId && form.campId > 0
+                        ? `Campamento seleccionado: #${form.campId}`
+                        : 'Campamento no seleccionado'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate('/main-homepage', {
+                          state: { initialAppState: 'global-map' },
+                        })
+                      }
+                      style={{
+                        background: 'none',
+                        border: '1px solid rgba(105,191,183,0.4)',
+                        color: '#8ed8d0',
+                        fontSize: 9,
+                        letterSpacing: '1px',
+                        textTransform: 'uppercase',
+                        padding: '5px 8px',
+                        cursor: 'pointer',
+                        fontFamily: "'Courier New', monospace",
+                      }}
+                    >
+                      {form.campId && form.campId > 0 ? 'Cambiar' : 'Seleccionar'}
                     </button>
                   </div>
 

@@ -1,4 +1,6 @@
+/* eslint-disable react-hooks/purity */
 import { motion } from 'framer-motion'
+import { useMemo } from 'react'
 import { GHOST_CHARACTERS } from '../../../shared/constants/app'
 
 function GhostCharacter({
@@ -106,14 +108,17 @@ function GhostCharacter({
 }
 
 export function FloatingParticles() {
-  const particles = Array.from({ length: 24 }).map((_, i) => ({
-    id: i,
-    x: `${Math.random() * 100}%`,
-    size: Math.random() * 3 + 1,
-    delay: Math.random() * 6,
-    duration: 4 + Math.random() * 5,
-    color: `rgba(${60 + Math.random() * 40}, ${130 + Math.random() * 60}, ${20 + Math.random() * 20}, ${0.2 + Math.random() * 0.4})`,
-  }))
+  const particles = useMemo(
+    () => Array.from({ length: 24 }).map((_, i) => ({
+      id: i,
+      x: `${Math.random() * 100}%`,
+      size: Math.random() * 3 + 1,
+      delay: Math.random() * 6,
+      duration: 4 + Math.random() * 5,
+      color: `rgba(${60 + Math.random() * 40}, ${130 + Math.random() * 60}, ${20 + Math.random() * 20}, ${0.2 + Math.random() * 0.4})`,
+    })),
+    [],
+  )
 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>

@@ -1,4 +1,3 @@
-
 import {
   Suspense,
   useEffect,
@@ -8,119 +7,122 @@ import {
   type MutableRefObject,
   type RefObject,
   useCallback,
-} from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Html, OrbitControls, PerspectiveCamera, useGLTF, useProgress } from '@react-three/drei';
-import { useNavigate } from 'react-router-dom';
-import type { LucideIcon } from 'lucide-react';
-import {
-  AudioLines,
-  Check,
-  ChevronLeft,
-  LogOut,
-} from 'lucide-react';
-import * as THREE from 'three';
-import './admin-main-view-ui.css';
-import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService';
+} from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Html, OrbitControls, PerspectiveCamera, useGLTF, useProgress } from '@react-three/drei'
+import { useNavigate } from 'react-router-dom'
+import type { LucideIcon } from 'lucide-react'
+import { AudioLines, Check, ChevronLeft, LogOut } from 'lucide-react'
+import * as THREE from 'three'
+import './admin-main-view-ui.css'
+import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
 
-type Vec3 = [number, number, number];
-type ViewMode = 'normal' | 'zoom';
-type SyncState = 'idle' | 'syncing' | 'ready';
+type Vec3 = [number, number, number]
+type ViewMode = 'normal' | 'zoom'
+type SyncState = 'idle' | 'syncing' | 'ready'
 
 type CameraState = {
-  position: Vec3;
-  target: Vec3;
-};
+  position: Vec3
+  target: Vec3
+}
 
 type Asset = {
-  id: string;
-  name: string;
-  url: string;
-  position: Vec3;
-  rotation: Vec3;
-  scale: number;
-};
+  id: string
+  name: string
+  url: string
+  position: Vec3
+  rotation: Vec3
+  scale: number
+}
 
 interface ZoomPreset {
-  id: string;
-  name: string;
-  subtitle: string;
-  position: Vec3;
-  target: Vec3;
-  hotspotPos?: Vec3;
-  hotspotSize?: Vec3;
-  hotspotRot?: Vec3;
+  id: string
+  name: string
+  subtitle: string
+  position: Vec3
+  target: Vec3
+  hotspotPos?: Vec3
+  hotspotSize?: Vec3
+  hotspotRot?: Vec3
 }
 
 interface ModelProps {
-  url: string;
-  position?: Vec3;
-  rotation?: Vec3;
-  scale?: number;
+  url: string
+  position?: Vec3
+  rotation?: Vec3
+  scale?: number
 }
 
 interface CameraTransitionControllerProps {
-  activePosition: Vec3;
-  activeTarget: Vec3;
-  isTransitioning: boolean;
-  setIsTransitioning: (value: boolean) => void;
-  controlsRef: RefObject<any>;
+  activePosition: Vec3
+  activeTarget: Vec3
+  isTransitioning: boolean
+  setIsTransitioning: (value: boolean) => void
+  controlsRef: RefObject<any>
 }
 
 interface SceneProps {
-  assets: Asset[];
-  cameraConfig: CameraState;
-  cameraSessionRef: MutableRefObject<CameraState>;
-  activePosition: Vec3;
-  activeTarget: Vec3;
-  viewMode: ViewMode;
-  activePresetId: string;
-  zoomPresets: ZoomPreset[];
-  setActivePresetId: (id: string) => void;
-  onEnterZoom: (presetId: string) => void;
-  onTransitionEnd: (presetId: string) => void;
-  onMonitorAction: (presetId: string) => void;
-  hoveredMonitorId: string | null;
-  setHoveredMonitorId: (id: string | null) => void;
-  hoveredConsole: boolean;
-  setHoveredConsole: (v: boolean) => void;
-  hoveredComms: boolean;
-  setHoveredComms: (v: boolean) => void;
+  assets: Asset[]
+  cameraConfig: CameraState
+  cameraSessionRef: MutableRefObject<CameraState>
+  activePosition: Vec3
+  activeTarget: Vec3
+  viewMode: ViewMode
+  activePresetId: string
+  zoomPresets: ZoomPreset[]
+  setActivePresetId: (id: string) => void
+  onEnterZoom: (presetId: string) => void
+  onTransitionEnd: (presetId: string) => void
+  onMonitorAction: (presetId: string) => void
+  hoveredMonitorId: string | null
+  setHoveredMonitorId: (id: string | null) => void
+  hoveredConsole: boolean
+  setHoveredConsole: (v: boolean) => void
+  hoveredComms: boolean
+  setHoveredComms: (v: boolean) => void
 }
 
 interface RibbonButtonProps {
-  icon?: LucideIcon;
-  label: string;
-  onClick: () => void;
-  accent?: 'slate' | 'cyan' | 'rose';
-  disabled?: boolean;
+  icon?: LucideIcon
+  label: string
+  onClick: () => void
+  accent?: 'slate' | 'cyan' | 'rose'
+  disabled?: boolean
 }
 
 interface IconRibbonButtonProps {
-  icon: LucideIcon;
-  label: string;
-  onClick: () => void;
-  accent?: 'slate' | 'cyan' | 'rose';
-  active?: boolean;
+  icon: LucideIcon
+  label: string
+  onClick: () => void
+  accent?: 'slate' | 'cyan' | 'rose'
+  active?: boolean
 }
 
-const CAMERA_STORAGE_KEY = 'hangar_camera_view_v1';
+const CAMERA_STORAGE_KEY = 'hangar_camera_view_v1'
 const BRUSH_CLIP =
-  'polygon(2% 8%, 95% 1%, 100% 12%, 96% 24%, 100% 36%, 95% 52%, 100% 68%, 94% 84%, 98% 100%, 2% 92%, 0% 84%, 4% 71%, 1% 58%, 5% 43%, 0% 28%, 6% 16%)';
+  'polygon(2% 8%, 95% 1%, 100% 12%, 96% 24%, 100% 36%, 95% 52%, 100% 68%, 94% 84%, 98% 100%, 2% 92%, 0% 84%, 4% 71%, 1% 58%, 5% 43%, 0% 28%, 6% 16%)'
 
-const WAREHOUSE_URL = 'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/warehouse.glb';
-const SIDE_TABLE_URL = 'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/sci-fi_side_table__monitors.glb';
-const CABINET_URL = 'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/metal_cabinet_low_poly.glb';
-const WHITEBOARD_URL = 'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/whiteboard_-_practical_model_yadira.glb';
-const COMMS_ROOM_URL = 'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/comms_room_-_assets.glb';
-const CHAIR_URL = 'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/chair%20(2).glb';
-const LOUNGE_SET_URL = 'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/chesterfield_lounge_set.glb';
-const CLOCK_URL = 'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/reloj_xd.glb';
+const WAREHOUSE_URL =
+  'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/warehouse.glb'
+const SIDE_TABLE_URL =
+  'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/sci-fi_side_table__monitors.glb'
+const CABINET_URL =
+  'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/metal_cabinet_low_poly.glb'
+const WHITEBOARD_URL =
+  'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/whiteboard_-_practical_model_yadira.glb'
+const COMMS_ROOM_URL =
+  'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/comms_room_-_assets.glb'
+const CHAIR_URL =
+  'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/chair%20(2).glb'
+const LOUNGE_SET_URL =
+  'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/chesterfield_lounge_set.glb'
+const CLOCK_URL =
+  'https://ibtvipgvroakdoeitbns.supabase.co/storage/v1/object/public/Admin/reloj_xd.glb'
 
 const DEFAULT_CAMERA: CameraState = {
   position: [0.8033762000072371, 3.3410362864962178, 0.009533869766730029],
   target: [-2, 2, 0],
-};
+}
 
 const DEFAULT_ASSETS: Asset[] = [
   {
@@ -187,7 +189,7 @@ const DEFAULT_ASSETS: Asset[] = [
     rotation: [0, 0.158, 0],
     scale: 0.33,
   },
-];
+]
 
 const DEFAULT_PRESETS: ZoomPreset[] = [
   {
@@ -253,14 +255,14 @@ const DEFAULT_PRESETS: ZoomPreset[] = [
     position: [1.05, 1.8, -0.2],
     target: [-0.95, 1.4, -3.7],
   },
-];
+]
 
 const MONITOR_PRESET_IDS = new Set(
   DEFAULT_PRESETS.filter((preset) => preset.id.startsWith('monitor')).map((preset) => preset.id),
-);
+)
 
 function cloneVec3(vector: Vec3): Vec3 {
-  return [vector[0], vector[1], vector[2]];
+  return [vector[0], vector[1], vector[2]]
 }
 
 function isVec3(value: unknown): value is Vec3 {
@@ -268,72 +270,62 @@ function isVec3(value: unknown): value is Vec3 {
     Array.isArray(value) &&
     value.length === 3 &&
     value.every((entry) => typeof entry === 'number' && Number.isFinite(entry))
-  );
+  )
 }
 
 function readStoredCamera(): CameraState {
   if (typeof window === 'undefined') {
-    return DEFAULT_CAMERA;
+    return DEFAULT_CAMERA
   }
 
   try {
-    const stored = window.localStorage.getItem(CAMERA_STORAGE_KEY);
+    const stored = window.localStorage.getItem(CAMERA_STORAGE_KEY)
     if (!stored) {
-      return DEFAULT_CAMERA;
+      return DEFAULT_CAMERA
     }
 
-    const parsed = JSON.parse(stored) as Partial<CameraState>;
+    const parsed = JSON.parse(stored) as Partial<CameraState>
     if (isVec3(parsed.position) && isVec3(parsed.target)) {
       return {
         position: cloneVec3(parsed.position),
         target: cloneVec3(parsed.target),
-      };
+      }
     }
   } catch {
-    return DEFAULT_CAMERA;
+    return DEFAULT_CAMERA
   }
 
-  return DEFAULT_CAMERA;
+  return DEFAULT_CAMERA
 }
 
 function ribbonSurface(accent: 'slate' | 'cyan' | 'rose', active = false): string {
   if (accent === 'rose') {
     return active
       ? 'bg-rose-400 border-rose-300 text-black'
-      : 'bg-[#020617]/95 border-rose-500/30 text-rose-100 hover:bg-rose-400 hover:text-black';
+      : 'bg-[#020617]/95 border-rose-500/30 text-rose-100 hover:bg-rose-400 hover:text-black'
   }
 
   if (accent === 'cyan') {
     return active
       ? 'bg-cyan-300 border-cyan-200 text-black'
-      : 'bg-[#020617]/95 border-cyan-400/30 text-cyan-50 hover:bg-cyan-300 hover:text-black';
+      : 'bg-[#020617]/95 border-cyan-400/30 text-cyan-50 hover:bg-cyan-300 hover:text-black'
   }
 
   return active
     ? 'bg-cyan-300 border-cyan-200 text-black'
-    : 'bg-[#020617]/95 border-white/10 text-white hover:bg-cyan-300 hover:text-black';
+    : 'bg-[#020617]/95 border-white/10 text-white hover:bg-cyan-300 hover:text-black'
 }
 
-function RibbonButton({
-  icon: Icon,
-  label,
-  onClick,
-  disabled = false,
-}: RibbonButtonProps) {
+function RibbonButton({ icon: Icon, label, onClick, disabled = false }: RibbonButtonProps) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="admin-ui-hud-button"
-    >
+    <button type="button" onClick={onClick} disabled={disabled} className="admin-ui-hud-button">
       <span className="admin-ui-hud-button-bg" />
       <span className="admin-ui-hud-button-content">
         {Icon ? <Icon className="admin-ui-hud-back-icon" size={16} strokeWidth={3.5} /> : null}
         <span>{label}</span>
       </span>
     </button>
-  );
+  )
 }
 
 function IconRibbonButton({
@@ -360,24 +352,24 @@ function IconRibbonButton({
         strokeWidth={3.5}
       />
     </button>
-  );
+  )
 }
 
 function Model({ url, position = [0, 0, 0], rotation = [0, 0, 0], scale = 1 }: ModelProps) {
-  const gltf = useGLTF(url) as { scene: THREE.Group };
-  const clonedScene = useMemo(() => gltf.scene.clone(true), [gltf.scene]);
+  const gltf = useGLTF(url) as { scene: THREE.Group }
+  const clonedScene = useMemo(() => gltf.scene.clone(true), [gltf.scene])
 
   useEffect(() => {
     clonedScene.traverse((node) => {
-      const mesh = node as THREE.Mesh;
+      const mesh = node as THREE.Mesh
       if ('isMesh' in mesh && mesh.isMesh) {
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
+        mesh.castShadow = true
+        mesh.receiveShadow = true
       }
-    });
-  }, [clonedScene]);
+    })
+  }, [clonedScene])
 
-  return <primitive object={clonedScene} position={position} rotation={rotation} scale={scale} />;
+  return <primitive object={clonedScene} position={position} rotation={rotation} scale={scale} />
 }
 
 function CameraTransitionController({
@@ -387,67 +379,62 @@ function CameraTransitionController({
   setIsTransitioning,
   controlsRef,
 }: CameraTransitionControllerProps) {
-  const { camera } = useThree();
-  const destinationPosition = useMemo(() => new THREE.Vector3(...activePosition), [activePosition]);
-  const destinationTarget = useMemo(() => new THREE.Vector3(...activeTarget), [activeTarget]);
-  
-  const currentTarget = useRef(new THREE.Vector3());
-  const initialized = useRef(false);
+  const { camera } = useThree()
+  const destinationPosition = useMemo(() => new THREE.Vector3(...activePosition), [activePosition])
+  const destinationTarget = useMemo(() => new THREE.Vector3(...activeTarget), [activeTarget])
 
+  const currentTarget = useRef(new THREE.Vector3())
+  const initialized = useRef(false)
 
   useEffect(() => {
     if (isTransitioning) {
       if (controlsRef.current) {
-        currentTarget.current.copy(controlsRef.current.target);
+        currentTarget.current.copy(controlsRef.current.target)
       } else {
-        
-        const dir = new THREE.Vector3();
-        camera.getWorldDirection(dir);
-        currentTarget.current.copy(camera.position).add(dir.multiplyScalar(5));
+        const dir = new THREE.Vector3()
+        camera.getWorldDirection(dir)
+        currentTarget.current.copy(camera.position).add(dir.multiplyScalar(5))
       }
     }
-  }, [isTransitioning, camera, controlsRef]);
+  }, [isTransitioning, camera, controlsRef])
 
-  
   useEffect(() => {
     if (!initialized.current && controlsRef.current) {
-      currentTarget.current.copy(controlsRef.current.target);
-      initialized.current = true;
+      currentTarget.current.copy(controlsRef.current.target)
+      initialized.current = true
     }
-  });
+  })
 
   useFrame((_, delta) => {
     if (!isTransitioning) {
-      return;
+      return
     }
 
-    const alpha = Math.min(1, delta * 5);
+    const alpha = Math.min(1, delta * 5)
 
-    
-    camera.position.lerp(destinationPosition, alpha);
+    camera.position.lerp(destinationPosition, alpha)
 
-    currentTarget.current.lerp(destinationTarget, alpha);
+    currentTarget.current.lerp(destinationTarget, alpha)
 
-    camera.lookAt(currentTarget.current);
+    camera.lookAt(currentTarget.current)
 
-    const positionDistance = camera.position.distanceTo(destinationPosition);
-    const targetDistance = currentTarget.current.distanceTo(destinationTarget);
+    const positionDistance = camera.position.distanceTo(destinationPosition)
+    const targetDistance = currentTarget.current.distanceTo(destinationTarget)
 
     if (positionDistance < 0.01 && targetDistance < 0.01) {
-      camera.position.copy(destinationPosition);
-      currentTarget.current.copy(destinationTarget);
-      camera.lookAt(destinationTarget);
+      camera.position.copy(destinationPosition)
+      currentTarget.current.copy(destinationTarget)
+      camera.lookAt(destinationTarget)
 
-     
       if (controlsRef.current) {
-        controlsRef.current.target.copy(destinationTarget);
-        controlsRef.current.update();
+        controlsRef.current.target.copy(destinationTarget)
+        controlsRef.current.update()
       }
-      setIsTransitioning(false);
+      setIsTransitioning(false)
     }
-  });
+  })
 
-  return null;
+  return null
 }
 
 function Scene({
@@ -469,20 +456,18 @@ function Scene({
   hoveredComms,
   setHoveredComms,
 }: Omit<SceneProps, 'cameraConfig'>) {
-  const controlsRef = useRef<any>(null);
-  const previousTransitionState = useRef(false);
-  const [isTransitioning, setIsTransitioning] = useState(true);
+  const controlsRef = useRef<any>(null)
+  const previousTransitionState = useRef(false)
+  const [isTransitioning, setIsTransitioning] = useState(true)
 
   const maxDistance = useMemo(() => {
-    const position = new THREE.Vector3(...activePosition);
-    const target = new THREE.Vector3(...activeTarget);
-    return position.distanceTo(target) + 0.01;
-  }, [activePosition, activeTarget]);
-
-  
+    const position = new THREE.Vector3(...activePosition)
+    const target = new THREE.Vector3(...activeTarget)
+    return position.distanceTo(target) + 0.01
+  }, [activePosition, activeTarget])
 
   useEffect(() => {
-    setIsTransitioning(true);
+    setIsTransitioning(true)
   }, [
     activePosition[0],
     activePosition[1],
@@ -490,20 +475,20 @@ function Scene({
     activeTarget[0],
     activeTarget[1],
     activeTarget[2],
-  ]);
+  ])
 
   useEffect(() => {
     if (previousTransitionState.current && !isTransitioning) {
-      onTransitionEnd(activePresetId);
+      onTransitionEnd(activePresetId)
     }
-    previousTransitionState.current = isTransitioning;
-  }, [activePresetId, isTransitioning, onTransitionEnd]);
+    previousTransitionState.current = isTransitioning
+  }, [activePresetId, isTransitioning, onTransitionEnd])
 
   useEffect(() => {
     return () => {
-      document.body.style.cursor = 'default';
-    };
-  }, []);
+      document.body.style.cursor = 'default'
+    }
+  }, [])
 
   return (
     <Suspense fallback={null}>
@@ -526,26 +511,26 @@ function Scene({
               <group
                 onClick={(event) => {
                   if (viewMode !== 'normal') {
-                    return;
+                    return
                   }
-                  event.stopPropagation();
-                  onEnterZoom('console');
+                  event.stopPropagation()
+                  onEnterZoom('console')
                 }}
                 onPointerOver={(event) => {
                   if (viewMode !== 'normal') {
-                    return;
+                    return
                   }
-                  event.stopPropagation();
-                  setHoveredConsole(true);
-                  document.body.style.cursor = 'pointer';
+                  event.stopPropagation()
+                  setHoveredConsole(true)
+                  document.body.style.cursor = 'pointer'
                 }}
                 onPointerOut={(event) => {
                   if (viewMode !== 'normal') {
-                    return;
+                    return
                   }
-                  event.stopPropagation();
-                  setHoveredConsole(false);
-                  document.body.style.cursor = 'default';
+                  event.stopPropagation()
+                  setHoveredConsole(false)
+                  document.body.style.cursor = 'default'
                 }}
               >
                 <Model
@@ -565,17 +550,17 @@ function Scene({
                 </Html>
               ) : null}
 
-              {viewMode === 'zoom' && (activePresetId === 'console' || MONITOR_PRESET_IDS.has(activePresetId))
+              {viewMode === 'zoom' &&
+              (activePresetId === 'console' || MONITOR_PRESET_IDS.has(activePresetId))
                 ? zoomPresets
                     .filter((preset) => MONITOR_PRESET_IDS.has(preset.id))
                     .map((preset) => {
                       const hotspotPosition =
-                        preset.hotspotPos ??
-                        ([-5.16, preset.target[1], preset.target[2]] as Vec3);
-                      const hotspotSize = preset.hotspotSize ?? ([0.08, 0.45, 0.38] as Vec3);
-                      const hotspotRotation = preset.hotspotRot ?? ([0, 0, 0] as Vec3);
-                      const isHovered = hoveredMonitorId === preset.id;
-                      const isSelected = activePresetId === preset.id;
+                        preset.hotspotPos ?? ([-5.16, preset.target[1], preset.target[2]] as Vec3)
+                      const hotspotSize = preset.hotspotSize ?? ([0.08, 0.45, 0.38] as Vec3)
+                      const hotspotRotation = preset.hotspotRot ?? ([0, 0, 0] as Vec3)
+                      const isHovered = hoveredMonitorId === preset.id
+                      const isSelected = activePresetId === preset.id
 
                       return (
                         <group key={`monitor-hotspot-${preset.id}`}>
@@ -587,24 +572,22 @@ function Scene({
                               THREE.MathUtils.degToRad(hotspotRotation[2]),
                             ]}
                             onClick={(event) => {
-                              event.stopPropagation();
+                              event.stopPropagation()
                               if (isSelected) {
-                                
-                                onMonitorAction(preset.id);
+                                onMonitorAction(preset.id)
                               } else {
-                                
-                                setActivePresetId(preset.id);
+                                setActivePresetId(preset.id)
                               }
                             }}
                             onPointerOver={(event) => {
-                              event.stopPropagation();
-                              setHoveredMonitorId(preset.id);
-                              document.body.style.cursor = 'pointer';
+                              event.stopPropagation()
+                              setHoveredMonitorId(preset.id)
+                              document.body.style.cursor = 'pointer'
                             }}
                             onPointerOut={(event) => {
-                              event.stopPropagation();
-                              setHoveredMonitorId(null);
-                              document.body.style.cursor = 'default';
+                              event.stopPropagation()
+                              setHoveredMonitorId(null)
+                              document.body.style.cursor = 'default'
                             }}
                           >
                             <boxGeometry args={hotspotSize} />
@@ -652,11 +635,11 @@ function Scene({
                             </Html>
                           ) : null}
                         </group>
-                      );
+                      )
                     })
                 : null}
             </group>
-          );
+          )
         }
 
         if (asset.id === 'comms_room') {
@@ -665,26 +648,26 @@ function Scene({
               key={asset.id}
               onClick={(event) => {
                 if (viewMode !== 'normal') {
-                  return;
+                  return
                 }
-                event.stopPropagation();
-                onEnterZoom('comms');
+                event.stopPropagation()
+                onEnterZoom('comms')
               }}
               onPointerOver={(event) => {
                 if (viewMode !== 'normal') {
-                  return;
+                  return
                 }
-                event.stopPropagation();
-                setHoveredComms(true);
-                document.body.style.cursor = 'pointer';
+                event.stopPropagation()
+                setHoveredComms(true)
+                document.body.style.cursor = 'pointer'
               }}
               onPointerOut={(event) => {
                 if (viewMode !== 'normal') {
-                  return;
+                  return
                 }
-                event.stopPropagation();
-                setHoveredComms(false);
-                document.body.style.cursor = 'default';
+                event.stopPropagation()
+                setHoveredComms(false)
+                document.body.style.cursor = 'default'
               }}
             >
               <Model
@@ -694,7 +677,10 @@ function Scene({
                 scale={asset.scale}
               />
               {viewMode === 'normal' && hoveredComms ? (
-                <Html center position={[asset.position[0], asset.position[1] + 2.2, asset.position[2]]}>
+                <Html
+                  center
+                  position={[asset.position[0], asset.position[1] + 2.2, asset.position[2]]}
+                >
                   <div className="pointer-events-none flex items-center gap-2 rounded border border-cyan-500 bg-[#020202]/95 px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.28em] text-cyan-400 shadow-[0_0_16px_rgba(34,211,238,0.28)] whitespace-nowrap">
                     <span className="h-2 w-2 rounded-full bg-cyan-400" />
                     <span>SALA DE COMUNICACIONES</span>
@@ -702,7 +688,7 @@ function Scene({
                 </Html>
               ) : null}
             </group>
-          );
+          )
         }
 
         return (
@@ -713,7 +699,7 @@ function Scene({
             rotation={asset.rotation}
             scale={asset.scale}
           />
-        );
+        )
       })}
 
       <CameraTransitionController
@@ -737,24 +723,24 @@ function Scene({
         minPolarAngle={0}
         onChange={(event) => {
           if (isTransitioning) {
-            return;
+            return
           }
 
-          const controls = event?.target;
+          const controls = event?.target
           if (!controls || !controls.object || !controls.target) {
-            return;
+            return
           }
 
-          const liveCamera = controls.object as THREE.PerspectiveCamera;
-          const liveTarget = controls.target as THREE.Vector3;
+          const liveCamera = controls.object as THREE.PerspectiveCamera
+          const liveTarget = controls.target as THREE.Vector3
           cameraSessionRef.current = {
             position: [liveCamera.position.x, liveCamera.position.y, liveCamera.position.z],
             target: [liveTarget.x, liveTarget.y, liveTarget.z],
-          };
+          }
         }}
       />
     </Suspense>
-  );
+  )
 }
 
 function BootOverlay({ progress }: { progress: number }) {
@@ -792,30 +778,30 @@ function BootOverlay({ progress }: { progress: number }) {
         </p>
       </div>
     </div>
-  );
+  )
 }
 
 function AdminMainViewUiLoader() {
-  const { active, loaded, total, progress } = useProgress();
-  const [isComplete, setIsComplete] = useState(false);
-  const hasKnownTotal = total > 0;
-  const rawProgress = hasKnownTotal ? (loaded / total) * 100 : progress;
-  const isLoaded = hasKnownTotal && loaded >= total && !active;
-  const displayProgress = isLoaded ? 100 : Math.min(99, Math.max(0, Math.round(rawProgress)));
+  const { active, loaded, total, progress } = useProgress()
+  const [isComplete, setIsComplete] = useState(false)
+  const hasKnownTotal = total > 0
+  const rawProgress = hasKnownTotal ? (loaded / total) * 100 : progress
+  const isLoaded = hasKnownTotal && loaded >= total && !active
+  const displayProgress = isLoaded ? 100 : Math.min(99, Math.max(0, Math.round(rawProgress)))
 
   useEffect(() => {
     if (isLoaded) {
-      const timeout = window.setTimeout(() => setIsComplete(true), 500);
-      return () => window.clearTimeout(timeout);
+      const timeout = window.setTimeout(() => setIsComplete(true), 500)
+      return () => window.clearTimeout(timeout)
     }
 
     if (active) {
-      setIsComplete(false);
+      setIsComplete(false)
     }
-  }, [active, isLoaded]);
+  }, [active, isLoaded])
 
   if (isComplete) {
-    return null;
+    return null
   }
 
   return (
@@ -830,7 +816,7 @@ function AdminMainViewUiLoader() {
         <div className="admin-ui-loader-spinner" />
       </div>
     </div>
-  );
+  )
 }
 
 function SyncOverlay({
@@ -840,43 +826,43 @@ function SyncOverlay({
   onComplete,
   onBack,
 }: {
-  isSyncing: boolean;
-  syncState: SyncState;
-  presetName: string;
-  onComplete: () => void;
-  onBack: () => void;
+  isSyncing: boolean
+  syncState: SyncState
+  presetName: string
+  onComplete: () => void
+  onBack: () => void
 }) {
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(0)
 
   useEffect(() => {
     if (!isSyncing || syncState !== 'syncing') {
-      setProgress(0);
-      return;
+      setProgress(0)
+      return
     }
 
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
+          clearInterval(interval)
+          return 100
         }
-        return prev + 2;
-      });
-    }, 20);
+        return prev + 2
+      })
+    }, 20)
 
-    return () => clearInterval(interval);
-  }, [isSyncing, syncState]);
+    return () => clearInterval(interval)
+  }, [isSyncing, syncState])
 
   useEffect(() => {
     if (progress >= 100 && syncState === 'syncing') {
-      
+      onComplete();
     }
-  }, [progress, syncState]);
+  }, [onComplete, progress, syncState]);
 
-  if (!isSyncing) return null;
+  if (!isSyncing) return null
 
-  const isReady = syncState === 'ready' || progress >= 100;
-  const canAccess = progress >= 100;
+  const isReady = syncState === 'ready' || progress >= 100
+  const canAccess = progress >= 100
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-700">
@@ -891,7 +877,9 @@ function SyncOverlay({
             {isReady ? (
               <Check className="h-12 w-12 text-emerald-400" strokeWidth={3} />
             ) : (
-              <span className="font-mono text-3xl font-black text-white leading-none">{progress}%</span>
+              <span className="font-mono text-3xl font-black text-white leading-none">
+                {progress}%
+              </span>
             )}
             <span className="font-mono text-[8px] text-cyan-400/60 uppercase tracking-[0.3em] mt-1">
               {isReady ? 'LINK_READY' : 'LINK_SYNC'}
@@ -938,15 +926,18 @@ function SyncOverlay({
             />
             <div className="relative z-10 flex items-center gap-3">
               {canAccess ? (
-                <Check className="h-4 w-4 text-emerald-400 group-hover:text-black" strokeWidth={3} />
+                <Check
+                  className="h-4 w-4 text-emerald-400 group-hover:text-black"
+                  strokeWidth={3}
+                />
               ) : (
-                <span className="font-mono text-[10px] font-black text-cyan-400/50">{progress}%</span>
+                <span className="font-mono text-[10px] font-black text-cyan-400/50">
+                  {progress}%
+                </span>
               )}
               <span
                 className={`text-[10px] font-black tracking-[0.4em] uppercase drop-shadow-md transition-colors ${
-                  canAccess
-                    ? 'text-white group-hover:text-black'
-                    : 'text-white/40'
+                  canAccess ? 'text-white group-hover:text-black' : 'text-white/40'
                 }`}
               >
                 ACCEDER AL SISTEMA
@@ -972,134 +963,142 @@ function SyncOverlay({
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 export default function AdminMainViewUiPage() {
-  const navigate = useNavigate();
-  const [cameraConfig, setCameraConfig] = useState<CameraState>(() => readStoredCamera());
-  const [viewMode, setViewMode] = useState<ViewMode>('normal');
-  const [activePresetId, setActivePresetId] = useState('console');
-  const [bootProgress, setBootProgress] = useState(0);
-  const [appLoaded, setAppLoaded] = useState(false);
-  const [syncState, setSyncState] = useState<SyncState>('idle');
-  const [signalEnabled, setSignalEnabled] = useState(true);
-  const [toast, setToast] = useState<string | null>(null);
-  const [hoveredMonitorId, setHoveredMonitorId] = useState<string | null>(null);
-  const [hoveredConsole, setHoveredConsole] = useState(false);
-  const [hoveredComms, setHoveredComms] = useState(false);
+  const navigate = useNavigate()
+  const [cameraConfig, setCameraConfig] = useState<CameraState>(() => readStoredCamera())
+  const [viewMode, setViewMode] = useState<ViewMode>('normal')
+  const [activePresetId, setActivePresetId] = useState('console')
+  const [bootProgress, setBootProgress] = useState(0)
+  const [appLoaded, setAppLoaded] = useState(false)
+  const [syncState, setSyncState] = useState<SyncState>('idle')
+  const [signalEnabled, setSignalEnabled] = useState(true)
+  const [toast, setToast] = useState<string | null>(null)
+  const [hoveredMonitorId, setHoveredMonitorId] = useState<string | null>(null)
+  const [hoveredConsole, setHoveredConsole] = useState(false)
+  const [hoveredComms, setHoveredComms] = useState(false)
 
   const cameraSessionRef = useRef<CameraState>({
     position: cloneVec3(cameraConfig.position),
     target: cloneVec3(cameraConfig.target),
-  });
+  })
 
   const currentPreset = useMemo(() => {
-    return DEFAULT_PRESETS.find((preset) => preset.id === activePresetId) ?? DEFAULT_PRESETS[0];
-  }, [activePresetId]);
+    return DEFAULT_PRESETS.find((preset) => preset.id === activePresetId) ?? DEFAULT_PRESETS[0]
+  }, [activePresetId])
 
   const activePosition = useMemo<Vec3>(() => {
-    return viewMode === 'normal' ? cameraConfig.position : currentPreset.position;
-  }, [cameraConfig.position, currentPreset.position, viewMode]);
+    return viewMode === 'normal' ? cameraConfig.position : currentPreset.position
+  }, [cameraConfig.position, currentPreset.position, viewMode])
 
   const activeTarget = useMemo<Vec3>(() => {
-    return viewMode === 'normal' ? cameraConfig.target : currentPreset.target;
-  }, [cameraConfig.target, currentPreset.target, viewMode]);
+    return viewMode === 'normal' ? cameraConfig.target : currentPreset.target
+  }, [cameraConfig.target, currentPreset.target, viewMode])
 
   useEffect(() => {
     const interval = window.setInterval(() => {
       setBootProgress((current) => {
-        const next = Math.min(100, current + Math.floor(Math.random() * 20) + 12);
+        const next = Math.min(100, current + Math.floor(Math.random() * 20) + 12)
         if (next >= 100) {
-          window.clearInterval(interval);
-          window.setTimeout(() => setAppLoaded(true), 180);
+          window.clearInterval(interval)
+          window.setTimeout(() => setAppLoaded(true), 180)
         }
-        return next;
-      });
-    }, 45);
+        return next
+      })
+    }, 45)
 
     return () => {
-      window.clearInterval(interval);
-    };
-  }, []);
+      window.clearInterval(interval)
+    }
+  }, [])
 
   useEffect(() => {
-    window.localStorage.setItem(CAMERA_STORAGE_KEY, JSON.stringify(cameraConfig));
-  }, [cameraConfig]);
+    window.localStorage.setItem(CAMERA_STORAGE_KEY, JSON.stringify(cameraConfig))
+  }, [cameraConfig])
 
   useEffect(() => {
     if (viewMode === 'normal' && syncState === 'idle') {
-      setSignalEnabled(true);
+      setSignalEnabled(true)
     }
-  }, [syncState, viewMode]);
+  }, [syncState, viewMode])
 
   useEffect(() => {
     if (!toast) {
-      return;
+      return
     }
 
-    const timeout = window.setTimeout(() => setToast(null), 1800);
-    return () => window.clearTimeout(timeout);
-  }, [toast]);
+    const timeout = window.setTimeout(() => setToast(null), 1800)
+    return () => window.clearTimeout(timeout)
+  }, [toast])
 
   const persistLiveCamera = () => {
     const snapshot: CameraState = {
       position: cloneVec3(cameraSessionRef.current.position),
       target: cloneVec3(cameraSessionRef.current.target),
-    };
-    setCameraConfig(snapshot);
-  };
+    }
+    setCameraConfig(snapshot)
+  }
 
   const handleEnterZoom = useCallback((presetId: string) => {
-    persistLiveCamera();
-    setActivePresetId(presetId);
-    setViewMode('zoom');
-    setSyncState('idle');
-    setHoveredMonitorId(null);
-  }, []);
+    persistLiveCamera()
+    setActivePresetId(presetId)
+    setViewMode('zoom')
+    setSyncState('idle')
+    setHoveredMonitorId(null)
+  }, [])
 
   const handleMonitorSelect = useCallback((presetId: string) => {
-    setActivePresetId(presetId);
-    setSyncState('idle');
-  }, []);
+    setActivePresetId(presetId)
+    setSyncState('idle')
+  }, [])
 
-  const handleStartSync = useCallback((presetId: string) => {
-    if (MONITOR_PRESET_IDS.has(presetId) && viewMode === 'zoom') {
-      setSyncState('syncing');
-    }
-  }, [viewMode]);
+  const handleStartSync = useCallback(
+    (presetId: string) => {
+      if (MONITOR_PRESET_IDS.has(presetId) && viewMode === 'zoom') {
+        setSyncState('syncing')
+      }
+    },
+    [viewMode],
+  )
 
   const handleSyncComplete = useCallback(() => {
     setSyncState('ready');
-  }, []);
+    window.setTimeout(() => {
+      navigate('/admin-dashboard-ui-v2');
+    }, 420);
+  }, [navigate]);
 
   const handleBack = useCallback(() => {
     if (syncState !== 'idle') {
-      setSyncState('idle');
-      return;
+      setSyncState('idle')
+      return
     }
 
     if (viewMode === 'zoom') {
       if (MONITOR_PRESET_IDS.has(activePresetId)) {
-        setActivePresetId('console');
-        setHoveredMonitorId(null);
-        return;
+        setActivePresetId('console')
+        setHoveredMonitorId(null)
+        return
       }
 
-      setViewMode('normal');
-      return;
+      setViewMode('normal')
+      return
     }
 
-    navigate('/');
-  }, [activePresetId, navigate, syncState, viewMode]);
+    navigate('/')
+  }, [activePresetId, navigate, syncState, viewMode])
 
-  const handleTransitionEnd = useCallback((presetId: string) => {
-    if (viewMode === 'zoom' && MONITOR_PRESET_IDS.has(presetId) && syncState === 'idle') {
-      
-    }
-  }, [viewMode, syncState]);
+  const handleTransitionEnd = useCallback(
+    (presetId: string) => {
+      if (viewMode === 'zoom' && MONITOR_PRESET_IDS.has(presetId) && syncState === 'idle') {
+      }
+    },
+    [viewMode, syncState],
+  )
 
-  const isSyncing = syncState !== 'idle';
+  const isSyncing = syncState !== 'idle'
 
   return (
     <div className="admin-main-view-ui-page relative h-screen w-full overflow-hidden bg-[#020202] text-white">
@@ -1158,8 +1157,8 @@ export default function AdminMainViewUiPage() {
               icon={AudioLines}
               label="Señal"
               onClick={() => {
-                setSignalEnabled((current) => !current);
-                setToast(signalEnabled ? 'Canal silenciado' : 'Canal restaurado');
+                setSignalEnabled((current) => !current)
+                setToast(signalEnabled ? 'Canal silenciado' : 'Canal restaurado')
               }}
             />
             <IconRibbonButton
@@ -1167,16 +1166,15 @@ export default function AdminMainViewUiPage() {
               icon={LogOut}
               label="Cerrar sesiÃ³n"
               onClick={() => {
-                window.localStorage.removeItem('token');
-                window.localStorage.removeItem('user');
-                window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT));
-                navigate('/');
+                window.localStorage.removeItem('token')
+                window.localStorage.removeItem('accessToken')
+                window.localStorage.removeItem('user')
+                window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
+                navigate('/')
               }}
             />
           </div>
         </div>
-
-
 
         {toast ? (
           <div className="absolute bottom-6 right-6 rounded border border-cyan-400/20 bg-slate-950/90 px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-200 shadow-[0_0_24px_rgba(34,211,238,0.18)]">
@@ -1185,14 +1183,14 @@ export default function AdminMainViewUiPage() {
         ) : null}
       </div>
     </div>
-  );
+  )
 }
 
-useGLTF.preload(WAREHOUSE_URL);
-useGLTF.preload(SIDE_TABLE_URL);
-useGLTF.preload(CABINET_URL);
-useGLTF.preload(WHITEBOARD_URL);
-useGLTF.preload(COMMS_ROOM_URL);
-useGLTF.preload(CHAIR_URL);
-useGLTF.preload(LOUNGE_SET_URL);
-useGLTF.preload(CLOCK_URL);
+useGLTF.preload(WAREHOUSE_URL)
+useGLTF.preload(SIDE_TABLE_URL)
+useGLTF.preload(CABINET_URL)
+useGLTF.preload(WHITEBOARD_URL)
+useGLTF.preload(COMMS_ROOM_URL)
+useGLTF.preload(CHAIR_URL)
+useGLTF.preload(LOUNGE_SET_URL)
+useGLTF.preload(CLOCK_URL)

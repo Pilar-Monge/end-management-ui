@@ -21,7 +21,8 @@ export interface LoggedUser {
 }
 
 export interface LoginApiResponse {
-  token: string
+  token?: string
+  accessToken?: string
   user: {
     id: number
     username: string
@@ -29,4 +30,9 @@ export interface LoginApiResponse {
     campId: number
   }
 }
-export type LoginErrors = Partial<LoginForm & { general: string }>
+export type LoginErrors = Partial<{
+  username: string
+  password: string
+  campId: string
+  general: string
+}>
