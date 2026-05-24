@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode, Component } from 'react'
+import React from 'react'
 import {
   autoAssignWorkerCoverage,
   fetchWorkerAtRiskCoverage,
@@ -190,7 +191,11 @@ function GenericWorkerContent({
     case 'ocupaciones':
       return <OccupationsSection />
     case 'cobertura':
-      return <CoverageSection sessionUser={sessionUser} />
+      return (
+        <ErrorBoundary>
+          <CoverageSection sessionUser={sessionUser} />
+        </ErrorBoundary>
+      )
     default:
       return <ModuleStateCard title={section.label} message="Sin datos disponibles para este módulo." />
   }
@@ -1157,6 +1162,31 @@ function ModuleStateCard({ title, message }: { title: string; message: string })
       <p>{message}</p>
     </div>
   )
+}
+ 
+class ErrorBoundary extends Component<{ children?: ReactNode }, { hasError: boolean; message?: string }> {
+  constructor(props: any) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error('Worker coverage error:', error)
+    this.setState({ hasError: true, message: error instanceof Error ? error.message : String(error) })
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="worker-empty-state">
+          <strong>Se produjo un error</strong>
+          <p>{this.state.message ?? 'Error en el módulo de cobertura'}</p>
+        </div>
+      )
+    }
+
+    return this.props.children ?? null
+  }
 }
 
 function MetricBox({ label, value }: { label: string; value: string }) {

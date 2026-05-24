@@ -3,10 +3,7 @@
   inset: 0;
   isolation: isolate;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 22% 14%, rgba(105, 191, 183, 0.16), transparent 32%),
-    radial-gradient(circle at 80% 18%, rgba(103, 172, 169, 0.1), transparent 34%),
-    linear-gradient(165deg, #060e10 0%, #0a1618 48%, #061013 100%);
+  background: radial-gradient(ellipse at 20% 20%, rgba(12, 23, 24, 0.72), rgba(6,8,9,0.96));
   color: #a4c2c5;
   font-family: 'Arial Narrow', 'Bahnschrift', 'Segoe UI Condensed', sans-serif;
 }
@@ -47,7 +44,7 @@
 }
 
 .worker-loading-overlay.is-loaded {
-  background: rgba(3, 9, 10, 0.88);
+  background: rgba(0,0,0,0.6);
 }
 
 .worker-loading-panel {
