@@ -263,6 +263,7 @@ const ReplicaGlobe = ({
   const globeEl = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
+  const [isTouchDevice, setIsTouchDevice] = useState(false)
   const [selectedCampamento, setSelectedCampamento] = useState<Campamento | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [isSearchFocused, setIsSearchFocused] = useState(false)
@@ -278,6 +279,24 @@ const ReplicaGlobe = ({
       onLoadingComplete()
     }
   }, [isReady, onLoadingComplete])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const updateTouchState = () => {
+      const hasCoarsePointer = window.matchMedia('(pointer: coarse)').matches
+      setIsTouchDevice(hasCoarsePointer || navigator.maxTouchPoints > 0)
+    }
+
+    updateTouchState()
+    window.addEventListener('resize', updateTouchState)
+    window.addEventListener('orientationchange', updateTouchState)
+
+    return () => {
+      window.removeEventListener('resize', updateTouchState)
+      window.removeEventListener('orientationchange', updateTouchState)
+    }
+  }, [])
 
   useEffect(() => {
     const updateSize = () => {
@@ -302,6 +321,8 @@ const ReplicaGlobe = ({
       globeEl.current.controls().autoRotateSpeed = 0.4
     }
   }, [selectedCampamento])
+
+  const isCompactViewport = isTouchDevice && dimensions.width <= 1024 && dimensions.height <= 700
 
   useEffect(() => {
     let frameId: number
@@ -394,6 +415,93 @@ const ReplicaGlobe = ({
       ref={containerRef}
       className="w-full h-full bg-transparent overflow-hidden relative font-sans text-white"
     >
+      <style>{`
+        .camp-info-card--compact {
+          position: fixed !important;
+          left: 50% !important;
+          right: auto !important;
+          top: 50% !important;
+          bottom: auto !important;
+          width: min(calc(100vw - 0.75rem), 21rem) !important;
+          max-height: calc(100dvh - 0.75rem) !important;
+          overflow-y: auto !important;
+          overscroll-behavior: contain;
+          transform: translate(-50%, -50%) !important;
+          border-radius: 0.9rem !important;
+          padding: 0.75rem !important;
+        }
+
+        .camp-info-card--compact .camp-info-card__title {
+          font-size: 0.9rem !important;
+          line-height: 1.1 !important;
+        }
+
+        .camp-info-card--compact .camp-info-card__header {
+          margin-bottom: 0.5rem !important;
+          padding-right: 2rem !important;
+        }
+
+        .camp-info-card--compact .camp-info-card__badge-row {
+          gap: 0.3rem !important;
+          margin-top: 0.35rem !important;
+        }
+
+        .camp-info-card--compact .camp-info-card__badge {
+          font-size: 0.5rem !important;
+          letter-spacing: 0.12em !important;
+          padding-top: 0.12rem !important;
+          padding-bottom: 0.12rem !important;
+        }
+
+        .camp-info-card--compact .camp-info-card__meta {
+          gap: 0.5rem !important;
+          margin-bottom: 0.7rem !important;
+        }
+
+        .camp-info-card--compact .camp-info-card__meta > div > div:first-child {
+          font-size: 0.58rem !important;
+          letter-spacing: 0.14em !important;
+        }
+
+        .camp-info-card--compact .camp-info-card__meta > div > div:last-child {
+          font-size: 0.82rem !important;
+          line-height: 1.05 !important;
+        }
+
+        .camp-info-card--compact .camp-info-card__desc {
+          min-height: 1.5rem !important;
+          margin-bottom: 0.7rem !important;
+          padding-left: 0.7rem !important;
+        }
+
+        .camp-info-card--compact .camp-info-card__desc p {
+          font-size: 0.62rem !important;
+          line-height: 1.25 !important;
+          max-height: 2.8rem !important;
+          overflow: hidden !important;
+        }
+
+        .camp-info-card--compact .camp-info-card__actions {
+          gap: 0.4rem !important;
+        }
+
+        .camp-info-card--compact .camp-info-card__action {
+          padding-top: 0.55rem !important;
+          padding-bottom: 0.55rem !important;
+        }
+
+        .camp-info-card--compact .camp-info-card__action-text {
+          font-size: 0.58rem !important;
+          letter-spacing: 0.14em !important;
+        }
+
+        .camp-info-card--compact .camp-info-card__close {
+          top: 0.1rem !important;
+          right: 0.1rem !important;
+          padding: 0.25rem !important;
+        }
+      `}</style>
+
       {}
       <div
         className={`absolute inset-0 pointer-events-none transition-all duration-1000 ${isReady ? 'z-[15] opacity-50' : 'z-[80]'}`}
@@ -521,7 +629,7 @@ const ReplicaGlobe = ({
             isSelected: selectedCampamento?.id === c.id,
           }))}
           htmlElement={useCallback(
-            (d: any) => {
+            (d: object) => {
               const camp = d as Campamento & { isSelected: boolean }
               const el = document.createElement('div')
               el.className = 'group relative'
@@ -540,62 +648,57 @@ const ReplicaGlobe = ({
 
               el.innerHTML = `
             <div class="marker-root relative" style="pointer-events: none;">
-              <!-- Circle marker area -->
               <div class="marker-dot-area flex items-center justify-center relative pointer-events-auto cursor-pointer" style="width: 24px; height: 24px; transform: translate(-50%, -50%);">
                 <div class="absolute w-8 h-8 rounded-full border border-white/20 animate-ping opacity-60 pointer-events-none"></div>
                 <div class="absolute w-6 h-6 rounded-full bg-white/5 animate-pulse blur-sm pointer-events-none"></div>
-                
                 <div class="absolute w-8 h-8 rounded-full bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-md pointer-events-none"></div>
                 <div class="relative w-3.5 h-3.5 rounded-full bg-white border-2 border-white shadow-[0_0_15px_rgba(255,255,255,1)] transition-all duration-300 ${isSelected ? 'scale-110 ring-4 ring-white/30' : 'group-hover:ring-4 group-hover:ring-white/20'} pointer-events-none"></div>
-                
                 <div class="marker-label absolute bottom-10 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/90 backdrop-blur-md border border-white/30 rounded-full transition-all duration-300 pointer-events-none whitespace-nowrap opacity-0 ${isSelected ? 'opacity-0' : 'group-hover:opacity-100 shadow-[0_0_20px_rgba(0,0,0,0.5)]'}">
                   <div class="text-white text-[10px] font-black tracking-widest uppercase px-1">${camp.name}</div>
                 </div>
               </div>
 
-              <!-- Information Card -->
-              <div class="info-card absolute top-[-70px] left-[25px] z-[60] w-[280px] bg-black/95 backdrop-blur-3xl border border-white/30 p-6 rounded-sm shadow-[0_0_60px_rgba(0,0,0,0.8)] transition-all duration-500 origin-left pointer-events-auto ${isSelected ? 'opacity-100 scale-100 translate-x-0' : 'opacity-0 scale-95 -translate-x-4 pointer-events-none invisible'}">
-                
-                <div class="absolute top-2 right-2 text-white/60 hover:rotate-90 hover:scale-110 hover:text-white transition-all duration-300 close-btn cursor-pointer z-[70] p-2">
+              <div class="info-card ${isCompactViewport ? 'camp-info-card--compact' : 'absolute top-[-70px] left-[25px]'} z-[60] w-[280px] bg-black/95 backdrop-blur-3xl border border-white/30 p-6 rounded-sm shadow-[0_0_60px_rgba(0,0,0,0.8)] transition-all duration-500 origin-left pointer-events-auto ${isSelected ? 'opacity-100 scale-100 translate-x-0' : 'opacity-0 scale-95 -translate-x-4 pointer-events-none invisible'}">
+                <div class="absolute top-2 right-2 text-white/60 hover:rotate-90 hover:scale-110 hover:text-white transition-all duration-300 close-btn cursor-pointer z-[70] p-2 camp-info-card__close">
                   <svg size="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px; pointer-events: none;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </div>
 
-                <div class="mb-4 pr-10">
+                <div class="mb-4 pr-10 camp-info-card__header">
                   <div class="title-anchor inline-block border-b-0">
-                    <div class="text-white text-[18px] font-black uppercase tracking-tighter italic leading-tight">${camp.name}</div>
+                    <div class="camp-info-card__title text-white text-[18px] font-black uppercase tracking-tighter italic leading-tight">${camp.name}</div>
                   </div>
-                  <div class="mt-2 flex items-center gap-2">
+                  <div class="mt-2 flex items-center gap-2 camp-info-card__badge-row">
                     <div class="w-2.5 h-2.5 rounded-full bg-green-400 pulse-green shadow-[0_0_8px_#4ade80]"></div>
-                    <div class="bg-black/60 text-white/80 text-[11px] font-mono font-bold tracking-widest px-2 py-0.5 border border-white/20">CAMP_ID_00${camp.id}</div>
+                    <div class="bg-black/60 text-white/80 text-[11px] font-mono font-bold tracking-widest px-2 py-0.5 border border-white/20 camp-info-card__badge">CAMP_ID_00${camp.id}</div>
                   </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-6 mb-6">
+                <div class="camp-info-card__meta grid grid-cols-2 gap-6 mb-6">
                   <div class="space-y-1">
-                    <div class="text-white/50 text-[9px] uppercase font-bold tracking-[0.2em] font-mono">STATUS</div>
-                    <div class="text-[15px] font-black tracking-tighter italic uppercase" style="color: ${statusColor}">${camp.status}</div>
+                    <div class="text-white/50 text-[9px] uppercase font-bold tracking-[0.2em] font-mono camp-info-card__label">STATUS</div>
+                    <div class="text-[15px] font-black tracking-tighter italic uppercase camp-info-card__value" style="color: ${statusColor}">${camp.status}</div>
                   </div>
                   <div class="space-y-1">
-                    <div class="text-white/50 text-[9px] uppercase font-bold tracking-[0.2em] font-mono">POBLACIÓN</div>
-                    <div class="text-white text-[15px] font-black tracking-tighter italic uppercase font-mono">${camp.survivors}</div>
+                    <div class="text-white/50 text-[9px] uppercase font-bold tracking-[0.2em] font-mono camp-info-card__label">POBLACIÓN</div>
+                    <div class="text-white text-[15px] font-black tracking-tighter italic uppercase font-mono camp-info-card__value">${camp.survivors}</div>
                   </div>
                 </div>
 
-                <div class="relative mb-6 min-h-[3rem] flex items-center border-l-2 border-white/20 pl-4">
+                <div class="camp-info-card__desc relative mb-6 min-h-[3rem] flex items-center border-l-2 border-white/20 pl-4">
                   <p class="text-white/50 text-[11px] leading-relaxed italic font-medium">
                     "${camp.description}"
                   </p>
                 </div>
 
-                <div class="flex flex-col gap-4">
-                  <button class="action-btn menu-brush w-full py-4 rounded-none uppercase tracking-[0.2em] font-black italic flex items-center justify-center group/btn relative overflow-hidden active:scale-[0.98] transition-transform">
-                    <span class="relative z-10 flex items-center justify-center gap-3 text-white text-[13px] transition-transform duration-300 group-hover/btn:scale-105 pointer-events-none">
+                <div class="camp-info-card__actions flex flex-col gap-4">
+                  <button class="camp-info-card__action action-btn menu-brush w-full py-4 rounded-none uppercase tracking-[0.2em] font-black italic flex items-center justify-center group/btn relative overflow-hidden active:scale-[0.98] transition-transform">
+                    <span class="camp-info-card__action-text relative z-10 flex items-center justify-center gap-3 text-white text-[13px] transition-transform duration-300 group-hover/btn:scale-105 pointer-events-none">
                       ${homeIcon}
                       INGRESAR
                     </span>
                   </button>
-                  <button class="admission-request-btn action-btn menu-brush w-full py-3 rounded-none uppercase tracking-[0.2em] font-black italic flex items-center justify-center group/btn relative overflow-hidden active:scale-[0.98] transition-transform">
-                    <span class="relative z-10 flex items-center justify-center gap-3 text-white text-[11px] transition-transform duration-300 group-hover/btn:scale-105 pointer-events-none">
+                  <button class="camp-info-card__action admission-request-btn action-btn menu-brush w-full py-3 rounded-none uppercase tracking-[0.2em] font-black italic flex items-center justify-center group/btn relative overflow-hidden active:scale-[0.98] transition-transform">
+                    <span class="camp-info-card__action-text relative z-10 flex items-center justify-center gap-3 text-white text-[11px] transition-transform duration-300 group-hover/btn:scale-105 pointer-events-none">
                       ${fileIcon}
                       SOLICITAR ACCESO
                     </span>
@@ -650,7 +753,7 @@ const ReplicaGlobe = ({
 
               return el
             },
-            [handleSelectCampamento, navigate],
+            [handleSelectCampamento, navigate, onLoginClick, isCompactViewport],
           )}
         />
       </motion.div>
