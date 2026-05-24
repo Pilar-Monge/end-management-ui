@@ -25,6 +25,9 @@ const AdminMainViewUiPage = lazy(() =>
 const AdminDashboardUiV2Page = lazy(() =>
   import('./features/admin-dashboard-ui-v2').then((m) => ({ default: m.AdminDashboardUiV2Page })),
 )
+const WorkerMainViewPage = lazy(() =>
+  import('./features/worker-main-view/pages/WorkerMainViewPage').then((m) => ({ default: m.WorkerMainViewPage })),
+)
 const ResourceTypesPage = lazy(() =>
   import('./features/catalogs').then((m) => ({ default: m.ResourceTypesPage })),
 )
@@ -317,6 +320,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/worker-main-view" element={withSuspense(<WorkerMainViewPage />)} />
         <Route
           path="/dashboard"
           element={
