@@ -10,7 +10,6 @@ type WorkerSection = {
   id: WorkerSectionId
   label: string
   shortLabel: string
-  note: string
   icon: ReactNode
 }
 
@@ -19,35 +18,30 @@ const WORKER_NAV_DATA: WorkerSection[] = [
     id: 'dashboard',
     label: 'Dashboard personal',
     shortLabel: 'DB',
-    note: 'El worker solo tiene acceso a dashboard personal. No puede acceder a dashboard general, inventario ni expediciones.',
     icon: <DashboardIcon />,
   },
   {
     id: 'recoleccion',
     label: 'Recoleccion diaria',
     shortLabel: 'RC',
-    note: 'Según la matriz, worker solo puede ver el detalle del registro de recoleccion diaria.',
     icon: <CollectionIcon />,
   },
   {
     id: 'notificaciones',
     label: 'Notificaciones',
     shortLabel: 'NT',
-    note: 'Worker puede listar, ver detalle y actualizar notificaciones, pero no crearlas ni eliminarlas.',
     icon: <NotificationIcon />,
   },
   {
     id: 'ocupaciones',
     label: 'Ocupaciones',
     shortLabel: 'OC',
-    note: 'El acceso a ocupaciones es de solo lectura para worker.',
     icon: <OccupationIcon />,
   },
   {
     id: 'cobertura',
     label: 'Cobertura de oficio',
     shortLabel: 'CB',
-    note: 'Este es uno de los pocos módulos donde worker conserva el conjunto completo de acciones.',
     icon: <CoverageIcon />,
   },
 ]
@@ -95,15 +89,11 @@ export function WorkerMainViewPage() {
             <button className="worker-hud-btn" type="button">
               Panel Trabajador
             </button>
-            <button className="worker-hud-btn" type="button">
-              Sesion de Prueba
-            </button>
           </header>
 
           <main className="worker-main-area">
             <div className="worker-title-row">
               <h1>{activeSection.label}</h1>
-              <span>Rol worker con permisos filtrados</span>
             </div>
 
             <section className="worker-shell" aria-label="Panel de trabajador">
@@ -171,14 +161,6 @@ function GenericWorkerContent({
 }) {
   return (
     <div className="worker-content-grid worker-content-grid-single">
-      <article className="worker-card worker-card-highlight">
-        <div className="worker-card-label">Modulo activo</div>
-        <h3>{section.label}</h3>
-        <p>
-          {section.note}
-        </p>
-      </article>
-
       {renderModuleDetails(section)}
     </div>
   )
