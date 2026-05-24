@@ -216,9 +216,6 @@ export default function LandingPage({
           >
             <div className="relative z-10 flex items-center justify-between mb-2 border-b border-white/10 pb-4">
               <div className="flex flex-col">
-                <div className="text-[10px] uppercase tracking-[0.4em] font-mono text-white/40 underline decoration-blue-400/40">
-                  Opciones Globales
-                </div>
                 <span
                   className="text-[16px] font-black tracking-[0.3em] text-white italic uppercase"
                   style={{ fontFamily: "'Oswald', sans-serif" }}
