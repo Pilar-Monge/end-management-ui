@@ -310,54 +310,6 @@ export default function LoginPage() {
                     </button>
                   </div>
 
-                  <div
-                    style={{
-                      border: '1px solid rgba(74,138,48,0.25)',
-                      borderRadius: 4,
-                      padding: '10px 12px',
-                      background: 'rgba(74,138,48,0.06)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: 10,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontFamily: "'Courier New', monospace",
-                        fontSize: 10,
-                        letterSpacing: '1px',
-                        color: '#9ccf78',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      {form.campId && form.campId > 0
-                        ? `Campamento seleccionado: #${form.campId}`
-                        : 'Campamento no seleccionado'}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate('/main-homepage', {
-                          state: { initialAppState: 'global-map' },
-                        })
-                      }
-                      style={{
-                        background: 'none',
-                        border: '1px solid rgba(105,191,183,0.4)',
-                        color: '#8ed8d0',
-                        fontSize: 9,
-                        letterSpacing: '1px',
-                        textTransform: 'uppercase',
-                        padding: '5px 8px',
-                        cursor: 'pointer',
-                        fontFamily: "'Courier New', monospace",
-                      }}
-                    >
-                      {form.campId && form.campId > 0 ? 'Cambiar' : 'Seleccionar'}
-                    </button>
-                  </div>
-
                   <AnimatePresence>
                     {errors.general && (
                       <motion.div

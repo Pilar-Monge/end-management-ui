@@ -2378,31 +2378,10 @@ export function MainHomePage() {
                       )}
                     </div>
 
-                    {appState === 'login' && (
-                      <div className="space-y-3 w-full max-w-[260px]">
-                        <label className="text-[11px] uppercase font-bold tracking-[0.2em] text-white block">
-                          Campamento
-                        </label>
-                        <div className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-2.5 text-white font-mono text-xs flex items-center justify-between gap-2">
-                          <span>
-                            {authForm.campId && authForm.campId > 0
-                              ? `Campamento #${authForm.campId}`
-                              : 'No seleccionado'}
-                          </span>
-                          <button
-                            type="button"
-                            className="text-[10px] uppercase tracking-[0.12em] text-blue-300 hover:text-blue-200"
-                            onClick={() => setAppState('global-map')}
-                          >
-                            {authForm.campId && authForm.campId > 0 ? 'Cambiar' : 'Seleccionar'}
-                          </button>
-                        </div>
-                        {authErrors.campId && (
-                          <p className="text-[10px] text-red-400 uppercase tracking-[0.08em]">
-                            {authErrors.campId}
-                          </p>
-                        )}
-                      </div>
+                    {appState === 'login' && authErrors.campId && (
+                      <p className="text-[10px] text-red-400 uppercase tracking-[0.08em] max-w-[260px]">
+                        {authErrors.campId}
+                      </p>
                     )}
 
                     {appState === 'register' && (
