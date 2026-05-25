@@ -40,6 +40,9 @@ const AchievementsPage = lazy(() =>
 const ExpeditionsUiPage = lazy(() =>
   import('./features/expeditions-ui').then((m) => ({ default: m.ExpeditionsUiPage })),
 )
+const LoadingPage = lazy(() =>
+  import('./features/loading').then((m) => ({ default: m.LoadingPage })),
+)
 
 const routeFallback = (
   <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#060a04', color: '#7ddb50' }}>
@@ -250,6 +253,7 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/loading" element={withSuspense(<LoadingPage />)} />
         <Route path="/main-homepage" element={withSuspense(<MainHomePage />)} />
         <Route
           path="/app"

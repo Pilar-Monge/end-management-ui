@@ -47,7 +47,7 @@ export default function HomePage() {
 
         <div style={{ display: 'flex', gap: '16px', flexDirection: 'column' }}>
           <button
-            onClick={() => navigate('/main-homepage')}
+            onClick={() => navigate('/loading')}
             style={{
               background: 'rgba(74, 138, 48, 0.2)',
               border: '1px solid rgba(125, 219, 80, 0.5)',
@@ -155,7 +155,7 @@ export default function HomePage() {
           </button>
 
           <button
-            onClick={() => navigate('/main-homepage')}
+            onClick={() => navigate('/loading')}
             style={{
               background: 'rgba(74, 138, 48, 0.12)',
               border: '1px solid rgba(125, 219, 80, 0.35)',

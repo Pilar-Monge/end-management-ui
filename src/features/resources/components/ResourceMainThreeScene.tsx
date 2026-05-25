@@ -2,53 +2,16 @@
 import { OrbitControls, useGLTF, Html, useProgress } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
-
-const HANGAR_URL =
-  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/polygon.glb'
-const MONITORING_STATION_URL =
-  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorExpediciones/monitoring_station.glb'
-const BEER_BREWERY_URL =
-  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/beer_brewery_set.glb'
-const FORD_URL =
-  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/ford_f100_1967.glb'
-const MEAT_URL =
-  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/vietnamese_meat_market_stall.glb'
-const SHELF_URL =
-  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/metal_storage_cabinet.glb'
-const FORKLIFT_URL =
-  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/forklifter_-_game_ready.glb'
-const CEILING_LAMP_URL =
-  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/fluorescent_lamplight_-_4096px2.glb'
-const FRUIT_URL =
-  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/fruit_veg_market%20(1).glb'
-const CHAIR_URL =
-  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/dock-01_chair.glb'
-
-const INITIAL_CAMERA = [-66.4, 11.2, -40.9] as [number, number, number]
-const INITIAL_TARGET = [-60, 9, -33] as [number, number, number]
-
-type ResourceZoomTarget = 'station' | 'meat' | 'beer' | null
-
-const ZOOM_VIEWS: Record<
-  Exclude<ResourceZoomTarget, null>,
-  {
-    camera: [number, number, number]
-    look: [number, number, number]
-  }
-> = {
-  station: {
-    camera: [-60, 10, -50],
-    look: [-60, 8, -60],
-  },
-  meat: {
-    camera: [-70, 15, -28],
-    look: [-70, 4, 1],
-  },
-  beer: {
-    camera: [-40, 15, -25],
-    look: [-40, 4, 0],
-  },
-}
+import {
+  GLTF_URLS,
+  INITIAL_CAMERA,
+  INITIAL_TARGET,
+  ResourceZoomTarget,
+  ZOOM_VIEWS,
+  RESOURCE_MODELS_CONFIG,
+  INTERACTION_TARGETS,
+} from '../constants/resourceSceneConfigs'
+import { useResourceScene } from '../hooks'
 
 function ResourceModel({
   url,
@@ -479,28 +442,29 @@ interface ResourceMainThreeSceneProps {
 }
 
 export default function ResourceMainThreeScene({ onExit, onOpenPanel }: ResourceMainThreeSceneProps) {
-  const controlsRef = useRef(null)
-  const [hoveredTarget, setHoveredTarget] = useState<{
-    type: Exclude<ResourceZoomTarget, null>
-    name: string
-    position: [number, number, number]
-  } | null>(null)
-  const [zoomedTarget, setZoomedTarget] = useState<ResourceZoomTarget>(null)
-  const [isSyncing, setIsSyncing] = useState(false)
+  const {
+    controlsRef,
+    hoveredTarget,
+    setHoveredTarget,
+    zoomedTarget,
+    setZoomedTarget,
+    isSyncing,
+    setIsSyncing,
+  } = useResourceScene()
 
   useEffect(() => {
-    useGLTF.preload(HANGAR_URL)
+    useGLTF.preload(GLTF_URLS.hangar)
 
     const timer = setTimeout(() => {
-      useGLTF.preload(MONITORING_STATION_URL)
-      useGLTF.preload(BEER_BREWERY_URL)
-      useGLTF.preload(FORD_URL)
-      useGLTF.preload(MEAT_URL)
-      useGLTF.preload(SHELF_URL)
-      useGLTF.preload(FORKLIFT_URL)
-      useGLTF.preload(CEILING_LAMP_URL)
-      useGLTF.preload(FRUIT_URL)
-      useGLTF.preload(CHAIR_URL)
+      useGLTF.preload(GLTF_URLS.monitoringStation)
+      useGLTF.preload(GLTF_URLS.beerBrewery)
+      useGLTF.preload(GLTF_URLS.ford)
+      useGLTF.preload(GLTF_URLS.meat)
+      useGLTF.preload(GLTF_URLS.shelf)
+      useGLTF.preload(GLTF_URLS.forklift)
+      useGLTF.preload(GLTF_URLS.ceilingLamp)
+      useGLTF.preload(GLTF_URLS.fruit)
+      useGLTF.preload(GLTF_URLS.chair)
     }, 2000)
 
     return () => clearTimeout(timer)
