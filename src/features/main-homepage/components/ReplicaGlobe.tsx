@@ -134,25 +134,25 @@ const ParticleSystem: React.FC<ParticleSystemProps> = ({ progress, isReady }) =>
     React.Fragment,
     null,
     React.createElement(
-      'points' as any,
+      'points',
       { ref: swarmRef },
       React.createElement(
-        'bufferGeometry' as any,
+        'bufferGeometry',
         null,
-        React.createElement('bufferAttribute' as any, {
+        React.createElement('bufferAttribute', {
           attach: 'attributes-position',
           count: formationCount,
           array: initialSwarmPositions,
           itemSize: 3,
         }),
-        React.createElement('bufferAttribute' as any, {
+        React.createElement('bufferAttribute', {
           attach: 'attributes-color',
           count: formationCount,
           array: swarmPositions.colors,
           itemSize: 3,
         }),
       ),
-      React.createElement('pointsMaterial' as any, {
+      React.createElement('pointsMaterial', {
         ref: swarmMaterialRef,
         size: 1.8,
         vertexColors: true,
@@ -272,6 +272,63 @@ const ReplicaGlobe = ({
   const [isLoading, setIsLoading] = useState(true)
   const [formationProgress, setFormationProgress] = useState(0)
   const [displayProgress, setDisplayProgress] = useState(0)
+  const [hoveredPoint, setHoveredPoint] = useState<Campamento | null>(null)
+
+  const { customLayerData, cyberParticlesData } = useMemo(() => {
+    const customLayerData = Array(5)
+      .fill(0)
+      .map(() => {
+        const count = 200
+        const positions = new Float32Array(count * 3)
+        const velocities = new Float32Array(count * 3)
+        for (let i = 0; i < count; i++) {
+          const radius = 101
+          const phi = Math.acos(-1 + (2 * i) / count)
+          const theta = Math.sqrt(count * Math.PI) * phi
+          positions[i * 3] = radius * Math.cos(theta) * Math.sin(phi)
+          positions[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi)
+          positions[i * 3 + 2] = radius * Math.cos(phi)
+          velocities[i * 3] = (Math.random() - 0.5) * 0.1
+          velocities[i * 3 + 1] = (Math.random() - 0.5) * 0.1
+          velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.1
+        }
+        return { positions, velocities }
+      })
+
+    const cyberParticlesData = Array(10)
+      .fill(0)
+      .map(() => {
+        const count = 500
+        const positions = new Float32Array(count * 3)
+        for (let i = 0; i < count; i++) {
+          const radius = Math.random() * 150 + 110
+          const phi = Math.acos(-1 + 2 * Math.random())
+          const theta = Math.random() * Math.PI * 2
+          positions[i * 3] = radius * Math.cos(theta) * Math.sin(phi)
+          positions[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi)
+          positions[i * 3 + 2] = radius * Math.cos(phi)
+        }
+        return { positions }
+      })
+
+    return { customLayerData, cyberParticlesData }
+  }, [])
+
+  const campHaloPositions = useMemo(() => {
+    const count = CAMPAMENTOS_DATA.length
+    const positions = new Float32Array(count * 3)
+    const radius = 101
+    for (let i = 0; i < count; i++) {
+      const lat = CAMPAMENTOS_DATA[i].lat
+      const lng = CAMPAMENTOS_DATA[i].lng
+      const phi = (90 - lat) * (Math.PI / 180)
+      const theta = (lng + 180) * (Math.PI / 180)
+      positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta)
+      positions[i * 3 + 1] = radius * Math.cos(phi)
+      positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta)
+    }
+    return positions
+  }, [])
 
   useEffect(() => {
     if (isReady && onLoadingComplete) {
@@ -295,13 +352,6 @@ const ReplicaGlobe = ({
 
     return () => observer.disconnect()
   }, [])
-
-  useEffect(() => {
-    if (globeEl.current) {
-      globeEl.current.controls().autoRotate = !selectedCampamento
-      globeEl.current.controls().autoRotateSpeed = 0.4
-    }
-  }, [selectedCampamento])
 
   useEffect(() => {
     let frameId: number
@@ -388,6 +438,17 @@ const ReplicaGlobe = ({
     },
     [onSelectCamp],
   )
+
+  const syncAutoRotate = useCallback(() => {
+    const controls = globeEl.current?.controls?.()
+    if (!controls) return
+    controls.autoRotate = !selectedCampamento
+    controls.autoRotateSpeed = 0.4
+  }, [selectedCampamento])
+
+  useEffect(() => {
+    syncAutoRotate()
+  }, [syncAutoRotate])
 
   return (
     <div
@@ -480,6 +541,11 @@ const ReplicaGlobe = ({
           right: 0.1rem !important;
           padding: 0.25rem !important;
         }
+
+        @keyframes fadeInOut {
+          0%, 100% { opacity: 0.2; }
+          50% { opacity: 0.8; }
+        }
       `}</style>
 
       {}
@@ -490,7 +556,7 @@ const ReplicaGlobe = ({
           camera={{ position: [0, 0, 250], fov: 45 }}
           style={{ width: '100%', height: '100%' }}
         >
-          {React.createElement('ambientLight' as any, { intensity: 0.5 })}
+          {React.createElement('ambientLight', { intensity: 0.5 })}
           <ParticleSystem progress={formationProgress} isReady={isReady} />
         </Canvas>
       </div>
@@ -604,61 +670,117 @@ const ReplicaGlobe = ({
           atmosphereColor="#ffffff"
           atmosphereAltitude={0.15}
           backgroundColor="rgba(0,0,0,0)"
-          htmlElementsData={CAMPAMENTOS_DATA.map((c) => ({
+          pointsData={CAMPAMENTOS_DATA.map((c) => ({
             ...c,
             isSelected: selectedCampamento?.id === c.id,
           }))}
-          htmlElement={useCallback(
-            (d: object) => {
-              const camp = d as Campamento & { isSelected: boolean }
-              const el = document.createElement('div')
-              el.className = 'group relative'
-              el.style.pointerEvents = 'none'
-              const isSelected = camp.isSelected
-
-              el.innerHTML = `
-              <div class="marker-root relative flex items-center justify-center" style="pointer-events: none; width: 40px; height: 40px;">
-              <div class="marker-dot-area flex items-center justify-center relative pointer-events-auto cursor-pointer" style="width: 40px; height: 40px; transform: translate(-50%, -50%); touch-action: manipulation;">
-                <div class="absolute w-8 h-8 rounded-full border border-white/20 animate-ping opacity-60 pointer-events-none"></div>
-                <div class="absolute w-6 h-6 rounded-full bg-white/5 animate-pulse blur-sm pointer-events-none"></div>
-                <div class="absolute w-8 h-8 rounded-full bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-md pointer-events-none"></div>
-                <div class="relative w-3.5 h-3.5 rounded-full bg-white border-2 border-white shadow-[0_0_15px_rgba(255,255,255,1)] transition-all duration-300 ${isSelected ? 'scale-110 ring-4 ring-white/30' : 'group-hover:ring-4 group-hover:ring-white/20'} pointer-events-none"></div>
-                <div class="marker-label absolute bottom-10 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/90 backdrop-blur-md border border-white/30 rounded-full transition-all duration-300 pointer-events-none whitespace-nowrap opacity-0 ${isSelected ? 'opacity-0' : 'group-hover:opacity-100 shadow-[0_0_20px_rgba(0,0,0,0.5)]'}">
-                  <div class="text-white text-[10px] font-black tracking-widest uppercase px-1">${camp.name}</div>
-                </div>
-              </div>
-            </div>
-          `
-
-              const markerDotArea = el.querySelector('.marker-dot-area') as HTMLElement
-
-              const preventGlobe = (e: Event) => {
-                e.stopPropagation()
-                if ('stopImmediatePropagation' in e) e.stopImmediatePropagation()
-              }
-
-              const handleInteraction = (e: MouseEvent | TouchEvent) => {
-                preventGlobe(e)
-                const clickTarget = e.target as HTMLElement
-
-                if (clickTarget.closest('.marker-dot-area')) {
-                  handleSelectCampamento(camp.isSelected ? null : camp)
-                  return
-                }
-              }
-
-              if (markerDotArea) {
-                markerDotArea.addEventListener('pointerdown', preventGlobe)
-                markerDotArea.addEventListener('pointerup', preventGlobe)
-                markerDotArea.addEventListener('click', (e) => handleInteraction(e as MouseEvent))
-                markerDotArea.addEventListener('contextmenu', preventGlobe)
-              }
-
-              return el
-            },
-            [handleSelectCampamento],
+          pointAltitude={useCallback(
+            (point) => ((point as Campamento) === hoveredPoint ? 0.05 : 0.01),
+            [hoveredPoint],
           )}
-        />
+          onPointClick={(point) => {
+            const camp = point as Campamento
+            handleSelectCampamento(camp.isSelected ? null : camp)
+          }}
+          onPointHover={(point) => setHoveredPoint(point as Campamento | null)}
+          pointLabel={useCallback((point) => {
+            const camp = point as Campamento
+            return `
+              <div class="text-center">
+                <div class="text-white font-bold text-xs tracking-widest uppercase">${camp.name}</div>
+              </div>
+            `
+          }, [])}
+          pointColor={useCallback((point) => {
+            const camp = point as Campamento & { isSelected: boolean }
+            return camp.isSelected ? '#ffffff' : '#ffd166'
+          }, [])}
+          pointRadius={useCallback((point) => {
+            const camp = point as Campamento & { isSelected: boolean }
+            return camp.isSelected ? 2.8 : 1.6
+          }, [])}
+          pointsTransitionDuration={300}
+        >
+          {React.createElement(
+            'points',
+            { key: 'camp-halo' },
+            React.createElement(
+              'bufferGeometry',
+              null,
+              React.createElement('bufferAttribute', {
+                attach: 'attributes-position',
+                count: campHaloPositions.length / 3,
+                array: campHaloPositions,
+                itemSize: 3,
+              }),
+            ),
+            React.createElement('pointsMaterial', {
+              size: 8,
+              color: '#ffffff',
+              transparent: true,
+              opacity: 0.12,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+            }),
+          )}
+          {customLayerData.map((data, index) =>
+            React.createElement(
+              'points' as any,
+              { key: index },
+              React.createElement(
+                'bufferGeometry' as any,
+                null,
+                React.createElement('bufferAttribute' as any, {
+                  attach: 'attributes-position',
+                  count: data.positions.length / 3,
+                  array: data.positions,
+                  itemSize: 3,
+                }),
+                React.createElement('bufferAttribute' as any, {
+                  attach: 'attributes-velocity',
+                  count: data.velocities.length / 3,
+                  array: data.velocities,
+                  itemSize: 3,
+                }),
+              ),
+                React.createElement('pointsMaterial' as any, {
+                size: 0.008,
+                color: '#262626',
+                transparent: true,
+                opacity: 0.7,
+                blending: THREE.AdditiveBlending,
+              }),
+            ),
+          )}
+          {cyberParticlesData.map((data, index) =>
+            React.createElement(
+              'points' as any,
+              { key: index },
+              React.createElement(
+                'bufferGeometry' as any,
+                null,
+                React.createElement('bufferAttribute' as any, {
+                  attach: 'attributes-position',
+                  count: data.positions.length / 3,
+                  array: data.positions,
+                  itemSize: 3,
+                }),
+              ),
+              React.createElement('pointsMaterial' as any, {
+                  size: 0.01,
+                  color: '#4f46e5',
+                  transparent: true,
+                  opacity: 0.6,
+                  blending: THREE.AdditiveBlending,
+                }),
+            ),
+          )}
+          {React.createElement('ambientLight' as any, { intensity: 0.5 })}
+          {React.createElement('directionalLight' as any, {
+            position: [0, 5, 5],
+            intensity: 1,
+          })}
+        </Globe>
       </motion.div>
 
       <AnimatePresence>
@@ -871,7 +993,7 @@ const ReplicaGlobe = ({
                           className="w-full text-left p-4 border-b border-white/5 hover:bg-white/10 transition-all duration-300 group flex items-center justify-between"
                         >
                           <div className="flex items-center gap-3 group-hover:translate-x-1 transition-transform duration-300">
-                            <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shadow-[0_0_8px_white]" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]" style={{ animation: 'fadeInOut 2s infinite' }} />
                             <div className="text-white text-[10px] font-black tracking-widest uppercase">
                               {camp.name}
                             </div>
