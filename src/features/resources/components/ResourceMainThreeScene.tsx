@@ -6,11 +6,9 @@ import {
   GLTF_URLS,
   INITIAL_CAMERA,
   INITIAL_TARGET,
-  ResourceZoomTarget,
   ZOOM_VIEWS,
-  RESOURCE_MODELS_CONFIG,
-  INTERACTION_TARGETS,
 } from '../constants/resourceSceneConfigs'
+import type { ResourceZoomTarget } from '../constants/resourceSceneConfigs'
 import { useResourceScene } from '../hooks'
 
 function ResourceModel({
@@ -298,21 +296,21 @@ function ResourceSceneContent({
         <meshBasicMaterial attach="material" color="#22d3ee" transparent opacity={0.4} />
       </gridHelper>
 
-      <ResourceModel url={HANGAR_URL} position={[0, 0, 0]} />
+      <ResourceModel url={GLTF_URLS.hangar} position={[0, 0, 0]} />
       <ResourceModel
-        url={MONITORING_STATION_URL}
+        url={GLTF_URLS.monitoringStation}
         position={[-60, 1, -60]}
         rotation={[0, -Math.PI / 2, 0]}
         scale={7}
       />
       <pointLight color="#00ffff" intensity={15} distance={15} decay={2} position={[-60, 5, -58]} />
 
-      <ResourceModel url={BEER_BREWERY_URL} position={[-40, 0.5, 0]} rotation={[0, Math.PI, 0]} />
-      <ResourceModel url={FORD_URL} position={[50, 0.7, -56]} targetSize={25} />
-      <ResourceModel url={MEAT_URL} position={[-70, 0.5, 1]} scale={2} />
-      <ResourceModel url={SHELF_URL} position={[-74, 1, -60]} scale={0.2} />
+      <ResourceModel url={GLTF_URLS.beerBrewery} position={[-40, 0.5, 0]} rotation={[0, Math.PI, 0]} />
+      <ResourceModel url={GLTF_URLS.ford} position={[50, 0.7, -56]} targetSize={25} />
+      <ResourceModel url={GLTF_URLS.meat} position={[-70, 0.5, 1]} scale={2} />
+      <ResourceModel url={GLTF_URLS.shelf} position={[-74, 1, -60]} scale={0.2} />
       <ResourceModel
-        url={FORKLIFT_URL}
+        url={GLTF_URLS.forklift}
         position={[0, 0.9, -15]}
         rotation={[0, -Math.PI / 2, 0]}
         scale={0.05}
@@ -320,7 +318,7 @@ function ResourceSceneContent({
       />
 
       <ResourceModel
-        url={CEILING_LAMP_URL}
+        url={GLTF_URLS.ceilingLamp}
         position={[-72, 20, -50]}
         rotation={[0, Math.PI * 1.5, 0]}
         targetSize={8}
@@ -336,7 +334,7 @@ function ResourceSceneContent({
       <TargetedSpotLight position={[-72, 19.2, -50]} targetPosition={[-72, 0, -50]} />
 
       <ResourceModel
-        url={CEILING_LAMP_URL}
+        url={GLTF_URLS.ceilingLamp}
         position={[-72, 20, -20]}
         rotation={[0, Math.PI * 1.5, 0]}
         targetSize={8}
@@ -351,9 +349,9 @@ function ResourceSceneContent({
       />
       <TargetedSpotLight position={[-72, 19.2, -20]} targetPosition={[-72, 0, -20]} />
 
-      <ResourceModel url={FRUIT_URL} position={[-95, 1, -16]} scale={0.04} />
+      <ResourceModel url={GLTF_URLS.fruit} position={[-95, 1, -16]} scale={0.04} />
       <ResourceModel
-        url={CHAIR_URL}
+        url={GLTF_URLS.chair}
         position={[-55, 1, -50]}
         rotation={[0, THREE.MathUtils.degToRad(30), 0]}
         targetSize={7}
