@@ -979,3 +979,15 @@
     align-items: flex-start;
   }
 }
+
+.worker-loading-art {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  filter: contrast(1.02) saturate(1.02);
+  opacity: 1;
+}

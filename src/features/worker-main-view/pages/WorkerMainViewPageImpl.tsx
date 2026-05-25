@@ -56,6 +56,53 @@ const EXPEDITION_STATUS_LABELS: Record<string, string> = {
   CANCELED: 'Canceladas',
 }
 
+const WORKER_LOADING_ART = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#020706"/>
+      <stop offset="55%" stop-color="#061313"/>
+      <stop offset="100%" stop-color="#020706"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1180 360) rotate(135) scale(620 330)">
+      <stop offset="0%" stop-color="#69BFB7" stop-opacity="0.28"/>
+      <stop offset="60%" stop-color="#69BFB7" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#69BFB7" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#A4C2C5" stop-opacity="0.94"/>
+      <stop offset="100%" stop-color="#5D9797" stop-opacity="0.82"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1A120D"/>
+      <stop offset="100%" stop-color="#342319"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#glow)"/>
+  <ellipse cx="960" cy="640" rx="720" ry="210" fill="#0B1716" fill-opacity="0.72"/>
+  <path d="M0 650C260 570 500 560 760 590C1040 625 1270 660 1600 620V900H0V650Z" fill="url(#wood)"/>
+  <path d="M0 690C240 635 500 630 760 650C1020 670 1280 704 1600 690V900H0V690Z" fill="#251A12" fill-opacity="0.82"/>
+  <g transform="translate(1090 110)">
+    <ellipse cx="140" cy="95" rx="190" ry="45" fill="#040806" fill-opacity="0.65"/>
+    <path d="M70 60H210C230 60 245 75 245 95V160H35V95C35 75 50 60 70 60Z" fill="url(#metal)" fill-opacity="0.16"/>
+    <path d="M58 88H218L260 175H16L58 88Z" fill="url(#metal)" fill-opacity="0.9"/>
+    <path d="M88 15H188C206 15 221 30 221 48V92H55V48C55 30 70 15 88 15Z" fill="#0C1313" fill-opacity="0.95"/>
+    <path d="M105 0H171C184 0 194 10 194 23V43H82V23C82 10 92 0 105 0Z" fill="#A4C2C5" fill-opacity="0.18"/>
+    <rect x="109" y="176" width="42" height="236" rx="18" fill="url(#metal)" fill-opacity="0.82"/>
+    <rect x="86" y="382" width="90" height="34" rx="8" fill="#0D1010" fill-opacity="0.8"/>
+    <circle cx="142" cy="82" r="18" fill="#020706"/>
+    <circle cx="144" cy="81" r="8" fill="#69BFB7" fill-opacity="0.42"/>
+  </g>
+  <g opacity="0.65">
+    <path d="M110 160H430" stroke="#69BFB7" stroke-opacity="0.12" stroke-width="2"/>
+    <path d="M110 205H510" stroke="#69BFB7" stroke-opacity="0.1" stroke-width="2"/>
+    <path d="M110 250H370" stroke="#69BFB7" stroke-opacity="0.08" stroke-width="2"/>
+    <path d="M110 295H460" stroke="#69BFB7" stroke-opacity="0.06" stroke-width="2"/>
+  </g>
+</svg>
+`)}`
+
 export function WorkerMainViewPage() {
   const [showLoading, setShowLoading] = useState(true)
   const [isLoaded, setIsLoaded] = useState(false)
@@ -173,6 +220,7 @@ function LoadingOverlay({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.7, ease: 'easeInOut' }}
         >
+          <div className="worker-loading-art" aria-hidden="true" style={{ backgroundImage: `url("${WORKER_LOADING_ART}")` }} />
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
@@ -191,7 +239,7 @@ function LoadingOverlay({
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3, duration: 0.8 }}
             >
-              Inicializando sistema
+              Conectando con base de campo
             </motion.div>
 
             <motion.h1
@@ -217,8 +265,8 @@ function LoadingOverlay({
               transition={{ delay: 1.2, duration: 0.6 }}
             >
               {isLoaded
-                ? 'Calibrando brújula • Módulos cargados • Listo para operar'
-                : 'Calibrando brújula • Cargando módulos • Sincronizando...'}
+                ? 'Sincronizando asignaciones • Verificando permisos • Listo para comenzar'
+                : 'Sincronizando asignaciones • Cargando tareas asignadas • Verificando permisos...'}
             </motion.div>
 
             {isLoaded && (
