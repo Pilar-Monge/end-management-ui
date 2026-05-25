@@ -7,6 +7,7 @@ import {
   ShieldAlert, 
   Calendar, 
   Info, 
+  TrendingUp, 
   Package, 
   ArrowRightLeft, 
   Shuffle, 
