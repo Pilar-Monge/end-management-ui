@@ -10,5 +10,7 @@ declare namespace JSX {
     bufferAttribute: any
     pointsMaterial: any
     ambientLight: any
+    directionalLight: any
+    primitive: any
   }
 }
