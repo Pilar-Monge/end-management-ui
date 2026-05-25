@@ -7,8 +7,12 @@ import { HudCorners, Scanlines } from '../components/BackgroundEffects'
 import { loginRequest } from '../services/authApi'
 import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
 import { getPostLoginRoute, normalizeUserRole } from '../../../shared/services/postLoginRouting'
+import { getErrorMessage } from '../../../shared/services/errorMessages'
 import { useAuthState } from '../../../shared/context/AuthContext'
+import { PopupMessage } from '../../../shared/components/PopupMessage'
 import type { LoginErrors, LoginForm } from '../types'
+
+const LAST_SELECTED_CAMP_ID_KEY = 'last_selected_camp_id'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -20,11 +24,31 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showLoginForm, setShowLoginForm] = useState(false)
   const [cinematicPulse, setCinematicPulse] = useState(0)
+  const [popupMessage, setPopupMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    if (authState?.selectedCampId) {
+    if (authState?.selectedCampId && authState.selectedCampId > 0) {
       setForm((prev) => ({ ...prev, campId: authState.selectedCampId }))
+      localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(authState.selectedCampId))
+      return
     }
+
+    const storedCampIdRaw = localStorage.getItem(LAST_SELECTED_CAMP_ID_KEY)
+    const storedCampId = storedCampIdRaw ? Number(storedCampIdRaw) : NaN
+    if (Number.isFinite(storedCampId) && storedCampId > 0) {
+      setForm((prev) => ({ ...prev, campId: storedCampId }))
+      return
+    }
+
+    const rawUser = localStorage.getItem('user')
+    if (!rawUser) return
+    try {
+      const parsed = JSON.parse(rawUser) as { campId?: number }
+      if (typeof parsed.campId === 'number' && parsed.campId > 0) {
+        setForm((prev) => ({ ...prev, campId: parsed.campId }))
+        localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(parsed.campId))
+      }
+    } catch {    }
   }, [authState?.selectedCampId])
 
   function validate(): boolean {
@@ -38,11 +62,10 @@ export default function LoginPage() {
     if (form.password.length > 0 && form.password.length < 6)
       nextErrors.password = 'Mínimo 6 caracteres'
 
-    if (!form.campId) {
-      ;(nextErrors as any).campId = 'Debes seleccionar un campamento en el globo'
-    }
+    if (!form.campId || form.campId <= 0) nextErrors.general = 'Debes seleccionar un campamento antes de iniciar sesion'
 
     setErrors(nextErrors)
+    if (nextErrors.general) setPopupMessage(nextErrors.general)
     return Object.keys(nextErrors).length === 0
   }
 
@@ -69,20 +92,22 @@ export default function LoginPage() {
       localStorage.setItem('token', token)
       localStorage.setItem('accessToken', token)
       localStorage.setItem('user', JSON.stringify(normalizedUser))
+      localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(response.user.campId))
       window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
 
       const defaultRoute = getPostLoginRoute(normalizedUser.role)
       const redirectPath =
-        normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard-ui-v2')
+        normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard')
           ? savedPath
           : defaultRoute
       localStorage.removeItem('last_secure_path')
       navigate(redirectPath, { replace: true })
     } catch (error) {
+      const message = getErrorMessage(error, 'login')
       setErrors({
-        general:
-          error instanceof Error ? error.message : 'No se pudo iniciar sesión contra el backend',
+        general: message,
       })
+      setPopupMessage(message)
     } finally {
       setLoading(false)
     }
@@ -288,28 +313,6 @@ export default function LoginPage() {
                     </button>
                   </div>
 
-                  <AnimatePresence>
-                    {errors.general && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        style={{
-                          background: 'rgba(224,80,80,0.08)',
-                          border: '1px solid rgba(224,80,80,0.3)',
-                          borderRadius: 4,
-                          padding: '10px 14px',
-                          fontSize: 10,
-                          color: '#e08080',
-                          letterSpacing: '1px',
-                          fontFamily: "'Courier New', monospace",
-                        }}
-                      >
-                        ⚠ {errors.general}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
                   <motion.button
                     type="submit"
                     disabled={loading}
@@ -357,6 +360,11 @@ export default function LoginPage() {
           )}
         </AnimatePresence>
       </motion.div>
+      <PopupMessage
+        message={popupMessage}
+        onClose={() => setPopupMessage(null)}
+        variant="error"
+      />
     </div>
   )
 }

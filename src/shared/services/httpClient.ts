@@ -30,6 +30,20 @@ interface RequestOptions extends Omit<RequestInit, 'headers'> {
   headers?: Record<string, string>
 }
 
+const HTTP_STATUS_MESSAGES: Record<number, string> = {
+  400: 'Solicitud invalida. Revisa los datos e intenta nuevamente.',
+  401: 'Sesion inactiva o expirada. Inicia sesion para continuar.',
+  403: 'No tienes permisos para realizar esta accion.',
+  404: 'No se encontro la informacion solicitada.',
+  409: 'Conflicto de datos. Actualiza la vista e intenta de nuevo.',
+  422: 'Los datos enviados no son validos.',
+  429: 'Demasiadas solicitudes. Espera un momento e intenta nuevamente.',
+  500: 'Error interno del servidor. Intenta nuevamente en unos minutos.',
+  502: 'El servicio no esta disponible temporalmente.',
+  503: 'Servicio en mantenimiento. Intenta nuevamente mas tarde.',
+  504: 'Tiempo de espera agotado con el servidor.',
+}
+
 function getToken(): string | null {
   return localStorage.getItem('token') ?? localStorage.getItem('accessToken')
 }
@@ -71,8 +85,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   if (!response.ok) {
     const errorBody = await parseErrorBody(response)
-    const message = errorBody?.message ?? `Request failed with status ${response.status}`
-    throw new ApiHttpError(response.status, message, errorBody?.error)
+    const message = HTTP_STATUS_MESSAGES[response.status] ?? `Error de servicio (${response.status}). Intenta nuevamente.`
+    const details = errorBody?.message ?? errorBody?.error
+    throw new ApiHttpError(response.status, message, details)
   }
 
   if (response.status === 204) {

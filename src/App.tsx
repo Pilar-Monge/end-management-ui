@@ -1,5 +1,5 @@
-import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react'
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import LoginPage from './features/login/pages/LoginPage'
 import { MobileOrientationView } from './shared/components/MobileOrientationView'
@@ -16,14 +16,14 @@ const ExpeditionsPage = lazy(() => import('./features/expeditions').then((m) => 
 const ResourceMainViewPage = lazy(() =>
   import('./features/resources').then((m) => ({ default: m.ResourceMainViewPage })),
 )
-const AdminDashboardPage = lazy(() =>
-  import('./features/admin-dashboard').then((m) => ({ default: m.AdminDashboardPage })),
-)
 const AdminMainViewUiPage = lazy(() =>
   import('./features/admin-main-view-ui').then((m) => ({ default: m.AdminMainViewUiPage })),
 )
-const AdminDashboardUiV2Page = lazy(() =>
-  import('./features/admin-dashboard-ui-v2').then((m) => ({ default: m.AdminDashboardUiV2Page })),
+const AdminDashboardPage = lazy(() =>
+  import('./features/admin-dashboard').then((m) => ({ default: m.AdminDashboardPage })),
+)
+const WorkerMainViewPage = lazy(() =>
+  import('./features/worker-main-view/pages/WorkerMainViewPage').then((m) => ({ default: m.WorkerMainViewPage })),
 )
 const ResourceTypesPage = lazy(() =>
   import('./features/catalogs').then((m) => ({ default: m.ResourceTypesPage })),
@@ -48,6 +48,64 @@ const routeFallback = (
 )
 
 const withSuspense = (node: ReactNode) => <Suspense fallback={routeFallback}>{node}</Suspense>
+
+function getSessionToken(): string | null {
+  return localStorage.getItem('token') ?? localStorage.getItem('accessToken')
+}
+
+function normalizeRole(role: string | null | undefined): string {
+  const normalized = (role ?? '').trim().toUpperCase()
+  if (normalized === 'GESTION_RECURSOS') return 'RESOURCE_MANAGEMENT'
+  if (normalized === 'ENCARGADO_VIAJES') return 'TRAVEL_MANAGER'
+  if (normalized === 'TRABAJADOR') return 'WORKER'
+  return normalized
+}
+
+function getCurrentUserRole(): string | null {
+  const rawUser = localStorage.getItem('user')
+  if (!rawUser) return null
+
+  try {
+    const parsed = JSON.parse(rawUser) as { role?: string; rol?: string }
+    return normalizeRole(parsed.role ?? parsed.rol)
+  } catch {
+    return null
+  }
+}
+
+function ProtectedRoute({
+  children,
+  allowedRoles,
+}: {
+  children: ReactNode
+  allowedRoles?: string[]
+}) {
+  const location = useLocation()
+  const token = getSessionToken()
+
+  if (!token) {
+    return (
+      <Navigate
+        to="/main-homepage"
+        replace
+        state={{
+          initialAppState: 'login',
+          sessionMessage: 'Sesion inactiva. Inicia sesion para continuar.',
+        }}
+      />
+    )
+  }
+
+  if (allowedRoles && allowedRoles.length > 0) {
+    const userRole = getCurrentUserRole()
+    const normalizedAllowedRoles = allowedRoles.map((role) => normalizeRole(role))
+    if (!userRole || !normalizedAllowedRoles.includes(userRole)) {
+      return <Navigate to="/app" replace state={{ unauthorized: true, from: location.pathname }} />
+    }
+  }
+
+  return <>{children}</>
+}
 
 function CatalogsLayout() {
   const navigate = useNavigate()
@@ -125,10 +183,13 @@ function CatalogsLayout() {
 function App() {
   const [isPortrait, setIsPortrait] = useState(true)
 
-  const isMobileDevice = 
-    /iPhone|iPad|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-    (typeof screen !== 'undefined' && (screen.availWidth < 600 || screen.availHeight < 600)) ||
-    (typeof window !== 'undefined' && window.innerWidth < 600)
+  const isMobileDevice = useMemo(
+    () =>
+      /iPhone|iPad|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      (typeof screen !== 'undefined' && (screen.availWidth < 600 || screen.availHeight < 600)) ||
+      (typeof window !== 'undefined' && window.innerWidth < 600),
+    [],
+  )
 
   useEffect(() => {
     const handleNavigation = () => {
@@ -190,18 +251,84 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/main-homepage" element={withSuspense(<MainHomePage />)} />
-        <Route path="/app" element={withSuspense(<MainAppPage />)} />
+        <Route
+          path="/app"
+          element={<ProtectedRoute>{withSuspense(<MainAppPage />)}</ProtectedRoute>}
+        />
         <Route path="/admission" element={withSuspense(<AdmissionPage />)} />
-        <Route path="/camps" element={withSuspense(<CampsPage />)} />
-        <Route path="/persons" element={withSuspense(<PersonsPage />)} />
-        <Route path="/expeditions" element={withSuspense(<ExpeditionsPage />)} />
-        <Route path="/expeditions-ui" element={withSuspense(<ExpeditionsUiPage />)} />
-        <Route path="/resource-main-view" element={withSuspense(<ResourceMainViewPage />)} />
-        <Route path="/admin-dashboard" element={withSuspense(<AdminDashboardPage />)} />
-        <Route path="/admin-dashboard-ui-v2" element={withSuspense(<AdminDashboardUiV2Page />)} />
-        <Route path="/admin-main-view-ui" element={withSuspense(<AdminMainViewUiPage />)} />
-        <Route path="/dashboard" element={withSuspense(<AdminDashboardPage />)} />
-        <Route path="/catalogs" element={withSuspense(<CatalogsLayout />)} />
+        <Route
+          path="/camps"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN']}>
+              {withSuspense(<CampsPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/persons"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN']}>
+              {withSuspense(<PersonsPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/expeditions"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'TRAVEL_MANAGER']}>
+              {withSuspense(<ExpeditionsPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/expeditions-ui"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'TRAVEL_MANAGER']}>
+              {withSuspense(<ExpeditionsUiPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/resource-main-view"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'RESOURCE_MANAGEMENT']}>
+              {withSuspense(<ResourceMainViewPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin-dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'RESOURCE_MANAGEMENT']}>
+              {withSuspense(<AdminDashboardPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin-main-view-ui"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN']}>
+              {withSuspense(<AdminMainViewUiPage />)}
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/worker-main-view" element={withSuspense(<WorkerMainViewPage />)} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'RESOURCE_MANAGEMENT']}>
+              <Navigate to="/admin-dashboard" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/catalogs"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN']}>
+              {withSuspense(<CatalogsLayout />)}
+            </ProtectedRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

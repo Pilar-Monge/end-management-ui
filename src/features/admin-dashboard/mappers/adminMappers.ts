@@ -14,8 +14,12 @@ type UiAdmission = {
   score: number
   badge: string | null
   status: 'pending' | 'approved' | 'rejected'
+  workflowStatus: 'PENDING_AI' | 'PENDING_ADMIN' | 'APPROVED' | 'REJECTED'
   skills: string[]
   reason: string
+  suggestedOccupationId?: number
+  finalOccupationId?: number
+  rejectionReason?: string
 }
 
 type UiNotification = {
@@ -115,6 +119,17 @@ export function mapAdmissionFromApi(item: AdminAdmissionRequest): UiAdmission {
           : []
 
   const normalizedStatus = String(item.status ?? '').toLowerCase()
+  const workflowStatusRaw = String(item.status ?? '').replace(/\s|-/g, '_').toUpperCase()
+  const normalizedWorkflowStatus =
+    workflowStatusRaw === 'PENDING_AI'
+      ? 'PENDING_AI'
+      : workflowStatusRaw === 'PENDING_ADMIN'
+        ? 'PENDING_ADMIN'
+        : workflowStatusRaw === 'APPROVED'
+          ? 'APPROVED'
+          : workflowStatusRaw === 'REJECTED'
+            ? 'REJECTED'
+            : 'PENDING_ADMIN'
   const status = normalizedStatus === 'approved' || normalizedStatus === 'rejected'
     ? (normalizedStatus as 'approved' | 'rejected')
     : 'pending'
@@ -136,11 +151,12 @@ export function mapAdmissionFromApi(item: AdminAdmissionRequest): UiAdmission {
     score,
     badge: hasSuspiciousFlag ? 'SOSPECHOSO' : null,
     status,
+    workflowStatus: normalizedWorkflowStatus,
     skills: rawSkills.length > 0
       ? rawSkills
       : typeof item.declaredSkills === 'string'
-        ? item.declaredSkills.split(',').map((skill) => skill.trim()).filter(Boolean)
-        : [],
+          ? item.declaredSkills.split(',').map((skill) => skill.trim()).filter(Boolean)
+          : [],
     reason: item.reason
       ?? item.rejectionReason
       ?? item.condicion
@@ -149,6 +165,9 @@ export function mapAdmissionFromApi(item: AdminAdmissionRequest): UiAdmission {
       ?? item.declaredHealthLevel
       ?? item.experiencia
       ?? 'Sin observaciones',
+    suggestedOccupationId: item.suggestedOccupationId ?? item.oficioSugeridoId,
+    finalOccupationId: item.finalOccupationId ?? item.oficioFinalId,
+    rejectionReason: item.rejectionReason ?? undefined,
   }
 }
 

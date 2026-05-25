@@ -1066,7 +1066,7 @@ export default function AdminMainViewUiPage() {
   const handleSyncComplete = useCallback(() => {
     setSyncState('ready');
     window.setTimeout(() => {
-      navigate('/admin-dashboard-ui-v2');
+      navigate('/admin-dashboard');
     }, 420);
   }, [navigate]);
 
@@ -1167,6 +1167,7 @@ export default function AdminMainViewUiPage() {
               label="Cerrar sesiÃ³n"
               onClick={() => {
                 window.localStorage.removeItem('token')
+                window.localStorage.removeItem('accessToken')
                 window.localStorage.removeItem('user')
                 window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
                 navigate('/')

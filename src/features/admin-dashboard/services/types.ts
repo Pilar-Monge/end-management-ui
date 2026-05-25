@@ -23,6 +23,10 @@ export interface AdminAdmissionRequest {
   declaredSkills?: string
   finalOccupationId?: number
   suggestedOccupationId?: number
+  oficioFinalId?: number
+  oficioSugeridoId?: number
+  finalRole?: string
+  rolFinal?: string
   sospechoso?: boolean
   suspicious?: boolean
 }
