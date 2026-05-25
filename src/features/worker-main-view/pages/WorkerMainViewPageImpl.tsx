@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode, Component } from 'react'
-import React from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   autoAssignWorkerCoverage,
   fetchWorkerAtRiskCoverage,
@@ -109,16 +109,22 @@ export function WorkerMainViewPage() {
         <>
           <header className="worker-top-hud">
             <button className="worker-hud-btn" type="button">
-              Panel Trabajador
+              Centro operativo
             </button>
+            <span className="worker-hud-chip">Panel trabajador</span>
           </header>
 
           <main className="worker-main-area">
             <div className="worker-title-row">
-              <h1>{activeSection.label}</h1>
+              <div className="worker-title-copy">
+                <span className="worker-section-kicker">Consola de campo</span>
+                <h1>{activeSection.label}</h1>
+              </div>
+              <span className="worker-title-badge">Módulo {activeSection.shortLabel}</span>
             </div>
 
             <section className="worker-shell" aria-label="Panel de trabajador">
+              <div className="worker-shell-glow" aria-hidden="true" />
               <div className="worker-content">
                 <GenericWorkerContent section={activeSection} sessionUser={sessionUser} />
               </div>
@@ -159,18 +165,94 @@ function LoadingOverlay({
   if (!show) return null
 
   return (
-    <div className={`worker-loading-overlay ${isLoaded ? 'is-loaded' : ''}`}>
-      <div className="worker-loading-panel">
-        <p className="worker-loading-eyebrow">Inicializando consola operativa</p>
-        <h2>Sistema de trabajador</h2>
-        <div className="worker-loading-bar">
-          <span style={{ width: isLoaded ? '100%' : '44%' }} />
-        </div>
-        <button type="button" className="worker-enter-btn" onClick={onEnter} disabled={!isLoaded}>
-          Entrar
-        </button>
-      </div>
-    </div>
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          className="fixed inset-0 z-[999] bg-[#020706]"
+          initial={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.7, ease: 'easeInOut' }}
+        >
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: `
+                linear-gradient(90deg, rgba(2,7,6,0.85) 0%, rgba(2,7,6,0.4) 35%, transparent 60%),
+                linear-gradient(0deg, rgba(2,7,6,0.8) 0%, transparent 40%),
+                radial-gradient(ellipse at 65% 45%, transparent 35%, rgba(2,7,6,0.5) 65%, rgba(2,7,6,0.92) 90%)
+              `,
+            }}
+          />
+
+          <div className="absolute left-8 right-8 bottom-0 top-0 z-10 flex flex-col justify-end pb-12 pointer-events-none">
+            <motion.div
+              className="text-[11px] font-bold tracking-[5px] text-[#A4C2C5]/40 uppercase mb-2"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3, duration: 0.8 }}
+            >
+              Inicializando sistema
+            </motion.div>
+
+            <motion.h1
+              className="text-[clamp(54px,8vw,118px)] font-black leading-none tracking-[-2px] text-[#f0fafa] uppercase whitespace-nowrap"
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5, duration: 0.8 }}
+            >
+              TRABAJADOR
+            </motion.h1>
+
+            <motion.div
+              className="h-[2px] my-4 bg-gradient-to-r from-[#69BFB7] via-[#67ACA9]/60 to-transparent"
+              initial={{ scaleX: 0, originX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ delay: 0.8, duration: 0.9, ease: 'easeOut' }}
+            />
+
+            <motion.div
+              className="text-[10px] font-bold tracking-[4px] text-[#A4C2C5]/35 uppercase mb-8"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.2, duration: 0.6 }}
+            >
+              {isLoaded
+                ? 'Calibrando brújula • Módulos cargados • Listo para operar'
+                : 'Calibrando brújula • Cargando módulos • Sincronizando...'}
+            </motion.div>
+
+            {isLoaded && (
+              <motion.div
+                className="pointer-events-auto"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+                whileHover={{ x: 10, scale: 1.04 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <button
+                  onClick={onEnter}
+                  className="side-button is-active relative loading-enter-button"
+                  style={{
+                    transformStyle: 'preserve-3d',
+                    transform: 'rotateY(25deg) translateZ(10px)',
+                    width: 'auto',
+                    maxWidth: 320,
+                    minHeight: 38,
+                    lineHeight: '38px',
+                    fontSize: 18,
+                    paddingLeft: '1.6em',
+                    paddingRight: '1.2em',
+                  }}
+                >
+                  <span className="btn-text whitespace-nowrap drop-shadow-md">INGRESAR</span>
+                </button>
+              </motion.div>
+            )}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 
