@@ -82,15 +82,6 @@ export const MODULES: ModuleItem[] = [
     color: '#5a9a10',
   },
   {
-    id: 'dashboard-tactical',
-    label: 'Dashboard Táctico',
-    icon: '◈',
-    description: 'Panel admin estilo expediciones',
-    roles: ['SYSTEM_ADMIN', 'RESOURCE_MANAGEMENT'],
-    path: '/admin-dashboard-ui-v2',
-    color: '#67aca9',
-  },
-  {
     id: 'profile',
     label: 'Mi Perfil',
     icon: '◇',

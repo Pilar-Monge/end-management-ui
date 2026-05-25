@@ -29,6 +29,7 @@ import { getPostLoginRoute, normalizeUserRole } from '../../../shared/services/p
 import { getErrorMessage } from '../../../shared/services/errorMessages'
 import type { LoginErrors, LoginForm } from '../../login/types'
 import { useAuthDispatch } from '../../../shared/context/AuthContext'
+import { PopupMessage } from '../../../shared/components/PopupMessage'
 
 import LandingPage from '../components/LandingPage'
 import ReplicaGlobe from '../components/ReplicaGlobe'
@@ -562,6 +563,7 @@ export function MainHomePage() {
     if (sessionMessage) {
       setAppState('login')
       setAuthErrors((prev) => ({ ...prev, general: sessionMessage }))
+      setPopupMessage(sessionMessage)
     }
   }, [sessionMessage])
 
@@ -599,6 +601,7 @@ export function MainHomePage() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [showCredits, setShowCredits] = useState(false)
   const [isGlobeLoaded, setIsGlobeLoaded] = useState(false)
+  const [popupMessage, setPopupMessage] = useState<string | null>(null)
   void selectedCamp
   void setSelectedCamp
   void isLocked
@@ -700,6 +703,7 @@ export function MainHomePage() {
     }
 
     setAuthErrors(nextErrors)
+    if (nextErrors.campId) setPopupMessage(nextErrors.campId)
     return Object.keys(nextErrors).length === 0
   }
 
@@ -707,6 +711,7 @@ export function MainHomePage() {
     setAuthForm((prev) => ({ ...prev, [field]: value }))
     if (authErrors[field]) setAuthErrors((prev) => ({ ...prev, [field]: undefined }))
     if (authErrors.general) setAuthErrors((prev) => ({ ...prev, general: undefined }))
+    if (popupMessage) setPopupMessage(null)
   }
 
   async function handleAuthSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -747,26 +752,35 @@ export function MainHomePage() {
 
       const defaultRoute = getPostLoginRoute(normalizedUser.role)
       const redirectPath =
-        normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard-ui-v2')
+        normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard')
           ? savedPath
           : defaultRoute
       localStorage.removeItem('last_secure_path')
       navigate(redirectPath, { replace: true })
     } catch (error) {
+      const message = getErrorMessage(error, 'login')
       setAuthErrors({
-        general: getErrorMessage(error, 'login'),
+        general: message,
       })
+      setPopupMessage(message)
     } finally {
       setIsAuthenticating(false)
     }
   }
 
   useEffect(() => {
+    if (appState !== 'explore' || isAnyMenuOpen) return
+
     const interval = setInterval(() => {
-      setCoords({ ...coordsRef.current })
-    }, 150)
+      const nextCoords = coordsRef.current
+      setCoords((prev) => {
+        if (prev.lat === nextCoords.lat && prev.lng === nextCoords.lng) return prev
+        return { ...nextCoords }
+      })
+    }, 300)
+
     return () => clearInterval(interval)
-  }, [])
+  }, [appState, isAnyMenuOpen])
 
   const [isAudioEnabled, setIsAudioEnabled] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -2378,12 +2392,6 @@ export function MainHomePage() {
                       )}
                     </div>
 
-                    {appState === 'login' && authErrors.campId && (
-                      <p className="text-[10px] text-red-400 uppercase tracking-[0.08em] max-w-[260px]">
-                        {authErrors.campId}
-                      </p>
-                    )}
-
                     {appState === 'register' && (
                       <div className="space-y-3 w-full max-w-[260px]">
                         <label className="text-[11px] uppercase font-bold tracking-[0.2em] text-white block">
@@ -2413,11 +2421,6 @@ export function MainHomePage() {
                       </span>
                     </button>
 
-                    {appState === 'login' && authErrors.general && (
-                      <p className="text-[10px] text-red-400 uppercase tracking-[0.08em] max-w-[260px]">
-                        {authErrors.general}
-                      </p>
-                    )}
                   </form>
 
                   <div className="mt-12 pt-10 border-t border-white/5">
@@ -2987,6 +2990,11 @@ export function MainHomePage() {
           </filter>
         </defs>
       </svg>
+      <PopupMessage
+        message={popupMessage}
+        onClose={() => setPopupMessage(null)}
+        variant="error"
+      />
     </div>
   )
 }
