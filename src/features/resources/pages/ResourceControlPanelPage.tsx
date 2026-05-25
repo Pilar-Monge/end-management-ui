@@ -1,6 +1,6 @@
-// @ts-nocheck
+﻿
 import "./resource-control-panel.css";
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import type {
   Camp,
   ResourceType,
@@ -23,7 +23,6 @@ import {
   INITIAL_CAMPS,
   INITIAL_RESOURCE_TYPES,
   INITIAL_CAMP_INVENTORIES,
-  INITIAL_DAILY_COLLECTIONS,
   INITIAL_MOVEMENTS,
   INITIAL_ALERTS,
   INITIAL_INTERCAMP_REQUESTS,
@@ -53,11 +52,13 @@ import {
   ViewNotificaciones,
   ViewDetalleRecursosSolicitados,
   ViewPersonasEnTraslado,
-  ViewHistorialDeTraslado
+  ViewHistorialDeTraslado,
+  ViewPersonalDashboard
 } from "../views/ResourceManagementViews";
 import { WorldMapDashboard } from "../views/WorldMapView";
+import { LoadingScreen } from "../components/ResourcePanelLoadingScreen";
 
-// Navigation data mapping the 16 recommended modules for RESOURCE_MANAGEMENT into elegant groups
+
 const NAVIGATION_DATA = [
   {
     id: "almacenes",
@@ -66,8 +67,7 @@ const NAVIGATION_DATA = [
     subOptions: [
       "Dashboard",
       "Inventario del campamento",
-      "Tipos de recurso",
-      "Campamentos"
+      "Tipos de recurso"
     ]
   },
   {
@@ -99,6 +99,7 @@ const NAVIGATION_DATA = [
     label: "Personal",
     icon: <SquadIcon />,
     subOptions: [
+      "Dashboard global",
       "Oficios y cobertura",
       "Notificaciones"
     ]
@@ -110,16 +111,85 @@ interface ResourceControlPanelPageProps {
 }
 
 export default function ResourceControlPanelPage({ onExit }: ResourceControlPanelPageProps) {
-  const [hasEntered] = useState(true);
+  const [showLoading, setShowLoading] = useState(true);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [hasEntered, setHasEntered] = useState(false);
 
   const [activeNav, setActiveNav] = useState<string | null>("almacenes");
   const [activeSub, setActiveSub] = useState<string>("Dashboard");
+  const [lastActiveNav, setLastActiveNav] = useState<string>("almacenes");
 
-  /* ════════════════ OPERATIONAL SYSTEM STATE ════════════════ */
+  
   const [camps, setCamps] = useState<Camp[]>(INITIAL_CAMPS);
+
+  
+  const [globalTimeState, setGlobalTimeState] = useState<{
+    baseServerTime: Date;
+    syncedAtClientMs: number;
+    lastSyncAt: Date;
+    status: 'synced' | 'syncing' | 'error';
+  }>({
+    baseServerTime: new Date("2026-05-25T06:25:47Z"),
+    syncedAtClientMs: Date.now(),
+    lastSyncAt: new Date(),
+    status: 'syncing',
+  });
+
+  const [currentGlobalTime, setCurrentGlobalTime] = useState<Date>(new Date("2026-05-25T06:25:47Z"));
+
+  const syncGlobalTime = async () => {
+    setGlobalTimeState(prev => ({ ...prev, status: 'syncing' }));
+    try {
+      const response = await fetch('/api/system/time');
+      if (!response.ok) {
+        throw new Error(`HTTP error ${response.status}`);
+      }
+      const data = await response.json();
+      const parsed = new Date(data.serverTime);
+
+      if (Number.isNaN(parsed.getTime())) {
+        throw new Error('Invalid server time');
+      }
+
+      setGlobalTimeState({
+        baseServerTime: parsed,
+        syncedAtClientMs: Date.now(),
+        lastSyncAt: new Date(),
+        status: 'synced',
+      });
+    } catch (err) {
+      console.warn("Could not sync with /api/system/time backend endpoint. Using client system time.", err);
+      setGlobalTimeState(prev => ({
+        ...prev,
+        status: 'error',
+      }));
+    }
+  };
+
+  useEffect(() => {
+    syncGlobalTime();
+
+
+    const syncInterval = setInterval(() => {
+      syncGlobalTime();
+    }, 60000);
+
+    return () => clearInterval(syncInterval);
+  }, []);
+
+
+  useEffect(() => {
+    const tickInterval = setInterval(() => {
+      const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
+      setCurrentGlobalTime(new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs));
+    }, 1000);
+
+    return () => clearInterval(tickInterval);
+  }, [globalTimeState]);
+
   const [resourceTypes, setResourceTypesState] = useState<ResourceType[]>(INITIAL_RESOURCE_TYPES);
   const [campInventories, setCampInventories] = useState<CampInventory[]>(INITIAL_CAMP_INVENTORIES);
-  const [dailyCollectionRecords, setDailyCollectionRecords] = useState<DailyCollectionRecord[]>(INITIAL_DAILY_COLLECTIONS);
+  const [dailyCollectionRecords, setDailyCollectionRecords] = useState<DailyCollectionRecord[]>([]);
   const [inventoryMovements, setInventoryMovements] = useState<InventoryMovement[]>(INITIAL_MOVEMENTS);
   const [inventoryAlerts, setInventoryAlerts] = useState<InventoryAlert[]>(INITIAL_ALERTS);
   const [intercampRequests, setIntercampRequests] = useState<IntercampRequest[]>(INITIAL_INTERCAMP_REQUESTS);
@@ -128,26 +198,143 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   const [transferPersons, setTransferPersons] = useState<TransferPerson[]>(INITIAL_TRANSFER_PERSONS);
   const [expeditionsResources, setExpeditionsResources] = useState<ExpeditionResource[]>(INITIAL_EXPEDITIONS_RESOURCES);
   const [deliveredTransferResources, setDeliveredTransferResources] = useState<DeliveredTransferResource[]>(INITIAL_DELIVERED_TRANSFER_RESOURCES);
-  const [occupations] = useState<Occupation[]>(INITIAL_OCCUPATIONS);
+  const [occupations, setOccupationsState] = useState<Occupation[]>(INITIAL_OCCUPATIONS);
   const [occupationCoverages, setOccupationCoverages] = useState<OccupationCoverage[]>(INITIAL_OCCUPATION_COVERAGES);
   const [notifications, setNotifications] = useState<OperationalNotification[]>(INITIAL_NOTIFICATIONS);
+
+  const fetchAllSystemData = async () => {
+
+    try {
+      const res = await fetch("/api/resource-types?page=1&limit=100");
+      if (res.ok) {
+        const data = await res.json();
+        let list: ResourceType[] = [];
+        if (Array.isArray(data)) list = data;
+        else if (data && Array.isArray(data.items)) list = data.items;
+        else if (data && Array.isArray(data.data)) list = data.data;
+        if (list.length > 0) {
+          setResourceTypesState(list);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load resource types from backend, using fallback.", e);
+    }
+
+
+    try {
+      const res = await fetch("/api/occupations");
+      if (res.ok) {
+        const data = await res.json();
+        let list: Occupation[] = [];
+        if (Array.isArray(data)) list = data;
+        else if (data && Array.isArray(data.items)) list = data.items;
+        else if (data && Array.isArray(data.data)) list = data.data;
+        if (list.length > 0) {
+          setOccupationsState(list);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load occupations from backend, using fallback.", e);
+    }
+
+
+    try {
+      const res = await fetch("/api/camp-inventory?page=1&limit=100");
+      if (res.ok) {
+        const data = await res.json();
+        let list: CampInventory[] = [];
+        if (Array.isArray(data)) list = data;
+        else if (data && Array.isArray(data.items)) list = data.items;
+        else if (data && Array.isArray(data.data)) list = data.data;
+        if (list.length > 0) {
+          setCampInventories(list);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load camp inventories from backend, using fallback.", e);
+    }
+
+
+    try {
+      const res = await fetch("/api/inventory-movements?page=1&limit=100");
+      if (res.ok) {
+        const data = await res.json();
+        let list: InventoryMovement[] = [];
+        if (Array.isArray(data)) list = data;
+        else if (data && Array.isArray(data.items)) list = data.items;
+        else if (data && Array.isArray(data.data)) list = data.data;
+        if (list.length > 0) {
+          setInventoryMovements(list);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load inventory movements from backend, using fallback.", e);
+    }
+
+
+    try {
+      const res = await fetch("/api/daily-collection-records?page=1&limit=100");
+      if (res.ok) {
+        const data = await res.json();
+        let list: DailyCollectionRecord[] = [];
+        if (Array.isArray(data)) list = data;
+        else if (data && Array.isArray(data.items)) list = data.items;
+        else if (data && Array.isArray(data.data)) list = data.data;
+        if (list.length > 0) {
+          setDailyCollectionRecords(list);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load daily collection records from backend.", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllSystemData();
+  }, []);
+
   const [transferHistories, setTransferHistories] = useState<TransferHistory[]>([
     {
       id: "th-1",
       transferId: "tr-1",
-      previousStatus: "PENDING_DEPARTURE",
-      newStatus: "COMPLETED",
+      previousStatus: "PLANNING",
+      newStatus: "DELIVERED",
       date: "2026-05-20T12:00:00Z",
       userId: "3",
       comment: "Traslado inicial completado satisfactoriamente."
     }
   ]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoaded(true);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleEnter = () => {
+    setHasEntered(true);
+    setTimeout(() => {
+      setShowLoading(false);
+    }, 150);
+  };
+
+  const handleLogout = () => {
+    if (onExit) {
+      onExit();
+      return;
+    }
+
+    setHasEntered(false);
+    setShowLoading(true);
+  };
+
   const handleNavClick = (navId: string) => {
     if (navId === "mapa") {
       setActiveNav(null);
     } else {
       setActiveNav(navId);
+      setLastActiveNav(navId);
       const navItem = NAVIGATION_DATA.find((item) => item.id === navId);
       setActiveSub(navItem?.subOptions[0] || "");
     }
@@ -157,13 +344,14 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     const match = NAVIGATION_DATA.find((item) => item.subOptions.includes(sub));
     if (match) {
       setActiveNav(match.id);
+      setLastActiveNav(match.id);
     } else {
       setActiveNav(null);
     }
     setActiveSub(sub);
   };
 
-  /* ════════════ STATE MUTATORS / API SIMULATION ════════════ */
+  
 
   const handleUpdateInventory = (campId: string, resourceTypeId: string, currentAmount: number, minimumAlertAmount: number) => {
     setCampInventories(prev =>
@@ -174,7 +362,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       )
     );
 
-    // If stock lowered beneath limit, create alert auto
+
     if (currentAmount <= minimumAlertAmount) {
       const alreadyHasAlert = inventoryAlerts.some(a => a.campId === campId && a.resourceTypeId === resourceTypeId && !a.resolved);
       if (!alreadyHasAlert) {
@@ -188,7 +376,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
         };
         setInventoryAlerts(prev => [...prev, newAlert]);
         
-        // Push notification of warning
+
         const newNot: OperationalNotification = {
           id: `not-${Date.now().toString().slice(-4)}`,
           campId,
@@ -205,47 +393,13 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     }
   };
 
-  const handleSaveCollection = (data: Omit<DailyCollectionRecord, "id">) => {
-    const newId = `col-${Date.now().toString().slice(-4)}`;
-    const record: DailyCollectionRecord = { ...data, id: newId };
-    setDailyCollectionRecords(prev => [...prev, record]);
 
-    // Update inventory to match the gathered quantities
-    setCampInventories(prev =>
-      prev.map(item =>
-        item.campId === data.campId && item.resourceTypeId === data.resourceTypeId
-          ? { ...item, currentAmount: item.currentAmount + data.actualAmount }
-          : item
-      )
-    );
-
-    // Append to structural inventory movements too
-    const newMovement: InventoryMovement = {
-      id: `mov-${Date.now().toString().slice(-4)}`,
-      campId: data.campId,
-      resourceTypeId: data.resourceTypeId,
-      amount: data.actualAmount,
-      movementType: "DAILY_COLLECTION",
-      sourceId: newId,
-      sourceType: "DAILY_COLLECTION",
-      recordedBy: data.recordedBy,
-      date: "Hoy",
-      description: `Ingreso por recolección regular: ${data.differenceReason}`
-    };
-    setInventoryMovements(prev => [...prev, newMovement]);
-  };
-
-  const handleAdjustRecord = (id: string, actualAmount: number, reason: string) => {
-    setDailyCollectionRecords(prev =>
-      prev.map(r => (r.id === id ? { ...r, actualAmount, differenceReason: reason } : r))
-    );
-  };
 
   const handleAddManualMovement = (data: Omit<InventoryMovement, "id">) => {
     const record: InventoryMovement = { ...data, id: `mov-${Date.now().toString().slice(-4)}` };
     setInventoryMovements(prev => [...prev, record]);
 
-    // Recalculates inventory amount based on operation types
+
     const op = (data.movementType === "DAILY_RATION" || data.movementType === "EXPEDITION_DEPARTURE" || data.movementType === "TRANSFER_SENT") ? -1 : 1;
     setCampInventories(prev =>
       prev.map(item =>
@@ -316,7 +470,19 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
         };
         setTransferHistories(h => [...h, newHistory]);
       }
-      return prev.map(t => (t.id === id ? { ...t, status, actualArrivalDate: new Date().toISOString(), receptionNotes: notes } : t));
+      return prev.map(t => {
+        if (t.id === id) {
+          const updated: Partial<Transfer> = { status };
+          if (status === "EN_ROUTE") {
+            updated.actualDepartureDate = new Date().toISOString();
+          } else if (status === "DELIVERED") {
+            updated.actualArrivalDate = new Date().toISOString();
+            updated.receptionNotes = notes;
+          }
+          return { ...t, ...updated };
+        }
+        return t;
+      });
     });
   };
 
@@ -369,7 +535,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
 
   const activeNavData = NAVIGATION_DATA.find((item) => item.id === activeNav);
 
-  // Dynamic content renderer based on the active side subscreen
+
   const renderContentArea = () => {
     switch (activeSub) {
       case "Dashboard":
@@ -380,7 +546,19 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             campInventories={campInventories}
             inventoryAlerts={inventoryAlerts}
             inventoryMovements={inventoryMovements}
+            dailyCollectionRecords={dailyCollectionRecords}
+            intercampRequests={intercampRequests}
+            transfers={transfers}
+            notifications={notifications}
+            onAddManualMovement={handleAddManualMovement}
+            onAddRequest={handleAddRequest}
+            onAddNotification={handleAddNotification}
+            onMarkAsRead={handleMarkAsRead}
+            onResolveAlert={handleResolveAlert}
+            onUpdateInventory={handleUpdateInventory}
             onNavigateToSub={handleInnerNavigation}
+            externalTime={currentGlobalTime}
+            syncStatus={globalTimeState.status}
           />
         );
       case "Inventario del campamento":
@@ -414,6 +592,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             onDeleteResourceType={(id) => {
               setResourceTypesState(prev => prev.filter(rt => rt.id !== id));
             }}
+            onNavigateToSub={handleInnerNavigation}
           />
         );
       case "Campamentos":
@@ -423,12 +602,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
           <ViewRecoleccionDiaria
             camps={camps}
             resourceTypes={resourceTypes}
-            dailyCollectionRecords={dailyCollectionRecords}
-            onSaveRecord={handleSaveCollection}
-            onAdjustRecord={handleAdjustRecord}
-            onDeleteRecord={(id) => {
-              setDailyCollectionRecords(prev => prev.filter(r => r.id !== id));
-            }}
+            onRefreshSystemData={fetchAllSystemData}
           />
         );
       case "Movimientos de inventario":
@@ -495,6 +669,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             onUpdateTransferStatus={handleUpdateTransferStatus}
             onAddPersonToTransfer={handleAddPersonToTransfer}
             onUpdatePersonStatus={handleUpdatePersonStatus}
+            onDeletePersonFromTransfer={(id: string) => setTransferPersons(prev => prev.filter(tp => tp.id !== id))}
           />
         );
       case "Personas en traslado":
@@ -530,6 +705,19 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             onSaveDelivery={handleSaveDelivery}
           />
         );
+      case "Dashboard global":
+        return (
+          <ViewPersonalDashboard
+            camps={camps}
+            resourceTypes={resourceTypes}
+            campInventories={campInventories}
+            inventoryAlerts={inventoryAlerts}
+            inventoryMovements={inventoryMovements}
+            notifications={notifications}
+            occupationCoverages={occupationCoverages}
+            onNavigateToSub={handleInnerNavigation}
+          />
+        );
       case "Oficios y cobertura":
         return (
           <ViewOficiosCobertura
@@ -557,7 +745,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     }
   };
 
-  // Convert simplified structure to match retro tactical map expectations
+
   const adapterMapResources = campInventories.map((ci, index) => {
     const rt = resourceTypes.find(t => t.id === ci.resourceTypeId);
     return {
@@ -574,10 +762,32 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     <div className="game-screen-layout text-[#A4C2C5]">
       <div className="holo-grid" />
 
-      {/* TOP HUD */}
-      {hasEntered && <TopHud onExit={onExit} />}
+      
+      <LoadingScreen
+        show={showLoading}
+        isLoaded={isLoaded}
+        onEnter={handleEnter}
+        onBack={onExit}
+      />
 
-      {/* MAIN WORKSPACE */}
+      
+      {hasEntered && (
+        <TopHud 
+          onLogout={handleLogout} 
+          activeNav={activeNav} 
+          onVolver={() => {
+            if (activeNav) {
+              handleNavClick("mapa");
+            } else {
+              handleNavClick(lastActiveNav);
+            }
+          }} 
+          globalTimeState={globalTimeState}
+          currentGlobalTime={currentGlobalTime}
+        />
+      )}
+
+      
       {hasEntered && (
         <div className="main-area">
           {activeNavData ? (
@@ -585,11 +795,11 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
               <SectionTitle title={activeNavData.label} />
               <section aria-label="Panel principal de recursos" className="settings-shell h-full w-full">
                 <div className="paint-glow" role="presentation" />
-                <div className="settings-inner h-full" style={{ padding: "42px 0 0 0", overflow: "hidden" }}>
+                <div className="settings-inner h-full flex flex-col" style={{ padding: "42px 0 0 0", overflow: "hidden" }}>
                   <div className="watermark-x" role="presentation" />
                   <div className="inner-layout">
-                    <aside className="inner-sidebar pl-1.5 pt-4">
-                      {/* Adapt sidebar menu dynamically from the new nested specification */}
+                    <aside className="inner-sidebar pt-4">
+                      
                       <SideMenu
                         items={activeNavData.subOptions}
                         activeItem={activeSub}
@@ -605,14 +815,14 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
               </section>
             </div>
           ) : (
-            /* DYNAMIC MAP OF RED NODES */
+            
             <div className="content-scroll">
               <SectionTitle title="Mapa Operativo de Suministros" />
               <section aria-label="Mapa de distribución de red" className="settings-shell h-full w-full">
                 <div className="paint-glow" role="presentation" />
-                <div className="settings-inner h-full" style={{ padding: "42px 0 0 0", overflow: "hidden" }}>
+                <div className="settings-inner h-full flex flex-col" style={{ padding: "42px 0 0 0", overflow: "hidden" }}>
                   <div className="watermark-x" role="presentation" />
-                  <div className="inner-content" style={{ padding: "16px 20px" }}>
+                  <div className="inner-content px-4 xs:px-5 sm:px-8 md:px-10 py-5 sm:py-7" style={{ overflowY: "auto", height: "100%" }}>
                     <WorldMapDashboard
                       camps={camps}
                       intercampRequests={intercampRequests}
@@ -629,7 +839,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
         </div>
       )}
 
-      {/* BOTTOM NAV BAR SPLIT WITH NEWLY CONFIGURED ICON SECTIONS */}
+      
       {hasEntered && (
         <>
           <BottomDock activeDock={activeNav || "mapa"} onSelect={handleNavClick} />
@@ -640,13 +850,62 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   );
 }
 
-function TopHud({ onExit }: { onExit?: () => void }) {
+function TopHud({ 
+  onLogout, 
+  activeNav, 
+  onVolver,
+  globalTimeState,
+  currentGlobalTime
+}: { 
+  onLogout: () => void; 
+  activeNav: string | null; 
+  onVolver: () => void;
+  globalTimeState: { status: 'synced' | 'syncing' | 'error' };
+  currentGlobalTime: Date;
+}) {
   return (
     <header className="game-hud-header pointer-events-none flex items-center justify-between px-3 pt-3 pb-2 text-[10px] font-black uppercase tracking-[-0.02em] text-[#A4C2C5]/80">
-      <div className="flex items-center gap-2" />
-      <button className="pointer-events-auto top-hud-btn" type="button" onClick={onExit}>
+      <div className="flex items-center gap-4">
+        <button className="pointer-events-auto top-hud-btn" type="button" onClick={onVolver}>
+          <span className="btn-text">
+            ◀ VOLVER
+          </span>
+        </button>
+
+        
+        <div className="pointer-events-auto flex items-center gap-2 bg-[#0d1414]/90 border border-[#67ACA9]/25 px-2.5 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-[-0.02em] text-white shadow-md">
+          <div className="inline-flex items-center shrink-0">
+            {globalTimeState.status === "synced" && (
+              <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <title>Sincronizado</title>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+              </svg>
+            )}
+            {globalTimeState.status === "syncing" && (
+              <svg className="h-3.5 w-3.5 text-amber-400 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <title>Sincronizando...</title>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+              </svg>
+            )}
+            {globalTimeState.status === "error" && (
+              <svg className="h-3.5 w-3.5 text-rose-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <title>Hora local (sin conexión)</title>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+              </svg>
+            )}
+          </div>
+          <span className="text-white">
+            {currentGlobalTime.getUTCDate().toString().padStart(2, '0')}/{(currentGlobalTime.getUTCMonth() + 1).toString().padStart(2, '0')}/{currentGlobalTime.getUTCFullYear()}
+          </span>
+          <span className="text-[#67ACA9] opacity-30 px-0.5">|</span>
+          <span className="text-white">
+            {currentGlobalTime.getUTCHours().toString().padStart(2, '0')}:{currentGlobalTime.getUTCMinutes().toString().padStart(2, '0')}:{currentGlobalTime.getUTCSeconds().toString().padStart(2, '0')} UTC
+          </span>
+        </div>
+      </div>
+      <button className="pointer-events-auto top-hud-btn" type="button" onClick={onLogout}>
         <span className="btn-text">
-          VOLVER AL HANGAR
+          CERRAR SESIÓN
           <span className="logout-mark" aria-hidden="true" />
         </span>
       </button>
@@ -733,11 +992,7 @@ function SupportLink() {
 }
 
 function SettingsHint() {
-  return (
-    <button className="settings-hint" type="button">
-      <span className="btn-text">ONLINE <GearIcon /></span>
-    </button>
-  );
+  return null;
 }
 
 function IconSvg({ children, className = "h-6 w-6" }: { children: ReactNode; className?: string }) {
@@ -815,7 +1070,7 @@ function GearIcon() {
 function SquadIcon() {
   return (
     <IconSvg>
-      {/* Hex/circular themed guard personnel cohort */}
+      
       <circle cx="16" cy="11" r="4" />
       <path d="M7 28v-2a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v2" />
       <circle cx="7" cy="15" r="3" />

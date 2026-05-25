@@ -1,12 +1,7 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable react-hooks/exhaustive-deps */
-// @ts-nocheck
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
+﻿import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, useGLTF, Html, useProgress } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { LoadingScreen as ResourcePanelLoadingScreen } from './ResourcePanelLoadingScreen'
 
 const HANGAR_URL =
   'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/polygon.glb'
@@ -179,34 +174,16 @@ function ResourceLoader() {
 
 function SyncOverlay({
   isSyncing,
-  onCancel,
   onEnter,
 }: {
   isSyncing: boolean
-  onCancel: () => void
   onEnter: () => void
 }) {
-  const [isLoaded, setIsLoaded] = useState(false)
-
   useEffect(() => {
-    if (!isSyncing) {
-      setIsLoaded(false)
-      return
-    }
+    if (isSyncing) onEnter()
+  }, [isSyncing, onEnter])
 
-    const timeout = window.setTimeout(() => setIsLoaded(true), 1500)
-
-    return () => window.clearTimeout(timeout)
-  }, [isSyncing])
-
-  return (
-    <ResourcePanelLoadingScreen
-      show={isSyncing}
-      isLoaded={isLoaded}
-      onEnter={onEnter}
-      onBack={onCancel}
-    />
-  )
+  return null
 }
 
 function CameraZoom({
@@ -554,7 +531,6 @@ export default function ResourceMainThreeScene({ onExit, onOpenPanel }: Resource
 
       <SyncOverlay
         isSyncing={isSyncing}
-        onCancel={() => setIsSyncing(false)}
         onEnter={() => {
           setIsSyncing(false)
           onOpenPanel?.()

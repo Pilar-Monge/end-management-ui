@@ -1,15 +1,16 @@
-// @ts-nocheck
-import { useState } from "react";
+﻿import { useState } from "react";
 import { WorldMap } from "../components/WorldMap";
 import { Btn } from "./ResourceManagementViews";
 import type { Camp, IntercampRequest, Transfer, ResourceType, CampInventory } from "../types/resourceManagementTypes";
+import { AlertCircle } from "lucide-react";
 
-// Coordinates corresponding to the real camp IDs
+
 const CAMP_COORDS: Record<string, { lat: number; lng: number; label: string }> = {
-  alfa: { lat: 4.6, lng: -74.08, label: "Base Alfa (CO)" },
-  bravo: { lat: 19.43, lng: -99.13, label: "Campamento Bravo" },
-  charlie: { lat: -33.87, lng: 151.21, label: "Campamento Charlie" },
-  delta: { lat: 51.51, lng: -0.13, label: "Avanzada Delta" }
+  "1": { lat: 4.6, lng: -74.08, label: "Alpha Bunker" },
+  "2": { lat: 19.43, lng: -99.13, label: "Sierra Base" },
+  "3": { lat: -33.87, lng: 151.21, label: "Delta Refuge" },
+  "4": { lat: 51.51, lng: -0.13, label: "Omega Fortress" },
+  "5": { lat: 35.68, lng: 139.69, label: "Echo Outpost" }
 };
 
 interface WorldMapDashboardProps {
@@ -29,19 +30,19 @@ export function WorldMapDashboard({
   campInventories = [],
   onNavigateToTab
 }: WorldMapDashboardProps) {
-  // Simulates which camp the Resource Manager is currently assigned to (or "all" for general network view)
-  const [activeCampFilter, setActiveCampFilter] = useState<string>("all");
+
+  const [activeCampFilter, setActiveCampFilter] = useState<string>("1");
   const [relationCampFilter, setRelationCampFilter] = useState<string>("all");
   const [selectedRoute, setSelectedRoute] = useState<any | null>(null);
   const [legendOpen, setLegendOpen] = useState<boolean>(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "planned">( "all");
 
-  // Helper to get camp name by ID
+
   const getCampName = (id: string) => {
     return camps.find(c => c.id === id)?.name || id;
   };
 
-  // Convert transfers into map lines/connections
+
   const transferDots = transfers.map((t) => {
     const req = intercampRequests.find(r => r.id === t.requestId);
     if (!req) return null;
@@ -53,13 +54,13 @@ export function WorldMapDashboard({
     return {
       start,
       end,
-      status: t.status === "COMPLETED" ? "COMPLETED" : t.status === "CANCELED" ? "LOST" : "PLANNED",
+      status: t.status === "DELIVERED" ? "COMPLETED" : t.status === "CANCELED" ? "LOST" : "PLANNED",
       meta: {
         id: t.id,
         requestId: t.requestId,
         type: "TRASLADO",
-        statusText: t.status === "COMPLETED" ? "Entregado / Completado" : t.status === "CANCELED" ? "Cancelado" : "En Tránsito / Planeado",
-        class: t.status === "COMPLETED" ? "COMPLETED" : t.status === "CANCELED" ? "LOST" : "ACTIVE",
+        statusText: t.status === "DELIVERED" ? "Entregado / Completado" : t.status === "CANCELED" ? "Cancelado" : "En Tránsito / Planeado",
+        class: t.status === "DELIVERED" ? "COMPLETED" : t.status === "CANCELED" ? "LOST" : "ACTIVE",
         plannedDeparture: t.plannedDepartureDate,
         plannedArrival: t.plannedArrivalDate,
         rations: t.rationsForTrip,
@@ -71,7 +72,7 @@ export function WorldMapDashboard({
     };
   }).filter(Boolean);
 
-  // Convert pending Intercamp Requests (not yet turned to transfers) into connections too
+
   const requestDots = intercampRequests
     .filter(r => r.status === "PENDING")
     .map((r) => {
@@ -82,7 +83,7 @@ export function WorldMapDashboard({
       return {
         start,
         end,
-        status: "DELAYED", // Uses color for planned/pending
+        status: "DELAYED", 
         meta: {
           id: r.id,
           requestId: r.id,
@@ -101,15 +102,21 @@ export function WorldMapDashboard({
     })
     .filter(Boolean);
 
-  const allVisibleDots = [...transferDots, ...requestDots];
 
-  // Apply camp-camp relationship filtering
+  const allVisibleDots = [...transferDots, ...requestDots].filter(d => {
+    if (!d) return false;
+    const origin = d.meta.origin.toLowerCase();
+    const destination = d.meta.destination.toLowerCase();
+    return origin === "1" || destination === "1";
+  });
+
+
   const campFilteredDots = allVisibleDots.filter(d => {
     if (!d) return false;
     const origin = d.meta.origin.toLowerCase();
     const destination = d.meta.destination.toLowerCase();
 
-    // Camp A filter
+
     if (activeCampFilter !== "all") {
       if (relationCampFilter === "all") {
         if (origin !== activeCampFilter && destination !== activeCampFilter) return false;
@@ -137,18 +144,18 @@ export function WorldMapDashboard({
     return true;
   });
 
-  // Get resources related to a request
+
   const getRequestResources = (reqId: string) => {
     return campInventories
-      .filter(() => true) // Placehold
+      .filter(() => true) 
       .map(ci => {
-        // Find if this resource is listed anywhere for the request
-        // In full flow, we query details
+
+
         return null;
       }).filter(Boolean);
   };
 
-  // Resources for rendering
+
   const getCampDetails = (campId: string) => {
     return campInventories.filter(ci => ci.campId.toLowerCase() === campId.toLowerCase()).map(ci => {
       const rt = resourceTypes.find(t => t.id === ci.resourceTypeId);
@@ -163,37 +170,42 @@ export function WorldMapDashboard({
   return (
     <div className="wm-layout flex flex-col gap-4">
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-stretch">
         
-        {/* LEFT COLUMN: TACTICAL VECTOR MAP */}
-        <div className="xl:col-span-7 flex flex-col gap-3 min-h-[480px]">
-          <div className="wm-map-area relative flex-1 bg-[#0b1010] border border-[#67ACA9]/20 rounded-sm overflow-hidden p-2 min-h-[440px]">
+        
+        <div className="lg:col-span-7 flex flex-col gap-2 h-[185px] xs:h-[210px] sm:h-[280px] md:h-[360px] lg:h-auto lg:min-h-[460px]">
+          <div className="wm-map-area relative flex-1 bg-[#0b1010] border border-[#67ACA9]/20 rounded-sm overflow-hidden p-2 h-full min-h-[170px]">
             
-            {/* Legend Badge (Collapsible and semi-transparent) */}
-            <div className="absolute top-3 left-3 bg-[#0d1414]/20 backdrop-blur-xs border border-[#67ACA9]/15 p-2 rounded-sm z-10 text-[9px] flex flex-col gap-1.5 font-mono select-none transition-colors duration-200 hover:bg-[#0d1414]/75">
-              <div 
-                className="flex items-center justify-between gap-3 cursor-pointer border-b border-[#67ACA9]/10 pb-1"
+            
+            <div className="absolute top-3 left-12 z-10 font-mono select-none">
+              <button 
+                type="button"
+                className="pointer-events-auto flex items-center justify-center p-2 rounded-full border border-[#67ACA9]/30 bg-[#0d1414]/90 text-[#69BFB7] hover:bg-[#67ACA9]/15 transition-all shadow-md cursor-pointer hover:border-[#69BFB7]"
                 onClick={() => setLegendOpen(!legendOpen)}
+                title="Información de Acoplamiento y Ruta Vectorial"
               >
-                <span className="text-[#69BFB7] font-bold text-[8px] tracking-wider">LEYENDA COLORES</span>
-                <span className="text-[#67ACA9]/80 text-[7px] font-bold">
-                  {legendOpen ? "[-] OCULTAR" : "[+] EXPANDIR"}
-                </span>
-              </div>
+                <AlertCircle size={15} className={legendOpen ? "animate-pulse" : ""} />
+              </button>
               
               {legendOpen && (
-                <div className="flex flex-col gap-1.5 mt-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-1.5 rounded-sm bg-[#4ade80]" />
-                    <span className="text-white text-[9px]">Completado</span>
+                <div className="absolute top-8 left-0 mt-1 min-w-[210px] bg-[#0d1414]/95 border border-[#67ACA9]/30 p-2.5 rounded-sm text-[9.5px] flex flex-col gap-2 shadow-2xl transition-all animate-in fade-in duration-200">
+                  <div className="text-[#69BFB7] font-black text-[8px] tracking-widest uppercase border-b border-[#67ACA9]/15 pb-1">
+                    ESTADO DE VECTORES DE RUTA
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-1.5 rounded-sm bg-[#f59e0b] animate-pulse" />
-                    <span className="text-white text-[9px]">Planeado / En espera</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-1.5 rounded-sm bg-[#67ACA9]/60" />
-                    <span className="text-[#A4C2C5]/85 text-[8px]">Solicitud Pendiente</span>
+                  
+                  <div className="flex flex-col gap-1.5 mt-1 text-[#A4C2C5]/90">
+                    <div className="flex items-center justify-between gap-3 bg-black/45 px-2 py-1 border border-[#67ACA9]/10 rounded-xs">
+                      <span className="text-[10px] font-bold text-white uppercase tracking-wider">━━━ Continuo:</span>
+                      <span className="text-[#A4C2C5] text-[9.5px]">Completado / Concluido</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 bg-black/45 px-2 py-1 border border-[#67ACA9]/10 rounded-xs">
+                      <span className="text-[10px] font-bold text-white uppercase tracking-wider">- - - Segmentado:</span>
+                      <span className="text-[#A4C2C5] text-[9.5px]">Planeado / En Tránsito</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 bg-black/45 px-2 py-1 border border-[#67ACA9]/10 rounded-xs">
+                      <span className="text-[10px] font-bold text-white uppercase tracking-wider">··· Punteado:</span>
+                      <span className="text-[#A4C2C5] text-[9.5px]">Solicitud Pendiente</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -207,70 +219,81 @@ export function WorldMapDashboard({
               }}
             />
 
-            {/* Instruction tooltip */}
-            <div className="absolute bottom-2 right-2 text-[7px] font-mono text-[#A4C2C5]/50 uppercase bg-black/40 px-2 py-0.5 rounded-xs">
+            
+            <div className="absolute bottom-2 right-8 text-[7px] font-mono text-[#A4C2C5]/50 uppercase bg-black/40 px-2 py-0.5 rounded-xs">
               Haga clic sobre un campamento de destino para inspeccionar el manifiesto
             </div>
           </div>
-        </div>
-
-        {/* RIGHT COLUMN: ACTION & HISTORY CARD */}
-        <div className="xl:col-span-5 flex flex-col gap-4">
+        </div>        
+        <div className="lg:col-span-5 flex flex-col gap-3 wm-sidebar max-h-[460px] lg:max-h-none">
           
-          {/* CAMP MANAGER FILTER (SISTEMA DE ASIGNACIÓN GEOLOCALIZADA) */}
+          
           <div className="bg-[#0d1414]/85 border border-[#67ACA9]/20 p-3 rounded-sm flex flex-col gap-3 backdrop-blur-xs">
             <div>
               <span className="text-[10px] font-mono text-[#69BFB7] block uppercase tracking-wider">
                 DEPARTAMENTO DE CONTROL DE SUMINISTROS
               </span>
               <h2 className="text-xs font-black text-white uppercase mt-0.5">
-                {activeCampFilter === "all" && relationCampFilter === "all"
-                  ? "🌐 Red Logística Global de Suministros"
-                  : `⛺ Filtro Activo: Propio (${getCampName(activeCampFilter).toUpperCase()}) ➔ Relación (${getCampName(relationCampFilter).toUpperCase()})`}
+                Conexiones de Base Alfa ➔ {relationCampFilter === "all" ? "Todos los Destinos" : getCampName(relationCampFilter).toUpperCase()}
               </h2>
             </div>
             
-            {/* Dual Camp Selection Space */}
-            <div className="grid grid-cols-2 gap-2 border-t border-[#67ACA9]/10 pt-2.5 font-mono">
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-[#67ACA9]/10 pt-2.5 font-mono">
               <div className="flex flex-col gap-1 text-[8px]">
                 <span className="text-[#69BFB7] font-bold uppercase tracking-wide">1. CAMPAMENTO PROPIO:</span>
-                <select 
-                  value={activeCampFilter} 
-                  onChange={(e) => { setActiveCampFilter(e.target.value); setSelectedRoute(null); }}
-                  className="bg-[#0b1010] border border-[#67ACA9]/20 text-white rounded-xs p-1 text-[9.5px] uppercase font-bold font-mono focus:outline-none focus:border-[#69BFB7] cursor-pointer"
-                >
-                  <option value="all">🌐 TODOS (SISTEMA)</option>
-                  {camps.map(c => <option key={c.id} value={c.id.toLowerCase()}>{c.name.toUpperCase()}</option>)}
-                </select>
+                <div className="bg-[#67ACA9]/10 border border-[#67ACA9]/30 text-white rounded-xs p-2 text-[10px] uppercase font-bold font-mono flex items-center gap-1.5 h-9">
+                  ALPHA BUNKER (PROPIO)
+                </div>
               </div>
 
               <div className="flex flex-col gap-1 text-[8px]">
-                <span className="text-[#69BFB7] font-bold uppercase tracking-wide">2. RELACIÓN CON:</span>
-                <select 
-                  value={relationCampFilter} 
-                  onChange={(e) => { setRelationCampFilter(e.target.value); setSelectedRoute(null); }}
-                  className="bg-[#0b1010] border border-[#67ACA9]/20 text-white rounded-xs p-1 text-[9.5px] uppercase font-bold font-mono focus:outline-none focus:border-[#69BFB7] cursor-pointer"
-                >
-                  <option value="all">🌐 TODOS (DESTINOS)</option>
-                  {camps.map(c => <option key={c.id} value={c.id.toLowerCase()}>{c.name.toUpperCase()}</option>)}
-                </select>
+                <span className="text-[#69BFB7] font-bold uppercase tracking-wide">2. RELACIÓN CON DESTINOS:</span>
+                <div className="flex flex-wrap gap-1.5 mt-1 items-center">
+                  {[
+                    { id: "all", label: "TODOS" },
+                    { id: "2", label: "SIERRA BASE" },
+                    { id: "3", label: "DELTA REFUGE" },
+                    { id: "4", label: "OMEGA FORTRESS" },
+                    { id: "5", label: "ECHO OUTPOST" }
+                  ].map((opt) => {
+                    const isActive = relationCampFilter === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setRelationCampFilter(opt.id);
+                          setSelectedRoute(null);
+                        }}
+                        className={`px-3 py-1.5 text-[11px] uppercase font-bold border rounded-xs transition-all cursor-pointer ${
+                          isActive 
+                            ? "bg-[#67ACA9]/30 border-[#69BFB7] text-white shadow-[0_0_8px_rgba(105,191,183,0.3)]" 
+                            : "bg-black/45 border-[#67ACA9]/10 text-[#A4C2C5]/70 hover:border-[#67ACA9]/30 hover:text-white"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            {/* Quick reset option if filters are active */}
-            {(activeCampFilter !== "all" || relationCampFilter !== "all") && (
-              <div className="flex justify-end pt-0.5">
+            
+            {relationCampFilter !== "all" && (
+              <div className="pt-2 border-t border-[#67ACA9]/10">
                 <button
                   type="button"
-                  onClick={() => { setActiveCampFilter("all"); setRelationCampFilter("all"); setSelectedRoute(null); }}
-                  className="text-[7.5px] font-mono text-cyan-300 hover:text-white uppercase tracking-wider"
+                  onClick={() => { setRelationCampFilter("all"); setSelectedRoute(null); }}
+                  className="w-full bg-[#1A1F1F] hover:bg-[#324f4c]/30 text-xs font-mono text-[#69BFB7] hover:text-white border border-[#67ACA9]/30 py-2 px-3 rounded-xs uppercase tracking-wider font-bold transition-all cursor-pointer text-center flex items-center justify-center gap-1.5"
                 >
-                  [✕ RESTABLECER VISTA GLOBAL]
+                  <span>✕ RESTABLECER VISTA GLOBAL</span>
                 </button>
               </div>
             )}
 
-            {/* INTERACTIVE FILTERS FOR ROUTE STATUS (As requested, visible complete planned options) */}
+            
             <div className="grid grid-cols-3 gap-1.5 border-t border-[#67ACA9]/10 pt-2 font-mono">
               <button
                 type="button"
@@ -278,172 +301,215 @@ export function WorldMapDashboard({
                 className={`p-1.5 rounded-sm border text-center transition-all flex flex-col items-center justify-center ${statusFilter === "all" ? "bg-[#67ACA9]/15 border-[#67ACA9] text-white" : "bg-black/20 border-[#67ACA9]/15 text-[#A4C2C5]/60 hover:border-[#67ACA9]/35"}`}
               >
                 <span className="text-[7.5px] uppercase tracking-wider">Rutas Visibles</span>
-                <span className="text-xs font-black text-white mt-0.5">{totalCount}</span>
+                <span className="text-sm font-black mt-0.5" style={{ color: "#ffffff" }}>{totalCount}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setStatusFilter("completed")}
-                className={`p-1.5 rounded-sm border text-center transition-all flex flex-col items-center justify-center ${statusFilter === "completed" ? "bg-emerald-950/20 border-emerald-400 text-emerald-300" : "bg-black/20 border-[#67ACA9]/15 text-[#A4C2C5]/60 hover:border-emerald-400/35"}`}
+                className={`p-1.5 rounded-sm border text-center transition-all flex flex-col items-center justify-center ${statusFilter === "completed" ? "bg-emerald-950/20 border-emerald-400 text-white" : "bg-black/20 border-[#67ACA9]/15 text-[#A4C2C5]/60 hover:border-emerald-400/35"}`}
               >
                 <span className="text-[7.5px] uppercase tracking-wider">Completadas</span>
-                <span className="text-xs font-black text-emerald-400 mt-0.5">{completedCount}</span>
+                <span className="text-sm font-black mt-0.5" style={{ color: "#ffffff" }}>{completedCount}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setStatusFilter("planned")}
-                className={`p-1.5 rounded-sm border text-center transition-all flex flex-col items-center justify-center ${statusFilter === "planned" ? "bg-amber-950/20 border-amber-400 text-amber-300" : "bg-black/20 border-[#67ACA9]/15 text-[#A4C2C5]/60 hover:border-amber-400/35"}`}
+                className={`p-1.5 rounded-sm border text-center transition-all flex flex-col items-center justify-center ${statusFilter === "planned" ? "bg-amber-950/20 border-amber-400 text-white" : "bg-black/20 border-[#67ACA9]/15 text-[#A4C2C5]/60 hover:border-amber-400/35"}`}
               >
                 <span className="text-[7.5px] uppercase tracking-wider">Planeadas</span>
-                <span className="text-xs font-black text-amber-500 mt-0.5">{plannedCount}</span>
+                <span className="text-sm font-black mt-0.5" style={{ color: "#ffffff" }}>{plannedCount}</span>
               </button>
             </div>
           </div>
           
-          {/* Detail Side-panel */}
+          
           {selectedRoute ? (
-            <div className="mission-card border border-[#69BFB7] bg-[#0d1414]/95 p-3.5 rounded-sm flex flex-col gap-3">
-              <div className="flex justify-between items-start border-b border-[#69BFB7]/20 pb-2">
+            <div className="tactical-zone-panel border border-[#69BFB7] bg-[#0d1414]/95 p-3.5 rounded-sm flex flex-col">
+              <div className="tactical-zone-header">
                 <div>
-                  <span className="text-[9px] font-mono text-[#69BFB7] uppercase tracking-wider block">
+                  <span className="text-[8px] font-mono text-[#69BFB7] uppercase tracking-wider block">
                     {selectedRoute.type} DETALLADO • MODELO DE RED
                   </span>
-                  <h3 className="text-xs font-black text-white uppercase mt-0.5">
+                  <h3 className="tactical-zone-title">
                     {getCampName(selectedRoute.origin)} ➔ {getCampName(selectedRoute.destination)}
                   </h3>
+                  <span className={`tactical-zone-status font-bold ${selectedRoute.class === 'COMPLETED' ? 'text-emerald-400' : 'text-amber-300'}`}>
+                    {selectedRoute.statusText}
+                  </span>
                 </div>
                 <button 
                   type="button" 
-                  className="text-red-400 hover:text-white font-black text-xs px-1"
+                  className="tactical-close-btn"
                   onClick={() => setSelectedRoute(null)}
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-[10px]">
-                <div className="p-2 bg-black/35 border border-[#67ACA9]/10 rounded-xs">
-                  <span className="block text-[8px] text-[#A4C2C5]/50 uppercase font-mono">ID Registro</span>
-                  <span className="font-bold text-white">{selectedRoute.id}</span>
+              <p className="tactical-zone-desc mt-2">{selectedRoute.desc || "Suministros de contingencia intercampamentos."}</p>
+
+              <div className="tactical-stats-grid my-2 rounded-xs">
+                <div className="tactical-stat">
+                  <span>ID Registro</span>
+                  <strong>{selectedRoute.id}</strong>
                 </div>
-                <div className="p-2 bg-black/35 border border-[#67ACA9]/10 rounded-xs">
-                  <span className="block text-[8px] text-[#A4C2C5]/50 uppercase font-mono">Estado Actual</span>
-                  <span className={`font-bold ${selectedRoute.class === 'COMPLETED' ? 'text-emerald-400' : 'text-amber-300'}`}>
-                    {selectedRoute.statusText}
-                  </span>
+                <div className="tactical-stat">
+                  <span>Raciones Convoy</span>
+                  <strong>{selectedRoute.rations > 0 ? `${selectedRoute.rations} u` : "0 u"}</strong>
+                </div>
+                <div className="tactical-stat">
+                  <span>Salida Programada</span>
+                  <strong>{selectedRoute.plannedDeparture || "—"}</strong>
+                </div>
+                <div className="tactical-stat">
+                  <span>Llegada Estimada</span>
+                  <strong>{selectedRoute.plannedArrival || "—"}</strong>
                 </div>
               </div>
 
-              <div className="text-[10px] flex flex-col gap-1 bg-black/50 p-2.5 rounded-sm border border-[#67ACA9]/10 font-mono">
-                <div className="flex justify-between">
-                  <span className="text-[#A4C2C5]/60">Motivo de Suministros:</span>
-                  <span className="text-white font-sans">{selectedRoute.desc}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#A4C2C5]/60">Salida Programada:</span>
-                  <span className="text-white font-sans">{selectedRoute.plannedDeparture}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#A4C2C5]/60">Llegada Estimada:</span>
-                  <span className="text-white font-sans">{selectedRoute.plannedArrival}</span>
-                </div>
-                {selectedRoute.rations > 0 && (
-                  <div className="flex justify-between border-t border-[#67ACA9]/10 pt-1 mt-1">
-                    <span className="text-[#A4C2C5]/60">Raciones para el Convoy:</span>
-                    <span className="text-cyan-300">{selectedRoute.rations} Raciones</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-[#A4C2C5]/60">Observaciones Revisor:</span>
-                  <span className="text-white italic">{selectedRoute.receptionNotes}</span>
+              <div className="tactical-resources mt-1">
+                <h4 className="tactical-subtitle">Suministros Solicitados</h4>
+                <div className="tactical-resource-cards">
+                  {(selectedRoute.id === "tr-1" || selectedRoute.requestId === "req-1") ? (
+                    <>
+                      <div className="tactical-resource-card">
+                        <span className="tactical-resource-icon">◆</span>
+                        <span>Alimentos: 150 kg</span>
+                      </div>
+                      <div className="tactical-resource-card">
+                        <span className="tactical-resource-icon">◆</span>
+                        <span>Médicos: 20 u</span>
+                      </div>
+                      <div className="tactical-resource-card">
+                        <span className="tactical-resource-icon">◆</span>
+                        <span>Raciones: 10 u</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="tactical-resource-card">
+                        <span className="tactical-resource-icon">◆</span>
+                        <span>Alimentos: 50 kg</span>
+                      </div>
+                      <div className="tactical-resource-card">
+                        <span className="tactical-resource-icon">◆</span>
+                        <span>Agua: 100 lts</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              {selectedRoute.receptionNotes && (
+                <div className="p-2 bg-black/40 border border-[#67ACA9]/10 rounded-xs mt-2 text-[10px] text-[#A4C2C5]/70 italic">
+                  Observaciones: {selectedRoute.receptionNotes}
+                </div>
+              )}
+
+              <div className="tactical-actions mt-4 gap-2">
                 {onNavigateToTab && (
-                  <Btn variant="primary" style={{ flex: 1 }} onClick={() => onNavigateToTab(selectedRoute.type === "TRASLADO" ? "Traslados" : "Solicitudes intercampamento")}>
-                    🚚 Gestionar este trámite
+                  <Btn variant="primary" style={{ width: '100%' }} onClick={() => onNavigateToTab(selectedRoute.type === "TRASLADO" ? "Traslados" : "Solicitudes intercampamento")}>
+                    🚚 Gestionar Trámite
                   </Btn>
                 )}
-                <button 
-                  type="button" 
-                  className="btn-text border border-[#67ACA9]/20 text-[10px] uppercase font-bold px-3 py-1 bg-transparent hover:bg-white/5 text-[#A4C2C5]"
-                  onClick={() => setSelectedRoute(null)}
-                >
-                  Regresar
-                </button>
+                <Btn variant="ghost" style={{ width: '100%' }} onClick={() => setSelectedRoute(null)}>
+                  Regresar al Listado
+                </Btn>
               </div>
             </div>
           ) : (
-            <div className="bg-[#000000]/30 border border-[#67ACA9]/15 p-3 rounded-sm flex flex-col gap-1.5">
-              <h3 className="text-[10px] font-black tracking-widest text-[#69BFB7] uppercase border-b border-[#67ACA9]/20 pb-1.5 mb-1.5 flex items-center justify-between">
-                <span>📋 Traslados {statusFilter === "all" ? "Totales" : statusFilter === "completed" ? "Completados" : "Planeados"}</span>
-                <span className="font-mono text-[8px] bg-[#67ACA9]/15 px-1.5 rounded-xs text-[#A4C2C5]">
-                  {activeCampFilter === "all" ? "TODOS" : activeCampFilter.toUpperCase()}
+            <div className="flex flex-col gap-3">
+              
+              <h3 className="wm-sidebar-title text-xs font-bold uppercase tracking-wider text-[#69BFB7] border-b border-[#67ACA9]/20 pb-1.5 mb-1 flex items-center justify-between">
+                <span>Traslados Activos ({statusFilter === "all" ? "Todos" : statusFilter === "completed" ? "Completados" : "Planeados"})</span>
+                <span className="font-mono text-[8px] bg-[#67ACA9]/15 px-1.5 py-0.5 rounded-xs text-[#A4C2C5]">
+                  {activeCampFilter.toUpperCase()}
                 </span>
               </h3>
 
               {dotsToDisplay.length === 0 ? (
-                <div className="text-[10px] text-[#A4C2C5]/40 italic p-6 text-center">
+                <div className="text-[10px] text-[#A4C2C5]/40 italic p-6 text-center border border-[#67ACA9]/15 bg-[#0d1414]/55 rounded-xs">
                   Ninguna conexión de transporte detectada para los filtros vigentes.
                 </div>
               ) : (
-                <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
+                <div className="wm-exp-list max-h-[190px] overflow-y-auto pr-1">
                   {dotsToDisplay.map((dot, index) => {
                     if (!dot) return null;
+                    const isCompleted = dot.meta.class === "COMPLETED";
+                    const iconSymbol = isCompleted ? "✓" : "◆";
+                    const iconColor = isCompleted ? "#4ade80" : "#67ACA9";
+                    
                     return (
                       <div 
                         key={`${dot.meta.id}-${index}`}
-                        className="group border border-[#67ACA9]/15 bg-[#0d1414]/55 hover:bg-[#67ACA9]/5 p-2 rounded-xs flex flex-col gap-1 text-[10px] cursor-pointer transition-colors"
+                        className="wm-exp-card"
                         onClick={() => setSelectedRoute(dot.meta)}
                       >
-                        <div className="flex justify-between items-center">
-                          <span className="font-bold text-white uppercase tracking-tight text-[9px]">
+                        <div className="wm-exp-icon" style={{ borderColor: iconColor, color: iconColor }}>
+                          {iconSymbol}
+                        </div>
+                        <div className="wm-exp-info flex-grow text-left">
+                          <span className="wm-exp-name text-white font-bold text-[10px] uppercase truncate block">
                             {dot.meta.id} • {getCampName(dot.meta.origin)} ➔ {getCampName(dot.meta.destination)}
                           </span>
-                          <span className={`text-[8px] font-mono font-bold uppercase ${dot.meta.class === "COMPLETED" ? 'text-emerald-400' : 'text-amber-400'}`}>
-                            {dot.meta.class === "COMPLETED" ? "Completado" : "Planeado"}
+                          <span className="wm-exp-team text-[#A4C2C5]/60 text-[9px] block truncate">
+                            &ldquo;{dot.meta.desc}&rdquo;
                           </span>
                         </div>
-                        
-                        <div className="text-[#A4C2C5]/70 truncate italic font-sans text-[9px]">
-                          &ldquo;{dot.meta.desc}&rdquo;
-                        </div>
-
-                        <div className="flex justify-between text-[8px] font-mono text-[#A4C2C5]/40 mt-1 border-t border-[#67ACA9]/5 pt-1 group-hover:text-cyan-300">
-                          <span>F. Estimada: {dot.meta.plannedArrival}</span>
-                          <span>Tipo: {dot.meta.type}</span>
+                        <div className="wm-exp-time text-right font-mono text-[9px] text-[#A4C2C5]/70 shrink-0 select-none">
+                          {dot.meta.plannedArrival}
                         </div>
                       </div>
                     );
                   })}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* LOCAL CAMP STOCK (Since manager is limited to their camp context) */}
-          {activeCampFilter !== "all" && (
-            <div className="bg-black/45 border border-[#67ACA9]/20 p-3 rounded-sm">
-              <h4 className="text-[10px] font-bold text-[#69BFB7] uppercase tracking-wider mb-2 flex items-center justify-between">
-                <span>📦 Reservas Locales de {getCampName(activeCampFilter)}</span>
-                <span className="text-[8px] text-[#A4C2C5]/50 font-normal">Sincronizado</span>
-              </h4>
-              <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono max-h-[120px] overflow-y-auto">
-                {getCampDetails(activeCampFilter).map(item => {
-                  const isCritical = item.currentAmount <= item.minimumAlertAmount;
-                  return (
-                    <div 
-                      key={item.resourceTypeId} 
-                      className={`p-1.5 flex justify-between items-center rounded-xs border ${isCritical ? 'border-red-500/30 bg-red-950/20 text-red-300' : 'border-[#67ACA9]/10 bg-black/20 text-white'}`}
-                    >
-                      <span className="truncate pr-1.5 text-[9px] text-[#A4C2C5]/85">{item.typeName}</span>
-                      <strong className="shrink-0">{item.currentAmount} {item.unit}</strong>
-                    </div>
-                  );
-                })}
+              
+              <h3 className="wm-sidebar-title" style={{ marginTop: 8 }}>Resumen de Suministros</h3>
+              <div className="wm-stats">
+                <div className="wm-stat-row">
+                  <span>Conexiones Totales</span>
+                  <span className="wm-stat-val text-white" style={{ color: "#ffffff" }}>{totalCount}</span>
+                </div>
+                <div className="wm-stat-row">
+                  <span>Completadas / Entregadas</span>
+                  <span className="wm-stat-val text-white" style={{ color: "#ffffff" }}>{completedCount}</span>
+                </div>
+                <div className="wm-stat-row">
+                  <span>En Espera / Planeadas</span>
+                  <span className="wm-stat-val text-white" style={{ color: "#ffffff" }}>{plannedCount}</span>
+                </div>
+                <div className="wm-stat-row">
+                  <span>Campamento Asignado</span>
+                  <span className="wm-stat-val text-white" style={{ color: "#ffffff" }}>Base Alfa</span>
+                </div>
               </div>
+              
+              
+              <div className="bg-black/45 border border-[#67ACA9]/20 p-2.5 rounded-sm mt-1">
+                <h4 className="text-[9.5px] font-bold text-[#69BFB7] uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span>Reservas de Suministros {getCampName(activeCampFilter)}</span>
+                  <span className="text-[7.5px] text-[#A4C2C5]/50 font-normal">Sincronizado</span>
+                </h4>
+                <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono max-h-[85px] overflow-y-auto pr-1">
+                  {getCampDetails(activeCampFilter).map(item => {
+                    const isCritical = item.currentAmount <= item.minimumAlertAmount;
+                    return (
+                      <div 
+                        key={item.resourceTypeId} 
+                        className={`p-1.5 flex justify-between items-center rounded-xs border ${isCritical ? 'border-red-500/30 bg-red-950/20 text-red-300' : 'border-[#67ACA9]/10 bg-black/20 text-white'}`}
+                      >
+                        <span className="truncate pr-1 px-0.5 text-[8.5px] text-[#A4C2C5]/85">{item.typeName}</span>
+                        <strong className="shrink-0">{item.currentAmount} {item.unit}</strong>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
             </div>
           )}
 

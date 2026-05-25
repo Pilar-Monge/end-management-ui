@@ -1,5 +1,17 @@
-// @ts-nocheck
-import { useState } from "react";
+﻿import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { 
+  Clock, 
+  AlertTriangle, 
+  CheckCircle2, 
+  ShieldAlert, 
+  Calendar, 
+  Info, 
+  Package, 
+  ArrowRightLeft, 
+  Shuffle, 
+  UserCheck 
+} from "lucide-react";
 import {
   PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -24,10 +36,31 @@ import type {
   OperationalNotification
 } from "../types/resourceManagementTypes";
 
-const currentUser = {
-  userId: "3",
-  campId: "alfa",
-  rol: "RESOURCE_MANAGEMENT"
+const sessionUserRaw = typeof window !== 'undefined' ? localStorage.getItem("session_user") : null;
+const sessionUserObj = sessionUserRaw ? JSON.parse(sessionUserRaw) : null;
+
+export const currentUser = {
+  userId: sessionUserObj?.userId ? Number(sessionUserObj.userId) : 3,
+  campId: sessionUserObj?.campId ? Number(sessionUserObj.campId) : 1,
+  rol: "RESOURCE_MANAGEMENT" as const
+};
+
+export const MAP_RESOURCE_ID_TO_STR: Record<number, string> = {
+  1: "rt-food",
+  2: "rt-water",
+  3: "rt-medical",
+  4: "rt-defense",
+  5: "rt-fuel",
+  6: "rt-parts"
+};
+
+export const MAP_RESOURCE_STR_TO_ID: Record<string, number> = {
+  "rt-food": 1,
+  "rt-water": 2,
+  "rt-medical": 3,
+  "rt-defense": 4,
+  "rt-fuel": 5,
+  "rt-parts": 6
 };
 
 export function Btn({
@@ -36,7 +69,9 @@ export function Btn({
   onClick,
   small,
   style,
-  disabled
+  disabled,
+  type = "button",
+  className
 }: {
   children: React.ReactNode;
   variant?: "primary" | "ghost" | "danger" | "success" | "warning";
@@ -44,8 +79,12 @@ export function Btn({
   small?: boolean;
   style?: React.CSSProperties;
   disabled?: boolean;
+  type?: "button" | "submit" | "reset";
+  className?: string;
 }) {
-  const base = small ? "px-2 py-0.5 text-[9px]" : "px-3 py-1.5 text-[11px]";
+  const base = small 
+    ? "px-1.5 py-0.5 text-[10px]" 
+    : "px-3 py-1.5 text-[11.5px] lg:text-[13px]";
   const colors = {
     primary: "bg-[#67ACA9] text-white hover:bg-[#69BFB7]",
     danger: "bg-red-600/40 text-red-200 border border-red-500/40 hover:bg-red-500/50",
@@ -58,8 +97,8 @@ export function Btn({
       onClick={onClick}
       style={style}
       disabled={disabled}
-      className={`${base} ${colors} font-bold uppercase tracking-wide rounded-sm transition-all whitespace-nowrap ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-      type="button"
+      className={`v-btn ${base} ${colors} font-bold uppercase tracking-wide rounded-sm transition-all whitespace-normal break-words sm:whitespace-nowrap ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${className || ""}`}
+      type={type}
     >
       {children}
     </button>
@@ -92,6 +131,234 @@ export function StatusIndicator({ status }: { status: "EXCELENTE" | "ESTABLE" | 
   );
 }
 
+export function DateTimeField({ 
+  label, 
+  required, 
+  value = "",
+  onChange
+}: {
+  label: string;
+  required?: boolean;
+  value?: string;
+  onChange: (val: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  const initialDate = value ? new Date(value) : new Date();
+  const initY = isNaN(initialDate.getTime()) ? 2026 : initialDate.getFullYear();
+  const initM = isNaN(initialDate.getTime()) ? 4 : initialDate.getMonth();
+  const initD = isNaN(initialDate.getTime()) ? "24" : String(initialDate.getDate());
+  const initH = isNaN(initialDate.getTime()) ? "08" : String(initialDate.getHours()).padStart(2, "0");
+  const initMin = isNaN(initialDate.getTime()) ? "00" : String(initialDate.getMinutes()).padStart(2, "0");
+
+  const [day, setDay] = useState(initD);
+  const [hour, setHour] = useState(initH);
+  const [minute, setMinute] = useState(initMin);
+  const [month, setMonth] = useState(initM);
+  const [year, setYear] = useState(initY);
+
+  useEffect(() => {
+    const d = value ? new Date(value) : new Date();
+    if (!isNaN(d.getTime())) {
+      setYear(d.getFullYear());
+      setMonth(d.getMonth());
+      setDay(String(d.getDate()));
+      setHour(String(d.getHours()).padStart(2, "0"));
+      setMinute(String(d.getMinutes()).padStart(2, "0"));
+    }
+  }, [value]);
+
+  const monthNames = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+  ];
+
+  const days = [
+    "26", "27", "28", "29", "30", "31", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", 
+    "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", 
+    "24", "25", "26", "27", "28", "29", "30", "1", "2", "3", "4", "5", "6"
+  ];
+  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+  const minutes = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+  const years = Array.from({ length: 7 }, (_, i) => 2024 + i);
+
+  const updateCombined = (newYr: number, newMo: number, newDy: string, newHr: string, newMin: string) => {
+    const dObj = new Date(newYr, newMo, parseInt(newDy) || 1, parseInt(newHr) || 0, parseInt(newMin) || 0);
+    onChange(dObj.toISOString());
+  };
+
+  const handleSelectDay = (item: string) => {
+    setDay(item);
+    updateCombined(year, month, item, hour, minute);
+  };
+
+  const handleSelectHour = (item: string) => {
+    setHour(item);
+    updateCombined(year, month, day, item, minute);
+  };
+
+  const handleSelectMinute = (item: string) => {
+    setMinute(item);
+    updateCombined(year, month, day, hour, item);
+  };
+
+  const prevMonth = () => {
+    let nextM = month - 1;
+    let nextY = year;
+    if (nextM < 0) {
+      nextM = 11;
+      nextY = year - 1;
+    }
+    setMonth(nextM);
+    setYear(nextY);
+    updateCombined(nextY, nextM, day, hour, minute);
+  };
+
+  const nextMonth = () => {
+    let nextM = month + 1;
+    let nextY = year;
+    if (nextM > 11) {
+      nextM = 0;
+      nextY = year + 1;
+    }
+    setMonth(nextM);
+    setYear(nextY);
+    updateCombined(nextY, nextM, day, hour, minute);
+  };
+
+  return (
+    <div className="v-field dt-shell">
+      <span className="v-field-label">
+        {label}
+        {required && <span className="text-[#69BFB7]"> *</span>}
+      </span>
+      <button
+        ref={triggerRef}
+        className="dt-trigger"
+        type="button"
+        onClick={() => setOpen(!open)}
+      >
+        <span>{monthNames[month].toUpperCase()} {day}, {year}</span>
+        <span className="dt-time">{hour}:{minute}</span>
+        <span className="dt-icon">▼</span>
+      </button>
+
+      {open && createPortal(
+        <div className="dt-portal-root">
+          <div className="dt-backdrop" onClick={() => setOpen(false)} />
+          <div
+            className="dt-popover font-mono text-[#f0fafa]"
+            style={{ 
+              position: "fixed", 
+              top: "50%", 
+              left: "50%", 
+              transform: "translate(-50%, -50%)", 
+              width: 500,
+              maxWidth: "95vw"
+            }}
+          >
+            <div className="dt-head">
+              <div className="dt-head-left">
+                <button type="button" className="dt-nav-btn" onClick={prevMonth}>‹</button>
+                <span className="uppercase text-xs font-bold text-[#69BFB7]">{monthNames[month]} de {year}</span>
+                <button type="button" className="dt-nav-btn" onClick={nextMonth}>›</button>
+              </div>
+              <div className="dt-head-right">
+                <select 
+                  className="dt-year-select" 
+                  value={year} 
+                  onChange={(e) => {
+                    const y = Number(e.target.value);
+                    setYear(y);
+                    updateCombined(y, month, day, hour, minute);
+                  }}
+                >
+                  {years.map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+                <button type="button" className="dt-close" onClick={() => setOpen(false)}>✕</button>
+              </div>
+            </div>
+
+            <div className="dt-body">
+              <div className="dt-cal">
+                <div className="dt-week text-center">
+                  <span>LU</span><span>MA</span><span>MI</span><span>JU</span><span>VI</span><span>SA</span><span>DO</span>
+                </div>
+                <div className="dt-days">
+                  {days.map((item, index) => (
+                    <button
+                      key={`${item}-${index}`}
+                      type="button"
+                      className={item === day ? "is-active" : ""}
+                      onClick={() => handleSelectDay(item)}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="dt-time-col" data-label="HORA">
+                {hours.map((item) => (
+                  <button 
+                    key={`h-${item}`} 
+                    type="button" 
+                    className={item === hour ? "is-active" : ""} 
+                    onClick={() => handleSelectHour(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+
+              <div className="dt-time-col" data-label="MIN">
+                {minutes.map((item) => (
+                  <button 
+                    key={`m-${item}`} 
+                    type="button" 
+                    className={item === minute ? "is-active" : ""} 
+                    onClick={() => handleSelectMinute(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="dt-actions">
+              <button 
+                type="button" 
+                onClick={() => {
+                  const nowStr = new Date().toISOString();
+                  onChange(nowStr);
+                  setOpen(false);
+                }}
+              >
+                REINICIAR
+              </button>
+              <button 
+                type="button" 
+                className="dt-today-btn" 
+                onClick={() => {
+                  const nowStr = new Date().toISOString();
+                  onChange(nowStr);
+                  setOpen(false);
+                }}
+              >
+                HOY
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 function SectionShell({
   kicker,
   title,
@@ -101,14 +368,33 @@ function SectionShell({
   title: string;
   children: React.ReactNode;
 }) {
+  if (!currentUser.userId || !currentUser.campId) {
+    return (
+      <div className="v-page res-management px-2 flex justify-center items-center py-20">
+        <div className="mission-card border-2 border-red-500/40 bg-[#090303]/90 p-8 rounded text-center max-w-sm sm:max-w-md">
+          <ShieldAlert className="h-12 w-12 text-rose-500 mx-auto mb-4 animate-bounce" />
+          <h3 className="text-sm sm:text-base font-black text-rose-400 uppercase tracking-wider">Sesión Expirada o Inválida</h3>
+          <p className="text-[11px] sm:text-xs text-[#A4C2C5]/70 mt-2 leading-relaxed">
+            Se requiere una identificación de sesión de guardia autorizada para acceder al sistema táctico de gestión de recursos.
+          </p>
+          <div className="mt-6 border-t border-[#67ACA9]/10 pt-4">
+            <p className="text-[9px] text-rose-400 font-mono italic">
+              Código de error: AUTH_SESSION_MISSING • RESOURCE_MANAGEMENT
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="v-page res-management px-2 overflow-y-auto max-h-[70vh]">
+    <div className="v-page res-management px-2">
       <div className="mission-brief mb-4">
         <div>
           <span className="mission-kicker text-[#69BFB7] text-[10px] font-bold uppercase tracking-[3px] block mb-1">
             {kicker}
           </span>
-          <h2 className="text-lg font-black uppercase text-[#f0fafa] tracking-tight">{title}</h2>
+          <h2 className="font-black uppercase text-[#f0fafa] tracking-tight break-words leading-tight">{title}</h2>
         </div>
       </div>
       <div className="mission-stack flex flex-col gap-5">{children}</div>
@@ -116,7 +402,7 @@ function SectionShell({
   );
 }
 
-// ----------------- Helper text adapters -----------------
+
 const getResourceTypeCategoryLabel = (cat: string) => {
   const labels: Record<string, string> = {
     FOOD: "ALIMENTO",
@@ -130,156 +416,1058 @@ const getResourceTypeCategoryLabel = (cat: string) => {
   return labels[cat] || cat;
 };
 
-// ----------------- SUB-COMPONENTS -----------------
 
-/* 1. DASHBOARD DE INVENTARIO */
+
+
 export function ViewDashboard({
   camps,
   resourceTypes,
   campInventories,
   inventoryAlerts,
   inventoryMovements,
-  onNavigateToSub
+  dailyCollectionRecords = [],
+  intercampRequests = [],
+  transfers = [],
+  notifications = [],
+  onSaveCollection,
+  onAddManualMovement,
+  onAddRequest,
+  onAddNotification,
+  onMarkAsRead,
+  onResolveAlert,
+  onUpdateInventory,
+  onNavigateToSub,
+  externalTime,
+  syncStatus
 }: {
   camps: Camp[];
   resourceTypes: ResourceType[];
   campInventories: CampInventory[];
   inventoryAlerts: InventoryAlert[];
   inventoryMovements: InventoryMovement[];
+  dailyCollectionRecords?: DailyCollectionRecord[];
+  intercampRequests?: IntercampRequest[];
+  transfers?: Transfer[];
+  notifications?: OperationalNotification[];
+  onSaveCollection?: (data: Omit<DailyCollectionRecord, "id">) => void;
+  onAddManualMovement?: (data: Omit<InventoryMovement, "id">) => void;
+  onAddRequest?: (data: Omit<IntercampRequest, "id">) => void;
+  onAddNotification?: (data: Omit<OperationalNotification, "id">) => void;
+  onMarkAsRead?: (id: string) => void;
+  onResolveAlert?: (id: string, resolvedBy: string) => void;
+  onUpdateInventory?: (campId: string, resourceTypeId: string, currentAmount: number, minimumAlertAmount: number) => void;
   onNavigateToSub: (sub: string) => void;
+  externalTime?: Date;
+  syncStatus?: 'synced' | 'syncing' | 'error';
 }) {
-  const totalByResource = campInventories.reduce((acc, curr) => {
-    acc[curr.resourceTypeId] = (acc[curr.resourceTypeId] || 0) + curr.currentAmount;
-    return acc;
-  }, {} as Record<string, number>);
+  const activeCampId = String(currentUser.campId); 
+  const campName = camps.find(c => c.id === activeCampId)?.name || "Alpha Bunker";
 
-  const chartData = Object.entries(totalByResource).map(([key, val]) => {
-    const type = resourceTypes.find(t => t.id === key);
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const triggerRefresh = () => {
+    setIsRefreshing(true);
+    setTimeout(() => setIsRefreshing(false), 800);
+  };
+
+
+  const [localSystTime, setLocalSystTime] = useState(new Date());
+
+  useEffect(() => {
+    if (externalTime) return;
+    const clockInterval = setInterval(() => {
+      setLocalSystTime(new Date());
+    }, 1000);
+    return () => clearInterval(clockInterval);
+  }, [externalTime]);
+
+  const systTime = externalTime || localSystTime;
+
+  const getNextUtcMidnight = (nowDate: Date): Date => {
+    return new Date(Date.UTC(
+      nowDate.getUTCFullYear(),
+      nowDate.getUTCMonth(),
+      nowDate.getUTCDate() + 1,
+      0,
+      0,
+      0,
+      0
+    ));
+  };
+
+  const nextMidnight = getNextUtcMidnight(systTime);
+  const remainingMs = Math.max(0, nextMidnight.getTime() - systTime.getTime());
+
+  const formatRemaining = (ms: number): string => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const getTimerStatus = (ms: number) => {
+    const hours = ms / 3600000;
+    const minutes = ms / 60000;
+    if (hours > 2) {
+      return { 
+        label: "Ciclo diario pendiente", 
+        color: "border-[#67ACA9]/20 text-emerald-300 bg-emerald-950/20" 
+      };
+    } else if (minutes > 5) {
+      return { 
+        label: "La recolección diaria está próxima", 
+        color: "border-amber-500/30 text-amber-300 bg-amber-950/25 animate-pulse" 
+      };
+    } else {
+      return { 
+        label: "El ciclo diario está por ejecutarse", 
+        color: "border-rose-500/40 text-rose-300 bg-rose-950/40 animate-pulse font-black" 
+      };
+    }
+  };
+
+  const statusStyle = getTimerStatus(remainingMs);
+
+
+  const [activeTab, setActiveTab] = useState<"inventario" | "alertas" | "movimientos" | "recoleccion" | "solicitudes">("inventario");
+  const [pageInventario, setPageInventario] = useState(1);
+  const [pageAlertas, setPageAlertas] = useState(1);
+  const [pageMovimientos, setPageMovimientos] = useState(1);
+  const [pageRecoleccion, setPageRecoleccion] = useState(1);
+  const [pageSolicitudes, setPageSolicitudes] = useState(1);
+  const pageSize = 5;
+
+
+  const [showNotificationPopup, setShowNotificationPopup] = useState(false);
+
+
+  const activeCampInventories = campInventories.filter(item => item.campId === activeCampId);
+  const unresolvedAlerts = inventoryAlerts.filter(a => !a.resolved && a.campId === activeCampId);
+  
+
+  const detailedResources = activeCampInventories.map(inv => {
+    const type = resourceTypes.find(t => t.id === inv.resourceTypeId);
+    const state = inv.currentAmount <= inv.minimumAlertAmount ? "CRÍTIICO" : "NORMAL";
     return {
-      name: type ? type.name : key,
-      cantidad: val
+      ...inv,
+      type,
+      state
     };
   });
 
-  const unresolvedAlerts = inventoryAlerts.filter(a => !a.resolved);
-  const recentMovements = inventoryMovements.slice(-5).reverse();
+
+  const highestStockResource = detailedResources.length > 0 
+    ? [...detailedResources].sort((a, b) => b.currentAmount - a.currentAmount)[0] 
+    : null;
+  const zeroStockResources = detailedResources.filter(r => r.currentAmount === 0);
+
+
+  const categoriesMap = detailedResources.reduce((acc, curr) => {
+    const cat = curr.type?.category || "OTHER";
+    acc[cat] = (acc[cat] || 0) + curr.currentAmount;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const resourcePieData = Object.entries(categoriesMap).map(([key, val]) => {
+    const label = getResourceTypeCategoryLabel(key);
+    return { name: label, value: Math.round(val) };
+  });
+
+  const totalResourceStocks = resourcePieData.reduce((sum, item) => sum + item.value, 0);
+
+
+
+  const consumptionMovements = inventoryMovements.filter(m => 
+    m.campId === activeCampId && 
+    ["DAILY_RATION", "EXPEDITION_DEPARTURE", "TRANSFER_SENT"].includes(m.movementType)
+  );
+
+
+  const defaultDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().split("T")[0];
+  });
+
+  const consumptionTrendMap = consumptionMovements.reduce((acc, curr) => {
+
+    let dateStr = curr.date;
+    if (curr.date.includes("/")) {
+      const parts = curr.date.split(" ")[0].split("/");
+      dateStr = `2026-${parts[1]}-${parts[0]}`;
+    } else if (curr.date.includes("T")) {
+      dateStr = curr.date.split("T")[0];
+    }
+    acc[dateStr] = (acc[dateStr] || 0) + Number(curr.amount);
+    return acc;
+  }, {} as Record<string, number>);
+
+  const dynamicTrendData = defaultDates.map(date => {
+    const formattedLabel = date.split("-").slice(1).reverse().join("/"); 
+    return {
+      date: formattedLabel,
+      totalConsumed: consumptionTrendMap[date] || 0
+    };
+  });
+
+  const totalConsumed7Days = dynamicTrendData.reduce((sum, item) => sum + item.totalConsumed, 0);
+  const highestConsumptionDay = dynamicTrendData.length > 0 
+    ? [...dynamicTrendData].sort((a, b) => b.totalConsumed - a.totalConsumed)[0] 
+    : { date: "—", totalConsumed: 0 };
+
+
+
+  const filteredTransfers = transfers.filter(t => {
+    const req = intercampRequests.find(r => r.id === t.requestId);
+    return req && (req.originCampId === activeCampId || req.destinationCampId === activeCampId);
+  }).slice(-5).reverse();
+
+
+  const fieldWarnings: string[] = [];
+  unresolvedAlerts.forEach(al => {
+    const type = resourceTypes.find(t => t.id === al.resourceTypeId);
+    fieldWarnings.push(`Alerta de stock crítico: El recurso "${type?.name || al.resourceTypeId}" está por debajo del mínimo de seguridad.`);
+  });
+  intercampRequests.filter(req => req.status === "PENDING" && req.destinationCampId === activeCampId).forEach(req => {
+    fieldWarnings.push(`Requisición pendiente: Solicitud de traslado ${req.id} requiere respuesta autorizada.`);
+  });
+  transfers.filter(t => (t.status === "PLANNING" || t.status === "EN_ROUTE") && intercampRequests.find(r => r.id === t.requestId)?.originCampId === activeCampId).forEach(t => {
+    fieldWarnings.push(`Despacho pendiente: Traslado ${t.id} listo para la firma de despacho.`);
+  });
+
+
+
+  const paginatedInventario = detailedResources.slice((pageInventario - 1) * pageSize, pageInventario * pageSize);
+  const totalPageInventario = Math.ceil(detailedResources.length / pageSize) || 1;
+
+
+  const paginatedAlertas = unresolvedAlerts.slice((pageAlertas - 1) * pageSize, pageAlertas * pageSize);
+  const totalPageAlertas = Math.ceil(unresolvedAlerts.length / pageSize) || 1;
+
+
+  const activeCampMovements = inventoryMovements.filter(m => m.campId === activeCampId).reverse();
+  const paginatedMovimientos = activeCampMovements.slice((pageMovimientos - 1) * pageSize, pageMovimientos * pageSize);
+  const totalPageMovimientos = Math.ceil(activeCampMovements.length / pageSize) || 1;
+
+
+  const activeCampCollections = dailyCollectionRecords.filter(c => String(c.campId) === activeCampId).reverse();
+  const paginatedRecoleccion = activeCampCollections.slice((pageRecoleccion - 1) * pageSize, pageRecoleccion * pageSize);
+  const totalPageRecoleccion = Math.ceil(activeCampCollections.length / pageSize) || 1;
+
+
+  const activeCampRequests = intercampRequests.filter(r => r.originCampId === activeCampId || r.destinationCampId === activeCampId).reverse();
+  const paginatedSolicitudes = activeCampRequests.slice((pageSolicitudes - 1) * pageSize, pageSolicitudes * pageSize);
+  const totalPageSolicitudes = Math.ceil(activeCampRequests.length / pageSize) || 1;
 
   return (
-    <SectionShell kicker="MONITOREO OPERACIONES" title="Dashboard de Inventario y Control">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="v-kpi border border-[#67ACA9]/20 bg-black/40 p-3 rounded-sm flex flex-col justify-between">
-          <span className="v-kpi-label text-[9px] text-[#A4C2C5]/70 uppercase font-bold">Reserva Total Almacenes</span>
-          <span className="v-kpi-value text-2xl font-black text-white mt-1">
-            {campInventories.reduce((sum, item) => sum + item.currentAmount, 0)} <span className="text-xs font-normal">unidades</span>
-          </span>
-        </div>
-        <div className="v-kpi border border-rose-500/20 bg-rose-950/10 p-3 rounded-sm flex flex-col justify-between">
-          <span className="v-kpi-label text-[9px] text-rose-400 uppercase font-bold text-rose-300">Alertas de Stock Abiertas 🚨</span>
-          <span className="v-kpi-value text-2xl font-black text-rose-400 mt-1">
-            {unresolvedAlerts.length} <span className="text-xs font-normal text-rose-300/80">críticos / bajos</span>
-          </span>
-        </div>
-        <div className="v-kpi border border-[#67ACA9]/20 bg-black/40 p-3 rounded-sm flex flex-col justify-between">
-          <span className="v-kpi-label text-[9px] text-[#A4C2C5]/70 uppercase font-bold">Campamentos en Sistema</span>
-          <span className="v-kpi-value text-2xl font-black text-[#69BFB7] mt-1">{camps.length} <span className="text-xs font-normal">Campamentos</span></span>
+    <SectionShell kicker="CENTRAL DE OPERACIONES" title="Dashboard de Recursos">
+      
+      <div className="flex justify-between items-center mb-1">
+        <h2 className="text-sm font-black tracking-widest text-[#69BFB7] uppercase">Panel de Control Operativo</h2>
+        <Btn onClick={triggerRefresh}>Refrescar datos</Btn>
+      </div>
+
+      
+      <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col gap-3 shadow-md">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+          <div>
+            <span className="text-[8.5px] font-mono text-[#69BFB7] font-bold uppercase tracking-wider block">CONSOLA OPERATIVA</span>
+            <h3 className="text-xs font-bold text-white uppercase mt-0.5">Control de Abastecimiento</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Btn 
+              small 
+              onClick={() => onNavigateToSub("Movimientos de inventario")}
+            >
+              Ajustar Movimiento
+            </Btn>
+            <Btn 
+              small
+              variant="danger"
+              onClick={() => onNavigateToSub("Alertas de inventario")}
+            >
+              Alertas ({unresolvedAlerts.length})
+            </Btn>
+            <Btn 
+              small
+              variant="ghost" 
+              onClick={() => onNavigateToSub("Inventario del campamento")}
+            >
+              Ver Inventario
+            </Btn>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Chart */}
-        <div className="mission-card border border-[#67ACA9]/20 bg-black/35 p-3 rounded-sm">
-          <div className="text-xs font-bold text-[#69BFB7] uppercase mb-2">Existencias Totales Acumuladas</div>
-          <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
-                <XAxis dataKey="name" tick={{ fill: CHART_THEME.text, fontSize: 8 }} />
-                <YAxis tick={{ fill: CHART_THEME.text, fontSize: 8 }} />
-                <Tooltip {...chartTooltipStyle} />
-                <Bar dataKey="cantidad" fill="#69BFB7" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+      
+      <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/95 p-4 rounded-sm shadow-md flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-[#67ACA9]/10 pb-3">
+          <div>
+            <div className="flex items-center gap-1.5 text-[8.5px] font-mono text-[#69BFB7] font-bold uppercase tracking-wider">
+              <Clock className="h-3 w-3 text-[#69BFB7]" />
+              Cronograma Operativo Automatizado
+            </div>
+            <h3 className="text-xs font-black text-white uppercase mt-0.5">Próxima Recolección y Consumo Diario</h3>
+          </div>
+          
+          <div className={`px-2.5 py-1 rounded-sm border text-[9px] font-mono uppercase font-bold tracking-wide flex items-center gap-1.5 ${statusStyle.color}`}>
+            <span className={`h-1.5 w-1.5 rounded-full bg-current ${remainingMs <= 300000 ? 'animate-ping' : ''}`} />
+            {statusStyle.label}
           </div>
         </div>
 
-        {/* Unresolved Alert List */}
-        <div className="mission-card border border-[#67ACA9]/20 bg-black/35 p-3 rounded-sm flex flex-col justify-between">
-          <div>
-            <div className="text-xs font-bold text-rose-400 uppercase mb-2 flex justify-between items-center">
-              <span>Alertas Críticas Activas</span>
-              <Btn small variant="ghost" onClick={() => onNavigateToSub("Alertas de inventario")}>Resolver Alertas</Btn>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          
+          <div className="bg-black/30 border border-[#67ACA9]/10 p-3 rounded-xs flex flex-col justify-between">
+            <span className="text-[8px] font-mono text-[#A4C2C5]/50 uppercase tracking-wider block mb-1">Cálculo de Siguiente Ciclo Neto</span>
+            <div className="flex flex-col justify-center py-1">
+              <div className="text-xl font-black text-[#69BFB7] font-mono tracking-tight leading-none">
+                {formatRemaining(remainingMs)}
+              </div>
+              <span className="text-[7.5px] text-[#A4C2C5]/40 mt-1 uppercase font-mono block">restantes para medianoche UTC</span>
             </div>
-            <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto pr-1">
-              {unresolvedAlerts.map(alert => {
-                const camp = camps.find(c => c.id === alert.campId);
-                const type = resourceTypes.find(t => t.id === alert.resourceTypeId);
+          </div>
+
+          
+          <div className="bg-black/30 border border-[#67ACA9]/10 p-3 rounded-xs flex flex-col justify-between">
+            <div className="flex justify-between items-center">
+              <span className="text-[8px] font-mono text-[#A4C2C5]/50 uppercase tracking-wider block mb-1">Zonificación Reloj Servidor</span>
+              <div className="inline-flex items-center scale-90 mb-1">
+                {syncStatus === "synced" && (
+                  <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <title>Sincronizado</title>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+                  </svg>
+                )}
+                {syncStatus === "syncing" && (
+                  <svg className="h-3.5 w-3.5 text-amber-400 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <title>Sincronizando...</title>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+                  </svg>
+                )}
+                {syncStatus !== "synced" && syncStatus !== "syncing" && (
+                  <svg className="h-3.5 w-3.5 text-rose-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <title>Hora local (sin conexión)</title>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+                  </svg>
+                )}
+              </div>
+            </div>
+            <div className="text-xs font-mono text-white flex flex-col gap-0.5 mt-0.5">
+              <div>Fecha: <strong className="text-white">{systTime.getUTCDate().toString().padStart(2, '0')}/{(systTime.getUTCMonth() + 1).toString().padStart(2, '0')}/{systTime.getUTCFullYear()}</strong></div>
+              <div>Hora: <strong className="text-[#69BFB7]">{systTime.getUTCHours().toString().padStart(2, '0')}:{systTime.getUTCMinutes().toString().padStart(2, '0')}:{systTime.getUTCSeconds().toString().padStart(2, '0')} UTC</strong></div>
+            </div>
+          </div>
+
+          
+          <div className="bg-black/30 border border-[#67ACA9]/10 p-3 rounded-xs flex flex-col justify-between">
+            <span className="text-[8px] font-mono text-[#A4C2C5]/50 uppercase tracking-wider block mb-1.5">Consumo & Recolección Sistema</span>
+            <div className="text-[9.5px] font-mono flex flex-col gap-1.5 text-[#A4C2C5]/85">
+              <div className="flex justify-between items-center bg-[#67ACA9]/5 px-1.5 py-0.5 rounded-xs border border-[#67ACA9]/10">
+                <span className="text-[8px] uppercase font-bold text-rose-400">Último Consumo:</span>
+                <span className="text-white font-bold">{
+                  inventoryMovements.some(m => m.campId === activeCampId && m.movementType === "DAILY_RATION") ? "Hoy 00:00 UTC" : "Ayer 00:00 UTC"
+                }</span>
+              </div>
+              <div className="flex justify-between items-center bg-[#67ACA9]/5 px-1.5 py-0.5 rounded-xs border border-[#67ACA9]/10">
+                <span className="text-[8px] uppercase font-bold text-emerald-400">Última Recolección:</span>
+                <span className="text-white font-bold">{
+                  inventoryMovements.some(m => m.campId === activeCampId && m.movementType === "DAILY_COLLECTION") ? "Hoy 00:00 UTC" : "Ayer 00:00 UTC"
+                }</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 text-xs">
+        
+        
+        <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between min-h-[290px]">
+          <div>
+            <div className="text-[10px] font-mono text-[#69BFB7] uppercase font-bold tracking-wider mb-2">
+              Recursos en inventario
+            </div>
+            <div className="v-kpi-value text-3xl font-black text-white tracking-tight flex items-baseline gap-1">
+              {activeCampInventories.length} 
+              <span className="text-[10px] font-mono text-[#A4C2C5]/60 font-normal">items</span>
+            </div>
+            
+            
+            <div className="flex flex-col gap-1 mt-3 text-[10px] font-mono select-none">
+              <div className="bg-[#67ACA9]/5 border border-[#67ACA9]/15 p-1.5 rounded-xs">
+                <span className="text-[#A4C2C5]/50 block text-[8px] uppercase">Máxima Reserva</span>
+                {highestStockResource ? (
+                  <strong className="text-[#69BFB7] truncate block text-[10px]">
+                    {highestStockResource.type?.name}: {highestStockResource.currentAmount} {highestStockResource.type?.unitOfMeasure}
+                  </strong>
+                ) : <span className="text-gray-500">—</span>}
+              </div>
+              <div className="bg-red-950/20 border border-red-500/20 p-1.5 rounded-xs mt-1">
+                <span className="text-red-300/60 block text-[8px] uppercase">Agotado (Existencias 0)</span>
+                <strong className="text-red-200 block text-[10px]">
+                  {zeroStockResources.length > 0 
+                    ? zeroStockResources.map(r => r.type?.name).join(", ") 
+                    : "Ningún insumo en cero"}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 border-t border-[#67ACA9]/15 pt-3.5 flex flex-col gap-1.5">
+            <Btn variant="primary" small style={{ width: "100%" }} onClick={() => onNavigateToSub("Inventario del campamento")}>
+              Ver inventario completo →
+            </Btn>
+            <div className="grid grid-cols-2 gap-1">
+              <Btn variant="ghost" small onClick={() => onNavigateToSub("Inventario del campamento")}>
+                Mínimos
+              </Btn>
+              <Btn variant="ghost" small onClick={() => onNavigateToSub("Movimientos de inventario")}>
+                Ajustar
+              </Btn>
+            </div>
+          </div>
+        </div>
+
+        
+        <div className="mission-card border border-[#ba3838]/40 bg-red-950/10 p-4 rounded-sm flex flex-col justify-between min-h-[290px]">
+          <div>
+            <div className="text-[10px] font-mono text-red-400 uppercase font-bold tracking-wider mb-2 flex justify-between items-center">
+              <span>Recursos críticos</span>
+              {unresolvedAlerts.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping inline-block" />}
+            </div>
+            <div className="v-kpi-value text-3xl font-black text-[#ef4444] tracking-tight">
+              {unresolvedAlerts.length}
+              <span className="text-[10px] font-mono text-[#A4C2C5]/50 font-normal ml-1">riesgos</span>
+            </div>
+
+            
+            <div className="flex flex-col gap-1 mt-3 max-h-24 overflow-y-auto pr-1">
+              {unresolvedAlerts.map(al => {
+                const type = resourceTypes.find(t => t.id === al.resourceTypeId);
+                const inv = campInventories.find(i => i.campId === activeCampId && i.resourceTypeId === al.resourceTypeId);
                 return (
-                  <div key={alert.id} className="text-[10px] bg-red-950/20 border border-red-500/20 rounded-sm p-1.5 py-1 text-red-100 flex justify-between items-center">
-                    <span>
-                      ⚠️ <strong>{camp?.name || alert.campId}</strong>: {type?.name || alert.resourceTypeId} bajo el mínimo
-                    </span>
-                    <span className="text-rose-300 font-mono font-bold">{alert.amountAtAlertGeneration} {type?.unitOfMeasure}</span>
+                  <div key={al.id} className="text-[9px] bg-red-950/35 border border-red-500/25 p-1 rounded-xs text-red-200 flex justify-between items-center font-mono">
+                    <span className="truncate pr-1.5">⚠️ {type?.name || al.resourceTypeId}</span>
+                    <strong className="shrink-0">{inv?.currentAmount || 0} / {inv?.minimumAlertAmount || "—"} u</strong>
                   </div>
                 );
               })}
               {unresolvedAlerts.length === 0 && (
-                <div className="text-[10px] text-emerald-400 border border-emerald-500/20 p-4 text-center rounded-sm bg-emerald-950/5">
-                  ✓ Ninguna alerta de stock activa de momento. Red balanceada.
+                <div className="text-[9.5px]/none text-emerald-400 font-mono mt-4 text-center border border-emerald-500/20 p-2 bg-emerald-950/10 rounded-xs">
+                  ✓ Inventario conforme. Todo insumo sobre el mínimo.
                 </div>
               )}
             </div>
           </div>
+
+          <div className="mt-4 border-t border-red-950/30 pt-3.5 flex flex-col gap-1.5">
+            <Btn variant="danger" small style={{ width: "100%" }} onClick={() => onNavigateToSub("Alertas de inventario")}>
+              Resolver Alertas →
+            </Btn>
+            <div className="grid grid-cols-2 gap-1">
+              <Btn variant="ghost" small onClick={() => onNavigateToSub("Movimientos de inventario")}>
+                Abastecer
+              </Btn>
+              <Btn variant="ghost" small onClick={() => onNavigateToSub("Notificaciones")}>
+                Notificar
+              </Btn>
+            </div>
+          </div>
         </div>
+
+        
+        <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between min-h-[290px]">
+          <div>
+            <div className="text-[10px] font-mono text-[#69BFB7] uppercase font-bold tracking-wider mb-2">
+              Distribución de Inventario
+            </div>
+            
+            <div className="h-32 w-full flex items-center justify-center relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={resourcePieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={28}
+                    outerRadius={44}
+                    paddingAngle={3}
+                    dataKey="value"
+                    strokeWidth={0}
+                  >
+                    {resourcePieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={["#69BFB7", "#f59e0b", "#10b981", "#ef4444", "#3b82f6", "#8b5cf6", "#ec4899"][index % 7]} />
+                    ))}
+                  </Pie>
+                  <Tooltip {...chartTooltipStyle} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-[7.5px] font-mono text-[#A4C2C5]/50 uppercase tracking-widest leading-none">Capacidad</span>
+                <span className="text-xs font-black text-white mt-0.5">{totalResourceStocks} u</span>
+              </div>
+            </div>
+
+            
+            <div className="flex flex-wrap gap-x-2 gap-y-0.5 justify-center mt-1 text-[8.5px] font-mono max-h-16 overflow-y-auto pr-1">
+              {resourcePieData.slice(0, 6).map((entry, index) => (
+                <div key={entry.name} className="flex items-center gap-1">
+                  <span className="h-1 w-1 rounded-xs shrink-0" style={{ backgroundColor: ["#69BFB7", "#f59e0b", "#10b981", "#ef4444", "#3b82f6", "#8b5cf6", "#ec4899"][index % 7] }} />
+                  <span className="text-[#A4C2C5]/70 truncate max-w-[65px]">{entry.name}:</span>
+                  <strong className="text-white">{entry.value}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 border-t border-[#67ACA9]/15 pt-2 flex flex-col gap-1">
+            <Btn variant="ghost" small style={{ width: "100%" }} onClick={() => onNavigateToSub("Tipos de recurso")}>
+              Ver tipos de recurso →
+            </Btn>
+          </div>
+        </div>
+
+        
+        <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between min-h-[290px]">
+          <div>
+            <div className="text-[10px] font-mono text-[#69BFB7] uppercase font-bold tracking-wider mb-2 flex justify-between items-center">
+              <span>Consumo últimos 7 días</span>
+              <span className="text-[8px] font-mono text-[#A4C2C5]/50">(Raciones, etc)</span>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-1 mb-1.5 bg-[#67ACA9]/5 p-1 border border-[#67ACA9]/10 rounded-xs text-[8.5px] font-mono">
+              <div>
+                <span className="text-[#A4C2C5]/50 block text-[7px] uppercase">Ración Total</span>
+                <span className="text-xs font-black text-[#69BFB7]">{totalConsumed7Days} <span className="text-[7.5px] font-normal">u</span></span>
+              </div>
+              <div className="border-l border-[#67ACA9]/10 pl-1.5">
+                <span className="text-[#A4C2C5]/50 block text-[7px] uppercase">Día Pico</span>
+                <span className="text-[9px] font-black text-rose-400 truncate block">{highestConsumptionDay.date}</span>
+              </div>
+            </div>
+
+            
+            <div className="h-28 mt-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={dynamicTrendData} margin={{ top: 2, right: 2, left: -32, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorTrendDashboard" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#69BFB7" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#69BFB7" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
+                  <XAxis dataKey="date" tick={{ fill: CHART_THEME.text, fontSize: 7.5 }} stroke="transparent" />
+                  <YAxis tick={{ fill: CHART_THEME.text, fontSize: 7.5 }} stroke="transparent" />
+                  <Tooltip {...chartTooltipStyle} />
+                  <Area type="monotone" dataKey="totalConsumed" stroke={CHART_THEME.teal} fill="url(#colorTrendDashboard)" strokeWidth={1.5} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="mt-3 border-t border-[#67ACA9]/15 pt-2 flex flex-col gap-1 text-[8.5px] font-mono text-center">
+            <span className="text-[#69BFB7] hover:underline cursor-pointer" onClick={() => onNavigateToSub("Movimientos de inventario")}>[Historial de Movimientos]</span>
+          </div>
+        </div>
+
       </div>
 
-      {/* Recent movements */}
-      <div className="mission-card border border-[#67ACA9]/20 bg-black/35 p-3 rounded-sm">
-        <div className="text-xs font-bold text-[#69BFB7] uppercase mb-2">Últimos Operaciones de Inventario Realizados</div>
-        <div className="v-table-wrap max-h-40 overflow-y-auto">
-          <table className="v-table text-[10px]">
-            <thead>
-              <tr>
-                <th>Tipo</th>
-                <th>Campamento</th>
-                <th>Recurso</th>
-                <th>Cantidad</th>
-                <th>Encargado</th>
-                <th>Fecha / Hora</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentMovements.map(m => {
-                const camp = camps.find(c => c.id === m.campId);
-                const rt = resourceTypes.find(t => t.id === m.resourceTypeId);
-                return (
-                  <tr key={m.id}>
-                    <td>
-                      <span className="px-1 py-0.5 rounded-xs font-bold font-mono text-[8px] border border-[#67ACA9]/20 text-[#69BFB7]">
-                        {m.movementType}
-                      </span>
-                    </td>
-                    <td>{camp?.name || m.campId}</td>
-                    <td className="font-bold">{rt?.name || m.resourceTypeId}</td>
-                    <td>{m.amount} {rt?.unitOfMeasure}</td>
-                    <td>{m.recordedBy}</td>
-                    <td>{m.date}</td>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-8">
+        
+        
+        <div className="lg:col-span-8 flex flex-col gap-4">
+          <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm shadow-md">
+            <span className="text-[10px] font-mono text-[#69BFB7] font-bold uppercase tracking-[3px] block mb-1">
+              LOGÍSTICA TRANSITARIA DE CONVOYES
+            </span>
+            <h2 className="text-sm font-black text-white uppercase tracking-wider mb-4 border-b border-[#67ACA9]/15 pb-2">
+              TIMELINE — PRÓXIMOS TRASLADOS (MOVIMIENTOS DE CARGA)
+            </h2>
+            
+            <div className="v-table-wrap overflow-x-auto">
+              <table className="v-table text-[10.5px]">
+                <thead>
+                  <tr className="border-b border-[#67ACA9]/15">
+                    <th className="text-left font-bold text-[#A4C2C5]/80 py-2">MANIFIESTO / RUTA</th>
+                    <th className="text-center font-bold text-[#A4C2C5]/80 py-2">ESTADO</th>
+                    <th className="text-left font-bold text-[#A4C2C5]/80 py-2">PARTIDA PROGRAMADA</th>
+                    <th className="text-center font-bold text-[#A4C2C5]/80 py-2">SUMINISTRO / RACIÓN</th>
+                    <th className="text-right font-bold text-[#A4C2C5]/80 py-2">ACCIONES</th>
                   </tr>
-                );
-              })}
-              {recentMovements.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="text-center py-4 text-[#A4C2C5]/40 italic">Inicie la red de datos para visualizar movimientos de inventario.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {filteredTransfers.map(tr => {
+                    const req = intercampRequests.find(r => r.id === tr.requestId);
+                    const originName = camps.find(c => c.id === req?.originCampId)?.name || req?.originCampId || "Base";
+                    const destName = camps.find(c => c.id === req?.destinationCampId)?.name || req?.destinationCampId || "Destino";
+                    const isCampInvolved = req?.originCampId === activeCampId;
+                    
+                    return (
+                      <tr key={tr.id} className="border-b border-[#67ACA9]/10 hover:bg-[#67ACA9]/5 transition-colors">
+                        <td className="py-2.5 font-bold text-white">
+                          {tr.id.toUpperCase()} • <span className="text-[#69BFB7]">{originName} ➔ {destName}</span>
+                        </td>
+                        <td className="text-center">
+                          <span className={`inline-block text-[8px] font-black tracking-wider uppercase px-2 py-0.5 rounded-sm border ${
+                            tr.status === "DELIVERED" ? "bg-emerald-950/40 text-emerald-300 border-emerald-500/30" :
+                            tr.status === "PLANNING" ? "bg-amber-950/40 text-amber-300 border-amber-500/30 font-bold" :
+                            tr.status === "EN_ROUTE" ? "bg-sky-950/40 text-sky-300 border-sky-500/30 animate-pulse font-bold" :
+                            "bg-blue-950/40 text-blue-300 border-blue-500/30"
+                          }`}>
+                            {tr.status.replace("_", " ")}
+                          </span>
+                        </td>
+                        <td className="font-mono text-[#A4C2C5]/80 text-[10px]">{tr.plannedDepartureDate}</td>
+                        <td className="text-center font-mono font-bold text-cyan-300 animate-pulse">
+                          {tr.rationsForTrip} Raciones
+                        </td>
+                        <td className="text-right">
+                          <Btn small variant="ghost" onClick={() => onNavigateToSub("Traslados")}>
+                            VER
+                          </Btn>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredTransfers.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center py-6 text-gray-500 italic">No hay traslados activos asignados a este campamento.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
+
+        
+        <div className="lg:col-span-4 flex flex-col">
+          <div className="mission-card border border-[#ba3838]/40 bg-[#0b1010]/95 p-4 rounded-sm h-full flex flex-col justify-between shadow-md">
+            <div>
+              <span className="text-[10px] font-mono text-[#ef4444] font-bold uppercase tracking-[2px] block mb-1">
+                DISCORDANCIAS Y ALERTAS
+              </span>
+              <h2 className="text-sm font-black text-[#f0fafa] uppercase tracking-wider mb-4 border-b border-red-900/30 pb-2">
+                ALERTAS DE CAMPO
+              </h2>
+              
+              <div className="flex flex-col gap-2.5">
+                {fieldWarnings.slice(0, 4).map((warning, index) => (
+                  <div key={index} className="bg-amber-950/15 border-l-2 border-amber-500 text-amber-100 p-2.5 rounded-sm text-[9.5px] font-mono tracking-wide leading-relaxed">
+                    {warning}
+                  </div>
+                ))}
+                {fieldWarnings.length === 0 && (
+                  <div className="p-4 rounded-sm border border-emerald-500/20 bg-emerald-950/10 text-emerald-300 text-xs text-center">
+                    ✓ Todos los sistemas conformes. No se detectan desajustes en {campName}.
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="mt-4 pt-3 border-t border-red-900/10 text-right">
+              <Btn 
+                variant="danger"
+                small
+                onClick={() => {
+                  setActiveTab("alertas");
+                  onNavigateToSub("Alertas de inventario");
+                }}
+              >
+                VER CONSOLA DE CONTINGENCIA ➔
+              </Btn>
+            </div>
+          </div>
+        </div>
+
       </div>
+
+      
+      <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm shadow-lg mb-8">
+        <span className="text-[10px] font-mono text-[#69BFB7] uppercase tracking-[3px] block mb-2">Centro de Fiscalización de Datos</span>
+        <h2 className="text-base font-black text-white uppercase tracking-tight mb-4 border-b border-[#67ACA9]/10 pb-2.5">
+          TABLAS DE CONTROL DE CAMPAMENTO ({campName.toUpperCase()})
+        </h2>
+
+        
+        <div className="flex flex-wrap gap-1.5 mb-5 border-b border-[#67ACA9]/10 pb-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab("inventario")}
+            className={`cursor-pointer px-3.5 py-2 text-[10px] lg:text-[11px] font-black uppercase tracking-wider border rounded-xs transition-all ${activeTab === "inventario" ? "bg-[#67ACA9]/20 border-[#69BFB7] text-white" : "bg-black/35 border-[#67ACA9]/10 text-[#A4C2C5]/70 hover:text-white hover:border-[#67ACA9]/25"}`}
+          >
+            1. Reservas de Almacén
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("alertas")}
+            className={`cursor-pointer px-3.5 py-2 text-[10px] lg:text-[11px] font-black uppercase tracking-wider border rounded-xs transition-all ${activeTab === "alertas" ? "bg-[#ba3838]/25 border-red-500 text-white" : "bg-black/35 border-[#67ACA9]/10 text-[#A4C2C5]/70 hover:text-white hover:border-[#67ACA9]/25"}`}
+          >
+            2. Alertas Abiertas ({unresolvedAlerts.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("movimientos")}
+            className={`cursor-pointer px-3.5 py-2 text-[10px] lg:text-[11px] font-black uppercase tracking-wider border rounded-xs transition-all ${activeTab === "movimientos" ? "bg-[#67ACA9]/20 border-[#69BFB7] text-white" : "bg-black/35 border-[#67ACA9]/10 text-[#A4C2C5]/70 hover:text-white hover:border-[#67ACA9]/25"}`}
+          >
+            3. Operaciones Recientes ({activeCampMovements.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("recoleccion")}
+            className={`cursor-pointer px-3.5 py-2 text-[10px] lg:text-[11px] font-black uppercase tracking-wider border rounded-xs transition-all ${activeTab === "recoleccion" ? "bg-[#67ACA9]/20 border-[#69BFB7] text-white" : "bg-black/35 border-[#67ACA9]/10 text-[#A4C2C5]/70 hover:text-white hover:border-[#67ACA9]/25"}`}
+          >
+            4. Cosecha / Recolección ({activeCampCollections.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("solicitudes")}
+            className={`cursor-pointer px-3.5 py-2 text-[10px] lg:text-[11px] font-black uppercase tracking-wider border rounded-xs transition-all ${activeTab === "solicitudes" ? "bg-[#67ACA9]/20 border-[#69BFB7] text-white" : "bg-black/35 border-[#67ACA9]/10 text-[#A4C2C5]/70 hover:text-white hover:border-[#67ACA9]/25"}`}
+          >
+            5. Trámites Intercampamento ({activeCampRequests.length})
+          </button>
+        </div>
+
+        
+        {activeTab === "inventario" && (
+          <div className="flex flex-col gap-3">
+            <div className="v-table-wrap overflow-x-auto">
+              <table className="v-table">
+                <thead>
+                  <tr>
+                    <th>RECURSO</th>
+                    <th>CATEGORÍA</th>
+                    <th>ESTADO</th>
+                    <th className="text-right">EXISTENCIA ACTUAL</th>
+                    <th className="text-right">MÍNIMO ALERTA</th>
+                    <th>ÚLTIMA ACTUALIZACIÓN</th>
+                    <th className="text-right">ACCIONES</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedInventario.map(inv => (
+                    <tr key={inv.resourceTypeId} className="hover:bg-white/5 transition-colors">
+                      <td className="font-bold text-white uppercase">{inv.type?.name || inv.resourceTypeId}</td>
+                      <td>
+                        <span className="font-bold text-[#A4C2C5]/70">{getResourceTypeCategoryLabel(inv.type?.category || "OTHER")}</span>
+                      </td>
+                      <td>
+                        <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 border rounded-xs ${
+                          inv.currentAmount <= inv.minimumAlertAmount 
+                            ? "bg-red-950/40 text-red-300 border-red-500/40 animate-pulse" 
+                            : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30"
+                        }`}>
+                          {inv.currentAmount <= inv.minimumAlertAmount ? "CRÍTICO" : "NORMAL"}
+                        </span>
+                      </td>
+                      <td className="text-right font-mono font-bold text-white text-xs">{inv.currentAmount} {inv.type?.unitOfMeasure}</td>
+                      <td className="text-right font-mono text-[#A4C2C5]/80 text-xs">{inv.minimumAlertAmount} {inv.type?.unitOfMeasure}</td>
+                      <td className="font-mono text-[#A4C2C5]/60 text-[10px]">{(inv as any).lastUpdate || "20/05/2026"}</td>
+                      <td className="text-right">
+                        <div className="flex inline-flex gap-1">
+                          <Btn variant="primary" small onClick={() => onNavigateToSub("Inventario del campamento")}>
+                            Detalle
+                          </Btn>
+                          <Btn variant="ghost" small onClick={() => onNavigateToSub("Movimientos de inventario")}>
+                            Ajustar
+                          </Btn>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            
+            <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-2 py-1 select-none">
+              <span>Registros {((pageInventario - 1) * pageSize) + 1} - {Math.min(pageInventario * pageSize, detailedResources.length)} de {detailedResources.length}</span>
+              <div className="flex gap-1">
+                <Btn small variant="ghost" onClick={() => setPageInventario(p => Math.max(1, p - 1))} disabled={pageInventario === 1}>◄ Anterior</Btn>
+                <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{pageInventario} / {totalPageInventario}</div>
+                <Btn small variant="ghost" onClick={() => setPageInventario(p => Math.min(totalPageInventario, p + 1))} disabled={pageInventario === totalPageInventario}>Siguiente ►</Btn>
+              </div>
+            </div>
+          </div>
+        )}
+
+        
+        {activeTab === "alertas" && (
+          <div className="flex flex-col gap-3">
+            <div className="v-table-wrap overflow-x-auto">
+              <table className="v-table">
+                <thead>
+                  <tr>
+                    <th>ID ALERTA</th>
+                    <th>RECURSO</th>
+                    <th>REGISTRADO CON</th>
+                    <th>FECHA DETECCIÓN</th>
+                    <th>ESTADO</th>
+                    <th className="text-right">ACCIONES</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedAlertas.map(al => {
+                    const type = resourceTypes.find(t => t.id === al.resourceTypeId);
+                    return (
+                      <tr key={al.id} className="hover:bg-white/5 transition-colors">
+                        <td className="font-mono font-bold text-rose-300">#{al.id}</td>
+                        <td className="font-bold text-white">{type?.name || al.resourceTypeId}</td>
+                        <td className="font-mono font-bold text-[#69BFB7]">{al.amountAtAlertGeneration} {type?.unitOfMeasure}</td>
+                        <td className="font-mono text-[10px]">{al.alertDate}</td>
+                        <td>
+                          <span className="inline-block text-[8px] font-black tracking-wider uppercase px-2 py-0.5 rounded-sm border bg-[#ba3838]/25 text-[#fca5a5] border-red-500 animate-pulse">
+                            SIN RESOLVER
+                          </span>
+                        </td>
+                        <td className="text-right">
+                          <div className="flex inline-flex gap-1">
+                            {onResolveAlert && (
+                              <Btn variant="success" small onClick={() => {
+                                onResolveAlert(al.id, String(currentUser.userId));
+                                alert("Alerta resuelta satisfactoriamente.");
+                              }}>
+                                ✓ Resolver Alerta
+                              </Btn>
+                            )}
+                            <Btn variant="ghost" small onClick={() => onNavigateToSub("Notificaciones")}>
+                              Notificar
+                            </Btn>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {unresolvedAlerts.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="text-center py-8 text-emerald-400 font-mono italic">✓ Registros excelentes. No existen alertas abiertas pendientes en {campName}.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {unresolvedAlerts.length > 0 && (
+              <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-2 py-1 select-none">
+                <span>Alertas {((pageAlertas - 1) * pageSize) + 1} - {Math.min(pageAlertas * pageSize, unresolvedAlerts.length)} de {unresolvedAlerts.length}</span>
+                <div className="flex gap-1">
+                  <Btn small variant="ghost" onClick={() => setPageAlertas(p => Math.max(1, p - 1))} disabled={pageAlertas === 1}>◄ Anterior</Btn>
+                  <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{pageAlertas} / {totalPageAlertas}</div>
+                  <Btn small variant="ghost" onClick={() => setPageAlertas(p => Math.min(totalPageAlertas, p + 1))} disabled={pageAlertas === totalPageAlertas}>Siguiente ►</Btn>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        
+        {activeTab === "movimientos" && (
+          <div className="flex flex-col gap-3">
+            <div className="v-table-wrap overflow-x-auto">
+              <table className="v-table text-[11px]">
+                <thead>
+                  <tr>
+                    <th>FECHA / HORA</th>
+                    <th>RECURSO</th>
+                    <th>TIPO MOVIMIENTO</th>
+                    <th className="text-right">CANTIDAD</th>
+                    <th>REGISTRADO POR</th>
+                    <th>DESCRIPCIÓN</th>
+                    <th className="text-right font-bold">ACCIONES</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedMovimientos.map(m => {
+                    const rt = resourceTypes.find(t => t.id === m.resourceTypeId);
+                    return (
+                      <tr key={m.id} className="hover:bg-white/5 transition-colors">
+                        <td className="font-mono text-[10px] text-[#A4C2C5]/70">{m.date}</td>
+                        <td className="font-bold text-white uppercase">{rt?.name || m.resourceTypeId}</td>
+                        <td>
+                          <span className="px-1.5 py-0.5 rounded-sm font-bold font-mono text-[8px] border border-[#67ACA9]/25 text-[#69BFB7] bg-[#67ACA9]/5">
+                            {m.movementType}
+                          </span>
+                        </td>
+                        <td className="text-right font-mono font-bold text-[#69BFB7]">{m.amount} {rt?.unitOfMeasure}</td>
+                        <td className="text-[#A4C2C5]/70">{m.recordedBy}</td>
+                        <td className="text-white italic">{m.description}</td>
+                        <td className="text-right">
+                          <Btn variant="ghost" small onClick={() => onNavigateToSub("Movimientos de inventario")}>
+                            Registrar nuevo
+                          </Btn>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {activeCampMovements.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="text-center py-8 text-gray-500 italic">No hay historial de movimientos disponible para {campName}.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {activeCampMovements.length > 0 && (
+              <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-2 py-1 select-none">
+                <span>Registros {((pageMovimientos - 1) * pageSize) + 1} - {Math.min(pageMovimientos * pageSize, activeCampMovements.length)} de {activeCampMovements.length}</span>
+                <div className="flex gap-1">
+                  <Btn small variant="ghost" onClick={() => setPageMovimientos(p => Math.max(1, p - 1))} disabled={pageMovimientos === 1}>◄ Anterior</Btn>
+                  <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{pageMovimientos} / {totalPageMovimientos}</div>
+                  <Btn small variant="ghost" onClick={() => setPageMovimientos(p => Math.min(totalPageMovimientos, p + 1))} disabled={pageMovimientos === totalPageMovimientos}>Siguiente ►</Btn>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        
+        {activeTab === "recoleccion" && (
+          <div className="flex flex-col gap-3">
+            <div className="v-table-wrap overflow-x-auto">
+              <table className="v-table">
+                <thead>
+                  <tr>
+                    <th>FECHA</th>
+                    <th>RECURSO</th>
+                    <th>RECOLECTOR/PERSONA</th>
+                    <th className="text-right">ESPERADO</th>
+                    <th className="text-right">REAL</th>
+                    <th className="text-right">DIFERENCIA</th>
+                    <th>REGISTRADO POR</th>
+                    <th>MOTIVO / INCIDENCIA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedRecoleccion.map(c => {
+                    const rtStrId = MAP_RESOURCE_ID_TO_STR[c.resourceTypeId] || `rt-${c.resourceTypeId}`;
+                    const rt = resourceTypes.find(t => t.id === rtStrId);
+                    const actualNum = Number(c.actualAmount || 0);
+                    const expectedNum = Number(c.expectedAmount || 0);
+                    const diff = actualNum - expectedNum;
+                    
+                    return (
+                      <tr key={c.id} className="hover:bg-white/5 transition-colors">
+                        <td className="font-mono text-xs">{c.date}</td>
+                        <td className="font-bold text-white">{rt?.name || rtStrId}</td>
+                        <td className="text-white font-mono">{c.personId}</td>
+                        <td className="text-right font-mono text-[#A4C2C5]/80">{expectedNum.toFixed(2)}</td>
+                        <td className="text-right font-mono font-bold text-white">{actualNum.toFixed(2)}</td>
+                        <td className={`text-right font-mono font-bold ${diff === 0 ? "text-emerald-400" : diff < 0 ? "text-amber-400" : "text-[#69BFB7]"}`}>
+                          {diff > 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2)}
+                        </td>
+                        <td className="text-[10px]">Especialista Sede</td>
+                        <td className="text-white font-serif italic text-xs">{c.differenceReason || "—"}</td>
+                      </tr>
+                    );
+                  })}
+                  {activeCampCollections.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="text-center py-8 text-gray-400 italic font-mono">No se registran bitácoras de recolección en este campamento.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {activeCampCollections.length > 0 && (
+              <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-2 py-1 select-none">
+                <span>Registros {((pageRecoleccion - 1) * pageSize) + 1} - {Math.min(pageRecoleccion * pageSize, activeCampCollections.length)} de {activeCampCollections.length}</span>
+                <div className="flex gap-1">
+                  <Btn small variant="ghost" onClick={() => setPageRecoleccion(p => Math.max(1, p - 1))} disabled={pageRecoleccion === 1}>◄ Anterior</Btn>
+                  <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{pageRecoleccion} / {totalPageRecoleccion}</div>
+                  <Btn small variant="ghost" onClick={() => setPageRecoleccion(p => Math.min(totalPageRecoleccion, p + 1))} disabled={pageRecoleccion === totalPageRecoleccion}>Siguiente ►</Btn>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        
+        {activeTab === "solicitudes" && (
+          <div className="flex flex-col gap-3">
+            <div className="v-table-wrap overflow-x-auto">
+              <table className="v-table text-[11px]">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>FLUJO DIRECCIÓN</th>
+                    <th>ORIGEN ➔ DESTINO</th>
+                    <th>ESTADO</th>
+                    <th>FECHA ESTIMADA</th>
+                    <th>MOTIVO DESCRIPCIÓN</th>
+                    <th>CREADA POR</th>
+                    <th className="text-right">ACCIONES</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedSolicitudes.map(r => {
+                    const isOrigin = r.originCampId === activeCampId;
+                    const originName = camps.find(c => c.id === r.originCampId)?.name || r.originCampId;
+                    const destName = camps.find(c => c.id === r.destinationCampId)?.name || r.destinationCampId;
+                    return (
+                      <tr key={r.id} className="hover:bg-white/5 transition-colors">
+                        <td className="font-mono font-bold text-white">#{r.id}</td>
+                        <td>
+                          <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 border rounded-xs ${
+                            isOrigin ? "bg-blue-950/20 text-blue-300 border-blue-500/25" : "bg-purple-950/20 text-purple-300 border-purple-500/25"
+                          }`}>
+                            {isOrigin ? "SALIENTE (Creada)" : "ENTRANTE (Recibida)"}
+                          </span>
+                        </td>
+                        <td className="font-bold text-white uppercase">{originName} ➔ {destName}</td>
+                        <td>
+                          <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 border rounded-xs ${
+                            r.status === "APPROVED" ? "bg-emerald-950/40 text-emerald-300 border-emerald-500/30" :
+                            r.status === "REJECTED" ? "bg-red-950/40 text-red-300 border-red-500/30" :
+                            "bg-amber-950/40 text-amber-300 border-amber-500/25"
+                          }`}>
+                            {r.status}
+                          </span>
+                        </td>
+                        <td className="font-mono text-xs text-[#A4C2C5]/70">{r.plannedDepartureDate}</td>
+                        <td className="italic text-white text-xs">{r.description}</td>
+                        <td className="text-[10px] text-gray-400">{r.createdBy}</td>
+                        <td className="text-right">
+                          <div className="flex inline-flex gap-1">
+                            <Btn variant="primary" small onClick={() => onNavigateToSub("Solicitudes intercampamento")}>
+                              Gestionar Solicitud
+                            </Btn>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {activeCampRequests.length > 0 && (
+              <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-2 py-1 select-none">
+                <span>Registros {((pageSolicitudes - 1) * pageSize) + 1} - {Math.min(pageSolicitudes * pageSize, activeCampRequests.length)} de {activeCampRequests.length}</span>
+                <div className="flex gap-1">
+                  <Btn small variant="ghost" onClick={() => setPageSolicitudes(p => Math.max(1, p - 1))} disabled={pageSolicitudes === 1}>◄ Anterior</Btn>
+                  <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{pageSolicitudes} / {totalPageSolicitudes}</div>
+                  <Btn small variant="ghost" onClick={() => setPageSolicitudes(p => Math.min(totalPageSolicitudes, p + 1))} disabled={pageSolicitudes === totalPageSolicitudes}>Siguiente ►</Btn>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
+
     </SectionShell>
   );
 }
 
-/* 2. INVENTARIO DEL CAMPAMENTO */
+
 export function ViewInventarioCampamento({
   camps,
   resourceTypes,
@@ -294,46 +1482,47 @@ export function ViewInventarioCampamento({
   onAddInventory: (data: CampInventory) => void;
 }) {
   const selectedCamp = currentUser.campId;
+  const legacyCampId = selectedCamp === 1 ? "camp-alpha" : selectedCamp === 2 ? "camp-beta" : "camp-gamma";
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [currVal, setCurrVal] = useState("");
   const [minVal, setMinVal] = useState("");
 
-  const activeCampsite = camps.find(c => c.id === selectedCamp);
-  const filteredInventories = campInventories.filter(i => i.campId === selectedCamp);
+  const activeCampsite = camps.find(c => c.id === legacyCampId);
+  const filteredInventories = campInventories.filter(i => i.campId === legacyCampId);
 
-  const handleUpdate = (campId: string, resourceTypeId: string) => {
-    if (currVal === "" || minVal === "") {
-      alert("Los valores de cantidad no pueden quedar vacíos.");
+  const handleUpdate = (campId: string, resourceTypeId: string, currentAmountVal: number) => {
+    if (minVal === "") {
+      alert("La cantidad mínima de alerta no puede quedar vacía.");
       return;
     }
 
-    const currNum = Number(currVal);
     const minNum = Number(minVal);
 
-    if (isNaN(currNum) || currNum < 0) {
-      alert("La cantidad actual debe ser un número decimal no negativo.");
-      return;
-    }
     if (isNaN(minNum) || minNum < 0) {
       alert("La cantidad mínima de alerta debe ser un número decimal no negativo.");
       return;
     }
 
-    onUpdateInventory(campId, resourceTypeId, currNum, minNum);
+    onUpdateInventory(campId, resourceTypeId, currentAmountVal, minNum);
     setEditingKey(null);
   };
 
   return (
     <SectionShell kicker="CENTRAL DE OPERACIONES" title="Inventario de Campamentos">
-      <div className="flex gap-2 border-b border-[#67ACA9]/20 pb-2 mb-3 items-center">
-        <span className="text-xs font-bold text-[#A4C2C5]">Campamento Activo:</span>
-        <span className="text-xs font-bold text-[#69BFB7] border border-[#69BFB7]/25 px-2.5 py-1 rounded-sm bg-black/45">
-          {activeCampsite?.name || "Base Alfa"}
-        </span>
+      <div className="flex justify-between items-center bg-[#0a0f0f]/95 border border-[#67ACA9]/20 p-3.5 rounded-sm mx-4 md:mx-10 my-1 shadow-lg">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold text-[#A4C2C5] tracking-wider uppercase">Campamento Activo:</span>
+          <span className="text-[11px] font-black text-[#69BFB7] border border-[#69BFB7]/30 px-2.5 py-1 rounded-sm bg-black/45 select-none truncate">
+            {activeCampsite?.name || "Alpha Bunker"}
+          </span>
+        </div>
+        <div className="text-[9px] font-mono text-[#A4C2C5]/70 hidden sm:block">
+          Ubicación: <strong className="text-white">{activeCampsite?.location || "Sector Central"}</strong>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Tabla de existencias - Full Width */}
+        
         <div className="lg:col-span-12 flex flex-col gap-3">
           {activeCampsite && (
             <div className="p-3 bg-black/45 border border-[#67ACA9]/10 rounded-sm text-xs">
@@ -368,16 +1557,7 @@ export function ViewInventarioCampamento({
                       <td className="font-bold text-white">{rt?.name || item.resourceTypeId}</td>
                       <td>{rt ? getResourceTypeCategoryLabel(rt.category) : item.resourceTypeId}</td>
                       <td>
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            value={currVal}
-                            onChange={(e) => setCurrVal(e.target.value)}
-                            className="w-16 bg-black text-white text-center font-mono border border-[#69BFB7] text-[10px] rounded-xs"
-                          />
-                        ) : (
-                          <span className="font-mono font-bold text-white">{item.currentAmount} {rt?.unitOfMeasure}</span>
-                        )}
+                        <span className="font-mono font-bold text-white">{item.currentAmount} {rt?.unitOfMeasure}</span>
                       </td>
                       <td>
                         {isEditing ? (
@@ -385,7 +1565,7 @@ export function ViewInventarioCampamento({
                             type="text"
                             value={minVal}
                             onChange={(e) => setMinVal(e.target.value)}
-                            className="w-16 bg-black text-white text-center font-mono border border-amber-500/50 text-[10px] rounded-xs"
+                            className="w-16 bg-black text-white text-center font-mono border border-amber-500/50 text-[10px] rounded-xs animate-pulse"
                           />
                         ) : (
                           <span className="font-mono text-[#A4C2C5]/80">{item.minimumAlertAmount} {rt?.unitOfMeasure}</span>
@@ -397,15 +1577,14 @@ export function ViewInventarioCampamento({
                       <td className="text-right">
                         {isEditing ? (
                           <div className="flex gap-1 justify-end">
-                            <Btn small variant="success" onClick={() => handleUpdate(item.campId, item.resourceTypeId)}>✓ Guardar</Btn>
+                            <Btn small variant="success" onClick={() => handleUpdate(item.campId, item.resourceTypeId, item.currentAmount)}>✓ Guardar</Btn>
                             <Btn small variant="ghost" onClick={() => setEditingKey(null)}>✕</Btn>
                           </div>
                         ) : (
                           <Btn small variant="ghost" onClick={() => {
                             setEditingKey(`${item.campId}-${item.resourceTypeId}`);
-                            setCurrVal(String(item.currentAmount));
                             setMinVal(String(item.minimumAlertAmount));
-                          }}>⚙ Editar</Btn>
+                          }}>⚙ Editar Mínimo</Btn>
                         )}
                       </td>
                     </tr>
@@ -420,181 +1599,784 @@ export function ViewInventarioCampamento({
   );
 }
 
-/* 3. RECOLECCION DIARIA */
+
 export function ViewRecoleccionDiaria({
   camps,
   resourceTypes,
-  dailyCollectionRecords,
-  onSaveRecord,
-  onAdjustRecord,
-  onDeleteRecord
+  onRefreshSystemData
 }: {
   camps: Camp[];
   resourceTypes: ResourceType[];
-  dailyCollectionRecords: DailyCollectionRecord[];
-  onSaveRecord: (data: Omit<DailyCollectionRecord, "id">) => void;
-  onAdjustRecord: (id: string, actualAmount: number, reason: string) => void;
-  onDeleteRecord: (id: string) => void;
+  onRefreshSystemData?: () => void;
 }) {
-  const campId = currentUser.campId;
-  const [personId, setPersonId] = useState("p-colector");
-  const [resourceTypeId, setResourceTypeId] = useState("rt-food");
-  const [expectedAmount, setExpectedAmount] = useState("");
+  const campId = currentUser.campId; 
+  const currentCamp = camps.find(c => Number(c.id) === campId);
+
+
+  const [apiPersonnel, setApiPersonnel] = useState<{ id: number; name: string }[]>([]);
+  const [hasPersonnelEndpoint, setHasPersonnelEndpoint] = useState<boolean | null>(null);
+
+
+  const [records, setRecords] = useState<DailyCollectionRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+
+  const [personId, setPersonId] = useState<number>(101);
+  const [resourceTypeId, setResourceTypeId] = useState<number>(1);
   const [actualAmount, setActualAmount] = useState("");
-  const [differenceReason, setDifferenceReason] = useState("Sin anomalías");
+  const [differenceReason, setDifferenceReason] = useState("");
+  const [manualDate, setManualDate] = useState(new Date().toISOString().split("T")[0]);
+  const [showManualForm, setShowManualForm] = useState(false);
+
+
+  const [filterPerson, setFilterPerson] = useState("");
+  const [filterResource, setFilterResource] = useState("");
+  const [filterDate, setFilterDate] = useState("");
+
+
+  const [adjustingId, setAdjustingId] = useState<number | null>(null);
+  const [adjustVal, setAdjustVal] = useState("");
+  const [adjustReason, setAdjustReason] = useState("");
+  const [selectedDetailRecord, setSelectedDetailRecord] = useState<DailyCollectionRecord | null>(null);
+
   const recordedBy = currentUser.userId;
 
-  // Adjust modal states
-  const [adjustingId, setAdjustingId] = useState<string | null>(null);
-  const [adjustVal, setAdjustVal] = useState(0);
-  const [adjustReason, setAdjustReason] = useState("");
-
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!expectedAmount || !actualAmount) return;
-    onSaveRecord({
-      campId,
-      personId,
-      resourceTypeId,
-      date: new Date().toISOString().split("T")[0],
-      expectedAmount: Number(expectedAmount),
-      actualAmount: Number(actualAmount),
-      differenceReason,
-      recordedBy,
-      movementId: `mov-manual-${Date.now().toString().slice(-4)}`
-    });
-    setExpectedAmount("");
-    setActualAmount("");
-    setDifferenceReason("Sin anomalías");
+  const campRosters: Record<number, { id: number; name: string }[]> = {
+    1: [
+      { id: 101, name: "Soldado R. Vásquez" },
+      { id: 102, name: "Piloto T. Henderson" },
+      { id: 103, name: "Operador J. Miller" },
+      { id: 104, name: "Auxiliar M. Gómez" }
+    ],
+    2: [
+      { id: 201, name: "Minero J. Doe" },
+      { id: 202, name: "Guardia A. Smith" }
+    ],
+    3: [
+      { id: 301, name: "Agricultor L. Rivera" },
+      { id: 302, name: "Colector G. Chen" }
+    ],
+    4: [
+      { id: 401, name: "Explorador K. Vance" }
+    ],
+    5: [
+      { id: 501, name: "Explorador S. O'Connor" }
+    ]
   };
 
+  const currentRoster = hasPersonnelEndpoint && apiPersonnel.length > 0
+    ? apiPersonnel
+    : (campRosters[campId] || [{ id: 901, name: "Especialista de Recursos Sede" }]);
+
+  const getPersonName = (pId: number): string => {
+    const apiFound = apiPersonnel.find(p => p.id === pId);
+    if (apiFound) return apiFound.name;
+
+    const allPersonnel = Object.values(campRosters).flat();
+    const found = allPersonnel.find(p => p.id === pId);
+    return found ? found.name : `Persona #${pId}`;
+  };
+
+
+
+
+  useEffect(() => {
+    if (currentRoster.length > 0) {
+      setPersonId(currentRoster[0].id);
+    }
+  }, [hasPersonnelEndpoint, apiPersonnel]);
+
+
+  useEffect(() => {
+    const checkPersonnel = async () => {
+      const endpoints = [
+        `/api/people`,
+        `/api/personnel`
+      ];
+      for (const url of endpoints) {
+        try {
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            let list: any[] = [];
+            if (Array.isArray(data)) list = data;
+            else if (data && Array.isArray(data.items)) list = data.items;
+            else if (data && Array.isArray(data.data)) list = data.data;
+
+            const formatted = list.map(p => ({
+              id: Number(p.id ?? p.userId ?? p.personId ?? 101),
+              name: String(p.name ?? p.fullName ?? p.username ?? `Persona #${p.id ?? 101}`)
+            }));
+            
+            setApiPersonnel(formatted);
+            setHasPersonnelEndpoint(true);
+            return;
+          }
+        } catch (e) {
+
+        }
+      }
+      setHasPersonnelEndpoint(false);
+    };
+    checkPersonnel();
+  }, []);
+
+
+  const fetchRecords = async (currentPage: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      let url = `/api/daily-collection-records?page=${currentPage}&limit=10`;
+      
+
+      if (filterResource) {
+        url += `&resourceTypeId=${filterResource}`;
+      }
+      if (filterDate) {
+        url += `&date=${filterDate}`;
+      }
+      const numericPersonId = Number(filterPerson);
+      if (filterPerson && !isNaN(numericPersonId)) {
+        url += `&personId=${numericPersonId}`;
+      }
+
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`HTTP error ${res.status}`);
+      }
+      const data = await res.json();
+      
+      let fetchedList: DailyCollectionRecord[] = [];
+      let calculatedTotalPages = 1;
+
+      if (Array.isArray(data)) {
+        fetchedList = data;
+        calculatedTotalPages = 1;
+      } else if (data && Array.isArray(data.items)) {
+        fetchedList = data.items;
+        calculatedTotalPages = Number(data.totalPages ?? data.pages ?? 1);
+      } else if (data && Array.isArray(data.data)) {
+        fetchedList = data.data;
+        calculatedTotalPages = Number(data.totalPages ?? data.pages ?? 1);
+      }
+
+
+      fetchedList = fetchedList.filter(record => Number(record.campId) === campId);
+      
+
+      if (filterPerson && isNaN(numericPersonId)) {
+        const searchLow = filterPerson.toLowerCase();
+        fetchedList = fetchedList.filter(record => {
+          const name = getPersonName(record.personId).toLowerCase();
+          return name.includes(searchLow);
+        });
+      }
+
+      setRecords(fetchedList);
+      setTotalPages(calculatedTotalPages);
+    } catch (err: any) {
+      console.warn("Could not load daily collections from backend", err);
+      setError("No se pudo cargar la recolección diaria. Por favor, reintente.");
+      setRecords([]);
+      setTotalPages(1);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecords(page);
+  }, [page, filterResource, filterDate, filterPerson]);
+
+  const activeResourceTypeObj = resourceTypes.find(rt => {
+    const mappedNumId = MAP_RESOURCE_STR_TO_ID[rt.id] || Number(rt.id);
+    return mappedNumId === resourceTypeId;
+  });
+  const expectedAmount = "120.00";
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!personId || !resourceTypeId || !manualDate || actualAmount === "") {
+      alert("Completa persona, recurso, fecha y cantidad recolectada.");
+      return;
+    }
+
+    const expectedNum = Number(expectedAmount);
+    const actualNum = Number(actualAmount);
+
+    if (isNaN(expectedNum) || expectedNum < 0 || isNaN(actualNum) || actualNum < 0) {
+      alert("Las cantidades deben ser números válidos no negativos.");
+      return;
+    }
+
+    if (expectedNum !== actualNum && !differenceReason.trim()) {
+      alert("Se detectó discrepancia. Se exige registrar un motivo para la diferencia de auditoría.");
+      return;
+    }
+
+    const payload = {
+      campId,
+      personId: Number(personId),
+      resourceTypeId: Number(resourceTypeId),
+      date: manualDate,
+      expectedAmount: expectedNum.toFixed(2),
+      actualAmount: actualNum.toFixed(2),
+      differenceReason: differenceReason.trim() || null,
+      recordedBy,
+      movementId: null
+    };
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/daily-collection-records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const errTxt = await res.text();
+        throw new Error(errTxt || "Error desconocido al registrar.");
+      }
+      
+      setActualAmount("");
+      setDifferenceReason("");
+      setShowManualForm(false);
+      
+
+      fetchRecords(1);
+      setPage(1);
+
+      if (onRefreshSystemData) {
+        onRefreshSystemData();
+      }
+    } catch (err: any) {
+      alert("No se pudo registrar en la API: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAdjustmentSubmit = async () => {
+    if (adjustVal === "" || isNaN(Number(adjustVal)) || Number(adjustVal) < 0) {
+      alert("La cantidad real corregida debe ser un número no negativo.");
+      return;
+    }
+    if (!adjustReason.trim()) {
+      alert("Se requiere consignar una razón técnica para el ajuste del inventario del campamento.");
+      return;
+    }
+    if (!adjustingId) return;
+
+    const payload = {
+      actualAmount: Number(adjustVal).toFixed(2),
+      differenceReason: adjustReason.trim(),
+      recordedBy
+    };
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/daily-collection-records/${adjustingId}/adjustment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const errTxt = await res.text();
+        throw new Error(errTxt || "Error al realizar el ajuste.");
+      }
+
+      setAdjustingId(null);
+      fetchRecords(page);
+
+      if (onRefreshSystemData) {
+        onRefreshSystemData();
+      }
+    } catch (err: any) {
+      alert("Error al guardar ajuste en API: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredRecords = records;
+
   return (
-    <SectionShell kicker="COSECHA Y PRODUCCIÓN COLECTIVA" title="Registros de Recolección Diaria">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+    <SectionShell kicker="AUDITORÍA Y BALANCE" title="Control Físico de Recolección Diaria">
+      <div className="flex flex-col gap-6 mx-2 md:mx-6 my-1">
         
-        {/* Registration Form */}
-        <form onSubmit={handleCreate} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-3 rounded-sm lg:col-span-5 flex flex-col gap-3">
-          <div className="text-xs font-bold text-emerald-400 uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-2">Crear Parte de Recolección</div>
-
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex flex-col gap-1">
-              <span className="v-field-label text-[#A4C2C5]/70">Campamento Activo</span>
-              <span className="v-input bg-black/20 text-[#69BFB7] border border-[#67ACA9]/10 select-none flex items-center px-2 py-1.5 h-[34px] font-bold rounded-sm">
-                Base Alfa (Propio)
-              </span>
+        
+        {hasPersonnelEndpoint && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between items-stretch gap-4 bg-[#0a0f0f]/80 p-5 rounded-md border border-[#67ACA9]/20 shadow-lg">
+            <div className="flex flex-col">
+              <span className="text-xs font-mono text-[#69BFB7] uppercase tracking-widest">Protocolo de Registro Directo</span>
+              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight mt-1">Ingreso Auditado de Cosecha y Suministros</h3>
+              <p className="text-[11px] sm:text-xs text-[#A4C2C5]/70 mt-0.5">Gestione entradas locales verificadas sin intermediarios en {currentCamp?.name || `Campamento #${campId}`}</p>
             </div>
-            <label className="v-field flex flex-col gap-1">
-              <span className="v-field-label text-[#A4C2C5]/70">Suministro recolectado</span>
-              <select value={resourceTypeId} onChange={e => setResourceTypeId(e.target.value)} className="v-select">
-                {resourceTypes.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
+            <div className="flex items-center">
+              <Btn 
+                variant={showManualForm ? "danger" : "success"}
+                onClick={() => setShowManualForm(!showManualForm)}
+                className="w-full sm:w-auto text-xs sm:text-sm py-2 px-5 font-bold uppercase tracking-wider shadow-md hover:scale-105 transition-transform"
+              >
+                {showManualForm ? "✕ Cerrar Formulario" : "✛ Registrar Recolección Directa"}
+              </Btn>
+            </div>
+          </div>
+        )}
+
+        
+        {hasPersonnelEndpoint && showManualForm && (
+          <div className="mission-card border-2 border-emerald-500/35 bg-[#060c0c]/95 p-5 rounded-md animate-in slide-in-from-top-4 duration-200">
+            <div className="text-sm font-black text-white uppercase border-b border-[#67ACA9]/15 pb-2.5 mb-4 flex justify-between items-center">
+              <span>Nueva Cosecha / Recolección</span>
+              <span className="text-[10px] tracking-normal text-zinc-500 italic">Auditado en Tiempo Real</span>
+            </div>
+            
+            <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 text-sm">
+              <label className="flex flex-col gap-1.5 w-full">
+                <span className="text-[#A4C2C5]/85 font-semibold text-xs sm:text-sm">Personal de Cosecha / Producción *</span>
+                <select value={personId} onChange={e => setPersonId(Number(e.target.value))} className="v-select py-2 text-sm bg-black/80 border-[#67ACA9]/20 text-white rounded">
+                  {currentRoster.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} (ID #{p.id})</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1.5 w-full">
+                <span className="text-[#A4C2C5]/85 font-semibold text-xs sm:text-sm">Tipo de Recurso *</span>
+                <select value={resourceTypeId} onChange={e => setResourceTypeId(Number(e.target.value))} className="v-select py-2 text-sm bg-black/80 border-[#67ACA9]/20 text-white rounded">
+                  {resourceTypes.map(rt => {
+                    const mappedId = MAP_RESOURCE_STR_TO_ID[rt.id] || rt.id;
+                    return (
+                      <option key={rt.id} value={mappedId}>{rt.name}</option>
+                    );
+                  })}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1.5 w-full">
+                <span className="text-[#A4C2C5]/85 font-semibold text-xs sm:text-sm">Fecha de Registro *</span>
+                <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="v-input py-2 text-sm bg-black/80 border-[#67ACA9]/20 text-white rounded" />
+              </label>
+
+              <label className="flex flex-col gap-1.5 w-full">
+                <span className="text-[#A4C2C5]/85 font-semibold text-xs sm:text-sm">Cantidad Esperada (Meta Planificada)</span>
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    value={expectedAmount} 
+                    disabled 
+                    className="v-input py-2 text-sm bg-[#121919] border-zinc-700 font-mono text-zinc-400 cursor-not-allowed w-full rounded"
+                  />
+                  <span className="text-[10px] text-amber-500/90 font-bold block mt-1">Fijado según el plan táctico asignado</span>
+                </div>
+              </label>
+
+              <label className="flex flex-col gap-1.5 w-full">
+                <span className="text-[#A4C2C5]/85 font-semibold text-xs sm:text-sm">Cantidad Real Recolectada *</span>
+                <input 
+                  type="text" 
+                  value={actualAmount} 
+                  onChange={e => setActualAmount(e.target.value)} 
+                  className="v-input py-2 text-sm text-white bg-black font-semibold font-mono border-[#67ACA9]/40 w-full rounded focus:border-[#69BFB7]" 
+                  placeholder="ej: 115.50" 
+                />
+              </label>
+
+              <label className="flex flex-col gap-1.5 w-full col-span-1 md:col-span-2 lg:col-span-1">
+                <span className="text-[#A4C2C5]/85 font-semibold text-xs sm:text-sm">Justificación de Diferencia / Comentario</span>
+                <input 
+                  type="text" 
+                  value={differenceReason} 
+                  onChange={e => setDifferenceReason(e.target.value)} 
+                  className="v-input py-2 text-sm w-full bg-black/80 border-[#67ACA9]/20 text-white rounded focus:border-[#69BFB7]" 
+                  placeholder="ej: Producción en invernaderos" 
+                />
+              </label>
+
+              <div className="col-span-1 md:col-span-2 lg:col-span-3 flex justify-end gap-3 mt-4 border-t border-[#67ACA9]/10 pt-4">
+                <Btn small={false} variant="ghost" className="text-xs sm:text-sm px-5 py-2" onClick={() => setShowManualForm(false)}>Cancelar</Btn>
+                <Btn small={false} variant="success" className="text-xs sm:text-sm px-6 py-2 font-black tracking-wide" type="submit">Guardar Registro en Base</Btn>
+              </div>
+            </form>
+          </div>
+        )}
+
+        
+        <div className="bg-[#0c1212]/90 p-5 rounded-md border border-[#67ACA9]/15 shadow-md">
+          <div className="text-xs sm:text-sm font-bold text-[#69BFB7] mb-3 uppercase tracking-wider flex items-center gap-2">
+            <span>⚙ PANEL DE BÚSQUEDA Y FILTRADO</span>
+            {(filterPerson || filterResource || filterDate) && (
+              <span className="text-[10px] bg-red-950/40 text-red-400 px-2 py-0.5 rounded border border-red-500/20 font-mono animate-pulse">
+                Filtros Activos
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <div className="flex flex-col gap-1 w-full">
+              <span className="text-[11px] sm:text-xs text-[#A4C2C5]/85 font-bold uppercase tracking-wider">Buscar persona por nombre o id</span>
+              <input 
+                type="text" 
+                placeholder="Escriba el nombre o ID de la persona..." 
+                value={filterPerson} 
+                onChange={e => setFilterPerson(e.target.value)} 
+                className="v-input text-xs sm:text-sm w-full py-2 px-3 bg-black/50 border-[#67ACA9]/20 text-white focus:border-[#69BFB7]/80 rounded" 
+              />
+            </div>
+
+            
+            <div className="flex flex-col gap-1 w-full">
+              <span className="text-[11px] sm:text-xs text-[#A4C2C5]/85 font-bold uppercase tracking-wider">Filtrar por Recurso</span>
+              <select 
+                value={filterResource} 
+                onChange={e => setFilterResource(e.target.value)} 
+                className="v-select text-xs sm:text-sm w-full py-2 px-3 bg-[#111] border-[#67ACA9]/20 text-white rounded focus:border-[#69BFB7]/80"
+              >
+                <option value="">— Todos los Recursos —</option>
+                {resourceTypes.map(rt => {
+                  const mappedId = MAP_RESOURCE_STR_TO_ID[rt.id] || rt.id;
+                  return (
+                    <option key={rt.id} value={mappedId}>{rt.name}</option>
+                  );
+                })}
               </select>
-            </label>
+            </div>
+
+            
+            <div className="flex flex-col gap-1 w-full">
+              <span className="text-[11px] sm:text-xs text-[#A4C2C5]/85 font-bold uppercase tracking-wider">Filtrar por Fecha</span>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="date" 
+                  value={filterDate} 
+                  onChange={e => setFilterDate(e.target.value)} 
+                  className="v-input text-xs sm:text-sm w-full py-2 px-3 bg-black/50 border-[#67ACA9]/20 text-white focus:border-[#69BFB7]/80 rounded" 
+                />
+                
+                {(filterPerson || filterResource || filterDate) && (
+                  <button 
+                    onClick={() => { setFilterPerson(""); setFilterResource(""); setFilterDate(""); }} 
+                    className="text-red-400 font-bold hover:text-red-300 hover:underline text-xs bg-red-950/20 border border-red-500/25 px-2.5 py-2 rounded font-mono transition-colors whitespace-nowrap"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        
+        <div className="mission-card border border-[#67ACA9]/20 bg-[#0d1414]/90 p-5 rounded-md shadow-lg">
+          <div className="text-xs sm:text-sm font-bold text-[#69BFB7] mb-3 uppercase tracking-widest border-b border-[#67ACA9]/10 pb-2">
+            Histórico de Cosechas Realizadas
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <label className="v-field flex flex-col gap-1">
-              <span className="v-field-label text-[#A4C2C5]/70">Estimado Esperado</span>
-              <input type="number" value={expectedAmount} onChange={e => setExpectedAmount(e.target.value)} className="v-input" placeholder="0" />
-            </label>
-            <label className="v-field flex flex-col gap-1">
-              <span className="v-field-label text-[#A4C2C5]/70">Extraído Real</span>
-              <input type="number" value={actualAmount} onChange={e => setActualAmount(e.target.value)} className="v-input" placeholder="0" />
-            </label>
-          </div>
-
-          <label className="v-field flex flex-col gap-1 text-xs">
-            <span className="v-field-label text-[#A4C2C5]/70">Código de Persona (Ficha)</span>
-            <input type="text" value={personId} onChange={e => setPersonId(e.target.value)} className="v-input" placeholder="e.g. p-agricultor-02" />
-          </label>
-
-          <div className="flex flex-col gap-1 text-xs">
-            <span className="v-field-label text-[#A4C2C5]/70 font-semibold text-[#69BFB7]">Operador de Registro</span>
-            <span className="v-input bg-black/20 text-[#A4C2C5]/50 border border-[#67ACA9]/10 select-none flex items-center px-2 py-1.5 h-[34px] rounded-sm font-mono text-[10px]">
-              Operario #{currentUser.userId} (Firmado)
-            </span>
-          </div>
-
-          <label className="v-field flex flex-col gap-1 text-xs">
-            <span className="v-field-label text-[#A4C2C5]/70">Explicación de diferencia o discrepancia</span>
-            <textarea value={differenceReason} onChange={e => setDifferenceReason(e.target.value)} className="v-input min-h-12" placeholder="Describir si la cosecha real rinde más o menos que lo proyectado" />
-          </label>
-
-          <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Guardar Bitácora Diaria</Btn>
-        </form>
-
-        {/* Existing records */}
-        <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-3 rounded-sm lg:col-span-7 flex flex-col justify-between">
-          <div>
-            <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-2">Parte Técnico de Recolección Histórico</div>
-            <div className="v-table-wrap max-h-72 overflow-y-auto">
-              <table className="v-table text-[10px]">
+          
+          <div className="hidden sm:block overflow-x-hidden">
+            <div className="v-table-wrap max-h-[420px] overflow-y-auto animate-in fade-in duration-150">
+              <table className="v-table w-full text-xs sm:text-sm">
                 <thead>
-                  <tr>
-                    <th>Campamento</th>
-                    <th>Recurso</th>
-                    <th>Esperado</th>
-                    <th>Real</th>
-                    <th>Explicación</th>
-                    <th className="text-right">Ajuste</th>
+                  <tr className="border-b border-[#67ACA9]/30 text-[#69BFB7] uppercase font-bold text-[11px]">
+                    <th className="py-2.5 pb-2">Fecha</th>
+                    <th className="py-2.5 pb-2">Persona ID</th>
+                    <th className="py-2.5 pb-2">Suministro / Recurso</th>
+                    <th className="py-2.5 pb-2">Cantidad Esperada</th>
+                    <th className="py-2.5 pb-2">Cantidad Real</th>
+                    <th className="py-2.5 pb-2">Desviación / Diferencia</th>
+                    <th className="py-2.5 pb-2 text-right">Controles de Calidad</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {dailyCollectionRecords.slice().reverse().map(record => {
-                    const camp = camps.find(c => c.id === record.campId);
-                    const rt = resourceTypes.find(t => t.id === record.resourceTypeId);
-                    return (
-                      <tr key={record.id} className="hover:bg-cyan-950/5">
-                        <td className="font-bold text-white">{camp?.name || record.campId}</td>
-                        <td>{rt?.name || record.resourceTypeId}</td>
-                        <td>{record.expectedAmount} {rt?.unitOfMeasure}</td>
-                        <td className="text-emerald-300 font-bold">{record.actualAmount} {rt?.unitOfMeasure}</td>
-                        <td className="italic text-[#A4C2C5]/70">{record.differenceReason}</td>
-                        <td className="text-right flex gap-1 justify-end">
-                          <Btn small variant="warning" onClick={() => {
-                            setAdjustingId(record.id);
-                            setAdjustVal(record.actualAmount);
-                            setAdjustReason(record.differenceReason);
-                          }}>Ajustar</Btn>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {filteredRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-8 text-[#A4C2C5]/40 italic text-sm">
+                        No se detectaron registros de recolección para los filtros seleccionados.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRecords.map(record => {
+                      const rtStrId = MAP_RESOURCE_ID_TO_STR[record.resourceTypeId] || `rt-${record.resourceTypeId}`;
+                      const rt = resourceTypes.find(t => t.id === rtStrId);
+                      const actualNum = Number(record.actualAmount || 0);
+                      const expectedNum = Number(record.expectedAmount || 0);
+                      const diff = actualNum - expectedNum;
+                      
+                      const diffColor = diff > 0 ? "text-emerald-400 font-bold" : diff < 0 ? "text-rose-400 font-bold" : "text-sky-300";
+                      
+                      return (
+                        <tr key={record.id} className="hover:bg-cyan-950/20 border-b border-[#67ACA9]/10 transition-colors">
+                          <td className="font-mono py-3 font-semibold text-white">{record.date}</td>
+                          <td className="font-semibold py-3 text-[#69BFB7]">{getPersonName(record.personId)} · <span className="text-zinc-500 font-mono text-[10px]">ID {record.personId}</span></td>
+                          <td className="py-3 font-medium text-white">{rt?.name || rtStrId}</td>
+                          <td className="font-mono py-3 text-[#A4C2C5]/80">{expectedNum.toFixed(2)} {rt?.unitOfMeasure}</td>
+                          <td className="text-white py-3 font-mono font-bold">{actualNum.toFixed(2)} {rt?.unitOfMeasure}</td>
+                          <td className={`${diffColor} py-3 font-bold font-mono`}>
+                            {diff > 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2)} {rt?.unitOfMeasure}
+                          </td>
+                          <td className="text-right py-3">
+                            <div className="flex gap-2 justify-end">
+                              <Btn small variant="ghost" onClick={() => setSelectedDetailRecord(record)}>
+                                Detalle
+                              </Btn>
+                              {Number(record.campId) === campId && (
+                                <Btn small variant="warning" onClick={() => {
+                                  setAdjustingId(record.id);
+                                  setAdjustVal(String(record.actualAmount));
+                                  setAdjustReason(record.differenceReason || "");
+                                }}>
+                                  Ajustar Real
+                                </Btn>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Adjust Sub-form Modal inside sidebar flow */}
-          {adjustingId && (
-            <div className="mt-3 p-3 bg-black/40 border border-amber-500/30 rounded-xs text-xs">
-              <div className="font-bold text-amber-400 mb-1.5 uppercase tracking-wide">Ajustar Registro Seleccionado</div>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <label className="flex flex-col gap-0.5">
-                  <span className="text-[10px] text-[#A4C2C5]/70">Nuevo Escrito Real:</span>
-                  <input type="number" value={adjustVal} onChange={e => setAdjustVal(Number(e.target.value))} className="v-input !py-1 text-center font-mono text-white" />
-                </label>
-                <label className="flex flex-col gap-0.5">
-                  <span className="text-[10px] text-[#A4C2C5]/70">Justificación Técnica:</span>
-                  <input type="text" value={adjustReason} onChange={e => setAdjustReason(e.target.value)} className="v-input !py-1 text-white" />
-                </label>
+          
+          <div className="block sm:hidden space-y-4">
+            {filteredRecords.length === 0 ? (
+              <div className="text-center py-6 text-[#A4C2C5]/40 italic text-sm">
+                No se detectaron registros de recolección para los filtros seleccionados.
               </div>
-              <div className="flex justify-end gap-1.5">
-                <Btn small variant="success" onClick={() => {
-                  onAdjustRecord(adjustingId, adjustVal, adjustReason);
-                  setAdjustingId(null);
-                }}>Confirmar Ajuste</Btn>
-                <Btn small variant="danger" onClick={() => setAdjustingId(null)}>Descartar</Btn>
+            ) : (
+              filteredRecords.map(record => {
+                const rtStrId = MAP_RESOURCE_ID_TO_STR[record.resourceTypeId] || `rt-${record.resourceTypeId}`;
+                const rt = resourceTypes.find(t => t.id === rtStrId);
+                const actualNum = Number(record.actualAmount || 0);
+                const expectedNum = Number(record.expectedAmount || 0);
+                const diff = actualNum - expectedNum;
+                const diffColor = diff > 0 ? "text-emerald-400 font-bold" : diff < 0 ? "text-rose-400 font-bold" : "text-sky-300";
+
+                return (
+                  <div key={record.id} className="p-4 bg-black/45 border border-[#67ACA9]/20 rounded-sm space-y-2.5 text-xs sm:text-sm">
+                    <div className="flex justify-between items-center border-b border-[#67ACA9]/10 pb-1.5">
+                      <span className="text-[12px] font-bold text-[#69BFB7]">{getPersonName(record.personId)} · <span className="text-zinc-500 font-mono text-[10px]">ID {record.personId}</span></span>
+                      <span className="text-[11px] font-mono text-zinc-400">{record.date}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-[10px] text-[#A4C2C5]/60 block uppercase">Recurso</span>
+                        <strong className="text-white text-[13px]">{rt?.name || rtStrId}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[#A4C2C5]/60 block uppercase">Cantidad Real</span>
+                        <strong className="text-white text-[13px] font-mono">{actualNum.toFixed(2)} {rt?.unitOfMeasure}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[#A4C2C5]/60 block uppercase">Cantidad Esperada</span>
+                        <span className="text-zinc-300 font-mono">{expectedNum.toFixed(2)} {rt?.unitOfMeasure}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[#A4C2C5]/60 block uppercase">Desviación</span>
+                        <span className={`${diffColor} font-bold font-mono`}>
+                          {diff > 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2)} {rt?.unitOfMeasure}
+                        </span>
+                      </div>
+                    </div>
+
+                    {record.differenceReason && (
+                      <div className="text-[11px] bg-black/30 p-2 border border-[#67ACA9]/5 text-zinc-300 italic rounded">
+                        <strong>Motivo:</strong> {record.differenceReason}
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-1 text-xs">
+                      <Btn small variant="ghost" className="w-1/2 text-xs py-1.5" onClick={() => setSelectedDetailRecord(record)}>
+                        Detalle
+                      </Btn>
+                      {Number(record.campId) === campId && (
+                        <Btn small variant="warning" className="w-1/2 text-xs py-1.5" onClick={() => {
+                          setAdjustingId(record.id);
+                          setAdjustVal(String(record.actualAmount));
+                          setAdjustReason(record.differenceReason || "");
+                        }}>
+                          Ajustar Real
+                        </Btn>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          
+          {loading && (
+            <div className="flex justify-center items-center py-6 gap-2 text-xs text-[#69BFB7] italic font-mono">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#69BFB7] animate-ping"></span>
+              Consultando base de datos táctica en tiempo real...
+            </div>
+          )}
+          {error && (
+            <div className="text-center py-6 text-rose-400 bg-red-950/20 border border-red-500/30 rounded text-xs flex flex-col items-center gap-3">
+              <span>⚠️ {error}</span>
+              <Btn small variant="ghost" onClick={() => fetchRecords(page)} className="border border-rose-500/20 px-4 py-1.5 hover:bg-rose-950/20">
+                🔄 Reintentar Cargar Datos
+              </Btn>
+            </div>
+          )}
+          {!loading && !error && totalPages > 1 && (
+            <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#67ACA9]/10">
+              <div className="text-[11px] text-[#A4C2C5]/60 font-mono">
+                Página {page} de {totalPages}
+              </div>
+              <div className="flex gap-2">
+                <Btn
+                  small
+                  variant="ghost"
+                  disabled={page === 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className={page === 1 ? "opacity-40 cursor-not-allowed" : ""}
+                >
+                  ◀ Anterior
+                </Btn>
+                <Btn
+                  small
+                  variant="ghost"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  className={page >= totalPages ? "opacity-40 cursor-not-allowed" : ""}
+                >
+                  Siguiente ▶
+                </Btn>
               </div>
             </div>
           )}
         </div>
+
+        
+        {adjustingId !== null && (
+          <div className="p-4 bg-black/90 border border-amber-500/40 rounded-sm bg-gradient-to-r from-amber-950/20 to-black/40 text-xs sm:text-sm animate-in slide-in-from-top-2 duration-150">
+            <div className="font-extrabold text-amber-400 mb-2 uppercase tracking-wider flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Ajustar Cantidad Real para Auditoría Física
+            </div>
+            <div className="bg-[#67ACA9]/5 border border-[#67ACA9]/10 p-3 rounded-sm mb-4">
+              <span className="text-[10px] text-[#A4C2C5]/60 uppercase block">Registro de Sólo Lectura:</span>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs text-zinc-300 mt-1">
+                <span>Registro: <strong className="text-white font-mono">#{adjustingId}</strong></span>
+                <span>Persona: <strong className="text-white font-mono">#{(filteredRecords.find(r => r.id === adjustingId))?.personId}</strong></span>
+                <span>Recurso: <strong className="text-white font-mono">{
+                  (() => {
+                    const rec = filteredRecords.find(r => r.id === adjustingId);
+                    const strId = rec ? MAP_RESOURCE_ID_TO_STR[rec.resourceTypeId] : "";
+                    return resourceTypes.find(t => t.id === strId)?.name || "—";
+                  })()
+                }</strong></span>
+                <span>Cantidad esperada: <strong className="text-white font-mono">{(filteredRecords.find(r => r.id === adjustingId))?.expectedAmount}</strong></span>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs text-[#A4C2C5] font-semibold">Cantidad Real Corregida:</span>
+                <input 
+                  type="text" 
+                  value={adjustVal} 
+                  onChange={e => setAdjustVal(e.target.value)} 
+                  className="v-input py-2 text-center font-mono text-white bg-black border-zinc-700 rounded" 
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs text-[#A4C2C5] font-semibold">Justificación Técnica del Ajuste:</span>
+                <input 
+                  type="text" 
+                  value={adjustReason} 
+                  onChange={e => setAdjustReason(e.target.value)} 
+                  className="v-input py-2 text-white bg-zinc-950 border-zinc-700 rounded" 
+                  placeholder="ej: Corrección validada por reconteo físico" 
+                />
+              </label>
+            </div>
+            <div className="flex justify-end gap-3 mt-2 border-t border-[#67ACA9]/10 pt-3">
+              <Btn small variant="ghost" onClick={() => setAdjustingId(null)}>Descartar</Btn>
+              <Btn small variant="success" className="font-bold px-4 py-1.5" onClick={handleAdjustmentSubmit}>
+                Confirmar Ajuste Físico ✔
+              </Btn>
+            </div>
+          </div>
+        )}
+
+        
+        {selectedDetailRecord && (
+          <div className="p-5 bg-[#0a0f0f] border border-[#67ACA9]/45 rounded-md relative animate-in fade-in duration-150">
+            <button 
+              className="absolute top-3 right-3 text-[#A4C2C5]/70 hover:text-white font-mono text-lg font-bold" 
+              onClick={() => setSelectedDetailRecord(null)}
+            >
+              ✕
+            </button>
+            <div className="font-extrabold text-[#69BFB7] mb-3.5 uppercase tracking-wider border-b border-[#67ACA9]/15 pb-2 flex items-center gap-2 text-sm sm:text-base">
+              <Info className="h-5 w-5" />
+              Boleta Detallada de Auditoría Física de Recolección
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-black/60 p-4 rounded-md border border-[#67ACA9]/10 text-xs sm:text-sm">
+              <div>
+                <span className="text-[#A4C2C5]/50 uppercase text-[10px] block">ID de Registro:</span>
+                <span className="font-mono text-white font-bold">#{selectedDetailRecord.id}</span>
+              </div>
+              <div>
+                <span className="text-[#A4C2C5]/50 uppercase text-[10px] block">Campamento Sede:</span>
+                <span className="text-white font-bold">{currentCamp?.name || `Campamento ID #${selectedDetailRecord.campId}`}</span>
+              </div>
+              <div>
+                <span className="text-[#A4C2C5]/50 uppercase text-[10px] block">Persona Productora:</span>
+                <span className="text-[#69BFB7] font-mono font-bold">Persona ID #{selectedDetailRecord.personId}</span>
+              </div>
+              <div>
+                <span className="text-[#A4C2C5]/50 uppercase text-[10px] block">Recurso y Categoría:</span>
+                <span className="text-white font-bold">
+                  {(() => {
+                    const strId = MAP_RESOURCE_ID_TO_STR[selectedDetailRecord.resourceTypeId];
+                    return resourceTypes.find(t => t.id === strId)?.name || strId;
+                  })()}
+                </span>
+              </div>
+              <div>
+                <span className="text-[#A4C2C5]/50 uppercase text-[10px] block">Fecha de Registro:</span>
+                <span className="text-white font-mono">{selectedDetailRecord.date}</span>
+              </div>
+              <div>
+                <span className="text-[#A4C2C5]/50 uppercase text-[10px] block">Origen / Movimiento Asociado:</span>
+                <span className="font-mono text-zinc-400">{selectedDetailRecord.movementId || "Validación física manual de stock"}</span>
+              </div>
+              <div>
+                <span className="text-[#A4C2C5]/50 uppercase text-[10px] block">Cantidad Esperada:</span>
+                <span className="text-white font-bold font-mono">{Number(selectedDetailRecord.expectedAmount).toFixed(2)}</span>
+              </div>
+              <div>
+                <span className="text-[#A4C2C5]/50 uppercase text-[10px] block">Cantidad Real Certificada:</span>
+                <span className="text-white font-bold font-mono">{Number(selectedDetailRecord.actualAmount).toFixed(2)}</span>
+              </div>
+              <div>
+                <span className="text-[#A4C2C5]/50 uppercase text-[10px] block">Estado de Auditoría:</span>
+                <span className="text-emerald-400 font-semibold uppercase font-mono">Verificado localmente</span>
+              </div>
+            </div>
+            <div className="flex justify-end mt-4">
+              <Btn small variant="ghost" onClick={() => setSelectedDetailRecord(null)}>Cerrar Boleta</Btn>
+            </div>
+          </div>
+        )}
 
       </div>
     </SectionShell>
   );
 }
 
-/* 4. MOVIMIENTOS DE INVENTARIO */
+
 export function ViewMovimientosInventario({
   camps,
   resourceTypes,
@@ -609,17 +2391,18 @@ export function ViewMovimientosInventario({
   onDeleteMovement: (id: string) => void;
 }) {
   const campId = currentUser.campId;
+  const legacyCampId = campId === 1 ? "camp-alpha" : campId === 2 ? "camp-beta" : "camp-gamma";
   const [resourceTypeId, setResourceTypeId] = useState("rt-food");
   const [amount, setAmount] = useState("");
   const [movementType, setMovementType] = useState<InventoryMovement["movementType"]>("MANUAL_ADJUSTMENT");
   const [description, setDescription] = useState("");
-  const recordedBy = currentUser.userId;
+  const recordedBy = String(currentUser.userId);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount) return;
+    if (!amount || Number(amount) <= 0) return;
     onAddManualMovement({
-      campId,
+      campId: legacyCampId,
       resourceTypeId,
       amount: Number(amount),
       movementType,
@@ -637,14 +2420,14 @@ export function ViewMovimientosInventario({
     <SectionShell kicker="AUDITORÍA DE STOCK" title="Operaciones y Movimientos de Inventario">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
-        {/* Manual Movement Form */}
+        
         <form onSubmit={handleCreate} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-3 rounded-sm lg:col-span-4 flex flex-col gap-3">
           <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-1">Registrar Operación Manual de Inventario</div>
 
-          <div className="flex flex-col gap-1 text-xs">
-            <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Campamento Activo</span>
-            <span className="v-input bg-black/20 text-[#69BFB7] border border-[#67ACA9]/10 select-none flex items-center px-2 py-1.5 h-[34px] font-bold rounded-sm">
-              Base Alfa (Propio)
+          <div className="flex flex-col gap-1 text-xs mx-3 px-3 py-1.5 border border-[#67ACA9]/15 bg-[#0a0f0f]/40 rounded-sm">
+            <span className="v-field-label text-[#A4C2C5]/70 font-semibold text-[10px]">Campamento Activo</span>
+            <span className="bg-[#050808]/75 text-[#69BFB7] border border-[#67ACA9]/10 select-none flex items-center px-2 py-1 h-[30px] font-bold rounded-xs truncate text-[11px]">
+              {camps.find(c => c.id === legacyCampId)?.name || "Alpha Bunker"} (Asignado)
             </span>
           </div>
 
@@ -677,7 +2460,7 @@ export function ViewMovimientosInventario({
           <div className="flex flex-col gap-1 text-xs">
             <span className="v-field-label text-[#A4C2C5]/70">Responsable Auditor</span>
             <span className="v-input bg-black/20 text-[#A4C2C5]/50 border border-[#67ACA9]/10 select-none flex items-center px-2 py-1.5 h-[34px] rounded-sm font-mono text-[10px]">
-              Operario #{currentUser.userId} (Firmado)
+              Personal de Guardia (Firmado)
             </span>
           </div>
 
@@ -689,7 +2472,7 @@ export function ViewMovimientosInventario({
           <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Insertar Operación en Historial</Btn>
         </form>
 
-        {/* Audit Movements Log List */}
+        
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-3 rounded-sm lg:col-span-8 flex flex-col justify-between">
           <div>
             <div className="text-xs font-bold text-amber-400 uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-2 flex justify-between items-center">
@@ -739,7 +2522,7 @@ export function ViewMovimientosInventario({
   );
 }
 
-/* 5. ALERTAS DE INVENTARIO */
+
 export function ViewAlertasInventario({
   camps,
   resourceTypes,
@@ -751,35 +2534,30 @@ export function ViewAlertasInventario({
   inventoryAlerts: InventoryAlert[];
   onResolveAlert: (id: string, resolvedBy: string) => void;
 }) {
-  const resolver = currentUser.userId;
+  const resolver = "Personal Autorizado";
+  const campId = currentUser.campId;
+
+
+  const filteredAlerts = inventoryAlerts.filter(alert => {
+    const alertCampIdStr = String(alert.campId);
+    const camp = camps.find(c => String(c.id) === alertCampIdStr || (typeof c.id === 'number' && c.id === Number(alertCampIdStr)));
+    if (!camp) return false;
+    const numericCampIdOfAlert = isNaN(Number(camp.id)) ? 0 : Number(camp.id);
+    return numericCampIdOfAlert === campId;
+  });
 
   return (
-    <SectionShell kicker="MONITOREO DE ALARMAS DE SEGURIDAD" title="Frenos y Alertas de Inventario">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+    <SectionShell kicker="MONITOREO DE ALARMAS DE SEGURIDAD" title="Alertas de Inventario">
+      <div className="grid grid-cols-1 gap-5">
         
-        {/* Detail layout summary */}
-        <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-4 text-xs">
-          <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-3">Protocolo de Alarma de Stock</div>
-          <p className="text-[#A4C2C5]/80 leading-relaxed mb-3">
-            El sistema genera alertas automatizadas en cuanto las reservas de cualquier recurso de un campamento descienden por debajo del rango de seguridad establecido.
-          </p>
-          <div className="p-2 border border-[#67ACA9]/20 bg-black/45 rounded-sm flex flex-col gap-1 font-mono text-[10px] text-[#A4C2C5]/85">
-            <div>📌 <strong>Campos de Auditoría:</strong></div>
-            <div>• campId, resourceTypeId</div>
-            <div>• amountAtAlertGeneration</div>
-            <div>• alertDate</div>
+        
+        <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col gap-3">
+          <div className="border-b border-[#67ACA9]/10 pb-2 mb-2">
+            <div className="text-xs font-bold text-rose-400 uppercase">Alertas de Almacén Registradas (Campamento Actual)</div>
+            <p className="text-[11px] text-[#A4C2C5]/70 mt-1">
+              Monitoreo operativo de alarmas automáticas activadas cuando los niveles de existencias descienden de los límites de seguridad provistos en su sede.
+            </p>
           </div>
-          <div className="mt-4 flex flex-col gap-1.5">
-            <span className="text-[10px] text-[#A4C2C5]/60 font-semibold block">Responsable de Resolución:</span>
-            <span className="v-input bg-black/20 text-[#A4C2C5]/50 border border-[#67ACA9]/10 select-none flex items-center px-2 py-1.5 h-[34px] rounded-sm font-mono text-[10px]">
-              Operario #{currentUser.userId} (Firmado)
-            </span>
-          </div>
-        </div>
-
-        {/* Alert grid tables */}
-        <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
-          <div className="text-xs font-bold text-rose-400 uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-2">Alertas de Almacén Registradas</div>
 
           <div className="v-table-wrap">
             <table className="v-table text-[10px]">
@@ -794,30 +2572,38 @@ export function ViewAlertasInventario({
                 </tr>
               </thead>
               <tbody>
-                {inventoryAlerts.map(alert => {
-                  const camp = camps.find(c => c.id === alert.campId);
-                  const rt = resourceTypes.find(t => t.id === alert.resourceTypeId);
-                  return (
-                    <tr key={alert.id} className="hover:bg-cyan-950/5">
-                      <td className="font-bold text-white">{camp?.name || alert.campId}</td>
-                      <td className="text-[#69BFB7] font-semibold">{rt?.name || alert.resourceTypeId}</td>
-                      <td className="font-mono text-white font-semibold">{alert.amountAtAlertGeneration} {rt?.unitOfMeasure}</td>
-                      <td>{alert.alertDate}</td>
-                      <td>
-                        <span className={`px-1.5 py-0.5 rounded-sm font-bold text-[8px] uppercase border ${alert.resolved ? 'border-emerald-500/30 text-emerald-300 bg-emerald-950/25' : 'border-rose-500/30 text-rose-300 bg-rose-950/25 animate-pulse'}`}>
-                          {alert.resolved ? "RESUELTO" : "ACTIVO • ALERTA"}
-                        </span>
-                      </td>
-                      <td className="text-right">
-                        {!alert.resolved ? (
-                          <Btn small variant="success" onClick={() => onResolveAlert(alert.id, resolver)}>Marcar Resuelta ✓</Btn>
-                        ) : (
-                          <span className="text-[9px] text-[#A4C2C5]/50 font-mono italic">Resuelto por {alert.resolvedBy}</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {filteredAlerts.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-6 text-zinc-500 font-mono italic">
+                      No hay alertas activas registradas para su campamento.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredAlerts.map(alert => {
+                    const camp = camps.find(c => c.id === alert.campId);
+                    const rt = resourceTypes.find(t => t.id === alert.resourceTypeId);
+                    return (
+                      <tr key={alert.id} className="hover:bg-cyan-950/5">
+                        <td className="font-bold text-white">{camp?.name || alert.campId}</td>
+                        <td className="text-[#69BFB7] font-semibold">{rt?.name || alert.resourceTypeId}</td>
+                        <td className="font-mono text-white font-semibold">{alert.amountAtAlertGeneration} {rt?.unitOfMeasure}</td>
+                        <td>{alert.alertDate}</td>
+                        <td>
+                          <span className={`px-1.5 py-0.5 rounded-sm font-bold text-[8px] uppercase border ${alert.resolved ? 'border-emerald-500/30 text-emerald-300 bg-emerald-950/25' : 'border-rose-500/30 text-rose-300 bg-rose-950/25 animate-pulse'}`}>
+                            {alert.resolved ? "RESUELTO" : "ACTIVO • ALERTA"}
+                          </span>
+                        </td>
+                        <td className="text-right">
+                          {!alert.resolved ? (
+                            <Btn small variant="success" onClick={() => onResolveAlert(alert.id, resolver)}>Marcar Resuelta ✓</Btn>
+                          ) : (
+                            <span className="text-[9px] text-[#A4C2C5]/50 font-mono italic">Resuelta</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -828,7 +2614,7 @@ export function ViewAlertasInventario({
   );
 }
 
-/* 6. SOLICITUDES INTERCAMPAMENTO */
+
 export function ViewSolicitudesIntercampamento({
   camps,
   resourceTypes,
@@ -848,17 +2634,29 @@ export function ViewSolicitudesIntercampamento({
   onAddResourceToRequest: (requestId: string, resourceTypeId: string, requestedAmount: number) => void;
   onDeleteRequestResource: (id: string) => void;
 }) {
-  const originCampId = currentUser.campId;
-  const [destinationCampId, setDestinationCampId] = useState("delta");
+  const campIdVal = currentUser.campId;
+  const originCampId = campIdVal === 1 ? "camp-alpha" : campIdVal === 2 ? "camp-beta" : "camp-gamma";
+  const [destinationCampId, setDestinationCampId] = useState("");
   const [description, setDescription] = useState("");
   const [plannedDepartureDate, setPlannedDepartureDate] = useState("2026-05-20");
   const [plannedArrivalDate, setPlannedArrivalDate] = useState("2026-05-21");
-  const createdBy = currentUser.userId;
+  const [reqOccupationId, setReqOccupationId] = useState("");
+  const [reqPersonQty, setReqPersonQty] = useState("");
+  const [requestTab, setRequestTab] = useState<"sent" | "received">("sent");
+  const createdBy = String(currentUser.userId);
 
-  // Selected state for details sub-panel
+
+  useEffect(() => {
+    const defaultCamp = camps.find(c => c.id !== originCampId);
+    if (defaultCamp && (!destinationCampId || destinationCampId === originCampId)) {
+      setDestinationCampId(defaultCamp.id);
+    }
+  }, [camps, destinationCampId, originCampId]);
+
+
   const [activeReqId, setActiveReqId] = useState<string | null>(null);
 
-  // New resource item fields
+
   const [resourceTypeId, setResourceTypeId] = useState("rt-food");
   const [qty, setQty] = useState("");
 
@@ -866,7 +2664,37 @@ export function ViewSolicitudesIntercampamento({
 
   const handleCreateRequest = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description) return;
+    if (!destinationCampId) {
+      alert("El campamento de destino es obligatorio.");
+      return;
+    }
+    if (destinationCampId === originCampId) {
+      alert("El campamento destino no puede ser tu propio campamento.");
+      return;
+    }
+    if (!description.trim()) {
+      alert("La motivación o descripción del reabastecimiento es obligatoria.");
+      return;
+    }
+    if (new Date(plannedArrivalDate) < new Date(plannedDepartureDate)) {
+      alert("La fecha de llegada proyectada no puede ser anterior a la salida planificada.");
+      return;
+    }
+
+    let personRequirements: { occupationId: string; quantity: number }[] = [];
+    if (reqOccupationId || reqPersonQty) {
+      if (!reqOccupationId) {
+        alert("Debes seleccionar el Oficio/Rol para el requerimiento de personal.");
+        return;
+      }
+      const qtyNum = Number(reqPersonQty);
+      if (isNaN(qtyNum) || qtyNum <= 0) {
+        alert("La cantidad de personal requerida debe ser un número entero mayor a 0.");
+        return;
+      }
+      personRequirements = [{ occupationId: reqOccupationId, quantity: Math.floor(qtyNum) }];
+    }
+
     onAddRequest({
       originCampId,
       destinationCampId,
@@ -874,55 +2702,85 @@ export function ViewSolicitudesIntercampamento({
       description,
       plannedDepartureDate,
       plannedArrivalDate,
-      personRequirements: [{ occupationId: "occ-driver", quantity: 1 }],
+      personRequirements,
       createdDate: new Date().toLocaleDateString("es-ES"),
       createdBy
     });
     setDescription("");
+    setReqOccupationId("");
+    setReqPersonQty("");
   };
 
   const currentDetails = requestResourceDetails.filter(d => d.requestId === activeReqId);
+
+
+  const sentRequests = intercampRequests.filter(req => req.originCampId === originCampId);
+  const receivedRequests = intercampRequests.filter(req => req.destinationCampId === originCampId);
+  const activeRequestsToShow = requestTab === "sent" ? sentRequests : receivedRequests;
 
   return (
     <SectionShell kicker="COORDINACIÓN LOGÍSTICA SUCURSAL" title="Solicitudes de Reabastecimiento Intercampamento">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
-        {/* Create Form */}
+        
         <form onSubmit={handleCreateRequest} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-3 rounded-sm lg:col-span-4 flex flex-col gap-3">
           <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-1">Nueva Solicitud Intercampamento</div>
 
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex flex-col gap-1">
-              <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Campamento Origen (Abastece)</span>
-              <span className="v-input bg-black/20 text-[#69BFB7] border border-[#67ACA9]/20 select-none flex items-center px-2 py-1.5 h-[34px] font-bold rounded-sm">
-                Base Alfa (Propio)
+              <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Campamento Origen *</span>
+              <span className="v-input bg-black/20 text-[#69BFB7] border border-[#67ACA9]/20 select-none flex items-center px-2 py-1.5 h-[34px] font-bold rounded-sm text-[11px]">
+                {camps.find(c => c.id === originCampId)?.name || "Bunker Propio"}
               </span>
             </div>
             <label className="v-field flex flex-col gap-1">
-              <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Campamento Destino (Solicita) *</span>
+              <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Campamento Destino *</span>
               <select value={destinationCampId} onChange={e => setDestinationCampId(e.target.value)} className="v-select text-[11px]">
-                {camps.filter(c => c.id !== currentUser.campId).map(c => (
+                {camps.filter(c => c.id !== originCampId).map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
             </label>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <label className="v-field flex flex-col gap-1">
-              <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Salida Planificada</span>
-              <input type="date" value={plannedDepartureDate} onChange={e => setPlannedDepartureDate(e.target.value)} className="v-input" />
-            </label>
-            <label className="v-field flex flex-col gap-1">
-              <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Llegada Proyectada</span>
-              <input type="date" value={plannedArrivalDate} onChange={e => setPlannedArrivalDate(e.target.value)} className="v-input" />
-            </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <DateTimeField 
+              label="Salida Planificada"
+              value={plannedDepartureDate}
+              onChange={setPlannedDepartureDate}
+            />
+            <DateTimeField 
+              label="Llegada Proyectada"
+              value={plannedArrivalDate}
+              onChange={setPlannedArrivalDate}
+            />
+          </div>
+
+          
+          <div className="border border-[#67ACA9]/20 p-2 rounded bg-black/25 text-xs flex flex-col gap-1.5">
+            <span className="text-[#A4C2C5]/70 font-bold block mb-0.5 text-[10px]">REQUERIMIENTOS DE PERSONAL (OPCIONAL)</span>
+            <div className="grid grid-cols-2 gap-1.5">
+              <label className="flex flex-col gap-0.5">
+                <span className="text-[9px] text-[#A4C2C5]/50">Oficio/Rol:</span>
+                <select value={reqOccupationId} onChange={e => setReqOccupationId(e.target.value)} className="v-select text-[10px] !py-0.5">
+                  <option value="">-- Ninguno --</option>
+                  <option value="occ-soldier">Soldado de Base</option>
+                  <option value="occ-pilot">Piloto Especializado</option>
+                  <option value="occ-medic">Cuerpo Médico</option>
+                  <option value="occ-driver">Conductor / Chofer</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-0.5">
+                <span className="text-[9px] text-[#A4C2C5]/50">Cantidad:</span>
+                <input type="number" value={reqPersonQty} onChange={e => setReqPersonQty(e.target.value)} className="v-input text-[10px] !py-0.5" placeholder="0" />
+              </label>
+            </div>
           </div>
 
           <div className="flex flex-col gap-1 text-xs">
             <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Encargado de Solicitud</span>
             <span className="v-input bg-black/20 text-[#A4C2C5]/50 border border-[#67ACA9]/10 select-none flex items-center px-2 py-1.5 h-[34px] rounded-sm font-mono text-[10px]">
-              Operario #{currentUser.userId} (Firmado)
+              Personal Autorizado
             </span>
           </div>
 
@@ -934,10 +2792,29 @@ export function ViewSolicitudesIntercampamento({
           <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Crear Solicitud Intercampamento</Btn>
         </form>
 
-        {/* List of Requests */}
+        
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-3 rounded-sm lg:col-span-8 flex flex-col gap-4">
           <div>
             <div className="text-xs font-bold text-amber-400 uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-2">Canal Operativo de Solicitudes</div>
+            
+            
+            <div className="flex gap-2 mb-3">
+              <button 
+                type="button"
+                onClick={() => setRequestTab("sent")}
+                className={`text-[10px] px-3 py-1.5 rounded-sm font-bold border transition ${requestTab === "sent" ? "bg-[#69BFB7]/20 border-[#69BFB7] text-[#69BFB7]" : "border-[#67ACA9]/10 text-[#A4C2C5]/60 hover:text-white bg-black/20"}`}
+              >
+                Solicitudes Enviadas ({sentRequests.length})
+              </button>
+              <button 
+                type="button"
+                onClick={() => setRequestTab("received")}
+                className={`text-[10px] px-3 py-1.5 rounded-sm font-bold border transition ${requestTab === "received" ? "bg-[#69BFB7]/20 border-[#69BFB7] text-[#69BFB7]" : "border-[#67ACA9]/10 text-[#A4C2C5]/60 hover:text-white bg-black/20"}`}
+              >
+                Solicitudes Recibidas ({receivedRequests.length})
+              </button>
+            </div>
+
             <div className="v-table-wrap max-h-48 overflow-y-auto">
               <table className="v-table text-[10px]">
                 <thead>
@@ -951,7 +2828,7 @@ export function ViewSolicitudesIntercampamento({
                   </tr>
                 </thead>
                 <tbody>
-                  {intercampRequests.map(req => {
+                  {activeRequestsToShow.map(req => {
                     const origin = camps.find(c => c.id === req.originCampId);
                     const dest = camps.find(c => c.id === req.destinationCampId);
                     return (
@@ -967,10 +2844,10 @@ export function ViewSolicitudesIntercampamento({
                         <td className="italic">{req.description}</td>
                         <td className="text-right flex gap-1 justify-end">
                           <Btn small variant="ghost" onClick={() => setActiveReqId(req.id)}>Ver Recursos</Btn>
-                          {req.status === "PENDING" && (
+                          {req.status === "PENDING" && requestTab === "received" && (
                             <>
-                              <Btn small variant="success" onClick={() => onUpdateRequestStatus(req.id, "APPROVED", currentUser.userId)}>Aprobar</Btn>
-                              <Btn small variant="danger" onClick={() => onUpdateRequestStatus(req.id, "REJECTED", currentUser.userId)}>Rechazar</Btn>
+                              <Btn small variant="success" onClick={() => onUpdateRequestStatus(req.id, "APPROVED", String(currentUser.userId))}>Aprobar</Btn>
+                              <Btn small variant="danger" onClick={() => onUpdateRequestStatus(req.id, "REJECTED", String(currentUser.userId))}>Rechazar</Btn>
                             </>
                           )}
                         </td>
@@ -982,7 +2859,7 @@ export function ViewSolicitudesIntercampamento({
             </div>
           </div>
 
-          {/* Sub-Panel: Resource Request Detail */}
+          
           {activeReqId && selectedRequest && (
             <div className="p-3 bg-black/45 border border-[#67ACA9]/30 rounded-sm">
               <div className="flex justify-between items-center border-b border-[#67ACA9]/15 pb-1 mb-2">
@@ -990,7 +2867,7 @@ export function ViewSolicitudesIntercampamento({
                 <button type="button" className="text-red-400 hover:text-white" onClick={() => setActiveReqId(null)}>✕</button>
               </div>
 
-              {/* Form to add item details to requested list */}
+              
               {selectedRequest.status === "PENDING" && (
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 mb-3 items-end">
                   <div className="col-span-5 flex flex-col gap-0.5 text-[10px]">
@@ -1000,20 +2877,24 @@ export function ViewSolicitudesIntercampamento({
                     </select>
                   </div>
                   <div className="col-span-3 flex flex-col gap-0.5 text-[10px]">
-                    <span className="text-[#A4C2C5]/70">Ración Cantidad</span>
+                    <span className="text-[#A4C2C5]/70">Ración Cantidad *</span>
                     <input type="number" value={qty} onChange={e => setQty(e.target.value)} className="v-input py-1 text-xs text-center" placeholder="0" />
                   </div>
                   <div className="col-span-4">
                     <Btn small variant="primary" style={{ width: "100%", padding: "5px" }} onClick={() => {
-                      if (!qty) return;
-                      onAddResourceToRequest(selectedRequest.id, resourceTypeId, Number(qty));
+                      const qtyNum = Number(qty);
+                      if (isNaN(qtyNum) || qtyNum <= 0 || !Number.isInteger(qtyNum)) {
+                        alert("La cantidad de recurso debe ser un número entero mayor a 0.");
+                        return;
+                      }
+                      onAddResourceToRequest(selectedRequest.id, resourceTypeId, qtyNum);
                       setQty("");
                     }}>Agregar Articulo</Btn>
                   </div>
                 </div>
               )}
 
-              {/* Table of items added */}
+              
               <div className="v-table-wrap max-h-32 overflow-y-auto">
                 <table className="v-table text-[10px]">
                   <thead>
@@ -1055,7 +2936,7 @@ export function ViewSolicitudesIntercampamento({
   );
 }
 
-/* 7. TRASLADOS */
+
 export function ViewTraslados({
   camps,
   intercampRequests,
@@ -1064,7 +2945,8 @@ export function ViewTraslados({
   onAddTransfer,
   onUpdateTransferStatus,
   onAddPersonToTransfer,
-  onUpdatePersonStatus
+  onUpdatePersonStatus,
+  onDeletePersonFromTransfer
 }: {
   camps: Camp[];
   intercampRequests: IntercampRequest[];
@@ -1074,11 +2956,11 @@ export function ViewTraslados({
   onUpdateTransferStatus: (id: string, status: Transfer["status"], notes: string) => void;
   onAddPersonToTransfer: (transferId: string, personId: string) => void;
   onUpdatePersonStatus: (id: string, status: TransferPerson["status"]) => void;
+  onDeletePersonFromTransfer: (id: string) => void;
 }) {
   const [requestId, setRequestId] = useState("");
   const [depDate, setDepDate] = useState("2026-05-20");
   const [arrDate, setArrDate] = useState("2026-05-21");
-  const [rations, setRations] = useState("10");
 
   const [activeTransferId, setActiveTransferId] = useState<string | null>(null);
   const [personId, setPersonId] = useState("");
@@ -1087,15 +2969,42 @@ export function ViewTraslados({
 
   const approvedRequests = intercampRequests.filter(r => r.status === "APPROVED" && !transfers.some(t => t.requestId === r.id));
 
+  const calculateRationsForTrip = (
+    peopleCount: number,
+    depDateStr: string,
+    arrDateStr: string
+  ): number => {
+    if (peopleCount === 0 || !depDateStr || !arrDateStr) return 0;
+    const departure = new Date(depDateStr);
+    const arrival = new Date(arrDateStr);
+    if (isNaN(departure.getTime()) || isNaN(arrival.getTime())) return 0;
+    
+    const diffTime = Math.max(0, arrival.getTime() - departure.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const durationDays = Math.max(1, diffDays); 
+    
+    const minimumDailyRationPerPerson = 1.50; 
+    return peopleCount * minimumDailyRationPerPerson * durationDays;
+  };
+
   const handleCreateTransfer = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!requestId) return;
+    if (!requestId) {
+      alert("Seleccione una solicitud aprobada.");
+      return;
+    }
+    const matchedReq = approvedRequests.find(r => r.id === requestId);
+    if (!matchedReq) {
+      alert("No se encontró la solicitud seleccionada.");
+      return;
+    }
+
     onAddTransfer({
       requestId,
-      plannedDepartureDate: depDate,
-      plannedArrivalDate: arrDate,
-      status: "PENDING_DEPARTURE",
-      rationsForTrip: Number(rations),
+      plannedDepartureDate: matchedReq.plannedDepartureDate,
+      plannedArrivalDate: matchedReq.plannedArrivalDate,
+      status: "PLANNING",
+      rationsForTrip: 0, 
     });
     setRequestId("");
   };
@@ -1108,14 +3017,14 @@ export function ViewTraslados({
     <SectionShell kicker="COORDINACIÓN LOGÍSTICA SUCURSAL" title="Gestión de Convoyes e Historial de Traslado">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
-        {/* Forms box */}
+        
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-3 rounded-sm lg:col-span-4 flex flex-col gap-3">
           <div className="text-xs font-bold text-emerald-400 uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-1">Habilitar Traslado desde Solicitud Aprobada</div>
 
           {approvedRequests.length > 0 ? (
             <form onSubmit={handleCreateTransfer} className="flex flex-col gap-3 text-xs">
               <label className="v-field flex flex-col gap-1">
-                <span className="v-field-label text-[#A4C2C5]/70">Solicitud Aprobada Relacionada</span>
+                <span className="v-field-label text-[#A4C2C5]/70">Solicitud Aprobada Relacionada *</span>
                 <select value={requestId} onChange={e => setRequestId(e.target.value)} className="v-select">
                   <option value="">Seleccionar Solicitud...</option>
                   {approvedRequests.map(r => (
@@ -1124,32 +3033,35 @@ export function ViewTraslados({
                 </select>
               </label>
 
-              <div className="grid grid-cols-2 gap-2">
-                <label className="v-field flex flex-col gap-1">
-                  <span className="v-field-label text-[#A4C2C5]/70">Salida Real</span>
-                  <input type="date" value={depDate} onChange={e => setDepDate(e.target.value)} className="v-input" />
-                </label>
-                <label className="v-field flex flex-col gap-1">
-                  <span className="v-field-label text-[#A4C2C5]/70">Llegada Real</span>
-                  <input type="date" value={arrDate} onChange={e => setArrDate(e.target.value)} className="v-input" />
-                </label>
-              </div>
+              {requestId && (() => {
+                const req = approvedRequests.find(r => r.id === requestId);
+                return (
+                  <div className="bg-[#67ACA9]/5 border border-[#67ACA9]/10 p-2.5 rounded-sm flex flex-col gap-1 text-[10px] font-mono leading-normal text-[#A4C2C5]">
+                    <span className="text-[#69BFB7] font-bold uppercase text-[9px] mb-0.5">Datos Heredados de Solicitud</span>
+                    <div>• <strong>Salida Planificada:</strong> {req?.plannedDepartureDate}</div>
+                    <div>• <strong>Llegada Proyectada:</strong> {req?.plannedArrivalDate}</div>
+                    <div>• <strong>Origen:</strong> {camps.find(c => c.id === req?.originCampId)?.name}</div>
+                    <div>• <strong>Destino:</strong> {camps.find(c => c.id === req?.destinationCampId)?.name}</div>
+                  </div>
+                );
+              })()}
 
-              <label className="v-field flex flex-col gap-1">
-                <span className="v-field-label text-[#A4C2C5]/70">Raciones para el Viaje</span>
-                <input type="number" value={rations} onChange={e => setRations(e.target.value)} className="v-input" />
-              </label>
+              <div className="p-3 border border-[#67ACA9]/25 bg-black/40 rounded-sm flex flex-col gap-1 select-none">
+                <span className="text-[9.5px] font-mono text-[#A4C2C5]/60 block uppercase">Cálculo Raciones Estimadas</span>
+                <span className="text-[10.5px] font-bold text-cyan-300">Provisión Automatizada via Backend</span>
+                <span className="text-[9px] text-[#A4C2C5]/50 italic leading-snug">Las raciones definitivas se sincronizan automáticamente una vez asigne escoltas al convoy de traslado.</span>
+              </div>
 
               <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Habilitar Manifiesto de Convoy</Btn>
             </form>
           ) : (
             <div className="text-[10px] text-amber-300 bg-amber-950/20 p-4 text-center rounded-sm border border-amber-500/20">
-              ⚡ No hay solicitudes de reabastecimiento intercampamento aprobadas pendientes de traslado.
+              No hay solicitudes de reabastecimiento intercampamento aprobadas pendientes de traslado.
             </div>
           )}
         </div>
 
-        {/* Transfers Active List */}
+        
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-3 rounded-sm lg:col-span-8 flex flex-col gap-4">
           <div>
             <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-2">Convoyes en Tránsito de Red</div>
@@ -1171,16 +3083,30 @@ export function ViewTraslados({
                       <td className="font-bold text-white">{tr.id}</td>
                       <td>{tr.requestId}</td>
                       <td>
-                        <span className={`px-1 rounded-xs font-bold text-[8px] uppercase border ${tr.status === "COMPLETED" ? "border-emerald-500/30 text-emerald-300" : "border-rose-500/3 animate-pulse text-amber-300 bg-amber-950/20"}`}>
+                        <span className={`px-1 py-0.5 rounded-xs font-bold text-[8px] uppercase border ${
+                          tr.status === "DELIVERED" ? "border-emerald-500/30 text-emerald-300 bg-emerald-950/20" : 
+                          tr.status === "EN_ROUTE" ? "border-sky-500/30 text-sky-300 bg-sky-950/20 animate-pulse" : 
+                          tr.status === "CANCELED" ? "border-rose-500/30 text-rose-300 bg-rose-950/20" : 
+                          "border-amber-500/30 text-amber-300 bg-amber-950/20"
+                        }`}>
                           {tr.status}
                         </span>
                       </td>
                       <td>{tr.rationsForTrip} Raciones</td>
                       <td>{tr.plannedDepartureDate}</td>
-                      <td className="text-right flex gap-1 justify-end">
-                        <Btn small variant="ghost" onClick={() => setActiveTransferId(tr.id)}>Asignar Personas</Btn>
-                        {tr.status === "PENDING_DEPARTURE" && (
-                          <Btn small variant="success" onClick={() => onUpdateTransferStatus(tr.id, "COMPLETED", "Entrega completada sin retraso")}>Marcar Completado ✓</Btn>
+                      <td className="text-right flex gap-1 justify-end flex-wrap max-w-xs ml-auto">
+                        <Btn small variant="ghost" onClick={() => setActiveTransferId(tr.id)}>Escoltas</Btn>
+                        {tr.status === "PLANNING" && (
+                          <>
+                            <Btn small variant="success" onClick={() => onUpdateTransferStatus(tr.id, "EN_ROUTE", "Viaje iniciado en ruta")}>Iniciar Viaje</Btn>
+                            <Btn small variant="danger" onClick={() => onUpdateTransferStatus(tr.id, "CANCELED", "Cancelado desde planificación")}>Cancelar</Btn>
+                          </>
+                        )}
+                        {tr.status === "EN_ROUTE" && (
+                          <>
+                            <Btn small variant="success" onClick={() => onUpdateTransferStatus(tr.id, "DELIVERED", "Entrega completada satisfactoriamente")}>Entregar ✓</Btn>
+                            <Btn small variant="danger" onClick={() => onUpdateTransferStatus(tr.id, "CANCELED", "Cancelado en pleno tránsito")}>Cancelar</Btn>
+                          </>
                         )}
                       </td>
                     </tr>
@@ -1190,7 +3116,7 @@ export function ViewTraslados({
             </div>
           </div>
 
-          {/* Subpanel for persons in transit convoy */}
+          
           {activeTransferId && selectedTransfer && (
             <div className="p-3 bg-black/45 border border-[#67ACA9]/30 rounded-sm">
               <div className="flex justify-between items-center border-b border-[#67ACA9]/15 pb-1 mb-2">
@@ -1198,19 +3124,28 @@ export function ViewTraslados({
                 <button type="button" className="text-red-400 hover:text-white" onClick={() => setActiveTransferId(null)}>✕</button>
               </div>
 
-              {selectedTransfer.status !== "COMPLETED" && (
+              {selectedTransfer.status === "PLANNING" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 mb-3 items-end">
                   <div className="col-span-8 flex flex-col gap-0.5 text-[10px]">
-                    <span className="text-[#A4C2C5]/70">Ficha de Identidad Persona (Nombre/Código)</span>
-                    <input type="text" value={personId} onChange={e => setPersonId(e.target.value)} className="v-input py-1 text-xs" placeholder="e.g. p-soldado-04" />
+                    <span className="text-[#A4C2C5]/70">Ficha de Identidad Persona (Nombre/Código) *</span>
+                    <input type="text" value={personId} onChange={e => setPersonId(e.target.value)} className="v-input py-1 text-xs" placeholder="e.g. p-soldier1" />
                   </div>
                   <div className="col-span-4">
                     <Btn small variant="primary" style={{ width: "100%", padding: "5px" }} onClick={() => {
                       if (!personId) return;
+                      const regex = /^p-[a-zA-Z0-9-]+$/;
+                      if (!regex.test(personId)) {
+                        alert("El ID personal no es válido. Debe comenzar con 'p-' (ej. p-soldier1, p-agricultor-02).");
+                        return;
+                      }
                       onAddPersonToTransfer(selectedTransfer.id, personId);
                       setPersonId("");
                     }}>Vincular Escolta</Btn>
                   </div>
+                </div>
+              ) : (
+                <div className="bg-[#67ACA9]/5 border border-[#67ACA9]/10 p-2 text-[10px] text-[#A4C2C5]/50 italic mb-2">
+                  La asignación de personal está bloqueada porque el convoy se encuentra en estado {selectedTransfer.status}. Solo se admite modificación en estado PLANNING.
                 </div>
               )}
 
@@ -1233,12 +3168,9 @@ export function ViewTraslados({
                           </span>
                         </td>
                         <td className="text-right">
-                          {tp.status === "CONFIRMED" && (
-                            <div className="flex justify-end gap-1">
-                              <Btn small variant="success" onClick={() => onUpdatePersonStatus(tp.id, "DELIVERED")}>Entregado</Btn>
-                              <Btn small variant="danger" onClick={() => onUpdatePersonStatus(tp.id, "CANCELED")}>Cancelar</Btn>
-                            </div>
-                          )}
+                          <div className="flex justify-end gap-1">
+                            <Btn small variant="danger" disabled={selectedTransfer.status !== "PLANNING"} onClick={() => onDeletePersonFromTransfer(tp.id)}>Quitar</Btn>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1250,6 +3182,25 @@ export function ViewTraslados({
                   </tbody>
                 </table>
               </div>
+
+              
+              <div className="mt-3.5 p-2.5 bg-[#67ACA9]/5 border border-[#67ACA9]/15 rounded-xs text-[10px] font-mono leading-relaxed text-[#A4C2C5]">
+                <span className="text-[#69BFB7] font-bold uppercase tracking-wider block mb-1 select-none">Cálculo de Provisión de Viaje:</span>
+                <div className="flex justify-between items-center bg-black/25 px-2 py-1.5 rounded-xs border border-[#67ACA9]/10 select-none">
+                  <span>Personas: <strong className="text-white">{currentPersons.length}</strong></span>
+                  <span>Días: <strong className="text-white">{Math.max(1, Math.ceil((new Date(selectedTransfer.plannedArrivalDate).getTime() - new Date(selectedTransfer.plannedDepartureDate).getTime()) / (1000 * 60 * 60 * 24)) || 1)}d</strong></span>
+                  <span className="font-bold">Total Est:</span>
+                  {currentPersons.length === 0 ? (
+                    <span className="text-amber-400 font-bold">Raciones pendientes</span>
+                  ) : (
+                    <span className="text-cyan-300 font-black">{(currentPersons.length * 1.50 * (Math.max(1, Math.ceil((new Date(selectedTransfer.plannedArrivalDate).getTime() - new Date(selectedTransfer.plannedDepartureDate).getTime()) / (1000 * 60 * 60 * 24)) || 1))).toFixed(2)} Raciones</span>
+                  )}
+                </div>
+                <span className="text-[8.5px] text-[#A4C2C5]/40 block mt-1.5 italic select-none">
+                  * Raciones calculadas automáticamente según personas y fechas de viaje.
+                </span>
+              </div>
+
             </div>
           )}
         </div>
@@ -1259,7 +3210,7 @@ export function ViewTraslados({
   );
 }
 
-/* 8. RECURSOS DE EXPEDICIONES */
+
 export function ViewRecursosExpediciones({
   resourceTypes,
   expeditionsResources,
@@ -1293,7 +3244,7 @@ export function ViewRecursosExpediciones({
     <SectionShell kicker="CONTROL LOGÍSTICO COMPLEMENTARIO" title="Recursos Consumidos y Obtenidos en Expediciones">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
-        {/* Registration */}
+        
         <form onSubmit={handleSubmit} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-3 rounded-sm lg:col-span-4 flex flex-col gap-3">
           <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/20 pb-1.5 mb-1">Registrar Parte del Campamento</div>
 
@@ -1331,7 +3282,7 @@ export function ViewRecursosExpediciones({
           <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Archivar Bitácora de Expedición</Btn>
         </form>
 
-        {/* Historic lists */}
+        
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
           <div className="text-xs font-bold text-amber-400 uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-2">Histórico de Consumos y Obtenciones</div>
 
@@ -1375,7 +3326,7 @@ export function ViewRecursosExpediciones({
   );
 }
 
-/* 9. RECURSOS ENTREGADOS DE TRASLADO */
+
 export function ViewRecursosEntregados({
   transfers,
   resourceTypes,
@@ -1393,7 +3344,7 @@ export function ViewRecursosEntregados({
   const [receivedAmount, setReceivedAmount] = useState("");
   const [recordedBy, setRecordedBy] = useState("M. Operator");
 
-  const completedTransfers = transfers.filter(t => t.status === "COMPLETED");
+  const completedTransfers = transfers.filter(t => t.status === "DELIVERED");
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1414,7 +3365,7 @@ export function ViewRecursosEntregados({
     <SectionShell kicker="VERIFICACIÓN COLECTIVA" title="Recursos Entregados y Discrepancias de Traslado">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
-        {/* Form */}
+        
         <form onSubmit={handleSave} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-3 rounded-sm lg:col-span-4 flex flex-col gap-3">
           <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-1">Registrar Control de Entrega</div>
 
@@ -1454,7 +3405,7 @@ export function ViewRecursosEntregados({
           <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>📊 Archivar Comprobante de Arribo</Btn>
         </form>
 
-        {/* List data */}
+        
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
           <div className="text-xs font-bold text-emerald-400 uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-2">Comprobantes de Entrega en Destino</div>
 
@@ -1503,105 +3454,86 @@ export function ViewRecursosEntregados({
   );
 }
 
-/* 10. TIPOS DE RECURSO */
+
 export function ViewTiposDeRecurso({
   resourceTypes,
   onAddResourceType,
   onUpdateResourceType,
-  onDeleteResourceType
+  onDeleteResourceType,
+  onNavigateToSub
 }: {
   resourceTypes: ResourceType[];
   onAddResourceType: (data: ResourceType) => void;
   onUpdateResourceType: (id: string, updated: Partial<ResourceType>) => void;
   onDeleteResourceType: (id: string) => void;
+  onNavigateToSub?: (sub: string) => void;
 }) {
-  const [name, setName] = useState("");
-  const [unitOfMeasure, setUnitOfMeasure] = useState("");
-  const [category, setCategory] = useState<ResourceType["category"]>("FOOD");
-  const [description, setDescription] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [detailResourceType, setDetailResourceType] = useState<ResourceType | null>(null);
+  const [movementResourceType, setMovementResourceType] = useState<ResourceType | null>(null);
 
-  // Editing states
-  const [editName, setEditName] = useState("");
-  const [editUnit, setEditUnit] = useState("");
-  const [editCat, setEditCat] = useState<ResourceType["category"]>("FOOD");
-  const [editDesc, setEditDesc] = useState("");
 
-  const handleCreate = (e: React.FormEvent) => {
+  const [movementAmount, setMovementAmount] = useState("");
+  const [movementType, setMovementType] = useState<string>("MANUAL_ADJUSTMENT");
+  const [movementDescription, setMovementDescription] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const filteredTypes = resourceTypes.filter(rt => {
+    const matchesSearch = rt.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (rt.description && rt.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesCat = selectedCategory === "ALL" || rt.category === selectedCategory;
+    return matchesSearch && matchesCat;
+  });
+
+  const handleRegisterMovement = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !unitOfMeasure.trim() || !category) {
-      alert("Por favor rellene todos los campos obligatorios.");
+    if (!movementResourceType) return;
+    const amountVal = Number(movementAmount);
+    if (!movementAmount.trim() || isNaN(amountVal) || amountVal <= 0) {
+      setErrorMsg("La cantidad debe ser mayor que cero.");
+      setSuccessMsg("");
       return;
     }
-
-    const nameExists = resourceTypes.some(rt => rt.name.toLowerCase() === name.trim().toLowerCase());
-    if (nameExists) {
-      alert("Error: Ya existe un tipo de recurso con este nombre.");
-      return;
-    }
-
-    onAddResourceType({
-      id: `rt-${Date.now().toString().slice(-4)}`,
-      name: name.trim(),
-      unitOfMeasure: unitOfMeasure.trim(),
-      category,
-      description: description.trim()
-    });
-
-    setName("");
-    setUnitOfMeasure("");
-    setDescription("");
-  };
-
-  const handleUpdate = (id: string) => {
-    if (!editName.trim() || !editUnit.trim()) {
-      alert("Nombre y Unidad de medida obligatorios.");
-      return;
-    }
-
-    const nameExists = resourceTypes.some(rt => rt.id !== id && rt.name.toLowerCase() === editName.trim().toLowerCase());
-    if (nameExists) {
-      alert("Error: Ya existe otro tipo de recurso con este nombre.");
-      return;
-    }
-
-    onUpdateResourceType(id, {
-      name: editName.trim(),
-      unitOfMeasure: editUnit.trim(),
-      category: editCat,
-      description: editDesc.trim()
-    });
-
-    setEditingId(null);
-  };
-
-  const handleDelete = (id: string) => {
-    if (confirm("🚨 ATENCIÓN: Eliminar un tipo de recurso puede invalidar inventarios actuales, movimientos y registros de distribución previos. ¿Está seguro de continuar?")) {
-      onDeleteResourceType(id);
-    }
+    
+    setErrorMsg("");
+    setSuccessMsg(`Movimiento de ${amountVal} ${movementResourceType.unitOfMeasure} (${movementType}) registrado con éxito.`);
+    
+    setTimeout(() => {
+      setMovementResourceType(null);
+      setMovementAmount("");
+      setMovementType("MANUAL_ADJUSTMENT");
+      setMovementDescription("");
+      setSuccessMsg("");
+    }, 2500);
   };
 
   return (
     <SectionShell kicker="DICCIONARIO DE SUMINISTROS" title="Glosario Registrado de Tipos de Recursos">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <div className="flex flex-col gap-5">
         
-        {/* Create Form */}
-        <form onSubmit={handleCreate} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-4 flex flex-col gap-3 h-fit">
-          <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-1">Registrar Tipo de Recurso</div>
+        
+        <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <span className="text-[10px] font-mono text-[#69BFB7] uppercase tracking-[2px] font-bold">Filtros Tácticos:</span>
+            
+            
+            <input
+              type="text"
+              className="v-input py-1 px-2.5 text-xs w-full md:w-[220px]"
+              placeholder="Buscar por nombre..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
 
-          <label className="v-field flex flex-col gap-0.5 text-xs">
-            <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Nombre del Recurso *</span>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} className="v-input" placeholder="e.g. Drinking Water" />
-          </label>
-
-          <label className="v-field flex flex-col gap-0.5 text-xs">
-            <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Unidad de Medida *</span>
-            <input type="text" value={unitOfMeasure} onChange={e => setUnitOfMeasure(e.target.value)} className="v-input" placeholder="e.g. liters, kg" />
-          </label>
-
-          <label className="v-field flex flex-col gap-1 text-xs">
-            <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Categoría *</span>
-            <select value={category} onChange={e => setCategory(e.target.value as any)} className="v-select">
+            
+            <select
+              value={selectedCategory}
+              onChange={e => setSelectedCategory(e.target.value)}
+              className="v-select py-1 px-2.5 text-xs w-full md:w-[180px]"
+            >
+              <option value="ALL">Todas las Categorías</option>
               <option value="FOOD">Comida (FOOD)</option>
               <option value="WATER">Agua (WATER)</option>
               <option value="HYGIENE">Higiene (HYGIENE)</option>
@@ -1610,108 +3542,232 @@ export function ViewTiposDeRecurso({
               <option value="MEDICAL">Medicina (MEDICAL)</option>
               <option value="OTHER">Otro (OTHER)</option>
             </select>
-          </label>
+          </div>
 
-          <label className="v-field flex flex-col gap-0.5 text-xs">
-            <span className="v-field-label text-[#A4C2C5]/70">Descripción Táctica</span>
-            <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="v-input" placeholder="Breve nota de uso..." />
-          </label>
-
-          <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Agregar Tipo de Recurso</Btn>
-        </form>
-
-        {/* List & Edit Table */}
-        <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
-          <div className="text-xs font-bold text-amber-300 uppercase border-b border-[#67ACA9]/10 pb-1.5">Tipos de Suministros Homologados</div>
-
-          <div className="v-table-wrap max-h-[450px] overflow-y-auto">
-            <table className="v-table text-[10px]">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Nombre</th>
-                  <th>Clase</th>
-                  <th>Unidad</th>
-                  <th>Descripción</th>
-                  <th className="text-right">Operaciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {resourceTypes.map(rt => {
-                  const isEditing = editingId === rt.id;
-
-                  return (
-                    <tr key={rt.id} className="hover:bg-cyan-950/5">
-                      <td className="font-mono text-white text-[9px]">{rt.id}</td>
-                      <td>
-                        {isEditing ? (
-                          <input type="text" className="v-input py-0.5 px-1 font-bold" value={editName} onChange={e => setEditName(e.target.value)} />
-                        ) : (
-                          <span className="font-bold text-[#69BFB7]">{rt.name}</span>
-                        )}
-                      </td>
-                      <td>
-                        {isEditing ? (
-                          <select value={editCat} onChange={e => setEditCat(e.target.value as any)} className="v-select py-0.5 px-1 text-[9px]">
-                            <option value="FOOD">FOOD</option>
-                            <option value="WATER">WATER</option>
-                            <option value="HYGIENE">HYGIENE</option>
-                            <option value="DEFENSE">DEFENSE</option>
-                            <option value="AMMUNITION">AMMUNITION</option>
-                            <option value="MEDICAL">MEDICAL</option>
-                            <option value="OTHER">OTHER</option>
-                          </select>
-                        ) : (
-                          <span className="font-mono text-[9px]">{rt.category}</span>
-                        )}
-                      </td>
-                      <td>
-                        {isEditing ? (
-                          <input type="text" className="v-input py-0.5 px-1" value={editUnit} onChange={e => setEditUnit(e.target.value)} />
-                        ) : (
-                          rt.unitOfMeasure
-                        )}
-                      </td>
-                      <td className="italic text-[#A4C2C5]/70 max-w-[150px] truncate">
-                        {isEditing ? (
-                          <input type="text" className="v-input py-0.5 px-1 italic" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
-                        ) : (
-                          rt.description
-                        )}
-                      </td>
-                      <td className="text-right flex gap-1 justify-end items-center">
-                        {isEditing ? (
-                          <>
-                            <Btn small variant="success" onClick={() => handleUpdate(rt.id)}>Guardar ✓</Btn>
-                            <Btn small variant="ghost" onClick={() => setEditingId(null)}>Can.</Btn>
-                          </>
-                        ) : (
-                          <>
-                            <Btn small variant="primary" onClick={() => {
-                              setEditingId(rt.id);
-                              setEditName(rt.name);
-                              setEditUnit(rt.unitOfMeasure);
-                              setEditCat(rt.category);
-                              setEditDesc(rt.description);
-                            }}>Editar</Btn>
-                            <Btn small variant="ghost" onClick={() => handleDelete(rt.id)}>Eliminar</Btn>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="text-[10px] font-mono text-zinc-500 uppercase">
+            Suministros coincidentes: <strong className="text-white font-mono">{filteredTypes.length}</strong>
           </div>
         </div>
+
+        
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          
+          
+          <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
+            <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 flex justify-between items-center">
+              <span>Tipos de Suministros Homologados (Solo Consulta)</span>
+              <span className="text-[9px] text-[#A4C2C5]/50 uppercase font-normal">Rol: RESOURCE_MANAGEMENT</span>
+            </div>
+
+            <div className="v-table-wrap max-h-[450px] overflow-y-auto">
+              <table className="v-table text-[11px]">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Clase / Categoría</th>
+                    <th>Unidad</th>
+                    <th className="text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTypes.map(rt => (
+                    <tr key={rt.id} className="hover:bg-cyan-950/10">
+                      <td className="font-mono text-white text-[9px]">{rt.id}</td>
+                      <td>
+                        <span className="font-bold text-[#69BFB7]">{rt.name}</span>
+                      </td>
+                      <td>
+                        <span className="font-mono text-[9px] bg-cyan-950/60 text-[#69BFB7] border border-[#67ACA9]/10 px-1.5 py-0.5 rounded-sm">
+                          {rt.category}
+                        </span>
+                      </td>
+                      <td className="font-mono text-[#A4C2C5]/80">{rt.unitOfMeasure}</td>
+                      <td className="text-right">
+                        <div className="flex gap-1 justify-end items-center font-mono">
+                          <Btn small variant="ghost" onClick={() => setDetailResourceType(rt)}>
+                            Detalle
+                          </Btn>
+                          <Btn small variant="ghost" onClick={() => {
+                            if (onNavigateToSub) {
+                              onNavigateToSub("Inventario del campamento");
+                            }
+                          }}>
+                            Inventario
+                          </Btn>
+                          <Btn small variant="primary" onClick={() => {
+                            setMovementResourceType(rt);
+                            setMovementAmount("");
+                            setMovementType("MANUAL_ADJUSTMENT");
+                            setMovementDescription("");
+                            setSuccessMsg("");
+                            setErrorMsg("");
+                          }}>
+                            + Movimiento
+                          </Btn>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredTypes.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center py-6 text-zinc-500 italic">
+                        No se encontraron tipos de recurso con los filtros seleccionados.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          
+          <div className="lg:col-span-4 flex flex-col gap-4">
+            
+            
+            {detailResourceType ? (
+              <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col gap-3 relative">
+                <button
+                  onClick={() => setDetailResourceType(null)}
+                  className="absolute top-3 right-3 text-xs text-zinc-500 hover:text-white font-mono cursor-pointer"
+                >
+                  [✕ CERRAR]
+                </button>
+                <div className="text-[10px] font-mono text-[#69BFB7] uppercase tracking-[3px] font-bold">FICHA TÉCNICA</div>
+                <h3 className="text-sm font-black text-white uppercase border-b border-[#67ACA9]/15 pb-1.5 mt-1">
+                  {detailResourceType.name}
+                </h3>
+
+                <div className="grid grid-cols-2 gap-x-2 gap-y-3 font-mono text-[10px] text-[#A4C2C5]/80 py-2">
+                  <div>
+                    <span className="block text-zinc-500 text-[9px] uppercase">ID DE CATÁLOGO:</span>
+                    <strong className="text-white">{detailResourceType.id}</strong>
+                  </div>
+                  <div>
+                    <span className="block text-zinc-500 text-[9px] uppercase">CATEGORÍA:</span>
+                    <strong className="text-cyan-300">{detailResourceType.category}</strong>
+                  </div>
+                  <div>
+                    <span className="block text-zinc-500 text-[9px] uppercase">UNIDAD MEDIDA:</span>
+                    <strong className="text-white">{detailResourceType.unitOfMeasure}</strong>
+                  </div>
+                </div>
+
+                <div className="bg-black/45 p-2.5 rounded-sm border border-[#67ACA9]/10 text-xs text-[#A4C2C5]/90 leading-relaxed font-mono">
+                  <span className="block text-zinc-500 text-[9px] font-mono mb-1 uppercase">DESCRIPCIÓN OPERATIVA:</span>
+                  {detailResourceType.description || "Sin descripción táctica registrada en el glosario central."}
+                </div>
+              </div>
+            ) : (
+              <div className="mission-card border border-[#67ACA9]/10 bg-black/20 p-6 rounded-sm text-center text-zinc-500 italic text-xs h-full flex items-center justify-center">
+                Seleccione "Detalle" en cualquier recurso para revisar sus especificaciones técnicas de campo.
+              </div>
+            )}
+
+          </div>
+
+        </div>
+
+        
+        {movementResourceType && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="mission-card border border-[#67ACA9]/40 bg-[#0d1414] p-5 rounded-xs w-full max-w-md flex flex-col gap-4 shadow-2xl">
+              <div className="flex justify-between items-center border-b border-[#67ACA9]/20 pb-2">
+                <div>
+                  <span className="text-[9px] font-mono text-[#69BFB7] uppercase tracking-[2px] block">OPERACIÓN EXPRESS</span>
+                  <h3 className="text-sm font-black text-white uppercase">Registrar Movimiento de Inventario</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMovementResourceType(null)}
+                  className="text-zinc-500 hover:text-white font-mono text-xs cursor-pointer"
+                >
+                  ✕ CANCELAR
+                </button>
+              </div>
+
+              <form onSubmit={handleRegisterMovement} className="flex flex-col gap-3 text-xs">
+                <div className="bg-cyan-950/20 p-2.5 rounded-sm border border-[#67ACA9]/10 font-mono text-[10px]">
+                  <span className="text-zinc-500 text-[9px] uppercase block">RECURSO SELECCIONADO:</span>
+                  <strong className="text-white">{movementResourceType.name} ({movementResourceType.unitOfMeasure})</strong>
+                </div>
+
+                {successMsg && (
+                  <div className="bg-emerald-950/20 text-emerald-300 p-2.5 rounded-sm border border-emerald-500/30 font-mono text-[10px]">
+                    ✓ {successMsg}
+                  </div>
+                )}
+
+                {errorMsg && (
+                  <div className="bg-red-950/20 text-red-300 p-2.5 rounded-sm border border-red-500/30 font-mono text-[10px]">
+                    ⚠️ {errorMsg}
+                  </div>
+                )}
+
+                <label className="v-field flex flex-col gap-0.5">
+                  <span className="v-field-label text-[#A4C2C5]/70">Cantidad a Afectar *</span>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    className="v-input font-mono"
+                    placeholder="Mayor que cero..."
+                    value={movementAmount}
+                    onChange={e => setMovementAmount(e.target.value)}
+                  />
+                </label>
+
+                <label className="v-field flex flex-col gap-1">
+                  <span className="v-field-label text-[#A4C2C5]/70">Tipo de Movimiento *</span>
+                  <select
+                    value={movementType}
+                    onChange={e => setMovementType(e.target.value)}
+                    className="v-select font-mono"
+                  >
+                    <option value="MANUAL_ADJUSTMENT">Ajuste Manual (MANUAL_ADJUSTMENT)</option>
+                    <option value="DAILY_COLLECTION">Cosecha Diaria (DAILY_COLLECTION)</option>
+                    <option value="DAILY_RATION">Ración Diaria (DAILY_RATION)</option>
+                    <option value="EXPEDITION_DEPARTURE">Salida Expedición (EXPEDITION_DEPARTURE)</option>
+                    <option value="EXPEDITION_RETURN">Retorno Expedición (EXPEDITION_RETURN)</option>
+                    <option value="TRANSFER_SENT">Traslado Enviado (TRANSFER_SENT)</option>
+                    <option value="TRANSFER_RECEIVED">Traslado Recibido (TRANSFER_RECEIVED)</option>
+                  </select>
+                </label>
+
+                <label className="v-field flex flex-col gap-0.5">
+                  <span className="v-field-label text-[#A4C2C5]/70">Descripción / Justificación</span>
+                  <textarea
+                    rows={2}
+                    className="v-input font-mono py-1.5 resize-none"
+                    placeholder="Detalles del movimiento..."
+                    value={movementDescription}
+                    onChange={e => setMovementDescription(e.target.value)}
+                  />
+                </label>
+
+                <div className="flex gap-2 font-mono mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setMovementResourceType(null)}
+                    className="cursor-pointer bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 px-4 py-2 text-[10px] font-bold uppercase rounded-sm flex-1 text-center"
+                  >
+                    Cerrar
+                  </button>
+                  <Btn variant="primary" onClick={() => {}} style={{ flex: 1, padding: "8px" }}>
+                    Registrar ✓
+                  </Btn>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
       </div>
     </SectionShell>
   );
 }
 
-/* 11. CAMPAMENTOS */
+
 export function ViewCampamentos({
   camps
 }: {
@@ -1749,7 +3805,7 @@ export function ViewCampamentos({
   );
 }
 
-/* 12. OFICIOS Y COBERTURA COLECTIVA */
+
 export function ViewOficiosCobertura({
   camps,
   occupations,
@@ -1765,7 +3821,7 @@ export function ViewOficiosCobertura({
     <SectionShell kicker="PERSONAL Y REFUERZOS SUCURSAL" title="Control Operativo de Oficios y Cobertura de Vacantes">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 text-xs">
         
-        {/* Left dictionary */}
+        
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-5 flex flex-col gap-3">
           <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5">Glosario de Oficios Habilitados</div>
           <div className="flex flex-col gap-2 max-h-52 overflow-y-auto">
@@ -1778,7 +3834,7 @@ export function ViewOficiosCobertura({
           </div>
         </div>
 
-        {/* Right coverage check */}
+        
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-7 flex flex-col gap-3">
           <div className="text-xs font-bold text-amber-300 uppercase border-b border-[#67ACA9]/10 pb-1.5 flex justify-between items-center">
             <span>Matriz de Rango Escolta por Campamento</span>
@@ -1814,9 +3870,9 @@ export function ViewOficiosCobertura({
                       <td className={stateColor}>{pct}% ({gap > 0 ? `Faltan ${gap}` : 'Vacante Completa'})</td>
                       <td className="text-right">
                         {gap > 0 ? (
-                          <Btn small variant="warning" onClick={() => onAutoAssign(cov.campId, cov.occupationId)}>⚡ Reforzar</Btn>
+                          <Btn small variant="warning" onClick={() => onAutoAssign(cov.campId, cov.occupationId)}>Reforzar</Btn>
                         ) : (
-                          <span className="text-[#A4C2C5]/50 font-mono text-[9px]">✔ Completo</span>
+                          <span className="text-emerald-400 font-mono text-[9px] font-bold">CUBIERTO</span>
                         )}
                       </td>
                     </tr>
@@ -1832,7 +3888,7 @@ export function ViewOficiosCobertura({
   );
 }
 
-/* 13. NOTIFICACIONES OPERACIONALES */
+
 export function ViewNotificaciones({
   camps,
   notifications,
@@ -1844,7 +3900,8 @@ export function ViewNotificaciones({
   onAddNotification: (data: Omit<OperationalNotification, "id">) => void;
   onMarkAsRead: (id: string) => void;
 }) {
-  const campId = currentUser.campId;
+  const campIdVal = currentUser.campId;
+  const campId = campIdVal === 1 ? "camp-alpha" : campIdVal === 2 ? "camp-beta" : "camp-gamma";
   const [destType, setDestType] = useState<"role" | "user">("role");
   const [targetRole, setTargetRole] = useState("WORKER");
   const [selectedUserId, setSelectedUserId] = useState("user-op");
@@ -1890,14 +3947,14 @@ export function ViewNotificaciones({
     <SectionShell kicker="MENSAJERÍA TÁCTICA" title="Notificaciones Operativas y Boletas de Guardia">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
-        {/* Create notify */}
+        
         <form onSubmit={handleSubmit} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-3 rounded-sm lg:col-span-4 flex flex-col gap-3">
           <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-1">Escribir Notificación de Red</div>
 
           <div className="flex flex-col gap-1 text-xs">
             <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Campamento Origen (Emisor)</span>
             <span className="v-input bg-black/20 text-[#69BFB7] border border-[#67ACA9]/10 select-none flex items-center px-2 py-1.5 h-[34px] font-bold rounded-sm">
-              Base Alfa (Propio)
+              Alpha Bunker (Propio)
             </span>
           </div>
 
@@ -1967,7 +4024,7 @@ export function ViewNotificaciones({
           <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Trasmitir Notificación</Btn>
         </form>
 
-        {/* Existing notification items list */}
+        
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
           <div className="text-xs font-bold text-amber-300 uppercase border-b border-[#67ACA9]/10 pb-1.5">Muro de Comunicados Actuales</div>
 
@@ -2006,7 +4063,7 @@ export function ViewNotificaciones({
   );
 }
 
-/* 14. DETALLE DE RECURSOS SOLICITADOS */
+
 export function ViewDetalleRecursosSolicitados({
   intercampRequests,
   resourceTypes,
@@ -2077,7 +4134,7 @@ export function ViewDetalleRecursosSolicitados({
     <SectionShell kicker="CONTROL DETALLADO DE SUMINISTROS" title="Detalle de Recursos Solicitados">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
-        {/* Adición de Detalles */}
+        
         <form onSubmit={handleCreate} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-4 flex flex-col gap-3 h-fit">
           <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-1">Agregar Recurso a Solicitud</div>
 
@@ -2117,7 +4174,7 @@ export function ViewDetalleRecursosSolicitados({
           <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Agregar Recurso</Btn>
         </form>
 
-        {/* Lista de Detalles de recursos solicitados */}
+        
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
           <div className="text-xs font-bold text-amber-300 uppercase border-b border-[#67ACA9]/10 pb-1.5">Lista de Suministros Pedidos</div>
 
@@ -2184,7 +4241,7 @@ export function ViewDetalleRecursosSolicitados({
   );
 }
 
-/* 15. PERSONAS EN TRASLADO */
+
 export function ViewPersonasEnTraslado({
   transfers,
   transferPersons,
@@ -2250,7 +4307,7 @@ export function ViewPersonasEnTraslado({
     <SectionShell kicker="COORDINACIÓN DE PERSONAL DE RUTA" title="Personas vinculadas a Traslado">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
-        {/* Vínculo de Personal */}
+        
         <form onSubmit={handleCreate} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-4 flex flex-col gap-3 h-fit">
           <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-1">Registrar Persona en Convoy</div>
 
@@ -2278,7 +4335,7 @@ export function ViewPersonasEnTraslado({
           <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Añadir Escolta de Convoy</Btn>
         </form>
 
-        {/* Lista de Personal en traslado */}
+        
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
           <div className="text-xs font-bold text-amber-300 uppercase border-b border-[#67ACA9]/10 pb-1.5">Personal del Sindicato Asignado</div>
 
@@ -2358,7 +4415,7 @@ export function ViewPersonasEnTraslado({
   );
 }
 
-/* 16. HISTORIAL DE TRASLADO */
+
 export function ViewHistorialDeTraslado({
   transfers,
   transferHistories,
@@ -2369,8 +4426,8 @@ export function ViewHistorialDeTraslado({
   onAddHistoryEntry: (data: Omit<TransferHistory, "id">) => void;
 }) {
   const [transferId, setTransferId] = useState("");
-  const [previousStatus, setPreviousStatus] = useState<Transfer["status"]>("PENDING_DEPARTURE");
-  const [newStatus, setNewStatus] = useState<Transfer["status"]>("COMPLETED");
+  const [previousStatus, setPreviousStatus] = useState<Transfer["status"]>("PLANNING");
+  const [newStatus, setNewStatus] = useState<Transfer["status"]>("DELIVERED");
   const [comment, setComment] = useState("");
   const [userId, setUserId] = useState("3");
 
@@ -2408,7 +4465,7 @@ export function ViewHistorialDeTraslado({
     <SectionShell kicker="CONTROL AUDITORÍA Y BITÁCORA" title="Historial Operativo de Traslado">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
-        {/* Registrar Historial Manual */}
+        
         <form onSubmit={handleCreate} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-4 flex flex-col gap-3 h-fit">
           <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-1">Registrar Evento de Tránsito</div>
 
@@ -2426,18 +4483,18 @@ export function ViewHistorialDeTraslado({
             <label className="v-field flex flex-col gap-1">
               <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Estado Anterior *</span>
               <select value={previousStatus} onChange={e => setPreviousStatus(e.target.value as any)} className="v-select bg-black font-mono text-[9px]">
-                <option value="PENDING_DEPARTURE">PENDING_DEPARTURE</option>
+                <option value="PLANNING">PLANNING</option>
                 <option value="EN_ROUTE">EN_ROUTE</option>
-                <option value="COMPLETED">COMPLETED</option>
+                <option value="DELIVERED">DELIVERED</option>
                 <option value="CANCELED">CANCELED</option>
               </select>
             </label>
             <label className="v-field flex flex-col gap-1">
               <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Nuevo Estado *</span>
               <select value={newStatus} onChange={e => setNewStatus(e.target.value as any)} className="v-select bg-black font-mono text-[9px]">
-                <option value="PENDING_DEPARTURE">PENDING_DEPARTURE</option>
+                <option value="PLANNING">PLANNING</option>
                 <option value="EN_ROUTE">EN_ROUTE</option>
-                <option value="COMPLETED">COMPLETED</option>
+                <option value="DELIVERED">DELIVERED</option>
                 <option value="CANCELED">CANCELED</option>
               </select>
             </label>
@@ -2467,7 +4524,7 @@ export function ViewHistorialDeTraslado({
           <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Loggear Historial</Btn>
         </form>
 
-        {/* List of transfer histories */}
+        
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
           <div className="text-xs font-bold text-amber-300 uppercase border-b border-[#67ACA9]/10 pb-1.5">Bitácora de Eventos de Convoyes</div>
 
@@ -2495,6 +4552,391 @@ export function ViewHistorialDeTraslado({
         </div>
 
       </div>
+    </SectionShell>
+  );
+}
+
+
+export function ViewPersonalDashboard({
+  camps,
+  resourceTypes,
+  campInventories,
+  inventoryAlerts,
+  inventoryMovements,
+  notifications,
+  occupationCoverages,
+  onNavigateToSub
+}: {
+  camps: Camp[];
+  resourceTypes: ResourceType[];
+  campInventories: CampInventory[];
+  inventoryAlerts: InventoryAlert[];
+  inventoryMovements: InventoryMovement[];
+  notifications: OperationalNotification[];
+  occupationCoverages: OccupationCoverage[];
+  onNavigateToSub: (sub: string) => void;
+}) {
+  const campIdVal = currentUser.campId;
+  const activeCampId = campIdVal === 1 ? "camp-alpha" : campIdVal === 2 ? "camp-beta" : "camp-gamma";
+  const campName = camps.find(c => c.id === activeCampId)?.name || "Alpha Bunker";
+
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const triggerRefresh = () => {
+    setIsRefreshing(true);
+    setTimeout(() => setIsRefreshing(false), 800);
+  };
+
+
+  const [localExpeditions, setLocalExpeditions] = useState({
+    PLANNED: 2,
+    IN_PROGRESS: 1,
+    DELAYED: 0,
+    COMPLETED: 5,
+    LOST: 1,
+    CANCELED: 1
+  });
+
+  const [simulatedEfectivos, setSimulatedEfectivos] = useState(0);
+
+  const handleSimulateMission = () => {
+    if (localExpeditions.PLANNED > 0) {
+      setLocalExpeditions(prev => ({
+        ...prev,
+        PLANNED: prev.PLANNED - 1,
+        IN_PROGRESS: prev.IN_PROGRESS + 1
+      }));
+    } else {
+      setLocalExpeditions(prev => ({
+        ...prev,
+        PLANNED: prev.PLANNED + 1
+      }));
+    }
+  };
+
+  const handleAddSpecialistLocal = () => {
+    setSimulatedEfectivos(prev => prev + 1);
+  };
+
+
+  const baseGarrisonCount = camps.find(c => c.id === activeCampId)?.personnelCount || 35;
+  const totalGarrison = baseGarrisonCount + simulatedEfectivos;
+  const criticalStockCount = campInventories.filter(ci => ci.campId === activeCampId && ci.currentAmount <= ci.minimumAlertAmount).length;
+  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
+
+  const activeAlphaCoverages = occupationCoverages.filter(cov => cov.campId === activeCampId);
+  const totalRequired = activeAlphaCoverages.reduce((sum, cov) => sum + cov.required, 0) || 14;
+  const totalActive = activeAlphaCoverages.reduce((sum, cov) => sum + cov.active, 0) + simulatedEfectivos;
+  const deploymentEfficiency = Math.min(100, Math.round(((totalActive) / totalRequired) * 100)) || 92;
+
+  const SPECIALISTS_PIE_DATA = [
+    { name: "Guardas", value: 10 + simulatedEfectivos },
+    { name: "Pilotos", value: 4 },
+    { name: "Conductores", value: 3 },
+    { name: "Médicos", value: 1 }
+  ];
+
+
+  const consumptionMovements = inventoryMovements.filter(m => 
+    m.campId === activeCampId && 
+    ["DAILY_RATION", "EXPEDITION_DEPARTURE", "TRANSFER_SENT"].includes(m.movementType)
+  );
+
+  const defaultDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().split("T")[0];
+  });
+
+  const consumptionTrendMap = consumptionMovements.reduce((acc, curr) => {
+    let dateStr = curr.date;
+    if (curr.date.includes("/")) {
+      const parts = curr.date.split(" ")[0].split("/");
+      dateStr = `2026-${parts[1]}-${parts[0]}`;
+    } else if (curr.date.includes("T")) {
+      dateStr = curr.date.split("T")[0];
+    }
+    acc[dateStr] = (acc[dateStr] || 0) + Number(curr.amount);
+    return acc;
+  }, {} as Record<string, number>);
+
+  const trendData = defaultDates.map(date => {
+    const formattedLabel = date.split("-").slice(1).reverse().join("/"); 
+
+    const realVal = consumptionTrendMap[date] || 0;
+    return {
+      date: formattedLabel,
+      totalConsumed: realVal > 0 ? realVal : Math.floor(Math.sin(parseInt(date.slice(-2)) || 1) * 20) + 45
+    };
+  });
+
+  return (
+    <SectionShell kicker="PERSONAL Y COBERTURAS" title="Dashboard Global de Personal">
+      
+      <div className="flex justify-between items-center mb-1">
+        <h2 className="text-sm font-black tracking-widest text-[#69BFB7] uppercase">Gobernanza y Personal Base</h2>
+        <Btn onClick={triggerRefresh}>Sincronizar personal</Btn>
+      </div>
+
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 text-xs">
+        
+        <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between min-h-[140px]">
+          <div>
+            <div className="text-[10px] font-mono text-[#69BFB7] uppercase font-bold tracking-wider mb-2">
+              Guarnición de Campo
+            </div>
+            <div className="v-kpi-value text-3xl font-black text-white tracking-tight flex items-baseline gap-1">
+              {totalGarrison}
+              <span className="text-[10px] font-mono text-[#A4C2C5]/60 font-normal">operativos</span>
+            </div>
+            <div className="text-[9px] font-mono text-[#A4C2C5]/60 mt-1 uppercase">
+              ALPHA BUNKER (PROPIO)
+            </div>
+          </div>
+          <button 
+            type="button"
+            onClick={handleAddSpecialistLocal}
+            className="text-[10px] font-mono text-[#69BFB7] hover:underline uppercase text-left w-fit cursor-pointer font-bold mt-3"
+          >
+            AÑADIR REFUERZO LOCAL
+          </button>
+        </div>
+
+        
+        <div className="mission-card border border-[#ba3838]/40 bg-red-950/10 p-4 rounded-sm flex flex-col justify-between min-h-[140px]">
+          <div>
+            <div className="text-[10px] font-mono text-crimson uppercase font-bold tracking-wider mb-2">
+              Suministros Críticos
+            </div>
+            <div className="v-kpi-value text-3xl font-black text-[#ef4444] tracking-tight flex items-baseline gap-1">
+              {criticalStockCount}
+              <span className="text-[10px] font-mono text-[#A4C2C5]/50 font-normal">alertas</span>
+            </div>
+            <div className="text-[9px] font-mono text-[#A4C2C5]/50 mt-1 uppercase">
+              Bajo umbral de resguardo
+            </div>
+          </div>
+          <button 
+            type="button"
+            onClick={() => onNavigateToSub("Inventario del campamento")}
+            className="text-[10px] font-mono text-[#69BFB7] hover:underline uppercase text-left w-fit cursor-pointer font-bold mt-3"
+          >
+            REVISAR ALMACENES →
+          </button>
+        </div>
+
+        
+        <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between min-h-[140px]">
+          <div>
+            <div className="text-[9.5px] font-mono text-[#69BFB7] uppercase font-bold tracking-wider mb-1 flex justify-between items-center">
+              <span>Especialistas Activos</span>
+              <span className="h-1 w-1 rounded-full bg-[#10b981] animate-ping inline-block" />
+            </div>
+            
+            <div className="h-16 w-full flex items-center justify-center relative select-none">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={SPECIALISTS_PIE_DATA}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={15}
+                    outerRadius={24}
+                    paddingAngle={3}
+                    dataKey="value"
+                    strokeWidth={0}
+                  >
+                    {SPECIALISTS_PIE_DATA.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={["#69BFB7", "#f59e0b", "#10b981", "#ef4444"][index % 4]} />
+                    ))}
+                  </Pie>
+                  <Tooltip {...chartTooltipStyle} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-[10px] font-black text-white">{SPECIALISTS_PIE_DATA.reduce((sum, item) => sum + item.value, 0)}</span>
+              </div>
+            </div>
+
+            
+            <div className="flex flex-wrap gap-x-1.5 justify-center text-[7.5px] font-mono leading-none mt-1">
+              {SPECIALISTS_PIE_DATA.map((entry, index) => (
+                <div key={entry.name} className="flex items-center gap-0.5 whitespace-nowrap">
+                  <span className="h-1 w-1 rounded-full shrink-0" style={{ backgroundColor: ["#69BFB7", "#f59e0b", "#10b981", "#ef4444"][index % 4] }} />
+                  <span className="text-[#A4C2C5]/60 text-[7.5px]">{entry.name.slice(0, 5)}:</span>
+                  <strong className="text-white text-[8px]">{entry.value}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        
+        <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between min-h-[140px]">
+          <div>
+            <div className="text-[10px] font-mono text-[#69BFB7] uppercase font-bold tracking-wider mb-2">
+              Cobertura de Despliegue
+            </div>
+            <div className="v-kpi-value text-3xl font-black text-white tracking-tight flex items-baseline gap-1">
+              {deploymentEfficiency}%
+              <span className="text-[10px] font-mono text-[#A4C2C5]/60 font-normal">cobertura</span>
+            </div>
+            <div className="text-[9px] font-mono text-[#A4C2C5]/50 mt-1 uppercase">
+              Personal vs Requerido
+            </div>
+          </div>
+          <button 
+            type="button"
+            onClick={() => onNavigateToSub("Oficios y cobertura")}
+            className="text-[10px] font-mono text-[#69BFB7] hover:underline uppercase text-left w-fit cursor-pointer font-bold mt-3"
+          >
+            AJUSTAR OFICIOS →
+          </button>
+        </div>
+      </div>
+
+      
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+        
+        
+        <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-6 flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center border-b border-[#67ACA9]/10 pb-2 mb-3">
+              <span className="text-xs font-bold text-white uppercase font-mono">Estado de Expediciones Activas</span>
+              <span className="text-[9px] font-mono text-zinc-400">Módulo Satelital</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center text-xs mb-4 select-none">
+              <div className="bg-[#ba7938]/10 border border-amber-500/20 p-2.5 rounded-sm">
+                <div className="text-amber-400 font-bold text-lg">{localExpeditions.PLANNED}</div>
+                <div className="text-[8px] font-mono uppercase tracking-wider text-[#A4C2C5]/60 mt-0.5">PLANIFICADAS</div>
+              </div>
+              <div className="bg-[#67ACA9]/10 border border-[#69BFB7]/30 p-2.5 rounded-sm animate-pulse">
+                <div className="text-[#69BFB7] font-bold text-lg">{localExpeditions.IN_PROGRESS}</div>
+                <div className="text-[8px] font-mono uppercase tracking-wider text-[#A4C2C5]/60 mt-0.5">EN CURSO</div>
+              </div>
+              <div className="bg-red-950/20 border border-red-500/20 p-2.5 rounded-sm">
+                <div className="text-red-400 font-bold text-lg">{localExpeditions.LOST}</div>
+                <div className="text-[8px] font-mono uppercase tracking-wider text-[#A4C2C5]/60 mt-0.5">PERDIDAS</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center text-xs select-none">
+              <div className="bg-emerald-950/20 border border-emerald-500/20 p-2.5 rounded-sm">
+                <div className="text-emerald-400 font-bold text-lg">{localExpeditions.COMPLETED}</div>
+                <div className="text-[8px] font-mono uppercase tracking-wider text-[#A4C2C5]/60 mt-0.5">COMPLETADAS</div>
+              </div>
+              <div className="bg-zinc-900/40 border border-zinc-700/20 p-2.5 rounded-sm">
+                <div className="text-zinc-400 font-bold text-lg">{localExpeditions.CANCELED}</div>
+                <div className="text-[8px] font-mono uppercase tracking-wider text-[#A4C2C5]/60 mt-0.5">CANCELADAS</div>
+              </div>
+              <div className="bg-orange-950/20 border border-orange-500/20 p-2.5 rounded-sm">
+                <div className="text-orange-400 font-bold text-lg">{localExpeditions.DELAYED}</div>
+                <div className="text-[8px] font-mono uppercase tracking-wider text-[#A4C2C5]/60 mt-0.5">RETRASADAS</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        
+        <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-6 flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center border-b border-[#67ACA9]/10 pb-2 mb-3">
+              <span className="text-xs font-bold text-white uppercase font-mono">Tendencia de Consumo Reciente (7 Días)</span>
+              <span className="text-[9px] font-mono text-[#69BFB7]">Raciones Totales</span>
+            </div>
+
+            <div className="h-44 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trendData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradientTrendPersonal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_THEME.teal} stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor={CHART_THEME.teal} stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
+                  <XAxis dataKey="date" stroke={CHART_THEME.text} style={{ fontSize: 9 }} />
+                  <YAxis stroke={CHART_THEME.text} style={{ fontSize: 9 }} />
+                  <Tooltip {...chartTooltipStyle} />
+                  <Area type="monotone" dataKey="totalConsumed" name="Consumo (Raciones)" stroke={CHART_THEME.teal} fillOpacity={1} fill="url(#gradientTrendPersonal)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div className="text-[9.5px] font-mono text-[#A4C2C5]/50 text-right mt-1.5 uppercase">
+            Suma agregada de movimientos de raciones, traslados y consumos
+          </div>
+        </div>
+      </div>
+
+      
+      <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm">
+        <div className="flex justify-between items-center border-b border-[#67ACA9]/10 pb-3 mb-4 flex-wrap gap-2">
+          <div>
+            <span className="text-[8.5px] font-mono text-[#69BFB7] font-bold uppercase tracking-wider block">CONTROL CAPACIDAD</span>
+            <h3 className="text-xs font-bold text-white uppercase mt-0.5">Nóminas de Especialistas en Alpha Bunker</h3>
+          </div>
+          
+          <Btn small onClick={() => onNavigateToSub("Oficios y cobertura")}>
+            Ajustar Coberturas Históricas
+          </Btn>
+        </div>
+
+        <div className="v-overflow-wrap overflow-x-auto">
+          <table className="v-table w-full text-left border-collapse" style={{ minWidth: "500px" }}>
+            <thead>
+              <tr className="border-b border-[#67ACA9]/20 text-[10px] tracking-wider text-[#A4C2C5]/50 uppercase font-mono">
+                <th className="pb-2">Especialidad</th>
+                <th className="pb-2">Requerida</th>
+                <th className="pb-2">Nivel Activo</th>
+                <th className="pb-2">Estado</th>
+                <th className="pb-2 text-right">Firma Técnico</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#67ACA9]/5 text-xs font-mono">
+              <tr>
+                <td className="py-2.5 font-bold text-white">Guarda / Defensor Armado</td>
+                <td className="py-2.5">10</td>
+                <td className="py-2.5 text-[#69BFB7] font-bold">{10 + simulatedEfectivos}</td>
+                <td className="py-2.5">
+                  <StatusIndicator status={(10 + simulatedEfectivos) >= 10 ? "EXCELENTE" : "ALERTA"} />
+                </td>
+                <td className="py-2.5 text-right text-[10px] text-[#A4C2C5]/40">[AUTORIZADO]</td>
+              </tr>
+              <tr>
+                <td className="py-2.5 font-bold text-white">Piloto de Aeronave VTOL</td>
+                <td className="py-2.5">4</td>
+                <td className="py-2.5 text-[#69BFB7] font-bold">4</td>
+                <td className="py-2.5">
+                  <StatusIndicator status="EXCELENTE" />
+                </td>
+                <td className="py-2.5 text-right text-[10px] text-[#A4C2C5]/40">[AUTORIZADO]</td>
+              </tr>
+              <tr>
+                <td className="py-2.5 font-bold text-white">Conductor de Convoy Pesado</td>
+                <td className="py-2.5">3</td>
+                <td className="py-2.5 text-[#69BFB7] font-bold">3</td>
+                <td className="py-2.5">
+                  <StatusIndicator status="ESTABLE" />
+                </td>
+                <td className="py-2.5 text-right text-[10px] text-[#A4C2C5]/40">[SINC EVENTO]</td>
+              </tr>
+              <tr>
+                <td className="py-2.5 font-bold text-white">Médico de Emergencia</td>
+                <td className="py-2.5">2</td>
+                <td className="py-2.5 text-[#69BFB7] font-bold">1</td>
+                <td className="py-2.5">
+                  <StatusIndicator status="ALERTA" />
+                </td>
+                <td className="py-2.5 text-right text-[10px] text-[#A4C2C5]/40">[CALIBRANDO]</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </SectionShell>
   );
 }

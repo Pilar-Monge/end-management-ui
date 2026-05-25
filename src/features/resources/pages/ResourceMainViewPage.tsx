@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react'
+﻿import { Suspense, lazy } from 'react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ResourceControlPanelPage from './ResourceControlPanelPage'

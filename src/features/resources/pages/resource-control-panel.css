@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 :root {
   color-scheme: dark;
@@ -42,16 +42,9 @@ button {
   border: 0;
 }
 
-/* ═══════════════════════════════════
-   PALETA DE COLORES
-   #67ACA9  — teal base
-   #69BFB7  — teal claro / brillo
-   #618C84  — teal oscuro
-   #5D9797  — teal grisáceo medio
-   #A4C2C5  — teal muy claro / gris
-   ═══════════════════════════════════ */
 
-/* ── LAYOUT FIJO ── */
+
+
 
 .game-screen-layout {
   position: fixed;
@@ -101,7 +94,7 @@ button {
   z-index: 0;
 }
 
-/* ── TOP HUD ── */
+
 
 .logout-mark {
   border: 2px solid #69BFB7;
@@ -210,9 +203,7 @@ button {
   opacity: 0.5;
 }
 
-/* ═══════════════════════════════════
-   TÍTULO DE SECCIÓN (banner arriba)
-   ═══════════════════════════════════ */
+
 
 .section-header {
   position: absolute;
@@ -289,16 +280,14 @@ button {
   z-index: 2;
 }
 
-/* ═══════════════════════════════════
-   SIDEBAR BOTONES
-   ═══════════════════════════════════ */
+
 
 .inner-sidebar {
-  flex: 0 0 300px;
-  padding: 30px 0 20px 36px;
+  flex: 0 0 320px;
+  padding: 30px 0 20px 75px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .side-button {
@@ -317,7 +306,7 @@ button {
   line-height: 28px;
   min-height: 28px;
   width: auto;
-  max-width: 280px;
+  max-width: 250px;
   display: flex;
   align-items: center;
   transition: color 160ms ease, transform 160ms ease;
@@ -396,7 +385,7 @@ button {
   transform: skewX(-15deg) translateX(-2px) scaleX(1.0);
 }
 
-/* Botón activo — glow teal sólido */
+
 .side-button.is-active::before {
   background:
     radial-gradient(circle at 2% 80%, #69BFB7 0 2px, transparent 2.5px),
@@ -434,7 +423,7 @@ button {
   color: #f0fafa;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   width: auto;
-  max-width: 280px;
+  max-width: 250px;
   padding-left: 1.4em;
   z-index: 2;
   transform: rotateY(25deg) translateZ(10px) translateX(10px) !important;
@@ -460,11 +449,9 @@ button {
   transition: letter-spacing 0.28s ease;
 }
 
-/* ═══════════════════════════════════
-   LAYOUT INTERNO
-   ═══════════════════════════════════ */
 
-/* área entre top-hud y bottom-dock */
+
+
 .main-area {
   position: absolute;
   top: 48px;
@@ -522,6 +509,7 @@ button {
   scrollbar-width: thin;
   scrollbar-color: rgba(103, 172, 169, 0.25) transparent;
   position: relative;
+  margin-right: 18px;
 }
 
 .inner-content::-webkit-scrollbar {
@@ -535,9 +523,7 @@ button {
   border-radius: 4px;
 }
 
-/* ═══════════════════════════════════
-   RECUADRO PRINCIPAL (transparente)
-   ═══════════════════════════════════ */
+
 
 .settings-shell {
   animation: panel-in 650ms cubic-bezier(0.18, 0.86, 0.25, 1) both;
@@ -690,9 +676,7 @@ button {
   transform: rotate(-45deg);
 }
 
-/* ═══════════════════════════════════
-   CONTENT GRID (settings form)
-   ═══════════════════════════════════ */
+
 
 .content-grid {
   display: grid;
@@ -745,7 +729,7 @@ button {
   padding-right: 8px;
 }
 
-/* ── SELECT ── */
+
 .form-select {
   position: relative;
   isolation: isolate;
@@ -780,7 +764,7 @@ button {
   margin-left: 3px;
 }
 
-/* ── SLIDER ── */
+
 .form-slider-wrap {
   display: flex;
   align-items: center;
@@ -821,7 +805,7 @@ button {
   font-weight: 700;
 }
 
-/* ── TOGGLE ── */
+
 .form-toggle {
   display: flex;
   justify-content: flex-end;
@@ -858,9 +842,7 @@ button {
   line-height: 1;
 }
 
-/* ═══════════════════════════════════
-   BOTTOM DOCK
-   ═══════════════════════════════════ */
+
 
 .dock {
   align-items: flex-end;
@@ -989,9 +971,7 @@ button {
   right: 5px;
 }
 
-/* ═══════════════════════════════════
-   SUPPORT & SETTINGS
-   ═══════════════════════════════════ */
+
 
 .support-link,
 .settings-hint {
@@ -1102,13 +1082,9 @@ button {
   right: 12px;
 }
 
-/* ═══════════════════════════════════
-   ANIMACIONES
-   ═══════════════════════════════════ */
 
-/* ═══════════════════════════════════
-   VISTAS / COMPONENTES DE CONTENIDO
-   ═══════════════════════════════════ */
+
+
 
 .v-page {
   display: flex;
@@ -1117,7 +1093,7 @@ button {
   padding-bottom: 24px;
 }
 
-/* ── Secciones con título ── */
+
 .v-section {
   border: 1px solid rgba(103, 172, 169, 0.18);
   background: rgba(4, 14, 14, 0.35);
@@ -1139,7 +1115,7 @@ button {
   padding: 14px;
 }
 
-/* ── KPI Cards ── */
+
 .v-kpi-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1186,7 +1162,7 @@ button {
   color: rgba(164, 194, 197, 0.55);
 }
 
-/* ── Tablas ── */
+
 .v-table-wrap {
   overflow-x: auto;
   scrollbar-width: thin;
@@ -1222,7 +1198,7 @@ button {
   background: rgba(103, 172, 169, 0.06);
 }
 
-/* ── Alertas ── */
+
 .v-alert {
   font-size: 11px;
   font-weight: 700;
@@ -1243,7 +1219,7 @@ button {
   color: rgba(164, 194, 197, 0.85);
 }
 
-/* ── Formularios ── */
+
 .v-form-grid {
   display: flex;
   flex-direction: column;
@@ -1309,7 +1285,7 @@ button {
   min-height: 60px;
 }
 
-/* ── Mission creation layout ── */
+
 .exp-create {
   gap: 14px;
 }
@@ -1339,10 +1315,30 @@ button {
   color: #f0fafa;
   font-size: 24px;
   font-weight: 950;
-  letter-spacing: 0.06em;
-  line-height: 1;
+  letter-spacing: 0.05em;
+  line-height: 1.1;
   margin: 4px 0 0;
   text-transform: uppercase;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+@media screen and (max-width: 1024px) {
+  .mission-brief h2 {
+    font-size: 13px !important;
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .mission-brief h2 {
+    font-size: 11px !important;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .mission-brief h2 {
+    font-size: 9.5px !important;
+  }
 }
 
 .mission-steps {
@@ -1418,6 +1414,10 @@ button {
   clip-path: polygon(1.5% 0, 98.5% 0, 100% 8%, 99% 100%, 1% 100%, 0 91%, 1% 50%, 0 9%);
   padding: 14px;
   position: relative;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  contain: paint;
+  isolation: isolate;
 }
 
 .mission-card::before {
@@ -1576,7 +1576,7 @@ button {
   text-align: right;
 }
 
-/* ── Tactical Zone Panel ── */
+
 .tactical-zone-panel {
   display: flex;
   flex-direction: column;
@@ -1708,7 +1708,7 @@ button {
   margin-top: auto;
 }
 
-/* ── Wizard Styles ── */
+
 .mission-wizard-steps {
   display: flex;
   gap: 12px;
@@ -1765,7 +1765,7 @@ button {
   margin-top: 16px;
 }
 
-/* ── Custom date picker ── */
+
 .dt-shell {
   position: relative;
 }
@@ -1804,7 +1804,7 @@ button {
   font-size: 10px;
 }
 
-/* ── Backdrop para overlay flotante ── */
+
 .dt-backdrop {
   position: fixed;
   inset: 0;
@@ -1935,7 +1935,7 @@ button {
   color: #fff;
 }
 
-/* Columnas de hora y minutos con scroll vertical */
+
 .dt-time-col {
   border-left: 1px solid rgba(103, 172, 169, 0.22);
   display: flex;
@@ -2000,7 +2000,7 @@ button {
   color: #fff;
 }
 
-/* ── Checkbox row ── */
+
 .v-checkbox-row {
   display: flex;
   align-items: center;
@@ -2026,7 +2026,7 @@ button {
   cursor: pointer;
 }
 
-/* ── Person Cards ── */
+
 .v-person-card {
   background: rgba(4, 14, 14, 0.4);
   border: 1px solid rgba(103, 172, 169, 0.2);
@@ -2094,16 +2094,12 @@ button {
   margin-top: auto;
 }
 
-/* ═══════════════════════════════════
-   WORLD MAP DASHBOARD
-   ═══════════════════════════════════ */
+
 
 .wm-layout {
-  display: grid;
-  grid-template-columns: 1fr 260px;
-  gap: 16px;
-  height: 100%;
-  min-height: 400px;
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .wm-map-area {
@@ -2115,17 +2111,17 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Proporción 2:1 para el contenedor del mapa mundial */
+  
   aspect-ratio: 2 / 1;
   max-height: 100%;
 }
 
-/* ── Dotted map container ── */
+
 .wm-dotted-container {
   position: relative;
   width: 100%;
   height: 100%;
-  /* Eliminamos el aspect-ratio fijo que causaba distorsión */
+  
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2134,32 +2130,28 @@ button {
 
 .wm-dotted-bg {
   position: absolute;
-  /* Usamos 'contain' para que la imagen nunca se deforme, solo se escale */
+  
   width: 100%;
   height: 100%;
   object-fit: contain;
   pointer-events: none;
   user-select: none;
   opacity: 0.8;
+  padding: 12px;
+  box-sizing: border-box;
 }
 
 .wm-dotted-overlay {
   position: absolute;
-  /* El SVG de los arcos debe tener el mismo tamaño y comportamiento que la imagen de fondo */
+  
   width: 100%;
   height: 100%;
   top: 0;
   left: 0;
   pointer-events: none;
   z-index: 5;
-}
-
-.wm-dotted-overlay {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
+  padding: 12px;
+  box-sizing: border-box;
 }
 
 .wm-legend {
@@ -2186,7 +2178,7 @@ button {
   letter-spacing: 0.03em;
 }
 
-/* ── Sidebar del mapa ── */
+
 
 .wm-sidebar {
   display: flex;
@@ -2275,7 +2267,7 @@ button {
   letter-spacing: 0.02em;
 }
 
-/* ── Stats ── */
+
 
 .wm-stats {
   display: flex;
@@ -2386,3 +2378,266 @@ button {
     transform: translateX(2px) scale(1);
   }
 }
+
+
+@media screen and (max-width: 1024px) {
+  .section-title-brush {
+    font-size: 14px !important;
+    padding: 0.15em 2.5em 0.18em 2.5em !important;
+  }
+  .section-title-brush::before {
+    inset: -0.05em -3.5em -0.08em -3em !important;
+  }
+  .section-title-brush::after {
+    inset: 0.18em -3em 0.18em -2.5em !important;
+  }
+  .section-header {
+    top: 4px !important;
+  }
+  
+  
+  .wm-map-area .absolute.bottom-2 {
+    right: 4px !important;
+    left: 4px !important;
+    text-align: center;
+    font-size: 6.5px !important;
+  }
+
+  
+  .inner-sidebar {
+    flex: 0 0 140px !important;
+    padding: 8px 4px 8px 12px !important;
+    overflow-y: auto !important;
+    max-height: 100% !important;
+    scrollbar-width: none !important;
+  }
+  .inner-sidebar::-webkit-scrollbar {
+    display: none !important;
+  }
+  
+  
+  .side-button {
+    margin-bottom: 3px !important;
+    padding: 3px 5px !important;
+  }
+  .side-button .btn-text {
+    font-size: 8px !important;
+    line-height: 1.15 !important;
+    white-space: normal !important;
+    word-break: keep-all !important;
+    overflow-wrap: break-word !important;
+    padding: 1px 0 !important;
+  }
+  
+  
+  .v-btn {
+    padding: 3px 6px !important;
+    font-size: 8px !important;
+    line-height: 1.15 !important;
+  }
+}
+
+@media screen and (orientation: landscape) and (max-width: 950px), screen and (max-height: 540px) and (orientation: landscape) {
+  
+  .inner-layout {
+    gap: 8px !important;
+  }
+  
+  
+  .inner-sidebar {
+    flex: 0 0 150px !important;
+    padding: 8px 4px 8px 12px !important;
+    overflow-y: auto !important;
+    max-height: 100% !important;
+    scrollbar-width: none !important;
+  }
+  .inner-sidebar::-webkit-scrollbar {
+    display: none !important;
+  }
+  
+  
+  .side-button {
+    margin-bottom: 3px !important;
+    padding: 3px 5px !important;
+  }
+  .side-button .btn-text {
+    font-size: 8px !important;
+    line-height: 1.15 !important;
+    white-space: normal !important;
+    word-break: keep-all !important;
+    overflow-wrap: break-word !important;
+    padding: 1px 0 !important;
+  }
+  
+  
+  .inner-content {
+    padding: 8px 12px 10px 10px !important;
+    margin-right: 14px !important;
+  }
+  
+  
+  .v-title-section {
+    margin-bottom: 6px !important;
+  }
+  
+  
+  .grid.lg\:grid-cols-12 {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  
+  
+  .grid.lg\:grid-cols-12 > :first-child:not(.lg\:col-span-12) {
+    flex: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 8px !important;
+    gap: 8px !important;
+  }
+  
+  
+  .grid.lg\:grid-cols-12 > :nth-child(2):not(.lg\:col-span-12) {
+    flex: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 8px !important;
+    gap: 8px !important;
+  }
+  
+  
+  .grid.lg\:grid-cols-12 > .lg\:col-span-12 {
+    flex: none !important;
+    width: 100% !important;
+  }
+
+  
+  .v-kpi-value {
+    font-size: 1.1rem !important;
+    margin-top: 2px !important;
+  }
+  .v-kpi-label {
+    font-size: 8px !important;
+  }
+  .v-kpi {
+    padding: 6px !important;
+  }
+  
+  
+  .grid-cols-1.md\:grid-cols-3 {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+  .grid-cols-1.lg\:grid-cols-2 {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  
+  
+  .h-44 {
+    height: 110px !important;
+  }
+  
+  
+  .v-table {
+    font-size: 8px !important;
+  }
+  .v-table th, .v-table td {
+    padding: 3px 4px !important;
+  }
+  
+  
+  .v-input {
+    height: 28px !important;
+    padding: 3px 6px !important;
+    font-size: 9px !important;
+  }
+  
+  .v-field-label {
+    font-size: 8px !important;
+    margin-bottom: 2px !important;
+  }
+  
+  
+  textarea.v-input {
+    min-height: 40px !important;
+  }
+  
+  
+  .v-btn {
+    padding: 3px 6px !important;
+    font-size: 8px !important;
+    line-height: 1.15 !important;
+  }
+  
+  
+  .status-tag {
+    font-size: 7px !important;
+    padding: 1px 3px !important;
+  }
+
+  
+  .section-title-brush {
+    font-size: 10px !important;
+    padding: 0.08em 1.5em 0.1em 1.5em !important;
+  }
+  .section-title-brush::before {
+    inset: -0.04em -2.5em -0.08em -2em !important;
+  }
+  .section-title-brush::after {
+    inset: 0.12em -2em 0.12em -1.5em !important;
+  }
+  .section-header {
+    top: 2px !important;
+    min-width: 140px !important;
+  }
+
+  
+  .text-xs.font-bold,
+  .text-sm.font-bold,
+  .mission-card .text-xs.font-bold,
+  .bg-black\/45 .text-xs.font-bold,
+  .text-xs.font-bold.text-\[\#69BFB7\],
+  .text-xs.font-bold.text-amber-300,
+  .text-xs.font-bold.text-rose-400,
+  .text-xs.font-bold.text-\[\#67ACA9\],
+  .text-xs.font-bold.text-emerald-400 {
+    font-size: 9px !important;
+    letter-spacing: 0.01em !important;
+    line-height: normal !important;
+  }
+
+  
+  .mission-card .uppercase,
+  .settings-shell .uppercase {
+    font-size: 9.5px !important;
+    margin-bottom: 4px !important;
+    padding-bottom: 3px !important;
+  }
+  
+  
+  .wm-layout {
+    gap: 8px !important;
+  }
+}
+
+
+.loading-enter-button {
+  margin-bottom: 0 !important;
+  padding: 0px 30px !important;
+  min-height: 38px !important;
+  max-width: 320px !important;
+  width: auto !important;
+}
+
+.loading-enter-button .btn-text {
+  font-size: 18px !important;
+  line-height: 38px !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  padding: 0 !important;
+}
+

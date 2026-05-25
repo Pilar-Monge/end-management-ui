@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+﻿import { useState, useCallback } from 'react'
 
 export type ResourceZoomTarget = 'station' | 'meat' | 'beer' | null
 export function useResourceCamera() {

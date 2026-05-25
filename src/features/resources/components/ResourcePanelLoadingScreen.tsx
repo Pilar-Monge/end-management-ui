@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from "framer-motion";
+﻿import { motion, AnimatePresence } from "framer-motion";
 import "../pages/resource-control-panel.css";
 import pistolBg from "../assets/images/pistol_bg_1779321852250.png";
 
@@ -19,7 +19,7 @@ export function LoadingScreen({ show, onEnter, onBack, isLoaded }: LoadingScreen
           exit={{ opacity: 0 }}
           transition={{ duration: 0.7, ease: "easeInOut" }}
         >
-          {/* Background image replace for the revolver gun */}
+          
           <div className="absolute inset-0 select-none pointer-events-none overflow-hidden bg-[#020706]">
             <img 
               src={pistolBg} 
@@ -29,7 +29,7 @@ export function LoadingScreen({ show, onEnter, onBack, isLoaded }: LoadingScreen
             />
           </div>
 
-          {/* Vignette + side darken */}
+          
           <div className="absolute inset-0 pointer-events-none"
                style={{
                  background: `
@@ -40,10 +40,10 @@ export function LoadingScreen({ show, onEnter, onBack, isLoaded }: LoadingScreen
                }} 
           />
 
-          {/* ── LEFT SIDE TEXT BLOCK ── */}
+          
           <div className="absolute left-8 right-8 bottom-0 top-0 z-10 flex flex-col justify-end pb-12 pointer-events-none">
 
-            {/* Subtítulo arriba */}
+            
             <motion.div
               className="text-[11px] font-bold tracking-[5px] text-[#A4C2C5]/40 uppercase mb-2"
               initial={{ opacity: 0, x: -20 }}
@@ -53,7 +53,7 @@ export function LoadingScreen({ show, onEnter, onBack, isLoaded }: LoadingScreen
               Inicializando sistema
             </motion.div>
 
-            {/* Título grande */}
+            
             <motion.h1
               className="text-[clamp(54px,8vw,118px)] font-black leading-none tracking-[-2px] text-[#f0fafa] uppercase whitespace-nowrap"
               initial={{ opacity: 0, x: -30 }}
@@ -63,7 +63,7 @@ export function LoadingScreen({ show, onEnter, onBack, isLoaded }: LoadingScreen
               SUMINISTROS
             </motion.h1>
 
-            {/* Línea divisoria */}
+            
             <motion.div
               className="h-[2px] my-4 bg-gradient-to-r from-[#69BFB7] via-[#67ACA9]/60 to-transparent"
               initial={{ scaleX: 0, originX: 0 }}
@@ -71,7 +71,7 @@ export function LoadingScreen({ show, onEnter, onBack, isLoaded }: LoadingScreen
               transition={{ delay: 0.8, duration: 0.9, ease: "easeOut" }}
             />
 
-            {/* Subtítulo abajo */}
+            
             <motion.div
               className="text-[10px] font-bold tracking-[4px] text-[#A4C2C5]/35 uppercase mb-8"
               initial={{ opacity: 0 }}
@@ -83,7 +83,7 @@ export function LoadingScreen({ show, onEnter, onBack, isLoaded }: LoadingScreen
                 : "Calibrando brújula • Cargando rutas • Sincronizando..."}
             </motion.div>
 
-            {/* Botón INGRESAR ── brush stroke style */}
+            
             {isLoaded && (
               <motion.div
                 className="pointer-events-auto flex flex-wrap items-center gap-4"
@@ -91,7 +91,7 @@ export function LoadingScreen({ show, onEnter, onBack, isLoaded }: LoadingScreen
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.5 }}
               >
-                <button
+                <motion.button
                   onClick={onEnter}
                   className="side-button is-active relative loading-enter-button"
                   style={{
@@ -105,11 +105,13 @@ export function LoadingScreen({ show, onEnter, onBack, isLoaded }: LoadingScreen
                     paddingLeft: "1.6em",
                     paddingRight: "1.2em",
                   }}
+                  whileHover={{ x: 10, scale: 1.04 }}
+                  whileTap={{ scale: 0.98 }}
                 >
                   <span className="btn-text whitespace-nowrap drop-shadow-md">
                     INGRESAR
                   </span>
-                </button>
+                </motion.button>
                 {onBack && (
                   <button
                     onClick={onBack}

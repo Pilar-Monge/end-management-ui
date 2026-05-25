@@ -1,5 +1,4 @@
-// @ts-nocheck
-import { useMemo, useId } from "react";
+﻿import { useMemo, useId } from "react";
 import DottedMap from "dotted-map";
 import { motion } from "framer-motion";
 
@@ -30,18 +29,20 @@ const STATUS_COLORS: Record<string, string> = {
   ACTIVE: "#69BFB7",
 };
 
+
+
+const STATIC_SVG_MAP = (() => {
+  const map = new DottedMap({ height: 100, grid: "diagonal" });
+  return map.getSVG({
+    radius: 0.22,
+    color: "rgba(103,172,169,0.35)",
+    shape: "circle",
+    backgroundColor: "transparent",
+  });
+})();
+
 export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: WorldMapProps) {
   const id = useId();
-
-  const svgMap = useMemo(() => {
-    const map = new DottedMap({ height: 100, grid: "diagonal" });
-    return map.getSVG({
-      radius: 0.22,
-      color: "rgba(103,172,169,0.35)",
-      shape: "circle",
-      backgroundColor: "transparent",
-    });
-  }, []);
 
   const projectPoint = (lat: number, lng: number) => {
     const x = (lng + 180) * (800 / 360);
@@ -59,16 +60,16 @@ export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: Worl
   };
 
   return (
-    <div className="wm-dotted-container">
-      {/* Mapa de fondo en puntos */}
+    <div className="wm-dotted-container p-3.5 sm:p-6">
+      
       <img
-        src={`data:image/svg+xml;utf8,${encodeURIComponent(svgMap)}`}
+        src={`data:image/svg+xml;utf8,${encodeURIComponent(STATIC_SVG_MAP)}`}
         className="wm-dotted-bg"
         alt="World map"
         draggable={false}
       />
 
-      {/* SVG con arcos y pins — preserveAspectRatio asegura que coincida con el img object-fit: contain */}
+      
       <svg 
         viewBox="0 0 800 400" 
         className="wm-dotted-overlay"
@@ -88,7 +89,7 @@ export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: Worl
 
           return (
             <g key={`arc-${i}`}>
-              {/* Línea curved de fondo */}
+              
               <motion.path
                 d={createCurvedPath(startPoint, endPoint)}
                 fill="none"
@@ -96,7 +97,7 @@ export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: Worl
                 strokeWidth="1"
                 opacity="0.15"
               />
-              {/* Línea curved animada */}
+              
               <motion.path
                 d={createCurvedPath(startPoint, endPoint)}
                 fill="none"
@@ -110,7 +111,7 @@ export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: Worl
           );
         })}
 
-        {/* Puntos de inicio y fin */}
+        
         {dots.map((dot, i) => {
           const startPoint = projectPoint(dot.start.lat, dot.start.lng);
           const endPoint = projectPoint(dot.end.lat, dot.end.lng);
@@ -118,7 +119,7 @@ export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: Worl
 
           return (
             <g key={`pins-${i}`}>
-              {/* Start pin */}
+              
               <g>
                 <circle cx={startPoint.x} cy={startPoint.y} r="3" fill={color} opacity="0.9">
                   <animate attributeName="r" from="3" to="9" dur="2s" repeatCount="indefinite" />
@@ -126,13 +127,24 @@ export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: Worl
                 </circle>
                 <circle cx={startPoint.x} cy={startPoint.y} r="3" fill={color} />
                 {dot.start.label && (
-                  <text x={startPoint.x} y={startPoint.y - 8} textAnchor="middle" fill="rgba(164,194,197,0.8)" fontSize="7" fontWeight="700">
+                  <text 
+                    x={startPoint.x} 
+                    y={startPoint.y - 10} 
+                    textAnchor="middle" 
+                    fill="rgba(235, 250, 248, 0.95)" 
+                    fontSize="10" 
+                    fontWeight="850"
+                    stroke="#000000"
+                    strokeWidth="2.5px"
+                    paintOrder="stroke"
+                    className="select-none tracking-wider"
+                  >
                     {dot.start.label}
                   </text>
                 )}
               </g>
 
-              {/* End pin */}
+              
               <g 
                 onClick={() => onZoneClick?.(dot)} 
                 style={{ cursor: "pointer" }}
@@ -144,7 +156,18 @@ export function WorldMap({ dots = [], lineColor = "#69BFB7", onZoneClick }: Worl
                 </circle>
                 <circle cx={endPoint.x} cy={endPoint.y} r="4" fill={color} />
                 {dot.end.label && (
-                  <text x={endPoint.x} y={endPoint.y - 10} textAnchor="middle" fill="rgba(164,194,197,0.9)" fontSize="8" fontWeight="800">
+                  <text 
+                    x={endPoint.x} 
+                    y={endPoint.y - 12} 
+                    textAnchor="middle" 
+                    fill="#ffffff" 
+                    fontSize="11.5" 
+                    fontWeight="900"
+                    stroke="#000000"
+                    strokeWidth="3px"
+                    paintOrder="stroke"
+                    className="select-none tracking-wider"
+                  >
                     {dot.end.label}
                   </text>
                 )}

@@ -1,4 +1,4 @@
-// Global API Mocking/In-Memory State store for complete compliance with user requested schema
+﻿
 export interface Camp {
   id: string;
   name: string;
@@ -7,7 +7,7 @@ export interface Camp {
 }
 
 export interface ResourceType {
-  id: string;
+  id: string | number;
   name: string;
   unitOfMeasure: string;
   category: "FOOD" | "WATER" | "HYGIENE" | "DEFENSE" | "AMMUNITION" | "MEDICAL" | "OTHER";
@@ -22,16 +22,16 @@ export interface CampInventory {
 }
 
 export interface DailyCollectionRecord {
-  id: string;
-  campId: string;
-  personId: string;
-  resourceTypeId: string;
+  id: number;
+  campId: number;
+  personId: number;
+  resourceTypeId: number;
   date: string;
-  expectedAmount: number;
-  actualAmount: number;
-  differenceReason: string;
-  recordedBy: string;
-  movementId: string;
+  expectedAmount: string;
+  actualAmount: string;
+  differenceReason: string | null;
+  recordedBy: number;
+  movementId: number | null;
 }
 
 export interface InventoryMovement {
@@ -89,7 +89,7 @@ export interface Transfer {
   actualDepartureDate?: string;
   plannedArrivalDate: string;
   actualArrivalDate?: string;
-  status: "PENDING_DEPARTURE" | "COMPLETED" | "CANCELED";
+  status: "PLANNING" | "EN_ROUTE" | "DELIVERED" | "CANCELED";
   departureApprovedBy?: string;
   arrivalApprovedBy?: string;
   rationsForTrip: number;
@@ -108,8 +108,8 @@ export interface TransferPerson {
 export interface TransferHistory {
   id: string;
   transferId: string;
-  previousStatus: "PENDING_DEPARTURE" | "COMPLETED" | "CANCELED";
-  newStatus: "PENDING_DEPARTURE" | "COMPLETED" | "CANCELED";
+  previousStatus: "PLANNING" | "EN_ROUTE" | "DELIVERED" | "CANCELED";
+  newStatus: "PLANNING" | "EN_ROUTE" | "DELIVERED" | "CANCELED";
   date: string;
   userId: string;
   comment?: string;
