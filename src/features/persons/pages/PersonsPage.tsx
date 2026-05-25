@@ -1,164 +1,44 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { EmptyState, ErrorState, LoadingSkeleton } from '../../catalogs/components/StateComponents'
-import { useCreatePerson, useDeletePerson, useUpdatePerson } from '../api/mutations'
 import { usePersons, usePersonsStats } from '../api/queries'
-import type { CreatePersonRequest, Person, PersonStatus, UpdatePersonRequest } from '../types'
-
-interface FormState {
-  id?: number
-  firstName: string
-  lastName: string
-  alias: string
-  age: number
-  campId: number
-  occupationId: number
-  notes: string
-  status: PersonStatus
-}
-
-const INITIAL_FORM: FormState = {
-  firstName: '',
-  lastName: '',
-  alias: '',
-  age: 18,
-  campId: 1,
-  occupationId: 1,
-  notes: '',
-  status: 'ACTIVE',
-}
-
-const STATUS_OPTIONS: Array<PersonStatus | 'ALL'> = [
-  'ALL',
-  'ACTIVE',
-  'INJURED',
-  'MISSING',
-  'DECEASED',
-]
+import type { Person } from '../types'
+import { usePersonForm } from '../hooks/usePersonForm'
+import { usePersonFiltering, STATUS_OPTIONS } from '../hooks/usePersonFiltering'
 
 export function PersonsPage() {
-  const [showForm, setShowForm] = useState(false)
-  const [formData, setFormData] = useState<FormState>(INITIAL_FORM)
-  const [formError, setFormError] = useState<string | null>(null)
-  const [filterStatus, setFilterStatus] = useState<PersonStatus | 'ALL'>('ALL')
-
   const { data: persons = [], isLoading, error, refetch } = usePersons()
   const { data: stats } = usePersonsStats()
 
-  const createMutation = useCreatePerson()
-  const updateMutation = useUpdatePerson()
-  const deleteMutation = useDeletePerson()
+  const {
+    showForm,
+    setShowForm,
+    formData,
+    setFormField,
+    formError,
+    resetForm,
+    openForm,
+    submitForm,
+    isSubmitting,
+    mutations: { delete: deleteMutation },
+  } = usePersonForm(refetch)
 
-  const filteredPersons = useMemo(() => {
-    if (filterStatus === 'ALL') {
-      return persons
-    }
-
-    return persons.filter((person: Person) => person.status === filterStatus)
-  }, [persons, filterStatus])
-
-  function resetForm() {
-    setFormData(INITIAL_FORM)
-    setFormError(null)
-    setShowForm(false)
-  }
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setFormError(null)
-
-    if (!formData.firstName.trim() || !formData.lastName.trim()) {
-      setFormError('Nombre y apellido son obligatorios.')
-      return
-    }
-
-    if (!Number.isFinite(formData.age) || formData.age < 1) {
-      setFormError('La edad debe ser mayor que cero.')
-      return
-    }
-
-    if (!Number.isFinite(formData.campId) || formData.campId < 1) {
-      setFormError('Campamento invalido.')
-      return
-    }
-
-    if (!Number.isFinite(formData.occupationId) || formData.occupationId < 1) {
-      setFormError('Ocupacion invalida.')
-      return
-    }
-
-    try {
-      if (formData.id) {
-        const payload: UpdatePersonRequest = {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          alias: formData.alias || undefined,
-          age: formData.age,
-          campId: formData.campId,
-          occupationId: formData.occupationId,
-          notes: formData.notes || undefined,
-          status: formData.status,
-        }
-
-        await updateMutation.mutateAsync({ id: formData.id, data: payload })
-      } else {
-        const payload: CreatePersonRequest = {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          alias: formData.alias || undefined,
-          age: formData.age,
-          campId: formData.campId,
-          occupationId: formData.occupationId,
-          notes: formData.notes || undefined,
-        }
-
-        await createMutation.mutateAsync(payload)
-      }
-
-      resetForm()
-    } catch (submitError) {
-      if (submitError instanceof Error) {
-        setFormError(submitError.message)
-      } else {
-        setFormError('No fue posible guardar la persona.')
-      }
-    }
-  }
-
-  function handleEdit(person: Person) {
-    setFormData({
-      id: person.id,
-      firstName: person.firstName,
-      lastName: person.lastName,
-      alias: person.alias ?? '',
-      age: person.age,
-      campId: person.campId,
-      occupationId: person.occupationId,
-      notes: person.notes ?? '',
-      status: person.status,
-    })
-
-    setFormError(null)
-    setShowForm(true)
-  }
+  const { filterStatus, setFilterStatus, searchTerm, setSearchTerm, filteredPersons } =
+    usePersonFiltering(persons)
 
   async function handleDelete(personId: number) {
     const confirmed = window.confirm('Deseas eliminar esta persona?')
-
-    if (!confirmed) {
-      return
-    }
-
+    if (!confirmed) return
     try {
       await deleteMutation.mutateAsync(personId)
+      refetch()
     } catch (deleteError) {
-      const message =
-        deleteError instanceof Error ? deleteError.message : 'No fue posible eliminar.'
+      const message = deleteError instanceof Error ? deleteError.message : 'No fue posible eliminar.'
       window.alert(message)
     }
   }
 
-  function statusColor(status: PersonStatus) {
+  function statusColor(status) {
     switch (status) {
       case 'ACTIVE':
         return '#7ddb50'
@@ -307,7 +187,7 @@ export function PersonsPage() {
             marginBottom: '20px',
           }}
         >
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={(e) => { e.preventDefault(); submitForm() }}>
             <h3 style={{ marginTop: 0, color: '#7ddb50', fontFamily: "'Courier New', monospace" }}>
               {formData.id ? 'Editar Persona' : 'Nueva Persona'}
             </h3>
@@ -322,17 +202,13 @@ export function PersonsPage() {
             >
               <input
                 value={formData.firstName}
-                onChange={(event) =>
-                  setFormData((prev) => ({ ...prev, firstName: event.target.value }))
-                }
+                onChange={(event) => setFormField('firstName', event.target.value)}
                 placeholder="Nombre"
                 style={inputStyle}
               />
               <input
                 value={formData.lastName}
-                onChange={(event) =>
-                  setFormData((prev) => ({ ...prev, lastName: event.target.value }))
-                }
+                onChange={(event) => setFormField('lastName', event.target.value)}
                 placeholder="Apellido"
                 style={inputStyle}
               />
@@ -348,9 +224,7 @@ export function PersonsPage() {
             >
               <input
                 value={formData.alias}
-                onChange={(event) =>
-                  setFormData((prev) => ({ ...prev, alias: event.target.value }))
-                }
+                onChange={(event) => setFormField('alias', event.target.value)}
                 placeholder="Alias"
                 style={inputStyle}
               />
@@ -358,20 +232,13 @@ export function PersonsPage() {
                 type="number"
                 value={formData.age}
                 min={1}
-                onChange={(event) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    age: Number.parseInt(event.target.value, 10) || 0,
-                  }))
-                }
+                onChange={(event) => setFormField('age', Number.parseInt(event.target.value, 10) || 0)}
                 placeholder="Edad"
                 style={inputStyle}
               />
               <select
                 value={formData.status}
-                onChange={(event) =>
-                  setFormData((prev) => ({ ...prev, status: event.target.value as PersonStatus }))
-                }
+                onChange={(event) => setFormField('status', event.target.value)}
                 style={inputStyle}
               >
                 <option value="ACTIVE">ACTIVE</option>
@@ -393,12 +260,7 @@ export function PersonsPage() {
                 type="number"
                 min={1}
                 value={formData.campId}
-                onChange={(event) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    campId: Number.parseInt(event.target.value, 10) || 0,
-                  }))
-                }
+                onChange={(event) => setFormField('campId', Number.parseInt(event.target.value, 10) || 0)}
                 placeholder="Camp ID"
                 style={inputStyle}
               />
@@ -406,12 +268,7 @@ export function PersonsPage() {
                 type="number"
                 min={1}
                 value={formData.occupationId}
-                onChange={(event) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    occupationId: Number.parseInt(event.target.value, 10) || 0,
-                  }))
-                }
+                onChange={(event) => setFormField('occupationId', Number.parseInt(event.target.value, 10) || 0)}
                 placeholder="Occupation ID"
                 style={inputStyle}
               />
@@ -419,7 +276,7 @@ export function PersonsPage() {
 
             <textarea
               value={formData.notes}
-              onChange={(event) => setFormData((prev) => ({ ...prev, notes: event.target.value }))}
+              onChange={(event) => setFormField('notes', event.target.value)}
               placeholder="Notas"
               style={{ ...inputStyle, width: '100%', minHeight: '72px', marginBottom: '12px' }}
             />
@@ -444,7 +301,7 @@ export function PersonsPage() {
               <button
                 type="submit"
                 style={primaryButtonStyle}
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={isSubmitting}
               >
                 {formData.id ? 'Actualizar' : 'Crear'}
               </button>
@@ -540,7 +397,7 @@ export function PersonsPage() {
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   type="button"
-                  onClick={() => handleEdit(person)}
+                  onClick={() => openForm(person)}
                   style={smallPrimaryButtonStyle}
                 >
                   Editar
