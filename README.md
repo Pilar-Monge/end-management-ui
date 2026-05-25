@@ -14,27 +14,35 @@ The following screenshots represent the main visual style and interactive sectio
 
 ### Main Homepage
 
-![Main Homepage](docs/screenshots/main-homepage.png)
+![Main Homepage](<readme.info/screenshots/Captura de pantalla 2026-05-25 013634.png>)
 
 ### Intro Scene
 
-![Intro Scene](docs/screenshots/intro-scene.png)
+![Intro Scene](<readme.info/screenshots/Captura de pantalla 2026-05-25 013737.png>)
 
 ### Interactive Globe
 
-![Interactive Globe](docs/screenshots/interactive-globe.png)
+![Interactive Globe](<readme.info/screenshots/Captura de pantalla 2026-05-25 013911.png>)
 
-### Expeditions Module
+### Story Message
 
-![Expeditions Module](docs/screenshots/expeditions-module.png)
+![Story Message](<readme.info/screenshots/Captura de pantalla 2026-05-25 014001.png>)
+
+### Environment Scene
+
+![Environment Scene](<readme.info/screenshots/Captura de pantalla 2026-05-25 014018.png>)
 
 ### 3D Monitoring Scene
 
-![3D Monitoring Scene](docs/screenshots/monitoring-scene.png)
+![3D Monitoring Scene](<readme.info/screenshots/Captura de pantalla 2026-05-25 014201.png>)
+
+### Expeditions Module
+
+![Expeditions Module](<readme.info/screenshots/Captura de pantalla 2026-05-25 014307.png>)
 
 ### Control Room Scene
 
-![Control Room Scene](docs/screenshots/control-room-scene.png)
+![Control Room Scene](<readme.info/screenshots/Captura de pantalla 2026-05-25 015211.png>)
 
 ---
 
