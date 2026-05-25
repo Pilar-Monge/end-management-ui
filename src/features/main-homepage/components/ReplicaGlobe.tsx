@@ -263,7 +263,6 @@ const ReplicaGlobe = ({
   const globeEl = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
-  const [isTouchDevice, setIsTouchDevice] = useState(false)
   const [selectedCampamento, setSelectedCampamento] = useState<Campamento | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [isSearchFocused, setIsSearchFocused] = useState(false)
@@ -279,24 +278,6 @@ const ReplicaGlobe = ({
       onLoadingComplete()
     }
   }, [isReady, onLoadingComplete])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const updateTouchState = () => {
-      const hasCoarsePointer = window.matchMedia('(pointer: coarse)').matches
-      setIsTouchDevice(hasCoarsePointer || navigator.maxTouchPoints > 0)
-    }
-
-    updateTouchState()
-    window.addEventListener('resize', updateTouchState)
-    window.addEventListener('orientationchange', updateTouchState)
-
-    return () => {
-      window.removeEventListener('resize', updateTouchState)
-      window.removeEventListener('orientationchange', updateTouchState)
-    }
-  }, [])
 
   useEffect(() => {
     const updateSize = () => {
@@ -321,8 +302,6 @@ const ReplicaGlobe = ({
       globeEl.current.controls().autoRotateSpeed = 0.4
     }
   }, [selectedCampamento])
-
-  const isCompactViewport = isTouchDevice && dimensions.width <= 1024 && dimensions.height <= 700
 
   useEffect(() => {
     let frameId: number
@@ -413,7 +392,7 @@ const ReplicaGlobe = ({
   return (
     <div
       ref={containerRef}
-      className="w-full h-full bg-transparent overflow-hidden relative font-sans text-white"
+      className="w-full h-full bg-transparent overflow-hidden overflow-x-hidden relative font-sans text-white"
     >
       <style>{`
         .camp-info-card--compact {
@@ -425,6 +404,7 @@ const ReplicaGlobe = ({
           width: min(calc(100vw - 0.75rem), 21rem) !important;
           max-height: calc(100dvh - 0.75rem) !important;
           overflow-y: auto !important;
+          overflow-x: hidden !important;
           overscroll-behavior: contain;
           transform: translate(-50%, -50%) !important;
           border-radius: 0.9rem !important;
@@ -634,21 +614,11 @@ const ReplicaGlobe = ({
               const el = document.createElement('div')
               el.className = 'group relative'
               el.style.pointerEvents = 'none'
-
-              const statusColor =
-                camp.status === 'Estable'
-                  ? '#4ade80'
-                  : camp.status === 'Próspero'
-                    ? 'white'
-                    : '#fbbf24'
               const isSelected = camp.isSelected
 
-              const homeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-300 group-hover:scale-110"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`
-              const fileIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-300 group-hover:translate-y-[-1px]"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>`
-
               el.innerHTML = `
-            <div class="marker-root relative" style="pointer-events: none;">
-              <div class="marker-dot-area flex items-center justify-center relative pointer-events-auto cursor-pointer" style="width: 24px; height: 24px; transform: translate(-50%, -50%);">
+              <div class="marker-root relative flex items-center justify-center" style="pointer-events: none; width: 40px; height: 40px;">
+              <div class="marker-dot-area flex items-center justify-center relative pointer-events-auto cursor-pointer" style="width: 40px; height: 40px; transform: translate(-50%, -50%); touch-action: manipulation;">
                 <div class="absolute w-8 h-8 rounded-full border border-white/20 animate-ping opacity-60 pointer-events-none"></div>
                 <div class="absolute w-6 h-6 rounded-full bg-white/5 animate-pulse blur-sm pointer-events-none"></div>
                 <div class="absolute w-8 h-8 rounded-full bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-md pointer-events-none"></div>
@@ -657,59 +627,10 @@ const ReplicaGlobe = ({
                   <div class="text-white text-[10px] font-black tracking-widest uppercase px-1">${camp.name}</div>
                 </div>
               </div>
-
-              <div class="info-card ${isCompactViewport ? 'camp-info-card--compact' : 'absolute top-[-70px] left-[25px]'} z-[60] w-[280px] bg-black/95 backdrop-blur-3xl border border-white/30 p-6 rounded-sm shadow-[0_0_60px_rgba(0,0,0,0.8)] transition-all duration-500 origin-left pointer-events-auto ${isSelected ? 'opacity-100 scale-100 translate-x-0' : 'opacity-0 scale-95 -translate-x-4 pointer-events-none invisible'}">
-                <div class="absolute top-2 right-2 text-white/60 hover:rotate-90 hover:scale-110 hover:text-white transition-all duration-300 close-btn cursor-pointer z-[70] p-2 camp-info-card__close">
-                  <svg size="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px; pointer-events: none;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </div>
-
-                <div class="mb-4 pr-10 camp-info-card__header">
-                  <div class="title-anchor inline-block border-b-0">
-                    <div class="camp-info-card__title text-white text-[18px] font-black uppercase tracking-tighter italic leading-tight">${camp.name}</div>
-                  </div>
-                  <div class="mt-2 flex items-center gap-2 camp-info-card__badge-row">
-                    <div class="w-2.5 h-2.5 rounded-full bg-green-400 pulse-green shadow-[0_0_8px_#4ade80]"></div>
-                    <div class="bg-black/60 text-white/80 text-[11px] font-mono font-bold tracking-widest px-2 py-0.5 border border-white/20 camp-info-card__badge">CAMP_ID_00${camp.id}</div>
-                  </div>
-                </div>
-
-                <div class="camp-info-card__meta grid grid-cols-2 gap-6 mb-6">
-                  <div class="space-y-1">
-                    <div class="text-white/50 text-[9px] uppercase font-bold tracking-[0.2em] font-mono camp-info-card__label">STATUS</div>
-                    <div class="text-[15px] font-black tracking-tighter italic uppercase camp-info-card__value" style="color: ${statusColor}">${camp.status}</div>
-                  </div>
-                  <div class="space-y-1">
-                    <div class="text-white/50 text-[9px] uppercase font-bold tracking-[0.2em] font-mono camp-info-card__label">POBLACIÓN</div>
-                    <div class="text-white text-[15px] font-black tracking-tighter italic uppercase font-mono camp-info-card__value">${camp.survivors}</div>
-                  </div>
-                </div>
-
-                <div class="camp-info-card__desc relative mb-6 min-h-[3rem] flex items-center border-l-2 border-white/20 pl-4">
-                  <p class="text-white/50 text-[11px] leading-relaxed italic font-medium">
-                    "${camp.description}"
-                  </p>
-                </div>
-
-                <div class="camp-info-card__actions flex flex-col gap-4">
-                  <button class="camp-info-card__action action-btn menu-brush w-full py-4 rounded-none uppercase tracking-[0.2em] font-black italic flex items-center justify-center group/btn relative overflow-hidden active:scale-[0.98] transition-transform">
-                    <span class="camp-info-card__action-text relative z-10 flex items-center justify-center gap-3 text-white text-[13px] transition-transform duration-300 group-hover/btn:scale-105 pointer-events-none">
-                      ${homeIcon}
-                      INGRESAR
-                    </span>
-                  </button>
-                  <button class="camp-info-card__action admission-request-btn action-btn menu-brush w-full py-3 rounded-none uppercase tracking-[0.2em] font-black italic flex items-center justify-center group/btn relative overflow-hidden active:scale-[0.98] transition-transform">
-                    <span class="camp-info-card__action-text relative z-10 flex items-center justify-center gap-3 text-white text-[11px] transition-transform duration-300 group-hover/btn:scale-105 pointer-events-none">
-                      ${fileIcon}
-                      SOLICITAR ACCESO
-                    </span>
-                  </button>
-                </div>
-              </div>
             </div>
           `
 
               const markerDotArea = el.querySelector('.marker-dot-area') as HTMLElement
-              const infoCard = el.querySelector('.info-card') as HTMLElement
 
               const preventGlobe = (e: Event) => {
                 e.stopPropagation()
@@ -720,43 +641,136 @@ const ReplicaGlobe = ({
                 preventGlobe(e)
                 const clickTarget = e.target as HTMLElement
 
-                if (clickTarget.closest('.close-btn')) {
-                  handleSelectCampamento(null)
-                  return
-                }
-                if (clickTarget.closest('.admission-request-btn')) {
-                  navigate('/admission', {
-                    state: { returnToGlobalMap: true, campId: camp.id, campName: camp.name },
-                  })
-                  return
-                }
-
                 if (clickTarget.closest('.marker-dot-area')) {
                   handleSelectCampamento(camp.isSelected ? null : camp)
                   return
                 }
-
-                if (clickTarget.closest('.action-btn')) {
-                  onLoginClick?.()
-                  return
-                }
               }
 
-              ;[markerDotArea, infoCard].forEach((target) => {
-                if (target) {
-                  target.addEventListener('pointerdown', preventGlobe)
-                  target.addEventListener('pointerup', preventGlobe)
-                  target.addEventListener('click', (e) => handleInteraction(e as MouseEvent))
-                  target.addEventListener('contextmenu', preventGlobe)
-                }
-              })
+              if (markerDotArea) {
+                markerDotArea.addEventListener('pointerdown', preventGlobe)
+                markerDotArea.addEventListener('pointerup', preventGlobe)
+                markerDotArea.addEventListener('click', (e) => handleInteraction(e as MouseEvent))
+                markerDotArea.addEventListener('contextmenu', preventGlobe)
+              }
 
               return el
             },
-            [handleSelectCampamento, navigate, onLoginClick, isCompactViewport],
+            [handleSelectCampamento],
           )}
         />
       </motion.div>
+
+      <AnimatePresence>
+        {selectedCampamento && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-center justify-center px-3 py-4 md:px-6 md:py-6 pointer-events-none bg-black/20 backdrop-blur-[2px] overflow-x-hidden overflow-y-hidden"
+          >
+            <motion.div
+              initial={{ scale: 0.96, y: 10, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.96, y: 10, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="camp-info-card--compact pointer-events-auto w-full max-w-[21rem] bg-black/95 backdrop-blur-3xl border border-white/30 p-6 rounded-sm shadow-[0_0_60px_rgba(0,0,0,0.8)] overflow-x-hidden"
+            >
+              <button
+                type="button"
+                onClick={() => handleSelectCampamento(null)}
+                className="absolute top-2 right-2 text-white/60 hover:rotate-90 hover:scale-110 hover:text-white transition-all duration-300 z-[70] p-2 camp-info-card__close cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="mb-4 pr-10 camp-info-card__header">
+                <div className="title-anchor inline-block border-b-0">
+                  <div className="camp-info-card__title text-white text-[18px] font-black uppercase tracking-tighter italic leading-tight">
+                    {selectedCampamento.name}
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center gap-2 camp-info-card__badge-row">
+                  <div className="w-2.5 h-2.5 rounded-full bg-green-400 pulse-green shadow-[0_0_8px_#4ade80]" />
+                  <div className="bg-black/60 text-white/80 text-[11px] font-mono font-bold tracking-widest px-2 py-0.5 border border-white/20 camp-info-card__badge">
+                    CAMP_ID_00{selectedCampamento.id}
+                  </div>
+                </div>
+              </div>
+
+              <div className="camp-info-card__meta grid grid-cols-2 gap-6 mb-6">
+                <div className="space-y-1">
+                  <div className="text-white/50 text-[9px] uppercase font-bold tracking-[0.2em] font-mono camp-info-card__label">
+                    STATUS
+                  </div>
+                  <div
+                    className="text-[15px] font-black tracking-tighter italic uppercase camp-info-card__value"
+                    style={{
+                      color:
+                        selectedCampamento.status === 'Estable'
+                          ? '#4ade80'
+                          : selectedCampamento.status === 'Próspero'
+                            ? 'white'
+                            : '#fbbf24',
+                    }}
+                  >
+                    {selectedCampamento.status}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-white/50 text-[9px] uppercase font-bold tracking-[0.2em] font-mono camp-info-card__label">
+                    POBLACIÓN
+                  </div>
+                  <div className="text-white text-[15px] font-black tracking-tighter italic uppercase font-mono camp-info-card__value">
+                    {selectedCampamento.survivors}
+                  </div>
+                </div>
+              </div>
+
+              <div className="camp-info-card__desc relative mb-6 min-h-[3rem] flex items-center border-l-2 border-white/20 pl-4">
+                <p className="text-white/50 text-[11px] leading-relaxed italic font-medium">
+                  &quot;{selectedCampamento.description}&quot;
+                </p>
+              </div>
+
+              <div className="camp-info-card__actions flex flex-col gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onLoginClick?.()
+                    handleSelectCampamento(null)
+                  }}
+                  className="camp-info-card__action action-btn menu-brush w-full py-4 rounded-none uppercase tracking-[0.2em] font-black italic flex items-center justify-center group/btn relative overflow-hidden active:scale-[0.98] transition-transform cursor-pointer"
+                >
+                  <span className="camp-info-card__action-text relative z-10 flex items-center justify-center gap-3 text-white text-[13px] transition-transform duration-300 group-hover/btn:scale-105 pointer-events-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    INGRESAR
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigate('/admission', {
+                      state: {
+                        returnToGlobalMap: true,
+                        campId: selectedCampamento.id,
+                        campName: selectedCampamento.name,
+                      },
+                    })
+                    handleSelectCampamento(null)
+                  }}
+                  className="camp-info-card__action action-btn menu-brush w-full py-3 rounded-none uppercase tracking-[0.2em] font-black italic flex items-center justify-center group/btn relative overflow-hidden active:scale-[0.98] transition-transform cursor-pointer"
+                >
+                  <span className="camp-info-card__action-text relative z-10 flex items-center justify-center gap-3 text-white text-[11px] transition-transform duration-300 group-hover/btn:scale-105 pointer-events-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+                    SOLICITAR ACCESO
+                  </span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {}
       <AnimatePresence>
