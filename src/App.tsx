@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import LoginPage from './features/login/pages/LoginPage'
@@ -16,14 +16,11 @@ const ExpeditionsPage = lazy(() => import('./features/expeditions').then((m) => 
 const ResourceMainViewPage = lazy(() =>
   import('./features/resources').then((m) => ({ default: m.ResourceMainViewPage })),
 )
-const AdminDashboardPage = lazy(() =>
-  import('./features/admin-dashboard').then((m) => ({ default: m.AdminDashboardPage })),
-)
 const AdminMainViewUiPage = lazy(() =>
   import('./features/admin-main-view-ui').then((m) => ({ default: m.AdminMainViewUiPage })),
 )
-const AdminDashboardUiV2Page = lazy(() =>
-  import('./features/admin-dashboard-ui-v2').then((m) => ({ default: m.AdminDashboardUiV2Page })),
+const AdminDashboardPage = lazy(() =>
+  import('./features/admin-dashboard').then((m) => ({ default: m.AdminDashboardPage })),
 )
 const ResourceTypesPage = lazy(() =>
   import('./features/catalogs').then((m) => ({ default: m.ResourceTypesPage })),
@@ -183,10 +180,13 @@ function CatalogsLayout() {
 function App() {
   const [isPortrait, setIsPortrait] = useState(true)
 
-  const isMobileDevice = 
-    /iPhone|iPad|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-    (typeof screen !== 'undefined' && (screen.availWidth < 600 || screen.availHeight < 600)) ||
-    (typeof window !== 'undefined' && window.innerWidth < 600)
+  const isMobileDevice = useMemo(
+    () =>
+      /iPhone|iPad|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      (typeof screen !== 'undefined' && (screen.availWidth < 600 || screen.availHeight < 600)) ||
+      (typeof window !== 'undefined' && window.innerWidth < 600),
+    [],
+  )
 
   useEffect(() => {
     const handleNavigation = () => {
@@ -302,14 +302,6 @@ function App() {
           }
         />
         <Route
-          path="/admin-dashboard-ui-v2"
-          element={
-            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'RESOURCE_MANAGEMENT']}>
-              {withSuspense(<AdminDashboardUiV2Page />)}
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/admin-main-view-ui"
           element={
             <ProtectedRoute allowedRoles={['SYSTEM_ADMIN']}>
@@ -321,7 +313,7 @@ function App() {
           path="/dashboard"
           element={
             <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'RESOURCE_MANAGEMENT']}>
-              {withSuspense(<AdminDashboardPage />)}
+              <Navigate to="/admin-dashboard" replace />
             </ProtectedRoute>
           }
         />

@@ -9,6 +9,7 @@ import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionSer
 import { getPostLoginRoute, normalizeUserRole } from '../../../shared/services/postLoginRouting'
 import { getErrorMessage } from '../../../shared/services/errorMessages'
 import { useAuthState } from '../../../shared/context/AuthContext'
+import { PopupMessage } from '../../../shared/components/PopupMessage'
 import type { LoginErrors, LoginForm } from '../types'
 
 const LAST_SELECTED_CAMP_ID_KEY = 'last_selected_camp_id'
@@ -23,6 +24,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showLoginForm, setShowLoginForm] = useState(false)
   const [cinematicPulse, setCinematicPulse] = useState(0)
+  const [popupMessage, setPopupMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (authState?.selectedCampId && authState.selectedCampId > 0) {
@@ -65,6 +67,7 @@ export default function LoginPage() {
     if (!form.campId || form.campId <= 0) nextErrors.general = 'Debes seleccionar un campamento antes de iniciar sesion'
 
     setErrors(nextErrors)
+    if (nextErrors.general) setPopupMessage(nextErrors.general)
     return Object.keys(nextErrors).length === 0
   }
 
@@ -96,15 +99,17 @@ export default function LoginPage() {
 
       const defaultRoute = getPostLoginRoute(normalizedUser.role)
       const redirectPath =
-        normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard-ui-v2')
+        normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard')
           ? savedPath
           : defaultRoute
       localStorage.removeItem('last_secure_path')
       navigate(redirectPath, { replace: true })
     } catch (error) {
+      const message = getErrorMessage(error, 'login')
       setErrors({
-        general: getErrorMessage(error, 'login'),
+        general: message,
       })
+      setPopupMessage(message)
     } finally {
       setLoading(false)
     }
@@ -310,28 +315,6 @@ export default function LoginPage() {
                     </button>
                   </div>
 
-                  <AnimatePresence>
-                    {errors.general && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        style={{
-                          background: 'rgba(224,80,80,0.08)',
-                          border: '1px solid rgba(224,80,80,0.3)',
-                          borderRadius: 4,
-                          padding: '10px 14px',
-                          fontSize: 10,
-                          color: '#e08080',
-                          letterSpacing: '1px',
-                          fontFamily: "'Courier New', monospace",
-                        }}
-                      >
-                        ⚠ {errors.general}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
                   <motion.button
                     type="submit"
                     disabled={loading}
@@ -379,6 +362,11 @@ export default function LoginPage() {
           )}
         </AnimatePresence>
       </motion.div>
+      <PopupMessage
+        message={popupMessage}
+        onClose={() => setPopupMessage(null)}
+        variant="error"
+      />
     </div>
   )
 }
