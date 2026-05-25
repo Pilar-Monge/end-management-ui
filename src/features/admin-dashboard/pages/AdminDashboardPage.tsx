@@ -215,7 +215,6 @@ const NAVIGATION_DATA: NavItem[] = [
   { id: "centro", label: "Centro de Mando", icon: <RadarIcon />, subOptions: ["Resumen táctico", "Monitoreo general"] },
   { id: "poblacion", label: "Población", icon: <ProfileIcon />, subOptions: ["Estadísticas", "Usuarios", "Roles temporales"] },
   { id: "admisiones", label: "Admisiones IA", icon: <ShieldIcon />, subOptions: ["Pendientes", "Historial"] },
-  { id: "inventario", label: "Inventario", icon: <CrateIcon />, subOptions: ["Resumen", "Ítems", "Movimientos", "Alertas", "Recolección"] },
   {
     id: "expediciones",
     label: "Expediciones",
@@ -1293,7 +1292,7 @@ function ContentArea({
   const moduleWarnings = useMemo(() => {
     if (section === "centro") {
       if (threatLevel >= 80) {
-        return ["Riesgo operativo alto: prioriza inventario, admisiones e inter-campamento."];
+        return ["Riesgo operativo alto: prioriza admisiones e inter-campamento."];
       }
       if (criticalUnreadCount > 0) {
         return [`Hay ${criticalUnreadCount} alerta(s) critica(s) sin atender.`];
@@ -1497,7 +1496,7 @@ function ContentArea({
         />
       )}
 
-      {(section === "inventario" || section === "seguridad" || section === "notificaciones") && (
+      {(section === "seguridad" || section === "notificaciones") && (
         <div className="admin-ui-v2-module-card">
           <h3>Módulo en diseño táctico</h3>
           <p>Este módulo mantiene la estructura visual nueva. En la siguiente iteración se porta la lógica completa igual que Población, Admisiones, Expediciones e Inter-campamentos.</p>
@@ -1565,17 +1564,15 @@ function DashboardModule({
   const healthScore = Math.max(0, Math.min(100, Math.round(100 - kpi.criticalResources * 8 - admissionsQueue * 4 - liveAlerts.length * 7)));
   const healthTone = healthScore < 45 ? "danger" : healthScore < 70 ? "warn" : "ok";
   const immediateEvents = [
-    { name: "Reposicion de agua", impact: "Alto", eta: "35 min", action: "Ir a inventario" },
     { name: "Revision admisiones IA", impact: admissionsQueue > 3 ? "Alto" : "Medio", eta: "50 min", action: "Ir a admisiones" },
     { name: "Sincronizacion intercamp", impact: intercampCount > 0 ? "Medio" : "Bajo", eta: "80 min", action: "Ir a intercamp" },
     { name: "Cierre de expedicion", impact: activeExpeditions > 1 ? "Alto" : "Medio", eta: "120 min", action: "Ir a expediciones" },
   ];
   const moduleStatus = [
     { name: "Admisiones IA", status: admissionsQueue > 0 ? "Pendiente" : "Estable", note: `${admissionsQueue} en cola`, tone: admissionsQueue > 0 ? "warn" : "ok" },
-    { name: "Inventario", status: kpi.criticalResources > 0 ? "Alerta" : "Estable", note: `${kpi.criticalResources} recursos críticos`, tone: kpi.criticalResources > 0 ? "danger" : "ok" },
     { name: "Expediciones", status: (kpi.activeExpeditions || activeExpeditions) > 0 ? "Activo" : "Reposo", note: `${kpi.activeExpeditions || activeExpeditions} operaciones`, tone: "info" },
     { name: "Intercamp", status: (kpi.pendingIntercamp || intercampCount) > 0 ? "Pendiente" : "Estable", note: `${kpi.pendingIntercamp || intercampCount} solicitudes`, tone: "warn" },
-  ] as const;
+  ] as Array<{ name: string; status: string; note: string; tone: "warn" | "ok" | "danger" | "info" }>;
 
   return (
     <div className="admin-ui-v2-dashboard">
@@ -1600,7 +1597,6 @@ function DashboardModule({
           <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
             <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void onReload()}>Actualizar</button>
             <button className="admin-ui-v2-btn is-info" type="button" onClick={() => onQuickNav("admisiones")}>Admisiones</button>
-            <button className="admin-ui-v2-btn" type="button" onClick={() => onQuickNav("inventario")}>Inventario</button>
             <button className="admin-ui-v2-btn" type="button" onClick={() => onQuickNav("expediciones")}>Expediciones</button>
           </div>
         </div>
@@ -2551,15 +2547,11 @@ function SettingsModule({
 }) {
   const [settings, setSettings] = useState(() => {
     const base = {
-      campName: `Campamento #${profile.campId ?? 1}`,
       adminName: profile.username ?? "Administrador",
       firstName: profile.firstName ?? "",
       middleName: profile.middleName ?? "",
       lastName1: profile.lastName1 ?? "",
       lastName2: profile.lastName2 ?? "",
-      day: 47,
-      alertThreshold: 20,
-      language: "es",
       autoBackup: true,
       soundAlerts: true,
       nightReport: true,
@@ -2625,12 +2617,10 @@ function SettingsModule({
               <span>Operativa</span>
             </div>
             <div className="admin-ui-v2-form-grid">
-              <label className="admin-ui-v2-muted">Nombre del campamento</label>
-              <input
-                className="v-input"
-                value={settings.campName}
-                onChange={(event) => setSettings((prev) => ({ ...prev, campName: event.target.value }))}
-              />
+              <label className="admin-ui-v2-muted">Campamento asignado</label>
+              <div className="v-input" aria-readonly="true">
+                {`Campamento #${profile.campId ?? 1}`}
+              </div>
 
               <label className="admin-ui-v2-muted">Nombre del administrador</label>
               <input
@@ -2667,20 +2657,6 @@ function SettingsModule({
                 onChange={(event) => setSettings((prev) => ({ ...prev, lastName2: event.target.value }))}
               />
 
-              <label className="admin-ui-v2-muted">Dia actual</label>
-              <div className="v-input" aria-readonly="true">
-                {settings.day}
-              </div>
-
-              <label className="admin-ui-v2-muted">Umbral de alerta (%)</label>
-              <input
-                className="v-input"
-                type="number"
-                min={1}
-                max={100}
-                value={settings.alertThreshold}
-                onChange={(event) => setSettings((prev) => ({ ...prev, alertThreshold: Number(event.target.value) || 1 }))}
-              />
             </div>
           </div>
         )}
@@ -2692,16 +2668,6 @@ function SettingsModule({
               <span>Entorno</span>
             </div>
             <div className="admin-ui-v2-form-grid">
-              <label className="admin-ui-v2-muted">Idioma</label>
-              <select
-                className="v-select"
-                value={settings.language}
-                onChange={(event) => setSettings((prev) => ({ ...prev, language: event.target.value }))}
-              >
-                <option value="es">Español</option>
-                <option value="en">English</option>
-              </select>
-
               <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
                 <button
                   className={`admin-ui-v2-btn ${settings.autoBackup ? "is-ok" : ""}`}
@@ -3267,16 +3233,6 @@ function ShieldIcon() {
     <IconSvg>
       <path d="M16 4 25 8v7c0 6-4 10-9 13-5-3-9-7-9-13V8l9-4Z" />
       <path d="m12 16 3 3 5-6" />
-    </IconSvg>
-  );
-}
-
-function CrateIcon() {
-  return (
-    <IconSvg>
-      <path d="M6 11 16 6l10 5-10 5-10-5Z" />
-      <path d="M6 11v10l10 5 10-5V11" />
-      <path d="M16 16v10" />
     </IconSvg>
   );
 }
