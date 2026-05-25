@@ -253,7 +253,7 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/loading" element={withSuspense(<LoadingPage />)} />
+        <Route path="/loading" element={<LoadingPage />} />
         <Route path="/main-homepage" element={withSuspense(<MainHomePage />)} />
         <Route
           path="/app"

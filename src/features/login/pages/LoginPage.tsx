@@ -101,7 +101,11 @@ export default function LoginPage() {
           ? savedPath
           : defaultRoute
       localStorage.removeItem('last_secure_path')
-      navigate(redirectPath, { replace: true })
+      
+      localStorage.setItem('postLoadingRoute', redirectPath)
+      
+  
+      navigate('/loading', { replace: true })
     } catch (error) {
       const message = getErrorMessage(error, 'login')
       setErrors({
