@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { SESSION_TOKEN_CHANGED_EVENT, sessionService } from '../services/sessionService'
 
-const PUBLIC_PATHS = new Set(['/', '/login', '/main-homepage', '/admission'])
+const PUBLIC_PATHS = new Set(['/', '/login', '/main-homepage', '/admission', '/loading'])
 const LAST_SECURE_PATH_KEY = 'last_secure_path'
 
 export function useSessionManager() {
