@@ -1,101 +1,140 @@
-import "../expeditionsUi.css";
-import { useState, useEffect, type ReactNode } from "react";
-import { ExpDashboard, ExpCrear, ExpLista, ExpDetalles, TrasladosVer, TrasladosCrear, PlaceholderView, PersonasView } from "../views/ExpedicionesViews";
-import { WorldMapDashboard } from "../views/WorldMapView";
-import { LoadingScreen } from "../components/LoadingScreen";
-import { OrientationWarning } from "../components/OrientationWarning";
+import '../expeditionsUi.css'
+import { useState, useEffect, type ReactNode } from 'react'
+import {
+  ExpDashboard,
+  ExpCrear,
+  ExpLista,
+  ExpDetalles,
+  TrasladosVer,
+  TrasladosCrear,
+  PlaceholderView,
+  PersonasView,
+} from '../views/ExpedicionesViews'
+import { WorldMapDashboard } from '../views/WorldMapView'
+import { LoadingScreen } from '../components/LoadingScreen'
+import { OrientationWarning } from '../components/OrientationWarning'
 
 const NAVIGATION_DATA = [
-  { id: "personas", label: "Personas", icon: <ProfileIcon />, subOptions: ["Lista de personas"] },
-  { id: "expediciones", label: "Expediciones", icon: <CompassIcon />, subOptions: ["Dashboard", "Crear expedición", "Lista de expediciones"] },
-  { id: "campamentos", label: "Campamentos", icon: <WeaponIcon />, subOptions: ["Dashboard", "Crear campamento", "Lista de campamentos"] },
-  { id: "traslados", label: "Traslados", icon: <VehicleIcon />, subOptions: ["Ver traslados", "Crear traslado"] },
-  { id: "recursos", label: "Recursos", icon: <SquadIcon />, subOptions: ["Inventario", "Registrar consumo", "Registrar obtención"] },
-  { id: "economia", label: "Economía", icon: <CurrencyIcon />, subOptions: ["Balance general", "Transacciones"] },
-  { id: "configuracion", label: "Configuración", icon: <RankIcon />, subOptions: ["Perfil", "Preferencias", "Usuarios"] },
-];
+  { id: 'personas', label: 'Personas', icon: <ProfileIcon />, subOptions: ['Lista de personas'] },
+  {
+    id: 'expediciones',
+    label: 'Expediciones',
+    icon: <CompassIcon />,
+    subOptions: ['Dashboard', 'Crear expedición', 'Lista de expediciones'],
+  },
+  {
+    id: 'campamentos',
+    label: 'Campamentos',
+    icon: <WeaponIcon />,
+    subOptions: ['Dashboard', 'Crear campamento', 'Lista de campamentos'],
+  },
+  {
+    id: 'traslados',
+    label: 'Traslados',
+    icon: <VehicleIcon />,
+    subOptions: ['Ver traslados', 'Crear traslado'],
+  },
+  {
+    id: 'recursos',
+    label: 'Recursos',
+    icon: <SquadIcon />,
+    subOptions: ['Inventario', 'Registrar consumo', 'Registrar obtención'],
+  },
+  {
+    id: 'economia',
+    label: 'Economía',
+    icon: <CurrencyIcon />,
+    subOptions: ['Balance general', 'Transacciones'],
+  },
+  {
+    id: 'configuracion',
+    label: 'Configuración',
+    icon: <RankIcon />,
+    subOptions: ['Perfil', 'Preferencias', 'Usuarios'],
+  },
+]
 
 export default function ExpeditionsUiPage() {
-  const [showLoading, setShowLoading] = useState(true);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [hasEntered, setHasEntered] = useState(false);
+  const [showLoading, setShowLoading] = useState(true)
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [hasEntered, setHasEntered] = useState(false)
 
-  const [activeNav, setActiveNav] = useState<string | null>(null);
-  const [activeSub, setActiveSub] = useState<string>("Dashboard");
-  const [activeExpId, setActiveExpId] = useState<number | undefined>(undefined);
+  const [activeNav, setActiveNav] = useState<string | null>(null)
+  const [activeSub, setActiveSub] = useState<string>('Dashboard')
+  const [activeExpId, setActiveExpId] = useState<number | undefined>(undefined)
   useEffect(() => {
     const timer = setTimeout(() => {
-      setIsLoaded(true);
-    }, 2600);
-    return () => clearTimeout(timer);
-  }, []);
+      setIsLoaded(true)
+    }, 2600)
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleEnter = () => {
-    setHasEntered(true);
+    setHasEntered(true)
     setTimeout(() => {
-      setShowLoading(false);
-    }, 450);
-  };
+      setShowLoading(false)
+    }, 450)
+  }
 
   const handleNavClick = (navId: string) => {
     if (activeNav === navId) {
-      setActiveNav(null);
+      setActiveNav(null)
     } else {
-      setActiveNav(navId);
-      const navItem = NAVIGATION_DATA.find((item) => item.id === navId);
-      setActiveSub(navItem?.subOptions[0] || "");
-      setActiveExpId(undefined);
+      setActiveNav(navId)
+      const navItem = NAVIGATION_DATA.find((item) => item.id === navId)
+      setActiveSub(navItem?.subOptions[0] || '')
+      setActiveExpId(undefined)
     }
-  };
+  }
 
   const handleInnerNavigation = (sub: string, id?: number) => {
-    setActiveSub(sub);
-    if (id !== undefined) setActiveExpId(id);
-  };
+    setActiveSub(sub)
+    if (id !== undefined) setActiveExpId(id)
+  }
 
-  const activeNavData = NAVIGATION_DATA.find((item) => item.id === activeNav);
+  const activeNavData = NAVIGATION_DATA.find((item) => item.id === activeNav)
 
   return (
     <div className="game-screen-layout text-[#A4C2C5]">
       <div className="holo-grid" />
 
       <OrientationWarning />
-      
-      <LoadingScreen 
-        show={showLoading} 
-        isLoaded={isLoaded} 
-        onEnter={handleEnter} 
-      />
 
-      
+      <LoadingScreen show={showLoading} isLoaded={isLoaded} onEnter={handleEnter} />
+
       {hasEntered && <TopHud />}
 
-      
       {hasEntered && (
         <div className="main-area">
           {activeNavData ? (
-            
             <div className="content-scroll">
               <SectionTitle title={activeNavData.label} />
               <section aria-label="Panel principal" className="settings-shell h-full w-full">
                 <div className="paint-glow" aria-hidden="true" />
-                <div className="settings-inner h-full" style={{ padding: "42px 0 0 0", overflow: "hidden" }}>
+                <div
+                  className="settings-inner h-full"
+                  style={{ padding: '42px 0 0 0', overflow: 'hidden' }}
+                >
                   <div className="watermark-x" aria-hidden="true" />
                   <div className="inner-layout">
                     <aside className="inner-sidebar">
-                      <SideMenu 
-                        items={activeNavData.subOptions} 
-                        activeItem={activeSub === "Detalles de Expedición" ? "Lista de expediciones" : activeSub} 
-                        onSelect={setActiveSub} 
+                      <SideMenu
+                        items={activeNavData.subOptions}
+                        activeItem={
+                          activeSub === 'Detalles de Expedición'
+                            ? 'Lista de expediciones'
+                            : activeSub
+                        }
+                        onSelect={setActiveSub}
                       />
                     </aside>
                     <div className="inner-divider" />
                     <div className="inner-content">
-                      <ContentArea 
-                        section={activeNav!} 
-                        sub={activeSub} 
-                        activeExpId={activeExpId} 
-                        onNavigate={handleInnerNavigation} 
+                      <ContentArea
+                        section={activeNav!}
+                        sub={activeSub}
+                        activeExpId={activeExpId}
+                        onNavigate={handleInnerNavigation}
                       />
                     </div>
                   </div>
@@ -103,14 +142,16 @@ export default function ExpeditionsUiPage() {
               </section>
             </div>
           ) : (
-            
             <div className="content-scroll">
               <SectionTitle title="Centro de Operaciones" />
               <section aria-label="Mapa mundial" className="settings-shell h-full w-full">
                 <div className="paint-glow" aria-hidden="true" />
-                <div className="settings-inner h-full" style={{ padding: "42px 0 0 0", overflow: "hidden" }}>
+                <div
+                  className="settings-inner h-full"
+                  style={{ padding: '42px 0 0 0', overflow: 'hidden' }}
+                >
                   <div className="watermark-x" aria-hidden="true" />
-                  <div className="inner-content" style={{ padding: "16px 20px" }}>
+                  <div className="inner-content" style={{ padding: '16px 20px' }}>
                     <WorldMapDashboard />
                   </div>
                 </div>
@@ -120,7 +161,6 @@ export default function ExpeditionsUiPage() {
         </div>
       )}
 
-      
       {hasEntered && (
         <>
           <BottomDock activeDock={activeNav} onSelect={handleNavClick} />
@@ -129,7 +169,7 @@ export default function ExpeditionsUiPage() {
         </>
       )}
     </div>
-  );
+  )
 }
 
 function TopHud() {
@@ -151,7 +191,7 @@ function TopHud() {
         </span>
       </button>
     </header>
-  );
+  )
 }
 
 function SectionTitle({ title }: { title: string }) {
@@ -160,111 +200,129 @@ function SectionTitle({ title }: { title: string }) {
       <div
         className="section-title-brush"
         style={{
-          transformStyle: "preserve-3d",
-          transform: "rotateY(25deg) translateZ(10px)",
+          transformStyle: 'preserve-3d',
+          transform: 'rotateY(25deg) translateZ(10px)',
         }}
       >
         <span className="btn-text">{title}</span>
       </div>
     </div>
-  );
+  )
 }
 
-function SideMenu({ items, activeItem, onSelect }: { items: string[]; activeItem: string; onSelect: (item: string) => void }) {
+function SideMenu({
+  items,
+  activeItem,
+  onSelect,
+}: {
+  items: string[]
+  activeItem: string
+  onSelect: (item: string) => void
+}) {
   return (
     <nav aria-label="Settings sections" className="w-full pl-2 pt-6 h-full flex flex-col">
       <div className="flex flex-col gap-[18px] perspective-[800px]">
         {items.map((item) => (
           <button
-            className={`side-button ${activeItem === item ? "is-active" : ""} relative`}
+            className={`side-button ${activeItem === item ? 'is-active' : ''} relative`}
             key={item}
             onClick={() => onSelect(item)}
             type="button"
             style={{
-              transformStyle: "preserve-3d",
-              transform: "rotateY(25deg) translateZ(10px)",
+              transformStyle: 'preserve-3d',
+              transform: 'rotateY(25deg) translateZ(10px)',
             }}
           >
-            <span className="btn-text whitespace-nowrap overflow-visible drop-shadow-md">{item}</span>
+            <span className="btn-text whitespace-nowrap overflow-visible drop-shadow-md">
+              {item}
+            </span>
           </button>
         ))}
       </div>
     </nav>
-  );
+  )
 }
 
-function ContentArea({ 
-  section, 
-  sub, 
-  activeExpId, 
-  onNavigate 
-}: { 
-  section: string; 
-  sub: string; 
-  activeExpId?: number;
-  onNavigate: (sub: string, id?: number) => void;
+function ContentArea({
+  section,
+  sub,
+  activeExpId,
+  onNavigate,
+}: {
+  section: string
+  sub: string
+  activeExpId?: number
+  onNavigate: (sub: string, id?: number) => void
 }) {
   const VIEW_MAP: Record<string, Record<string, React.ReactNode>> = {
     expediciones: {
-      "Dashboard": <ExpDashboard onNavigate={onNavigate} />,
-      "Crear expedición": <ExpCrear />,
-      "Lista de expediciones": <ExpLista onNavigate={onNavigate} />,
-      "Detalles de Expedición": <ExpDetalles expeditionId={activeExpId} onNavigate={onNavigate} />,
+      Dashboard: <ExpDashboard onNavigate={onNavigate} />,
+      'Crear expedición': <ExpCrear />,
+      'Lista de expediciones': <ExpLista onNavigate={onNavigate} />,
+      'Detalles de Expedición': <ExpDetalles expeditionId={activeExpId} onNavigate={onNavigate} />,
     },
     personas: {
-      "Lista de personas": <PersonasView onNavigate={onNavigate} />,
+      'Lista de personas': <PersonasView onNavigate={onNavigate} />,
     },
     traslados: {
-      "Ver traslados": <TrasladosVer />,
-      "Crear traslado": <TrasladosCrear />,
+      'Ver traslados': <TrasladosVer />,
+      'Crear traslado': <TrasladosCrear />,
     },
-  };
+  }
 
-  const view = VIEW_MAP[section]?.[sub];
-  if (view) return <>{view}</>;
-  return <PlaceholderView section={section} sub={sub} />;
+  const view = VIEW_MAP[section]?.[sub]
+  if (view) return <>{view}</>
+  return <PlaceholderView section={section} sub={sub} />
 }
 
-
-
-function BottomDock({ activeDock, onSelect }: { activeDock: string | null; onSelect: (id: string) => void }) {
+function BottomDock({
+  activeDock,
+  onSelect,
+}: {
+  activeDock: string | null
+  onSelect: (id: string) => void
+}) {
   return (
     <footer aria-label="Game navigation" className="dock">
       {NAVIGATION_DATA.map((item) => (
         <button
           aria-label={item.label}
-          className={`dock-item ${activeDock === item.id ? "is-active" : ""}`}
+          className={`dock-item ${activeDock === item.id ? 'is-active' : ''}`}
           key={item.id}
           onClick={() => onSelect(item.id)}
           type="button"
         >
           <span className="dock-content">
             {item.icon}
-            {item.id === "economia" && <span className="dock-number">304</span>}
+            {item.id === 'economia' && <span className="dock-number">304</span>}
           </span>
         </button>
       ))}
     </footer>
-  );
+  )
 }
 
 function SupportLink() {
   return (
     <button className="support-link" type="button">
-      <span className="btn-text"><span>?</span> Support</span>
+      <span className="btn-text">
+        <span>?</span> Support
+      </span>
     </button>
-  );
+  )
 }
 
 function SettingsHint() {
   return (
     <button className="settings-hint" type="button">
-      <span className="btn-text">Settings <GearIcon /></span>
+      <span className="btn-text">
+        Settings <GearIcon />
+      </span>
     </button>
-  );
+  )
 }
 
-function IconSvg({ children, className = "h-6 w-6" }: { children: ReactNode; className?: string }) {
+function IconSvg({ children, className = 'h-6 w-6' }: { children: ReactNode; className?: string }) {
   return (
     <svg
       aria-hidden="true"
@@ -278,7 +336,7 @@ function IconSvg({ children, className = "h-6 w-6" }: { children: ReactNode; cla
     >
       {children}
     </svg>
-  );
+  )
 }
 
 function ChevronLeft() {
@@ -286,7 +344,7 @@ function ChevronLeft() {
     <svg aria-hidden="true" className="h-4 w-3" fill="none" viewBox="0 0 10 16">
       <path d="M8 2 2 8l6 6" stroke="currentColor" strokeLinecap="square" strokeWidth="3" />
     </svg>
-  );
+  )
 }
 
 function ProfileIcon() {
@@ -296,7 +354,7 @@ function ProfileIcon() {
       <path d="M7 27c2.2-4.2 5.1-6.3 9-6.3s6.8 2.1 9 6.3" />
       <path d="M12 22.3 9 18m11 4.3 3-4.3" />
     </IconSvg>
-  );
+  )
 }
 
 function CompassIcon() {
@@ -306,7 +364,7 @@ function CompassIcon() {
       <path d="m16 7 4.5 9L16 25l-4.5-9L16 7Z" />
       <path d="m7 7 18 18M25 7 7 25" />
     </IconSvg>
-  );
+  )
 }
 
 function WeaponIcon() {
@@ -316,7 +374,7 @@ function WeaponIcon() {
       <path d="M22 14v-3h5v5M12 19v4" />
       <path d="M8 12h8" />
     </IconSvg>
-  );
+  )
 }
 
 function VehicleIcon() {
@@ -327,7 +385,7 @@ function VehicleIcon() {
       <path d="M10 23h4m7 0h4" />
       <path d="M11 14h10" />
     </IconSvg>
-  );
+  )
 }
 
 function SquadIcon() {
@@ -337,7 +395,7 @@ function SquadIcon() {
       <path d="M8 12a3 3 0 1 0 0 6M24 12a3 3 0 1 1 0 6" />
       <path d="M9 26c1.7-3.7 4-5.5 7-5.5s5.3 1.8 7 5.5M2.5 25c1.1-2.8 2.8-4.2 5.2-4.2M29.5 25c-1.1-2.8-2.8-4.2-5.2-4.2" />
     </IconSvg>
-  );
+  )
 }
 
 function CurrencyIcon() {
@@ -347,7 +405,7 @@ function CurrencyIcon() {
       <path d="M21 11.5c-1.1-1-2.7-1.5-4.7-1.5-3 0-5.1 1.4-5.1 3.5 0 4.6 10.1 1.9 10.1 6.2 0 2.2-2.2 3.7-5.3 3.7-2.3 0-4.1-.7-5.3-2" />
       <path d="M16 7v18" />
     </IconSvg>
-  );
+  )
 }
 
 function RankIcon() {
@@ -356,7 +414,7 @@ function RankIcon() {
       <path d="M16 3 20 13l9 2-6.8 5.6L23 29l-7-4.5L9 29l.8-8.4L3 15l9-2 4-10Z" />
       <path d="M16 9v15M10 15l6 4 6-4" />
     </IconSvg>
-  );
+  )
 }
 
 function GearIcon() {
@@ -370,5 +428,5 @@ function GearIcon() {
         strokeWidth="1.5"
       />
     </svg>
-  );
+  )
 }

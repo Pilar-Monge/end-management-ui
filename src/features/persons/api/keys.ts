@@ -10,6 +10,6 @@ export const personsKeys = {
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 
 export const ENDPOINTS = {
-  persons: `${API_BASE}/persons`,
-  personsStats: `${API_BASE}/persons/stats`,
+  persons: `${API_BASE}/person`,
+  personsStats: `${API_BASE}/person/stats`,
 } as const

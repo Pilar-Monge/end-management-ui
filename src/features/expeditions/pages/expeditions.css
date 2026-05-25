@@ -48,14 +48,31 @@
   gap: 16px;
   padding: 16px 32px;
   background: rgba(2, 6, 23, 0.98);
-  clip-path: polygon(2% 8%, 95% 1%, 100% 12%, 96% 24%, 100% 36%, 95% 52%, 100% 68%, 94% 84%, 98% 100%, 2% 92%, 0% 84%, 4% 71%, 1% 58%, 5% 43%, 0% 28%, 6% 16%);
+  clip-path: polygon(
+    2% 8%,
+    95% 1%,
+    100% 12%,
+    96% 24%,
+    100% 36%,
+    95% 52%,
+    100% 68%,
+    94% 84%,
+    98% 100%,
+    2% 92%,
+    0% 84%,
+    4% 71%,
+    1% 58%,
+    5% 43%,
+    0% 28%,
+    6% 16%
+  );
   transform: skewX(-10deg);
 }
 
 .expedition-loading-brush span {
   display: block;
   color: #22d3ee;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.3em;
@@ -71,7 +88,24 @@
   align-items: center;
   padding: 0 4px;
   background: rgba(2, 6, 23, 0.98);
-  clip-path: polygon(2% 8%, 95% 1%, 100% 12%, 96% 24%, 100% 36%, 95% 52%, 100% 68%, 94% 84%, 98% 100%, 2% 92%, 0% 84%, 4% 71%, 1% 58%, 5% 43%, 0% 28%, 6% 16%);
+  clip-path: polygon(
+    2% 8%,
+    95% 1%,
+    100% 12%,
+    96% 24%,
+    100% 36%,
+    95% 52%,
+    100% 68%,
+    94% 84%,
+    98% 100%,
+    2% 92%,
+    0% 84%,
+    4% 71%,
+    1% 58%,
+    5% 43%,
+    0% 28%,
+    6% 16%
+  );
 }
 
 .expedition-loading-bar {
@@ -91,7 +125,7 @@
 
 .expedition-loader-text {
   color: #22d3ee;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -151,7 +185,7 @@
 
 .expedition-sync-percent {
   color: #fff;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-size: 30px;
   font-weight: 900;
   line-height: 1;
@@ -160,7 +194,7 @@
 .expedition-sync-code {
   margin-top: 4px;
   color: rgba(34, 211, 238, 0.6);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-size: 8px;
   letter-spacing: 0.3em;
   text-transform: uppercase;
@@ -182,7 +216,7 @@
 
 .expedition-sync-title {
   color: #22d3ee;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.5em;
@@ -191,7 +225,7 @@
 
 .expedition-sync-subtitle {
   color: rgba(255, 255, 255, 0.3);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-size: 8px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -241,7 +275,7 @@
   gap: 8px;
   min-height: 42px;
   padding: 10px 48px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.25em;
@@ -313,7 +347,7 @@
 
 .expedition-hover-tag span {
   color: #22d3ee;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.25em;
@@ -377,7 +411,7 @@
 }
 
 .expedition-hud-button span {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.25em;
@@ -387,7 +421,9 @@
 .expedition-hud-icon,
 .expedition-hud-back-icon {
   color: currentColor;
-  transition: transform 0.3s, color 0.3s;
+  transition:
+    transform 0.3s,
+    color 0.3s;
 }
 
 .expedition-hud-button:hover .expedition-hud-back-icon {

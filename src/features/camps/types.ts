@@ -36,7 +36,7 @@ export interface CreateCampRequest {
   watchers?: number
 }
 
-export interface UpdateCampRequest extends Partial<CreateCampRequest> {}
+export type UpdateCampRequest = Partial<CreateCampRequest>
 export interface CampResourceRequest {
   campId: number
   resourceTypeId: number
@@ -61,6 +61,25 @@ export interface CampWithStats extends Camp {
   resourceTypes: number
   utilizationPercent: number
   threatLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+}
+
+export interface CampsStats {
+  totalCamps: number
+  activeCamps: number
+  totalPopulation: number
+}
+
+export interface CampResourceItem {
+  campId: number
+  resourceTypeId: number
+  quantity: number
+  updatedAt?: string
+}
+
+export interface CampResourceMutationResponse {
+  campId: number
+  resourceTypeId: number
+  quantity: number
 }
 
 export interface ApiError {

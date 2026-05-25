@@ -1,8 +1,10 @@
-import { useNavigate } from 'react-router-dom'
+import { Suspense, lazy } from 'react'
 import { useState } from 'react'
-import ResourceMainThreeScene from '../components/ResourceMainThreeScene'
+import { useNavigate } from 'react-router-dom'
 import ResourceControlPanelPage from './ResourceControlPanelPage'
 import './resource-main-view.css'
+
+const ResourceMainThreeScene = lazy(() => import('../components/ResourceMainThreeScene'))
 
 export default function ResourceMainViewPage() {
   const navigate = useNavigate()
@@ -13,7 +15,9 @@ export default function ResourceMainViewPage() {
       {showPanel ? (
         <ResourceControlPanelPage onExit={() => setShowPanel(false)} />
       ) : (
-        <ResourceMainThreeScene onExit={() => navigate('/')} onOpenPanel={() => setShowPanel(true)} />
+        <Suspense fallback={<div style={{ color: '#cfe7ff', padding: 16 }}>Cargando vista 3D...</div>}>
+          <ResourceMainThreeScene onExit={() => navigate('/')} onOpenPanel={() => setShowPanel(true)} />
+        </Suspense>
       )}
     </main>
   )

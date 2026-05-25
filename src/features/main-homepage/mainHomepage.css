@@ -1,12 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&family=Bebas+Neue&family=Oswald:wght@400;500;600;700;800&display=swap');
-@import "tailwindcss";
-@import "./introAnimations.css";
+@import 'tailwindcss';
+@import './introAnimations.css';
 
 @theme {
-  --font-sans: "Oswald", sans-serif;
-  --font-serif: "Oswald", sans-serif;
-  --font-mono: "Space Mono", monospace;
-  --font-bebas: "Bebas Neue", sans-serif;
+  --font-sans: 'Oswald', sans-serif;
+  --font-serif: 'Oswald', sans-serif;
+  --font-mono: 'Space Mono', monospace;
+  --font-bebas: 'Bebas Neue', sans-serif;
 }
 
 .main-homepage,
@@ -33,7 +33,9 @@
   background:
     linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
     linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-  background-size: 100% 2px, 3px 100%;
+  background-size:
+    100% 2px,
+    3px 100%;
 }
 
 .scanline {

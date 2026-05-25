@@ -6,11 +6,12 @@ import type {
   CampStatusUpdateRequest,
   CampResourceRequest,
   UpdateCampResourceRequest,
+  CampResourceMutationResponse,
   ApiError,
 } from '../types'
 import { campsKeys, ENDPOINTS } from './keys'
 
-const getToken = () => localStorage.getItem('token')
+const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('accessToken')
 
 const getHeaders = (): HeadersInit => ({
   'Content-Type': 'application/json',
@@ -115,7 +116,7 @@ export function useUpdateCampStatus(
     ...options,
   })
 }
-export async function addCampResource(data: CampResourceRequest): Promise<any> {
+export async function addCampResource(data: CampResourceRequest): Promise<CampResourceMutationResponse> {
   const res = await fetch(`${ENDPOINTS.campResources}`, {
     method: 'POST',
     headers: getHeaders(),
@@ -126,10 +127,10 @@ export async function addCampResource(data: CampResourceRequest): Promise<any> {
 }
 
 export function useAddCampResource(
-  options?: Omit<UseMutationOptions<any, ApiError, CampResourceRequest>, 'mutationFn'>,
+  options?: Omit<UseMutationOptions<CampResourceMutationResponse, ApiError, CampResourceRequest>, 'mutationFn'>,
 ) {
   const queryClient = useQueryClient()
-  return useMutation<any, ApiError, CampResourceRequest>({
+  return useMutation<CampResourceMutationResponse, ApiError, CampResourceRequest>({
     mutationFn: addCampResource,
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: campsKeys.resourcesByCamp(variables.campId) })
@@ -143,7 +144,7 @@ export async function updateCampResource(
   campId: number,
   resourceTypeId: number,
   data: UpdateCampResourceRequest,
-): Promise<any> {
+): Promise<CampResourceMutationResponse> {
   const res = await fetch(`${ENDPOINTS.campResources}/${campId}/${resourceTypeId}`, {
     method: 'PUT',
     headers: getHeaders(),
@@ -156,7 +157,7 @@ export async function updateCampResource(
 export function useUpdateCampResource(
   options?: Omit<
     UseMutationOptions<
-      any,
+      CampResourceMutationResponse,
       ApiError,
       { campId: number; resourceTypeId: number; data: UpdateCampResourceRequest }
     >,
@@ -165,7 +166,7 @@ export function useUpdateCampResource(
 ) {
   const queryClient = useQueryClient()
   return useMutation<
-    any,
+    CampResourceMutationResponse,
     ApiError,
     { campId: number; resourceTypeId: number; data: UpdateCampResourceRequest }
   >({

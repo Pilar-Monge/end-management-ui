@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react-hooks/exhaustive-deps */
 // @ts-nocheck
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, useGLTF, Html, useProgress } from '@react-three/drei'
@@ -5,26 +8,39 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import * as THREE from 'three'
 import { LoadingScreen as ResourcePanelLoadingScreen } from './ResourcePanelLoadingScreen'
 
-const HANGAR_URL = 'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/polygon.glb'
-const MONITORING_STATION_URL = 'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorExpediciones/monitoring_station.glb'
-const BEER_BREWERY_URL = 'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/beer_brewery_set.glb'
-const FORD_URL = 'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/ford_f100_1967.glb'
-const MEAT_URL = 'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/vietnamese_meat_market_stall.glb'
-const SHELF_URL = 'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/metal_storage_cabinet.glb'
-const FORKLIFT_URL = 'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/forklifter_-_game_ready.glb'
-const CEILING_LAMP_URL = 'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/fluorescent_lamplight_-_4096px2.glb'
-const FRUIT_URL = 'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/fruit_veg_market%20(1).glb'
-const CHAIR_URL = 'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/dock-01_chair.glb'
+const HANGAR_URL =
+  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/polygon.glb'
+const MONITORING_STATION_URL =
+  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorExpediciones/monitoring_station.glb'
+const BEER_BREWERY_URL =
+  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/beer_brewery_set.glb'
+const FORD_URL =
+  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/ford_f100_1967.glb'
+const MEAT_URL =
+  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/vietnamese_meat_market_stall.glb'
+const SHELF_URL =
+  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/metal_storage_cabinet.glb'
+const FORKLIFT_URL =
+  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/forklifter_-_game_ready.glb'
+const CEILING_LAMP_URL =
+  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/fluorescent_lamplight_-_4096px2.glb'
+const FRUIT_URL =
+  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/fruit_veg_market%20(1).glb'
+const CHAIR_URL =
+  'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorRecursos/dock-01_chair.glb'
 
 const INITIAL_CAMERA = [-66.4, 11.2, -40.9] as [number, number, number]
 const INITIAL_TARGET = [-60, 9, -33] as [number, number, number]
 
 type ResourceZoomTarget = 'station' | 'meat' | 'beer' | null
 
-const ZOOM_VIEWS: Record<Exclude<ResourceZoomTarget, null>, {
-  camera: [number, number, number]
-  look: [number, number, number]
-}> = {
+const ZOOM_VIEWS: Record<
+  Exclude<ResourceZoomTarget, null>,
+  {
+    camera: [number, number, number]
+    look: [number, number, number]
+  }
+> = {
   station: {
     camera: [-60, 10, -50],
     look: [-60, 8, -60],
@@ -271,8 +287,18 @@ function ResourceSceneContent({
   zoomedTarget: ResourceZoomTarget
   setZoomedTarget: (value: ResourceZoomTarget) => void
   setIsSyncing: (value: boolean) => void
-  hoveredTarget: { type: Exclude<ResourceZoomTarget, null>, name: string, position: [number, number, number] } | null
-  setHoveredTarget: (value: { type: Exclude<ResourceZoomTarget, null>, name: string, position: [number, number, number] } | null) => void
+  hoveredTarget: {
+    type: Exclude<ResourceZoomTarget, null>
+    name: string
+    position: [number, number, number]
+  } | null
+  setHoveredTarget: (
+    value: {
+      type: Exclude<ResourceZoomTarget, null>
+      name: string
+      position: [number, number, number]
+    } | null,
+  ) => void
   controlsRef: React.MutableRefObject<any>
 }) {
   const handleTargetClick = useCallback(
@@ -305,9 +331,27 @@ function ResourceSceneContent({
         shadow-bias={-0.0001}
       />
       <directionalLight color="#a0a8c0" intensity={0.6} position={[50, 20, -50]} />
-      <pointLight color="#ffe8d0" intensity={0.8} distance={15} decay={1.5} position={[-70, 5, 1]} />
-      <pointLight color="#e0d8cc" intensity={0.6} distance={50} decay={1.2} position={[-50, 8, -40]} />
-      <pointLight color="#d5dde8" intensity={0.5} distance={50} decay={1.2} position={[30, 8, -40]} />
+      <pointLight
+        color="#ffe8d0"
+        intensity={0.8}
+        distance={15}
+        decay={1.5}
+        position={[-70, 5, 1]}
+      />
+      <pointLight
+        color="#e0d8cc"
+        intensity={0.6}
+        distance={50}
+        decay={1.2}
+        position={[-50, 8, -40]}
+      />
+      <pointLight
+        color="#d5dde8"
+        intensity={0.5}
+        distance={50}
+        decay={1.2}
+        position={[30, 8, -40]}
+      />
       <pointLight color="#e0d8cc" intensity={0.4} distance={50} decay={1.2} position={[0, 8, 0]} />
 
       <gridHelper args={[200, 50, '#22d3ee', '#1a1a1a']} position={[0, -0.01, 0]}>
@@ -323,11 +367,7 @@ function ResourceSceneContent({
       />
       <pointLight color="#00ffff" intensity={15} distance={15} decay={2} position={[-60, 5, -58]} />
 
-      <ResourceModel
-        url={BEER_BREWERY_URL}
-        position={[-40, 0.5, 0]}
-        rotation={[0, Math.PI, 0]}
-      />
+      <ResourceModel url={BEER_BREWERY_URL} position={[-40, 0.5, 0]} rotation={[0, Math.PI, 0]} />
       <ResourceModel url={FORD_URL} position={[50, 0.7, -56]} targetSize={25} />
       <ResourceModel url={MEAT_URL} position={[-70, 0.5, 1]} scale={2} />
       <ResourceModel url={SHELF_URL} position={[-74, 1, -60]} scale={0.2} />
@@ -346,7 +386,13 @@ function ResourceSceneContent({
         targetSize={8}
         emissive
       />
-      <pointLight color="#fff8e8" intensity={6.5} distance={75} decay={1} position={[-72, 19, -50]} />
+      <pointLight
+        color="#fff8e8"
+        intensity={6.5}
+        distance={75}
+        decay={1}
+        position={[-72, 19, -50]}
+      />
       <TargetedSpotLight position={[-72, 19.2, -50]} targetPosition={[-72, 0, -50]} />
 
       <ResourceModel
@@ -356,7 +402,13 @@ function ResourceSceneContent({
         targetSize={8}
         emissive
       />
-      <pointLight color="#fff8e8" intensity={6.5} distance={75} decay={1} position={[-72, 19, -20]} />
+      <pointLight
+        color="#fff8e8"
+        intensity={6.5}
+        distance={75}
+        decay={1}
+        position={[-72, 19, -20]}
+      />
       <TargetedSpotLight position={[-72, 19.2, -20]} targetPosition={[-72, 0, -20]} />
 
       <ResourceModel url={FRUIT_URL} position={[-95, 1, -16]} scale={0.04} />
@@ -371,7 +423,12 @@ function ResourceSceneContent({
         position={[-60, 6, -60]}
         onPointerEnter={(event) => {
           event.stopPropagation()
-          if (!zoomedTarget) setHoveredTarget({ type: 'station', name: 'Estación de Monitoreo', position: [-60, 14, -60] })
+          if (!zoomedTarget)
+            setHoveredTarget({
+              type: 'station',
+              name: 'Estación de Monitoreo',
+              position: [-60, 14, -60],
+            })
         }}
         onPointerLeave={(event) => {
           event.stopPropagation()
@@ -387,7 +444,8 @@ function ResourceSceneContent({
         position={[-70, 3, 1]}
         onPointerEnter={(event) => {
           event.stopPropagation()
-          if (!zoomedTarget) setHoveredTarget({ type: 'meat', name: 'Puesto de Carne', position: [-70, 11, 1] })
+          if (!zoomedTarget)
+            setHoveredTarget({ type: 'meat', name: 'Puesto de Carne', position: [-70, 11, 1] })
         }}
         onPointerLeave={(event) => {
           event.stopPropagation()
@@ -403,7 +461,8 @@ function ResourceSceneContent({
         position={[-40, 3, 0]}
         onPointerEnter={(event) => {
           event.stopPropagation()
-          if (!zoomedTarget) setHoveredTarget({ type: 'beer', name: 'Cervecería', position: [-40, 11, 0] })
+          if (!zoomedTarget)
+            setHoveredTarget({ type: 'beer', name: 'Cervecería', position: [-40, 11, 0] })
         }}
         onPointerLeave={(event) => {
           event.stopPropagation()
@@ -444,11 +503,14 @@ interface ResourceMainThreeSceneProps {
 
 export default function ResourceMainThreeScene({ onExit, onOpenPanel }: ResourceMainThreeSceneProps) {
   const controlsRef = useRef(null)
-  const [hoveredTarget, setHoveredTarget] = useState<{ type: Exclude<ResourceZoomTarget, null>, name: string, position: [number, number, number] } | null>(null)
+  const [hoveredTarget, setHoveredTarget] = useState<{
+    type: Exclude<ResourceZoomTarget, null>
+    name: string
+    position: [number, number, number]
+  } | null>(null)
   const [zoomedTarget, setZoomedTarget] = useState<ResourceZoomTarget>(null)
   const [isSyncing, setIsSyncing] = useState(false)
 
-  
   useEffect(() => {
     useGLTF.preload(HANGAR_URL)
 
@@ -520,10 +582,23 @@ export default function ResourceMainThreeScene({ onExit, onOpenPanel }: Resource
 
       <div className="resource-hud">
         <div className="resource-hud-left">
-          <button className="resource-hud-button resource-hud-button--back" type="button" onClick={handleBack}>
+          <button
+            className="resource-hud-button resource-hud-button--back"
+            type="button"
+            onClick={handleBack}
+          >
             <div className="resource-hud-button-bg" />
             <div className="resource-hud-button-content">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="m15 18-6-6 6-6" />
               </svg>
               <span>VOLVER</span>
@@ -534,7 +609,16 @@ export default function ResourceMainThreeScene({ onExit, onOpenPanel }: Resource
         <div className="resource-hud-actions">
           <button className="resource-hud-icon-button" type="button" aria-label="Audio">
             <div className="resource-hud-button-bg" />
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M2 10v3" />
               <path d="M6 6v11" />
               <path d="M10 3v18" />
@@ -546,15 +630,38 @@ export default function ResourceMainThreeScene({ onExit, onOpenPanel }: Resource
 
           <button className="resource-hud-icon-button" type="button" aria-label="Settings">
             <div className="resource-hud-button-bg" />
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
               <circle cx="12" cy="12" r="3" />
             </svg>
           </button>
 
-          <button className="resource-hud-icon-button" type="button" aria-label="Exit" onClick={onExit}>
+          <button
+            className="resource-hud-icon-button"
+            type="button"
+            aria-label="Exit"
+            onClick={onExit}
+          >
             <div className="resource-hud-button-bg" />
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" x2="9" y1="12" y2="12" />

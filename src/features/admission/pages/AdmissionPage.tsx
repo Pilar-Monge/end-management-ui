@@ -155,7 +155,10 @@ export default function AdmissionPage() {
   const handleInput = (
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) => {
-    const { name, value } = event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    const { name, value } = event.target as
+      | HTMLInputElement
+      | HTMLTextAreaElement
+      | HTMLSelectElement
     updateFormValue(name as keyof FormState, value)
   }
 
@@ -249,11 +252,12 @@ export default function AdmissionPage() {
     setWarning('')
     setSuccessMessage('')
     setAiResult(null)
-    
-    const formattedExperience = form.experiencia && !Number.isNaN(Number(form.experiencia)) 
-      ? `${form.experiencia} años` 
-      : form.experiencia || null
-    
+
+    const formattedExperience =
+      form.experiencia && !Number.isNaN(Number(form.experiencia))
+        ? `${form.experiencia} años`
+        : form.experiencia || null
+
     const payload = {
       name: form.nombre,
       lastName1: form.primerApellido,
