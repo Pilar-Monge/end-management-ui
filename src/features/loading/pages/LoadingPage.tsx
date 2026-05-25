@@ -1,11 +1,13 @@
-import { useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { AnimationConfig } from "../types";
 import SplashIntro from "../components/SplashIntro";
-import MainContent from "../components/MainContent";
 import "../loading.css";
 
 export default function LoadingPage() {
-  const [animConfig, setAnimConfig] = useState<AnimationConfig>({
+  const navigate = useNavigate();
+  
+  const [animConfig] = useState<AnimationConfig>({
     duration: 1.1,
     type: "spring",
     stiffness: 120,
@@ -15,46 +17,42 @@ export default function LoadingPage() {
     autoDelay: 600,
   });
 
-  const [showSplash, setShowSplash] = useState(true);
   const [isTransitionTriggered, setIsTransitionTriggered] = useState(false);
 
-  const handleTransitionComplete = useCallback(() => {
+  useEffect(() => {
+    const loadHomepage = async () => {
+      try {
+        await import("../../main-homepage");
+      } catch (e) {
+        console.warn("Error precargando main-homepage:", e);
+      }
+    };
+    
+    loadHomepage();
   }, []);
 
-  const handleTriggerReplay = useCallback(() => {
-    setIsTransitionTriggered(false);
-    setShowSplash(true);
-    
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  const handleTransitionComplete = useCallback(() => {
+    navigate("/main-homepage", { replace: true });
+  }, [navigate]);
 
   return (
     <div style={{
-      position: "relative",
+      position: "fixed",
+      inset: 0,
       overflow: "hidden",
       minHeight: "100vh",
       backgroundColor: "#020617",
       color: "rgb(241, 245, 249)",
-      userSelect: "none"
+      userSelect: "none",
+      zIndex: 9998
     }}>
       
-      <MainContent
-        animConfig={animConfig}
-        setAnimConfig={setAnimConfig}
-        triggerFullReplay={handleTriggerReplay}
-        splashActive={showSplash && !isTransitionTriggered}
+      <SplashIntro
+        config={animConfig}
+        onTransitionComplete={handleTransitionComplete}
+        isTriggered={isTransitionTriggered}
+        setTriggered={setIsTransitionTriggered}
       />
-
-      {showSplash && (
-        <SplashIntro
-          config={animConfig}
-          onTransitionComplete={() => {
-            handleTransitionComplete();
-          }}
-          isTriggered={isTransitionTriggered}
-          setTriggered={setIsTransitionTriggered}
-        />
-      )}
     </div>
   );
 }

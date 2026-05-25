@@ -75,7 +75,7 @@ export default function SplashIntro({
 
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) > 8) {
+      if (isReadyToEnter && Math.abs(e.deltaY) > 8) {
         setTriggered(true);
       }
     };
@@ -87,7 +87,7 @@ export default function SplashIntro({
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (touchStartY.current !== null && e.touches.length > 0) {
+      if (isReadyToEnter && touchStartY.current !== null && e.touches.length > 0) {
         const deltaY = touchStartY.current - e.touches[0].clientY;
         if (Math.abs(deltaY) > 10) {
           setTriggered(true);
@@ -105,10 +105,12 @@ export default function SplashIntro({
       window.removeEventListener("touchstart", handleTouchStart);
       window.removeEventListener("touchmove", handleTouchMove);
     };
-  }, [setTriggered]);
+  }, [isReadyToEnter, setTriggered]);
 
   const handleTapToEnter = () => {
-    setTriggered(true);
+    if (isReadyToEnter) {
+      setTriggered(true);
+    }
   };
 
   const curtainTransition: any =
@@ -126,21 +128,27 @@ export default function SplashIntro({
           duration: config.duration,
         };
 
+  useEffect(() => {
+
+    if (isTriggered) {
+
+      const timer = setTimeout(() => {
+        onTransitionComplete();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isTriggered, onTransitionComplete]);
+
   return (
     <motion.div
       id="splash-curtain-container"
       initial={{ y: 0 }}
       animate={{ y: isTriggered ? "-100%" : 0 }}
       transition={curtainTransition}
-      onAnimationComplete={() => {
-        if (isTriggered) {
-          onTransitionComplete();
-        }
-      }}
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 50,
+        zIndex: 9999,
         overflow: "hidden",
         background: "#020617",
         display: "flex",
@@ -181,7 +189,9 @@ export default function SplashIntro({
         paddingTop: "48px",
         paddingBottom: "48px",
         position: "relative",
-        textAlign: "center"
+        textAlign: "center",
+        opacity: isTriggered ? 0 : 1,
+        transition: "opacity 200ms ease-out"
       }}>
         
         <div style={{
