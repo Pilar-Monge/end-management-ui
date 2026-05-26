@@ -1,8 +1,34 @@
 ﻿import { useState } from "react";
 import { WorldMap } from "../components/WorldMap";
 import { Btn } from "./ResourceManagementViews";
-import type { Camp, IntercampRequest, Transfer, ResourceType, CampInventory } from "../types/resourceManagementTypes";
+import type { Camp, IntercampRequest, Transfer, ResourceType, CampInventory, RequestResourceDetail } from "../types/resourceManagementTypes";
 import { AlertCircle } from "lucide-react";
+
+function getCurrentResourceUser() {
+  if (typeof window === "undefined") return null;
+
+  const raw = localStorage.getItem("session_user") ?? localStorage.getItem("user");
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as { userId?: unknown; id?: unknown; campId?: unknown; camp_id?: unknown; rol?: unknown; role?: unknown; camp?: { id?: unknown } };
+    const userId = Number(parsed.userId ?? parsed.id);
+    const campId = Number(parsed.campId ?? parsed.camp_id ?? parsed.camp?.id);
+    const role = String(parsed.rol ?? parsed.role ?? "").toUpperCase();
+
+    if (!Number.isFinite(userId) || !Number.isFinite(campId) || role !== "RESOURCE_MANAGEMENT") {
+      return null;
+    }
+
+    return {
+      userId,
+      campId,
+      rol: "RESOURCE_MANAGEMENT" as const,
+    };
+  } catch {
+    return null;
+  }
+}
 
 
 const CAMP_COORDS: Record<string, { lat: number; lng: number; label: string }> = {
@@ -19,8 +45,36 @@ interface WorldMapDashboardProps {
   transfers: Transfer[];
   resourceTypes: ResourceType[];
   campInventories: CampInventory[];
+  requestResourceDetails?: RequestResourceDetail[];
   onNavigateToTab?: (sub: string) => void;
 }
+
+type RouteMeta = {
+  id: string;
+  requestId: string;
+  type: string;
+  statusText: string;
+  class: string;
+  plannedDeparture: string;
+  plannedArrival: string;
+  rations: number;
+  receptionNotes: string;
+  origin: string;
+  destination: string;
+  desc: string;
+};
+
+type RouteDot = {
+  start: { lat: number; lng: number; label: string };
+  end: { lat: number; lng: number; label: string };
+  status?: string;
+  meta: RouteMeta;
+};
+
+type CampRelationOption = {
+  id: string;
+  label: string;
+};
 
 export function WorldMapDashboard({
   camps = [],
@@ -28,56 +82,75 @@ export function WorldMapDashboard({
   transfers = [],
   resourceTypes = [],
   campInventories = [],
+  requestResourceDetails = [],
   onNavigateToTab
 }: WorldMapDashboardProps) {
 
-  const [activeCampFilter, setActiveCampFilter] = useState<string>("1");
+  const sessionCampId = String(getCurrentResourceUser()?.campId ?? camps[0]?.id ?? "1");
+  const [activeCampFilter] = useState<string>(sessionCampId);
   const [relationCampFilter, setRelationCampFilter] = useState<string>("all");
-  const [selectedRoute, setSelectedRoute] = useState<any | null>(null);
+  const [selectedRoute, setSelectedRoute] = useState<RouteMeta | null>(null);
   const [legendOpen, setLegendOpen] = useState<boolean>(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "planned">( "all");
 
 
+  const campRelationOptions: CampRelationOption[] = Object.entries(CAMP_COORDS).reduce((options, [id, coord]) => {
+    if (id === sessionCampId) return options;
+
+    const apiCamp = camps.find(camp => String(camp.id) === id);
+    options.push({
+      id,
+      label: (apiCamp?.name || coord.label).toUpperCase(),
+    });
+
+    return options;
+  }, [] as CampRelationOption[]);
+
   const getCampName = (id: string) => {
-    return camps.find(c => c.id === id)?.name || id;
+    return camps.find(c => String(c.id) === String(id))?.name || CAMP_COORDS[id]?.label || id;
   };
 
 
-  const transferDots = transfers.map((t) => {
-    const req = intercampRequests.find(r => r.id === t.requestId);
+  const transferDots = transfers.map((t): RouteDot | null => {
+    const req = intercampRequests.find(r => String(r.id) === String(t.requestId));
     if (!req) return null;
 
-    const start = CAMP_COORDS[req.originCampId.toLowerCase()];
-    const end = CAMP_COORDS[req.destinationCampId.toLowerCase()];
+    const originId = String(req.originCampId);
+    const destinationId = String(req.destinationCampId);
+    const start = CAMP_COORDS[originId];
+    const end = CAMP_COORDS[destinationId];
     if (!start || !end) return null;
+    const isCompleted = t.status === "DELIVERED" || String(t.status) === "COMPLETED";
 
     return {
       start,
       end,
-      status: t.status === "DELIVERED" ? "COMPLETED" : t.status === "CANCELED" ? "LOST" : "PLANNED",
+      status: isCompleted ? "COMPLETED" : t.status === "CANCELED" ? "LOST" : "PLANNED",
       meta: {
         id: t.id,
         requestId: t.requestId,
         type: "TRASLADO",
-        statusText: t.status === "DELIVERED" ? "Entregado / Completado" : t.status === "CANCELED" ? "Cancelado" : "En Tránsito / Planeado",
-        class: t.status === "DELIVERED" ? "COMPLETED" : t.status === "CANCELED" ? "LOST" : "ACTIVE",
+        statusText: isCompleted ? "Entregado / Completado" : t.status === "CANCELED" ? "Cancelado" : "En Tránsito / Planeado",
+        class: isCompleted ? "COMPLETED" : t.status === "CANCELED" ? "LOST" : "ACTIVE",
         plannedDeparture: t.plannedDepartureDate,
         plannedArrival: t.plannedArrivalDate,
         rations: t.rationsForTrip,
         receptionNotes: t.receptionNotes || "Sin observaciones registradas",
-        origin: req.originCampId,
-        destination: req.destinationCampId,
+        origin: originId,
+        destination: destinationId,
         desc: req.description
       }
     };
-  }).filter(Boolean);
+  }).filter((dot): dot is RouteDot => dot !== null);
 
 
   const requestDots = intercampRequests
     .filter(r => r.status === "PENDING")
-    .map((r) => {
-      const start = CAMP_COORDS[r.originCampId.toLowerCase()];
-      const end = CAMP_COORDS[r.destinationCampId.toLowerCase()];
+    .map((r): RouteDot | null => {
+      const originId = String(r.originCampId);
+      const destinationId = String(r.destinationCampId);
+      const start = CAMP_COORDS[originId];
+      const end = CAMP_COORDS[destinationId];
       if (!start || !end) return null;
 
       return {
@@ -94,27 +167,25 @@ export function WorldMapDashboard({
           plannedArrival: r.plannedArrivalDate,
           rations: 0,
           receptionNotes: "Evaluando viabilidad militar",
-          origin: r.originCampId,
-          destination: r.destinationCampId,
+          origin: originId,
+          destination: destinationId,
           desc: r.description
         }
       };
     })
-    .filter(Boolean);
+    .filter((dot): dot is RouteDot => dot !== null);
 
 
-  const allVisibleDots = [...transferDots, ...requestDots].filter(d => {
-    if (!d) return false;
-    const origin = d.meta.origin.toLowerCase();
-    const destination = d.meta.destination.toLowerCase();
-    return origin === "1" || destination === "1";
+  const allVisibleDots = [...transferDots, ...requestDots].filter((d): d is RouteDot => {
+    const origin = String(d.meta.origin);
+    const destination = String(d.meta.destination);
+    return origin === sessionCampId || destination === sessionCampId;
   });
 
 
-  const campFilteredDots = allVisibleDots.filter(d => {
-    if (!d) return false;
-    const origin = d.meta.origin.toLowerCase();
-    const destination = d.meta.destination.toLowerCase();
+  const campFilteredDots = allVisibleDots.filter((d): d is RouteDot => {
+    const origin = String(d.meta.origin);
+    const destination = String(d.meta.destination);
 
 
     if (activeCampFilter !== "all") {
@@ -135,8 +206,7 @@ export function WorldMapDashboard({
   const completedCount = campFilteredDots.filter(d => d && d.meta.statusText.includes("Completado")).length;
   const plannedCount = campFilteredDots.filter(d => d && !d.meta.statusText.includes("Completado")).length;
 
-  const dotsToDisplay = campFilteredDots.filter(d => {
-    if (!d) return false;
+  const dotsToDisplay = campFilteredDots.filter((d): d is RouteDot => {
     if (statusFilter === "all") return true;
     const isCompleted = d.meta.statusText.includes("Completado");
     if (statusFilter === "completed") return isCompleted;
@@ -146,19 +216,21 @@ export function WorldMapDashboard({
 
 
   const getRequestResources = (reqId: string) => {
-    return campInventories
-      .filter(() => true) 
-      .map(ci => {
-
-
-        return null;
-      }).filter(Boolean);
+    return requestResourceDetails
+      .filter(detail => String(detail.requestId) === String(reqId))
+      .map(detail => {
+        const type = resourceTypes.find(resource => Number(resource.id) === Number(detail.resourceTypeId));
+        return {
+          id: detail.id,
+          label: `${type?.name || detail.resourceTypeId}: ${detail.requestedAmount} ${type?.unitOfMeasure || "u"}`
+        };
+      });
   };
 
 
   const getCampDetails = (campId: string) => {
-    return campInventories.filter(ci => ci.campId.toLowerCase() === campId.toLowerCase()).map(ci => {
-      const rt = resourceTypes.find(t => t.id === ci.resourceTypeId);
+    return campInventories.filter(ci => String(ci.campId) === String(campId)).map(ci => {
+      const rt = resourceTypes.find(t => Number(t.id) === Number(ci.resourceTypeId));
       return {
         ...ci,
         typeName: rt ? rt.name : ci.resourceTypeId,
@@ -167,14 +239,62 @@ export function WorldMapDashboard({
     });
   };
 
+  const activeTransfersList = (
+    <div className="bg-[#0d1414]/85 border border-[#67ACA9]/20 p-3 rounded-sm flex flex-col gap-3 backdrop-blur-xs">
+      <h3 className="wm-sidebar-title text-xs font-bold uppercase tracking-wider text-[#69BFB7] border-b border-[#67ACA9]/20 pb-1.5 mb-1 flex items-center justify-between">
+        <span>Traslados Activos ({statusFilter === "all" ? "Todos" : statusFilter === "completed" ? "Completados" : "Planeados"})</span>
+        <span className="font-mono text-[8px] bg-[#67ACA9]/15 px-1.5 py-0.5 rounded-xs text-[#A4C2C5]">
+          {activeCampFilter.toUpperCase()}
+        </span>
+      </h3>
+
+      {dotsToDisplay.length === 0 ? (
+        <div className="text-[10px] text-[#A4C2C5]/40 italic p-6 text-center border border-[#67ACA9]/15 bg-[#0d1414]/55 rounded-xs">
+          Ninguna conexión de transporte detectada para los filtros vigentes.
+        </div>
+      ) : (
+        <div className="wm-exp-list max-h-[220px] overflow-y-auto pr-1">
+          {dotsToDisplay.map((dot, index) => {
+            const isCompleted = dot.meta.class === "COMPLETED";
+            const iconSymbol = isCompleted ? "✓" : "◆";
+            const iconColor = isCompleted ? "#4ade80" : "#67ACA9";
+
+            return (
+              <div
+                key={`${dot.meta.id}-${index}`}
+                className="wm-exp-card"
+                onClick={() => setSelectedRoute(dot.meta)}
+              >
+                <div className="wm-exp-icon" style={{ borderColor: iconColor, color: iconColor }}>
+                  {iconSymbol}
+                </div>
+                <div className="wm-exp-info flex-grow text-left">
+                  <span className="wm-exp-name text-white font-bold text-[10px] uppercase truncate block">
+                    {dot.meta.id} • {getCampName(dot.meta.origin)} ➔ {getCampName(dot.meta.destination)}
+                  </span>
+                  <span className="wm-exp-team text-[#A4C2C5]/60 text-[9px] block truncate">
+                    &ldquo;{dot.meta.desc}&rdquo;
+                  </span>
+                </div>
+                <div className="wm-exp-time text-right font-mono text-[9px] text-[#A4C2C5]/70 shrink-0 select-none">
+                  {dot.meta.plannedArrival}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="wm-layout flex flex-col gap-4">
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-stretch">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-7 items-stretch lg:pr-3">
         
         
-        <div className="lg:col-span-7 flex flex-col gap-2 h-[185px] xs:h-[210px] sm:h-[280px] md:h-[360px] lg:h-auto lg:min-h-[460px]">
-          <div className="wm-map-area relative flex-1 bg-[#0b1010] border border-[#67ACA9]/20 rounded-sm overflow-hidden p-2 h-full min-h-[170px]">
+        <div className="lg:col-span-7 flex flex-col gap-3 min-w-0 lg:pl-4 xl:pl-5">
+          <div className="wm-map-area relative bg-[#0b1010] border border-[#67ACA9]/20 rounded-sm overflow-hidden p-2 h-[185px] xs:h-[210px] sm:h-[280px] md:h-[360px] lg:h-[320px] xl:h-[340px] 2xl:h-[360px] min-h-[150px] lg:min-h-0">
             
             
             <div className="absolute top-3 left-12 z-10 font-mono select-none">
@@ -212,10 +332,11 @@ export function WorldMapDashboard({
             </div>
 
             <WorldMap
-              dots={dotsToDisplay as any[]}
+              dots={dotsToDisplay}
               lineColor="#67ACA9"
-              onZoneClick={(dot: any) => {
-                if (dot.meta) setSelectedRoute(dot.meta);
+              onZoneClick={(dot) => {
+                const meta = dot.meta as RouteMeta | undefined;
+                if (meta) setSelectedRoute(meta);
               }}
             />
 
@@ -224,8 +345,9 @@ export function WorldMapDashboard({
               Haga clic sobre un campamento de destino para inspeccionar el manifiesto
             </div>
           </div>
+          {activeTransfersList}
         </div>        
-        <div className="lg:col-span-5 flex flex-col gap-3 wm-sidebar max-h-[460px] lg:max-h-none">
+        <div className="lg:col-span-5 flex flex-col gap-3 wm-sidebar max-h-[460px] lg:max-h-none lg:overflow-visible min-w-0 lg:pr-2">
           
           
           <div className="bg-[#0d1414]/85 border border-[#67ACA9]/20 p-3 rounded-sm flex flex-col gap-3 backdrop-blur-xs">
@@ -234,7 +356,7 @@ export function WorldMapDashboard({
                 DEPARTAMENTO DE CONTROL DE SUMINISTROS
               </span>
               <h2 className="text-xs font-black text-white uppercase mt-0.5">
-                Conexiones de Base Alfa ➔ {relationCampFilter === "all" ? "Todos los Destinos" : getCampName(relationCampFilter).toUpperCase()}
+                Conexiones de {getCampName(sessionCampId)} ➔ {relationCampFilter === "all" ? "Todos los Destinos" : getCampName(relationCampFilter).toUpperCase()}
               </h2>
             </div>
             
@@ -243,7 +365,7 @@ export function WorldMapDashboard({
               <div className="flex flex-col gap-1 text-[8px]">
                 <span className="text-[#69BFB7] font-bold uppercase tracking-wide">1. CAMPAMENTO PROPIO:</span>
                 <div className="bg-[#67ACA9]/10 border border-[#67ACA9]/30 text-white rounded-xs p-2 text-[10px] uppercase font-bold font-mono flex items-center gap-1.5 h-9">
-                  ALPHA BUNKER (PROPIO)
+                  {getCampName(sessionCampId).toUpperCase()} (PROPIO)
                 </div>
               </div>
 
@@ -252,10 +374,7 @@ export function WorldMapDashboard({
                 <div className="flex flex-wrap gap-1.5 mt-1 items-center">
                   {[
                     { id: "all", label: "TODOS" },
-                    { id: "2", label: "SIERRA BASE" },
-                    { id: "3", label: "DELTA REFUGE" },
-                    { id: "4", label: "OMEGA FORTRESS" },
-                    { id: "5", label: "ECHO OUTPOST" }
+                    ...campRelationOptions
                   ].map((opt) => {
                     const isActive = relationCampFilter === opt.id;
                     return (
@@ -372,32 +491,18 @@ export function WorldMapDashboard({
               <div className="tactical-resources mt-1">
                 <h4 className="tactical-subtitle">Suministros Solicitados</h4>
                 <div className="tactical-resource-cards">
-                  {(selectedRoute.id === "tr-1" || selectedRoute.requestId === "req-1") ? (
-                    <>
+                  {getRequestResources(String(selectedRoute.requestId)).length > 0 ? (
+                    getRequestResources(String(selectedRoute.requestId)).map(item => (
                       <div className="tactical-resource-card">
                         <span className="tactical-resource-icon">◆</span>
-                        <span>Alimentos: 150 kg</span>
+                        <span>{item.label}</span>
                       </div>
-                      <div className="tactical-resource-card">
-                        <span className="tactical-resource-icon">◆</span>
-                        <span>Médicos: 20 u</span>
-                      </div>
-                      <div className="tactical-resource-card">
-                        <span className="tactical-resource-icon">◆</span>
-                        <span>Raciones: 10 u</span>
-                      </div>
-                    </>
+                    ))
                   ) : (
-                    <>
-                      <div className="tactical-resource-card">
-                        <span className="tactical-resource-icon">◆</span>
-                        <span>Alimentos: 50 kg</span>
-                      </div>
-                      <div className="tactical-resource-card">
-                        <span className="tactical-resource-icon">◆</span>
-                        <span>Agua: 100 lts</span>
-                      </div>
-                    </>
+                    <div className="tactical-resource-card">
+                      <span className="tactical-resource-icon">◆</span>
+                      <span>Sin recursos vinculados</span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -421,53 +526,6 @@ export function WorldMapDashboard({
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              
-              <h3 className="wm-sidebar-title text-xs font-bold uppercase tracking-wider text-[#69BFB7] border-b border-[#67ACA9]/20 pb-1.5 mb-1 flex items-center justify-between">
-                <span>Traslados Activos ({statusFilter === "all" ? "Todos" : statusFilter === "completed" ? "Completados" : "Planeados"})</span>
-                <span className="font-mono text-[8px] bg-[#67ACA9]/15 px-1.5 py-0.5 rounded-xs text-[#A4C2C5]">
-                  {activeCampFilter.toUpperCase()}
-                </span>
-              </h3>
-
-              {dotsToDisplay.length === 0 ? (
-                <div className="text-[10px] text-[#A4C2C5]/40 italic p-6 text-center border border-[#67ACA9]/15 bg-[#0d1414]/55 rounded-xs">
-                  Ninguna conexión de transporte detectada para los filtros vigentes.
-                </div>
-              ) : (
-                <div className="wm-exp-list max-h-[190px] overflow-y-auto pr-1">
-                  {dotsToDisplay.map((dot, index) => {
-                    if (!dot) return null;
-                    const isCompleted = dot.meta.class === "COMPLETED";
-                    const iconSymbol = isCompleted ? "✓" : "◆";
-                    const iconColor = isCompleted ? "#4ade80" : "#67ACA9";
-                    
-                    return (
-                      <div 
-                        key={`${dot.meta.id}-${index}`}
-                        className="wm-exp-card"
-                        onClick={() => setSelectedRoute(dot.meta)}
-                      >
-                        <div className="wm-exp-icon" style={{ borderColor: iconColor, color: iconColor }}>
-                          {iconSymbol}
-                        </div>
-                        <div className="wm-exp-info flex-grow text-left">
-                          <span className="wm-exp-name text-white font-bold text-[10px] uppercase truncate block">
-                            {dot.meta.id} • {getCampName(dot.meta.origin)} ➔ {getCampName(dot.meta.destination)}
-                          </span>
-                          <span className="wm-exp-team text-[#A4C2C5]/60 text-[9px] block truncate">
-                            &ldquo;{dot.meta.desc}&rdquo;
-                          </span>
-                        </div>
-                        <div className="wm-exp-time text-right font-mono text-[9px] text-[#A4C2C5]/70 shrink-0 select-none">
-                          {dot.meta.plannedArrival}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              
               <h3 className="wm-sidebar-title" style={{ marginTop: 8 }}>Resumen de Suministros</h3>
               <div className="wm-stats">
                 <div className="wm-stat-row">
@@ -484,7 +542,7 @@ export function WorldMapDashboard({
                 </div>
                 <div className="wm-stat-row">
                   <span>Campamento Asignado</span>
-                  <span className="wm-stat-val text-white" style={{ color: "#ffffff" }}>Base Alfa</span>
+                  <span className="wm-stat-val text-white" style={{ color: "#ffffff" }}>{getCampName(sessionCampId)}</span>
                 </div>
               </div>
               
