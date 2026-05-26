@@ -57,6 +57,7 @@ import {
 } from "../views/ResourceManagementViews";
 import { WorldMapDashboard } from "../views/WorldMapView";
 import { LoadingScreen } from "../components/ResourcePanelLoadingScreen";
+import { resourceApi } from "../services/resourceManagementApi";
 
 
 const NAVIGATION_DATA = [
@@ -140,11 +141,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   const syncGlobalTime = async () => {
     setGlobalTimeState(prev => ({ ...prev, status: 'syncing' }));
     try {
-      const response = await fetch('/api/system/time');
-      if (!response.ok) {
-        throw new Error(`HTTP error ${response.status}`);
-      }
-      const data = await response.json();
+      const data = await resourceApi.getServerTime();
       const parsed = new Date(data.serverTime);
 
       if (Number.isNaN(parsed.getTime())) {
@@ -158,7 +155,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
         status: 'synced',
       });
     } catch (err) {
-      console.warn("Could not sync with /api/system/time backend endpoint. Using client system time.", err);
+      console.warn("Could not sync with /system/time backend endpoint. Using client system time.", err);
       setGlobalTimeState(prev => ({
         ...prev,
         status: 'error',
@@ -202,91 +199,71 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   const [occupationCoverages, setOccupationCoverages] = useState<OccupationCoverage[]>(INITIAL_OCCUPATION_COVERAGES);
   const [notifications, setNotifications] = useState<OperationalNotification[]>(INITIAL_NOTIFICATIONS);
 
+  const applyList = <T,>(list: T[], setter: (value: T[]) => void) => {
+    if (list.length > 0) setter(list);
+  };
+
   const fetchAllSystemData = async () => {
+    const results = await Promise.allSettled([
+      resourceApi.listCamps(),
+      resourceApi.listResourceTypes(),
+      resourceApi.listOccupations(),
+      resourceApi.listCampInventory(),
+      resourceApi.listDailyCollectionRecords(),
+      resourceApi.listInventoryMovements(),
+      resourceApi.listInventoryAlerts(),
+      resourceApi.listIntercampRequests(),
+      resourceApi.listRequestResourceDetails(),
+      resourceApi.listTransfers(),
+      resourceApi.listTransferPersons(),
+      resourceApi.listTransferHistory(),
+      resourceApi.listExpeditionResources(),
+      resourceApi.listDeliveredTransferResources(),
+      resourceApi.listOccupationCoverage(),
+      resourceApi.listNotifications(),
+    ]);
 
-    try {
-      const res = await fetch("/api/resource-types?page=1&limit=100");
-      if (res.ok) {
-        const data = await res.json();
-        let list: ResourceType[] = [];
-        if (Array.isArray(data)) list = data;
-        else if (data && Array.isArray(data.items)) list = data.items;
-        else if (data && Array.isArray(data.data)) list = data.data;
-        if (list.length > 0) {
-          setResourceTypesState(list);
-        }
+    const [
+      campsResult,
+      resourceTypesResult,
+      occupationsResult,
+      inventoriesResult,
+      dailyCollectionsResult,
+      movementsResult,
+      alertsResult,
+      requestsResult,
+      detailsResult,
+      transfersResult,
+      transferPersonsResult,
+      transferHistoryResult,
+      expeditionResourcesResult,
+      deliveredResourcesResult,
+      coverageResult,
+      notificationsResult,
+    ] = results;
+
+    if (campsResult.status === "fulfilled") applyList(campsResult.value, setCamps);
+    if (resourceTypesResult.status === "fulfilled") applyList(resourceTypesResult.value, setResourceTypesState);
+    if (occupationsResult.status === "fulfilled") applyList(occupationsResult.value, setOccupationsState);
+    if (inventoriesResult.status === "fulfilled") applyList(inventoriesResult.value, setCampInventories);
+    if (dailyCollectionsResult.status === "fulfilled") applyList(dailyCollectionsResult.value, setDailyCollectionRecords);
+    if (movementsResult.status === "fulfilled") applyList(movementsResult.value, setInventoryMovements);
+    if (alertsResult.status === "fulfilled") applyList(alertsResult.value, setInventoryAlerts);
+    if (requestsResult.status === "fulfilled") applyList(requestsResult.value, setIntercampRequests);
+    if (detailsResult.status === "fulfilled") applyList(detailsResult.value, setRequestResourceDetails);
+    if (transfersResult.status === "fulfilled") applyList(transfersResult.value, setTransfers);
+    if (transferPersonsResult.status === "fulfilled") applyList(transferPersonsResult.value, setTransferPersons);
+    if (transferHistoryResult.status === "fulfilled") applyList(transferHistoryResult.value, setTransferHistories);
+    if (expeditionResourcesResult.status === "fulfilled") applyList(expeditionResourcesResult.value, setExpeditionsResources);
+    if (deliveredResourcesResult.status === "fulfilled") applyList(deliveredResourcesResult.value, setDeliveredTransferResources);
+    if (coverageResult.status === "fulfilled") applyList(coverageResult.value, setOccupationCoverages);
+    if (notificationsResult.status === "fulfilled") applyList(notificationsResult.value, setNotifications);
+
+    results.forEach((result, index) => {
+      if (result.status === "rejected") {
+        console.warn(`Could not load resources dataset #${index} from backend. Keeping current data.`, result.reason);
       }
-    } catch (e) {
-      console.warn("Could not load resource types from backend, using fallback.", e);
-    }
-
-
-    try {
-      const res = await fetch("/api/occupations");
-      if (res.ok) {
-        const data = await res.json();
-        let list: Occupation[] = [];
-        if (Array.isArray(data)) list = data;
-        else if (data && Array.isArray(data.items)) list = data.items;
-        else if (data && Array.isArray(data.data)) list = data.data;
-        if (list.length > 0) {
-          setOccupationsState(list);
-        }
-      }
-    } catch (e) {
-      console.warn("Could not load occupations from backend, using fallback.", e);
-    }
-
-
-    try {
-      const res = await fetch("/api/camp-inventory?page=1&limit=100");
-      if (res.ok) {
-        const data = await res.json();
-        let list: CampInventory[] = [];
-        if (Array.isArray(data)) list = data;
-        else if (data && Array.isArray(data.items)) list = data.items;
-        else if (data && Array.isArray(data.data)) list = data.data;
-        if (list.length > 0) {
-          setCampInventories(list);
-        }
-      }
-    } catch (e) {
-      console.warn("Could not load camp inventories from backend, using fallback.", e);
-    }
-
-
-    try {
-      const res = await fetch("/api/inventory-movements?page=1&limit=100");
-      if (res.ok) {
-        const data = await res.json();
-        let list: InventoryMovement[] = [];
-        if (Array.isArray(data)) list = data;
-        else if (data && Array.isArray(data.items)) list = data.items;
-        else if (data && Array.isArray(data.data)) list = data.data;
-        if (list.length > 0) {
-          setInventoryMovements(list);
-        }
-      }
-    } catch (e) {
-      console.warn("Could not load inventory movements from backend, using fallback.", e);
-    }
-
-
-    try {
-      const res = await fetch("/api/daily-collection-records?page=1&limit=100");
-      if (res.ok) {
-        const data = await res.json();
-        let list: DailyCollectionRecord[] = [];
-        if (Array.isArray(data)) list = data;
-        else if (data && Array.isArray(data.items)) list = data.items;
-        else if (data && Array.isArray(data.data)) list = data.data;
-        if (list.length > 0) {
-          setDailyCollectionRecords(list);
-        }
-      }
-    } catch (e) {
-      console.warn("Could not load daily collection records from backend.", e);
-    }
+    });
   };
 
   useEffect(() => {
@@ -353,7 +330,14 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
 
   
 
-  const handleUpdateInventory = (campId: string, resourceTypeId: string, currentAmount: number, minimumAlertAmount: number) => {
+  const handleUpdateInventory = async (campId: string, resourceTypeId: string, currentAmount: number, minimumAlertAmount: number) => {
+    try {
+      await resourceApi.upsertCampInventory({ campId, resourceTypeId, currentAmount, minimumAlertAmount });
+    } catch (error) {
+      console.warn("Could not persist inventory update.", error);
+      alert("No se pudo guardar el inventario en la API. Se aplicará solo en pantalla.");
+    }
+
     setCampInventories(prev =>
       prev.map(item =>
         item.campId === campId && item.resourceTypeId === resourceTypeId
@@ -395,7 +379,16 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
 
 
 
-  const handleAddManualMovement = (data: Omit<InventoryMovement, "id">) => {
+  const handleAddManualMovement = async (data: Omit<InventoryMovement, "id">) => {
+    try {
+      await resourceApi.createInventoryMovement(data);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not persist inventory movement.", error);
+      alert("No se pudo registrar el movimiento en la API. Se aplicará solo en pantalla.");
+    }
+
     const record: InventoryMovement = { ...data, id: `mov-${Date.now().toString().slice(-4)}` };
     setInventoryMovements(prev => [...prev, record]);
 
@@ -410,11 +403,28 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     );
   };
 
-  const handleDeleteMovement = (id: string) => {
+  const handleDeleteMovement = async (id: string) => {
+    try {
+      await resourceApi.deleteInventoryMovement(id);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not delete inventory movement.", error);
+      alert("No se pudo eliminar el movimiento en la API. Se ocultará solo en pantalla.");
+    }
     setInventoryMovements(prev => prev.filter(m => m.id !== id));
   };
 
-  const handleResolveAlert = (id: string, resolvedBy: string) => {
+  const handleResolveAlert = async (id: string, resolvedBy: string) => {
+    try {
+      await resourceApi.resolveInventoryAlert(id, resolvedBy);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not resolve inventory alert.", error);
+      alert("No se pudo resolver la alerta en la API. Se marcará solo en pantalla.");
+    }
+
     setInventoryAlerts(prev =>
       prev.map(a =>
         a.id === id
@@ -424,18 +434,45 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     );
   };
 
-  const handleAddRequest = (data: Omit<IntercampRequest, "id">) => {
+  const handleAddRequest = async (data: Omit<IntercampRequest, "id">) => {
+    try {
+      await resourceApi.createIntercampRequest(data);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not create intercamp request.", error);
+      alert("No se pudo crear la solicitud en la API. Se agregará solo en pantalla.");
+    }
+
     const record: IntercampRequest = { ...data, id: `req-${Date.now().toString().slice(-4)}` };
     setIntercampRequests(prev => [...prev, record]);
   };
 
-  const handleUpdateRequestStatus = (id: string, status: IntercampRequest["status"], responder: string) => {
+  const handleUpdateRequestStatus = async (id: string, status: IntercampRequest["status"], responder: string) => {
+    try {
+      await resourceApi.updateIntercampRequestStatus(id, status, responder);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not update intercamp request status.", error);
+      alert("No se pudo actualizar la solicitud en la API. Se actualizará solo en pantalla.");
+    }
+
     setIntercampRequests(prev =>
       prev.map(r => (r.id === id ? { ...r, status, responseDate: "Hoy", respondedBy: responder } : r))
     );
   };
 
-  const handleAddResourceToRequest = (requestId: string, resourceTypeId: string, requestedAmount: number) => {
+  const handleAddResourceToRequest = async (requestId: string, resourceTypeId: string, requestedAmount: number) => {
+    try {
+      await resourceApi.createRequestResourceDetail(requestId, resourceTypeId, requestedAmount);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not create request resource detail.", error);
+      alert("No se pudo agregar el recurso solicitado en la API. Se agregará solo en pantalla.");
+    }
+
     const record: RequestResourceDetail = {
       id: `det-${Date.now().toString().slice(-4)}`,
       requestId,
@@ -446,16 +483,48 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     setRequestResourceDetails(prev => [...prev, record]);
   };
 
-  const handleDeleteRequestResource = (id: string) => {
+  const handleDeleteRequestResource = async (id: string) => {
+    try {
+      await resourceApi.deleteRequestResourceDetail(id);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not delete request resource detail.", error);
+      alert("No se pudo eliminar el detalle en la API. Se quitará solo en pantalla.");
+    }
+
     setRequestResourceDetails(prev => prev.filter(d => d.id !== id));
   };
 
-  const handleAddTransfer = (data: Omit<Transfer, "id">) => {
+  const handleAddTransfer = async (data: Omit<Transfer, "id">) => {
+    try {
+      await resourceApi.createTransfer(data);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not create transfer.", error);
+      alert("No se pudo crear el traslado en la API. Se agregará solo en pantalla.");
+    }
+
     const record: Transfer = { ...data, id: `tr-${Date.now().toString().slice(-4)}` };
     setTransfers(prev => [...prev, record]);
   };
 
-  const handleUpdateTransferStatus = (id: string, status: Transfer["status"], notes: string) => {
+  const handleUpdateTransferStatus = async (id: string, status: Transfer["status"], notes: string) => {
+    try {
+      await resourceApi.updateTransfer(id, {
+        status,
+        notes,
+        ...(status === "EN_ROUTE" ? { actualDepartureDate: new Date().toISOString() } : {}),
+        ...(status === "DELIVERED" ? { actualArrivalDate: new Date().toISOString(), receptionNotes: notes } : {}),
+      });
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not update transfer status.", error);
+      alert("No se pudo actualizar el traslado en la API. Se actualizará solo en pantalla.");
+    }
+
     setTransfers(prev => {
       const match = prev.find(t => t.id === id);
       if (match && match.status !== status) {
@@ -486,7 +555,16 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     });
   };
 
-  const handleAddPersonToTransfer = (transferId: string, personId: string) => {
+  const handleAddPersonToTransfer = async (transferId: string, personId: string) => {
+    try {
+      await resourceApi.createTransferPerson(transferId, personId);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not add transfer person.", error);
+      alert("No se pudo vincular la persona en la API. Se agregará solo en pantalla.");
+    }
+
     const record: TransferPerson = {
       id: `tp-${Date.now().toString().slice(-4)}`,
       transferId,
@@ -496,18 +574,46 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     setTransferPersons(prev => [...prev, record]);
   };
 
-  const handleUpdatePersonStatus = (id: string, status: TransferPerson["status"]) => {
+  const handleUpdatePersonStatus = async (id: string, status: TransferPerson["status"] | Partial<TransferPerson>) => {
+    const patch = typeof status === "string" ? { status } : status;
+    try {
+      await resourceApi.updateTransferPerson(id, patch);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not update transfer person.", error);
+      alert("No se pudo actualizar la persona del traslado en la API. Se actualizará solo en pantalla.");
+    }
+
     setTransferPersons(prev =>
-      prev.map(p => (p.id === id ? { ...p, status } : p))
+      prev.map(p => (p.id === id ? { ...p, ...patch } : p))
     );
   };
 
-  const handleSaveExpeditionResource = (data: Omit<ExpeditionResource, "id">) => {
+  const handleSaveExpeditionResource = async (data: Omit<ExpeditionResource, "id">) => {
+    try {
+      await resourceApi.createExpeditionResource(data);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not save expedition resource.", error);
+      alert("No se pudo guardar el recurso de expedición en la API. Se agregará solo en pantalla.");
+    }
+
     const record: ExpeditionResource = { ...data, id: `er-${Date.now().toString().slice(-4)}` };
     setExpeditionsResources(prev => [...prev, record]);
   };
 
-  const handleSaveDelivery = (data: Omit<DeliveredTransferResource, "id">) => {
+  const handleSaveDelivery = async (data: Omit<DeliveredTransferResource, "id">) => {
+    try {
+      await resourceApi.createDeliveredTransferResource(data);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not save delivered transfer resource.", error);
+      alert("No se pudo guardar la entrega en la API. Se agregará solo en pantalla.");
+    }
+
     const record: DeliveredTransferResource = { ...data, id: `dl-${Date.now().toString().slice(-4)}` };
     setDeliveredTransferResources(prev => [...prev, record]);
   };
@@ -522,12 +628,28 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     );
   };
 
-  const handleAddNotification = (data: Omit<OperationalNotification, "id">) => {
+  const handleAddNotification = async (data: Omit<OperationalNotification, "id">) => {
+    try {
+      await resourceApi.createNotification(data);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not create notification.", error);
+    }
+
     const record: OperationalNotification = { ...data, id: `not-${Date.now().toString().slice(-4)}` };
     setNotifications(prev => [record, ...prev]);
   };
 
-  const handleMarkAsRead = (id: string) => {
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await resourceApi.markNotificationRead(id);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not mark notification as read.", error);
+    }
+
     setNotifications(prev =>
       prev.map(n => (n.id === id ? { ...n, read: true, readDate: "Hoy" } : n))
     );
@@ -568,7 +690,16 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             resourceTypes={resourceTypes}
             campInventories={campInventories}
             onUpdateInventory={handleUpdateInventory}
-            onAddInventory={(data) => {
+            onAddInventory={async (data) => {
+              try {
+                await resourceApi.upsertCampInventory(data);
+                await fetchAllSystemData();
+                return;
+              } catch (error) {
+                console.warn("Could not persist new inventory entry.", error);
+                alert("No se pudo guardar el nuevo inventario en la API. Se agregará solo en pantalla.");
+              }
+
               setCampInventories(prev => {
                 const exists = prev.some(item => item.campId === data.campId && item.resourceTypeId === data.resourceTypeId);
                 if (exists) {
@@ -652,7 +783,15 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             resourceTypes={resourceTypes}
             requestResourceDetails={requestResourceDetails}
             onAddResourceDetail={handleAddResourceToRequest}
-            onUpdateResourceDetail={(id, updated) => {
+            onUpdateResourceDetail={async (id, updated) => {
+              try {
+                await resourceApi.updateRequestResourceDetail(id, updated);
+                await fetchAllSystemData();
+                return;
+              } catch (error) {
+                console.warn("Could not update request resource detail.", error);
+                alert("No se pudo actualizar el detalle en la API. Se actualizará solo en pantalla.");
+              }
               setRequestResourceDetails(prev => prev.map(d => d.id === id ? { ...d, ...updated } : d));
             }}
             onDeleteResourceDetail={handleDeleteRequestResource}
@@ -669,7 +808,17 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             onUpdateTransferStatus={handleUpdateTransferStatus}
             onAddPersonToTransfer={handleAddPersonToTransfer}
             onUpdatePersonStatus={handleUpdatePersonStatus}
-            onDeletePersonFromTransfer={(id: string) => setTransferPersons(prev => prev.filter(tp => tp.id !== id))}
+            onDeletePersonFromTransfer={async (id: string) => {
+              try {
+                await resourceApi.deleteTransferPerson(id);
+                await fetchAllSystemData();
+                return;
+              } catch (error) {
+                console.warn("Could not delete transfer person.", error);
+                alert("No se pudo quitar la persona en la API. Se quitará solo en pantalla.");
+              }
+              setTransferPersons(prev => prev.filter(tp => tp.id !== id));
+            }}
           />
         );
       case "Personas en traslado":
@@ -688,7 +837,15 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
           <ViewHistorialDeTraslado
             transfers={transfers}
             transferHistories={transferHistories}
-            onAddHistoryEntry={(data) => {
+            onAddHistoryEntry={async (data) => {
+              try {
+                await resourceApi.createTransferHistory(data);
+                await fetchAllSystemData();
+                return;
+              } catch (error) {
+                console.warn("Could not create transfer history entry.", error);
+                alert("No se pudo guardar el historial en la API. Se agregará solo en pantalla.");
+              }
               setTransferHistories(prev => [...prev, {
                 ...data,
                 id: `th-${Date.now().toString().slice(-4)}`

@@ -18,6 +18,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   Area, AreaChart, BarChart, Bar
 } from "recharts";
+import { apiRequest } from "../../../shared/services/httpClient";
 import type {
   Camp,
   ResourceType,
@@ -47,12 +48,12 @@ export const currentUser = {
 };
 
 export const MAP_RESOURCE_ID_TO_STR: Record<number, string> = {
-  1: "rt-food",
-  2: "rt-water",
-  3: "rt-medical",
-  4: "rt-defense",
-  5: "rt-fuel",
-  6: "rt-parts"
+  1: "1",
+  2: "2",
+  3: "3",
+  4: "4",
+  5: "5",
+  6: "6"
 };
 
 export const MAP_RESOURCE_STR_TO_ID: Record<string, number> = {
@@ -61,8 +62,25 @@ export const MAP_RESOURCE_STR_TO_ID: Record<string, number> = {
   "rt-medical": 3,
   "rt-defense": 4,
   "rt-fuel": 5,
-  "rt-parts": 6
+  "rt-parts": 6,
+  "1": 1,
+  "2": 2,
+  "3": 3,
+  "4": 4,
+  "5": 5,
+  "6": 6
 };
+
+function unwrapListPayload<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload as T[];
+  if (!payload || typeof payload !== "object") return [];
+  const data = payload as Record<string, unknown>;
+  if (Array.isArray(data.items)) return data.items as T[];
+  if (Array.isArray(data.data)) return data.data as T[];
+  if (Array.isArray(data.records)) return data.records as T[];
+  if (Array.isArray(data.results)) return data.results as T[];
+  return [];
+}
 
 export function Btn({
   children,
@@ -1483,7 +1501,7 @@ export function ViewInventarioCampamento({
   onAddInventory: (data: CampInventory) => void;
 }) {
   const selectedCamp = currentUser.campId;
-  const legacyCampId = selectedCamp === 1 ? "camp-alpha" : selectedCamp === 2 ? "camp-beta" : "camp-gamma";
+  const legacyCampId = String(selectedCamp);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [currVal, setCurrVal] = useState("");
   const [minVal, setMinVal] = useState("");
@@ -1694,28 +1712,21 @@ export function ViewRecoleccionDiaria({
   useEffect(() => {
     const checkPersonnel = async () => {
       const endpoints = [
-        `/api/people`,
-        `/api/personnel`
+        `/people`,
+        `/personnel`
       ];
       for (const url of endpoints) {
         try {
-          const res = await fetch(url);
-          if (res.ok) {
-            const data = await res.json();
-            let list: any[] = [];
-            if (Array.isArray(data)) list = data;
-            else if (data && Array.isArray(data.items)) list = data.items;
-            else if (data && Array.isArray(data.data)) list = data.data;
+          const data = await apiRequest<unknown>(url);
+          const list = unwrapListPayload<Record<string, unknown>>(data);
+          const formatted = list.map(p => ({
+            id: Number(p.id ?? p.userId ?? p.personId ?? 101),
+            name: String(p.name ?? p.fullName ?? p.username ?? `Persona #${p.id ?? 101}`)
+          }));
 
-            const formatted = list.map(p => ({
-              id: Number(p.id ?? p.userId ?? p.personId ?? 101),
-              name: String(p.name ?? p.fullName ?? p.username ?? `Persona #${p.id ?? 101}`)
-            }));
-            
-            setApiPersonnel(formatted);
-            setHasPersonnelEndpoint(true);
-            return;
-          }
+          setApiPersonnel(formatted);
+          setHasPersonnelEndpoint(true);
+          return;
         } catch (e) {
 
         }
@@ -1730,7 +1741,7 @@ export function ViewRecoleccionDiaria({
     setLoading(true);
     setError(null);
     try {
-      let url = `/api/daily-collection-records?page=${currentPage}&limit=10`;
+      let url = `/daily-collection-records?page=${currentPage}&limit=10`;
       
 
       if (filterResource) {
@@ -1744,24 +1755,22 @@ export function ViewRecoleccionDiaria({
         url += `&personId=${numericPersonId}`;
       }
 
-      const res = await fetch(url);
-      if (!res.ok) {
-        throw new Error(`HTTP error ${res.status}`);
-      }
-      const data = await res.json();
+      const data = await apiRequest<unknown>(url);
       
       let fetchedList: DailyCollectionRecord[] = [];
       let calculatedTotalPages = 1;
 
+      const list = unwrapListPayload<DailyCollectionRecord>(data);
       if (Array.isArray(data)) {
-        fetchedList = data;
+        fetchedList = list;
         calculatedTotalPages = 1;
-      } else if (data && Array.isArray(data.items)) {
-        fetchedList = data.items;
-        calculatedTotalPages = Number(data.totalPages ?? data.pages ?? 1);
-      } else if (data && Array.isArray(data.data)) {
-        fetchedList = data.data;
-        calculatedTotalPages = Number(data.totalPages ?? data.pages ?? 1);
+      } else if (data && typeof data === "object") {
+        fetchedList = list;
+        const obj = data as Record<string, unknown>;
+        const pagination = obj.pagination && typeof obj.pagination === "object"
+          ? obj.pagination as Record<string, unknown>
+          : {};
+        calculatedTotalPages = Number(obj.totalPages ?? obj.pages ?? pagination.totalPages ?? 1);
       }
 
 
@@ -1830,17 +1839,12 @@ export function ViewRecoleccionDiaria({
       movementId: null
     };
 
-    setLoading(true);
+      setLoading(true);
     try {
-      const res = await fetch("/api/daily-collection-records", {
+      await apiRequest<unknown>("/daily-collection-records", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      if (!res.ok) {
-        const errTxt = await res.text();
-        throw new Error(errTxt || "Error desconocido al registrar.");
-      }
       
       setActualAmount("");
       setDifferenceReason("");
@@ -1879,15 +1883,10 @@ export function ViewRecoleccionDiaria({
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/daily-collection-records/${adjustingId}/adjustment`, {
+      await apiRequest<unknown>(`/daily-collection-records/${adjustingId}/adjustment`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      if (!res.ok) {
-        const errTxt = await res.text();
-        throw new Error(errTxt || "Error al realizar el ajuste.");
-      }
 
       setAdjustingId(null);
       fetchRecords(page);
@@ -2392,7 +2391,7 @@ export function ViewMovimientosInventario({
   onDeleteMovement: (id: string) => void;
 }) {
   const campId = currentUser.campId;
-  const legacyCampId = campId === 1 ? "camp-alpha" : campId === 2 ? "camp-beta" : "camp-gamma";
+  const legacyCampId = String(campId);
   const [resourceTypeId, setResourceTypeId] = useState("rt-food");
   const [amount, setAmount] = useState("");
   const [movementType, setMovementType] = useState<InventoryMovement["movementType"]>("MANUAL_ADJUSTMENT");
@@ -2636,7 +2635,7 @@ export function ViewSolicitudesIntercampamento({
   onDeleteRequestResource: (id: string) => void;
 }) {
   const campIdVal = currentUser.campId;
-  const originCampId = campIdVal === 1 ? "camp-alpha" : campIdVal === 2 ? "camp-beta" : "camp-gamma";
+  const originCampId = String(campIdVal);
   const [destinationCampId, setDestinationCampId] = useState("");
   const [description, setDescription] = useState("");
   const [plannedDepartureDate, setPlannedDepartureDate] = useState("2026-05-20");
@@ -3902,7 +3901,7 @@ export function ViewNotificaciones({
   onMarkAsRead: (id: string) => void;
 }) {
   const campIdVal = currentUser.campId;
-  const campId = campIdVal === 1 ? "camp-alpha" : campIdVal === 2 ? "camp-beta" : "camp-gamma";
+  const campId = String(campIdVal);
   const [destType, setDestType] = useState<"role" | "user">("role");
   const [targetRole, setTargetRole] = useState("WORKER");
   const [selectedUserId, setSelectedUserId] = useState("user-op");
@@ -4578,7 +4577,7 @@ export function ViewPersonalDashboard({
   onNavigateToSub: (sub: string) => void;
 }) {
   const campIdVal = currentUser.campId;
-  const activeCampId = campIdVal === 1 ? "camp-alpha" : campIdVal === 2 ? "camp-beta" : "camp-gamma";
+  const activeCampId = String(campIdVal);
   const campName = camps.find(c => c.id === activeCampId)?.name || "Alpha Bunker";
 
 
