@@ -147,51 +147,43 @@ export function WorkerMainViewPage() {
   }
 
   return (
-    <div className="worker-screen-layout">
+    <div className="worker-screen-layout text-[#A4C2C5]">
       <div className="worker-holo-grid" aria-hidden="true" />
 
       <LoadingOverlay show={showLoading} isLoaded={isLoaded} onEnter={handleEnter} />
 
       {hasEntered ? (
         <>
-          <header className="worker-top-hud">
-            <button className="worker-hud-btn" type="button">
-              Centro operativo
-            </button>
-            <span className="worker-hud-chip">Panel trabajador</span>
-          </header>
+          <TopHud />
 
-          <main className="worker-main-area">
-            <div className="worker-title-row">
-              <div className="worker-title-copy">
-                <span className="worker-section-kicker">Consola de campo</span>
-                <h1>{activeSection.label}</h1>
-              </div>
-              <span className="worker-title-badge">Módulo {activeSection.shortLabel}</span>
+          <div className="main-area">
+            <div className="content-scroll">
+              <SectionTitle title={activeSection.label} />
+              <section aria-label="Panel principal" className="settings-shell h-full w-full">
+                <div className="paint-glow" aria-hidden="true" />
+                <div className="settings-inner h-full" style={{ padding: '42px 0 0 0', overflow: 'hidden' }}>
+                  <div className="watermark-x" aria-hidden="true" />
+                  <div className="inner-layout">
+                    <aside className="inner-sidebar">
+                      <SideMenu
+                        items={WORKER_NAV_DATA}
+                        activeId={activeSectionId}
+                        onSelect={(id) => setActiveSectionId(id)}
+                      />
+                    </aside>
+                    <div className="inner-divider" />
+                    <div className="inner-content">
+                      <GenericWorkerContent section={activeSection} sessionUser={sessionUser} />
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
+          </div>
 
-            <section className="worker-shell" aria-label="Panel de trabajador">
-              <div className="worker-shell-glow" aria-hidden="true" />
-              <div className="worker-content">
-                <GenericWorkerContent section={activeSection} sessionUser={sessionUser} />
-              </div>
-            </section>
-          </main>
-
-          <footer className="worker-dock" aria-label="Modulos de trabajador">
-            {WORKER_NAV_DATA.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                aria-label={item.label}
-                className={`worker-dock-item ${activeSectionId === item.id ? 'is-active' : ''}`}
-                onClick={() => setActiveSectionId(item.id)}
-              >
-                <span className="worker-dock-icon">{item.icon}</span>
-                <span className="worker-dock-text">{item.shortLabel}</span>
-              </button>
-            ))}
-          </footer>
+          <BottomDock activeDock={activeSectionId} onSelect={(id) => setActiveSectionId(id)} />
+          <SupportLink />
+          <SettingsHint />
         </>
       ) : null}
     </div>
@@ -199,6 +191,137 @@ export function WorkerMainViewPage() {
 }
 
 export default WorkerMainViewPage
+
+function TopHud() {
+  return (
+    <header className="worker-top-hud pointer-events-none flex items-center justify-between px-3 pt-3 pb-2 text-[10px] font-black uppercase tracking-[-0.02em] text-[#A4C2C5]/80">
+      <button className="pointer-events-auto worker-hud-btn" type="button">
+        <span className="btn-text">
+          <span className="flex items-center gap-[1px] text-[#69BFB7]">
+            <ChevronLeft />
+            <ChevronLeft />
+          </span>
+          Centro operativo
+        </span>
+      </button>
+      <button className="pointer-events-auto worker-hud-btn" type="button">
+        <span className="btn-text">
+          Panel trabajador
+          <span className="logout-mark" aria-hidden="true" />
+        </span>
+      </button>
+    </header>
+  )
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return (
+    <div className="section-header">
+      <div
+        className="section-title-brush"
+        style={{
+          transformStyle: 'preserve-3d',
+          transform: 'rotateY(25deg) translateZ(10px)',
+        }}
+      >
+        <span className="btn-text">{title}</span>
+      </div>
+    </div>
+  )
+}
+
+function SideMenu({
+  items,
+  activeId,
+  onSelect,
+}: {
+  items: WorkerSection[]
+  activeId: WorkerSectionId
+  onSelect: (id: WorkerSectionId) => void
+}) {
+  return (
+    <nav aria-label="Settings sections" className="w-full pl-2 pt-6 h-full flex flex-col">
+      <div className="flex flex-col gap-[18px] perspective-[800px]">
+        {items.map((item) => (
+          <button
+            className={`side-button ${activeId === item.id ? 'is-active' : ''} relative`}
+            key={item.id}
+            onClick={() => onSelect(item.id)}
+            type="button"
+            style={{
+              transformStyle: 'preserve-3d',
+              transform: 'rotateY(25deg) translateZ(10px)',
+            }}
+          >
+            <span className="btn-text whitespace-nowrap overflow-visible drop-shadow-md">{item.label}</span>
+          </button>
+        ))}
+      </div>
+    </nav>
+  )
+}
+
+function BottomDock({
+  activeDock,
+  onSelect,
+}: {
+  activeDock: WorkerSectionId
+  onSelect: (id: WorkerSectionId) => void
+}) {
+  return (
+    <footer aria-label="Game navigation" className="dock">
+      {WORKER_NAV_DATA.map((item) => (
+        <button
+          aria-label={item.label}
+          className={`dock-item ${activeDock === item.id ? 'is-active' : ''}`}
+          key={item.id}
+          onClick={() => onSelect(item.id)}
+          type="button"
+        >
+          <span className="dock-content">{item.icon}</span>
+        </button>
+      ))}
+    </footer>
+  )
+}
+
+function SupportLink() {
+  return (
+    <button className="support-link" type="button">
+      <span className="btn-text"><span>?</span> Soporte</span>
+    </button>
+  )
+}
+
+function SettingsHint() {
+  return (
+    <button className="settings-hint" type="button">
+      <span className="btn-text">Ajustes <GearIcon /></span>
+    </button>
+  )
+}
+
+function ChevronLeft() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-3" fill="none" viewBox="0 0 10 16">
+      <path d="M8 2 2 8l6 6" stroke="currentColor" strokeLinecap="square" strokeWidth="3" />
+    </svg>
+  )
+}
+
+function GearIcon() {
+  return (
+    <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
+      <path
+        d="M12 8.2A3.8 3.8 0 1 0 12 15.8 3.8 3.8 0 0 0 12 8.2Zm8.5 4.6v-1.6l-2.3-.8a6.8 6.8 0 0 0-.7-1.6l1-2.2-1.1-1.1-2.2 1a7 7 0 0 0-1.6-.7L12.8 3h-1.6l-.8 2.3a7 7 0 0 0-1.6.7l-2.2-1-1.1 1.1 1 2.2a6.8 6.8 0 0 0-.7 1.6l-2.3.8v1.6l2.3.8c.2.6.4 1.1.7 1.6l-1 2.2 1.1 1.1 2.2-1c.5.3 1 .5 1.6.7l.8 2.3h1.6l.8-2.3c.6-.2 1.1-.4 1.6-.7l2.2 1 1.1-1.1-1-2.2c.3-.5.5-1 .7-1.6l2.3-.8Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  )
+}
 
 function LoadingOverlay({
   show,
@@ -369,7 +492,6 @@ function DashboardSection() {
       <article className="worker-card worker-card-wide">
         <div className="worker-card-label">Resumen general</div>
         <div className="worker-metric-grid worker-metric-grid-dashboard">
-          <MetricBox label="Usuario" value={data.userId ? `#${data.userId}` : 'No asignado'} />
           <MetricBox label="Alertas sin leer" value={String(data.general.unreadNotifications)} />
           <MetricBox label="Personas registradas" value={String(data.general.totalPersons)} />
           <MetricBox label="Solicitudes pendientes" value={String(data.general.pendingAdmissionRequests)} />
@@ -691,10 +813,11 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
             <div className="worker-detail-stack">
               <h3>{selected.title}</h3>
               <p>{selected.message}</p>
-              <div className="worker-detail-grid">
-                <DetailRow label="Campamento" value={`#${selected.campId}`} />
+              <div className="worker-detail-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
                 <DetailRow label="Destino" value={selected.targetRole || 'Todos'} />
-                <DetailRow label="Tipo" value={selected.type} />
+                <DetailRow label="Fecha" value={formatDateLabel(selected.createdDate)} />
+              </div>
+              <div className="worker-detail-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
                 <DetailRow label="Fecha" value={formatDateLabel(selected.createdDate)} />
                 <DetailRow label="Estado" value={selected.read ? 'Leída' : 'Sin leer'} />
                 <DetailRow label="Origen" value={selected.sourceType ? `${selected.sourceType} #${selected.sourceId ?? '-'}` : 'Sin origen'} />
@@ -896,7 +1019,14 @@ function OccupationsSection() {
                     {item.collectsResources ? 'Recolección' : 'No recolecta'}
                   </span>
                 </div>
+                <p>ID #{item.id} · Recurso {item.resourceTypeId ? `#${item.resourceTypeId}` : 'sin tipo'}</p>
                 <p>{item.description || 'Sin descripción registrada'}</p>
+                <p>
+                  Produce {item.dailyAmountProduced} · Consume {item.dailyRationConsumed} · Mínimo {item.minimumRequiredWorkers}
+                </p>
+                <p>
+                  Preferido {item.preferredWorkers ? String(item.preferredWorkers) : 'sin preferencia'} · Umbral {item.criticalThresholdPercent}
+                </p>
                 <div className="worker-list-item-foot">
                   <span>{item.participatesInExpeditions ? 'Participa en expediciones' : 'Solo operaciones locales'}</span>
                   <span>{formatDateLabel(item.createdAt)}</span>
@@ -940,6 +1070,7 @@ function OccupationsSection() {
           {selected ? (
             <div className="worker-detail-stack">
               <h3>{selected.name}</h3>
+              <p>ID #{selected.id}</p>
               <p>{selected.description || 'Sin descripción registrada'}</p>
               <div className="worker-detail-grid">
                 <DetailRow label="Recolección" value={selected.collectsResources ? 'Sí' : 'No'} />
@@ -1058,6 +1189,8 @@ function CoverageSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser
 
   const handleAutoAssign = async () => {
     if (!campId || !selectedOccupationId) return
+    const confirmed = window.confirm('¿Deseas ejecutar la autoasignación para esta ocupación?')
+    if (!confirmed) return
     setActionLoading(true)
     setAutoResult(null)
 
@@ -1126,7 +1259,16 @@ function CoverageSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser
                     {row.isCritical ? 'Crítica' : row.isAtRisk ? 'En riesgo' : 'Estable'}
                   </span>
                 </div>
-                <p>{row.activeWorkers} activos / {row.minimumRequiredWorkers} mínimos</p>
+                  <p>ID #{row.occupationId} · Campamento #{row.campId}</p>
+                  <p>
+                    Activos {row.activeWorkers} · Disponibles {row.availableWorkers} · Mínimo {row.minimumRequiredWorkers}
+                  </p>
+                  <p>
+                    Preferido {row.preferredWorkers ? String(row.preferredWorkers) : 'sin preferencia'} · Umbral {row.criticalThresholdPercent}
+                  </p>
+                  <p>
+                    Cobertura {row.coveragePercent}% · Déficit {row.deficit} · Excedente {row.surplus}
+                  </p>
                 <div className="worker-chart-track">
                   <div className="worker-chart-fill" style={{ width: `${Math.min(100, row.coveragePercent)}%` }} />
                 </div>
@@ -1160,7 +1302,7 @@ function CoverageSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser
 
       <div className="worker-two-col-grid">
         <article className="worker-card">
-          <div className="worker-card-label">Ocupaciones críticas</div>
+          <div className="worker-card-label">Ocupaciones críticas y en riesgo</div>
           <div className="worker-list-stack">
             {criticalRows.map((row) => (
               <div key={row.occupationId} className="worker-list-item is-static">
@@ -1168,7 +1310,29 @@ function CoverageSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser
                   <strong>{row.occupationName}</strong>
                   <span className="worker-pill is-critical">Crítica</span>
                 </div>
-                <p>{row.availableWorkers} disponibles, cobertura {row.coveragePercent}%</p>
+                <p>ID #{row.occupationId} · Campamento #{row.campId}</p>
+                <p>
+                  Disponibles {row.availableWorkers} · Activos {row.activeWorkers} · Mínimo {row.minimumRequiredWorkers}
+                </p>
+                <p>Cobertura {row.coveragePercent}% · Déficit {row.deficit} · Excedente {row.surplus}</p>
+              </div>
+            ))}
+            {atRiskRows.map((row) => (
+              <div key={row.occupationId} className="worker-list-item is-static">
+                <div className="worker-list-item-head">
+                  <strong>{row.occupationName}</strong>
+                  <span className="worker-pill is-highlight">En riesgo</span>
+                </div>
+                <p>ID #{row.occupationId} · Campamento #{row.campId}</p>
+                <p>
+                  Disponibles {row.availableWorkers} · Mínimo {row.minimumRequired}
+                </p>
+                <p>Cobertura {row.coveragePercent}%</p>
+                <p>
+                  Sugerencias: {row.suggestedReplacements.length > 0
+                    ? row.suggestedReplacements.map((suggestion) => `${suggestion.personName} (${suggestion.priority})`).join(' · ')
+                    : 'Sin sugerencias'}
+                </p>
               </div>
             ))}
             {!criticalRows.length ? <ModuleStateCard title="Sin alertas críticas" message="No hay ocupaciones críticas en este campamento." /> : null}
@@ -1184,6 +1348,9 @@ function CoverageSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser
                   <strong>{suggestion.personName}</strong>
                   <span className={`worker-pill priority-${suggestion.priority.toLowerCase()}`}>{suggestion.priority}</span>
                 </div>
+                <p>
+                  Persona #{suggestion.personId} · Origen #{suggestion.currentOccupationId} · Destino #{suggestion.targetOccupationId}
+                </p>
                 <p>{suggestion.currentOccupationName} → {suggestion.targetOccupationName}</p>
                 <p>{suggestion.reason}</p>
               </div>
