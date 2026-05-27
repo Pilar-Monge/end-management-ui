@@ -813,14 +813,17 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
             <div className="worker-detail-stack">
               <h3>{selected.title}</h3>
               <p>{selected.message}</p>
-              <div className="worker-detail-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+              <div className="worker-detail-grid">
+                <DetailRow label="ID" value={String(selected.id)} />
+                <DetailRow label="Campamento" value={`#${selected.campId}`} />
+                <DetailRow label="Usuario" value={selected.userId ? `#${selected.userId}` : 'Sin usuario'} />
                 <DetailRow label="Destino" value={selected.targetRole || 'Todos'} />
-                <DetailRow label="Fecha" value={formatDateLabel(selected.createdDate)} />
-              </div>
-              <div className="worker-detail-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
-                <DetailRow label="Fecha" value={formatDateLabel(selected.createdDate)} />
-                <DetailRow label="Estado" value={selected.read ? 'Leída' : 'Sin leer'} />
-                <DetailRow label="Origen" value={selected.sourceType ? `${selected.sourceType} #${selected.sourceId ?? '-'}` : 'Sin origen'} />
+                <DetailRow label="Tipo" value={selected.type} />
+                <DetailRow label="Leída" value={selected.read ? 'Sí' : 'No'} />
+                <DetailRow label="Fecha creación" value={formatDateLabel(selected.createdDate)} />
+                <DetailRow label="Fecha lectura" value={selected.readDate ? formatDateLabel(selected.readDate) : 'Sin lectura'} />
+                <DetailRow label="Origen" value={selected.sourceType || 'Sin origen'} />
+                <DetailRow label="Origen ID" value={selected.sourceId ? `#${selected.sourceId}` : 'Sin origen'} />
               </div>
               <div className="worker-action-row">
                 <button type="button" className="worker-primary-btn" onClick={markAsRead} disabled={selected.read}>
@@ -1284,6 +1287,8 @@ function CoverageSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser
             <div className="worker-detail-stack">
               <h3>{selectedCoverage.occupationName}</h3>
               <div className="worker-detail-grid">
+                <DetailRow label="Ocupación ID" value={String(selectedCoverage.occupationId)} />
+                <DetailRow label="Campamento" value={`#${selectedCoverage.campId}`} />
                 <DetailRow label="Disponibles" value={String(selectedCoverage.availableWorkers)} />
                 <DetailRow label="Activos" value={String(selectedCoverage.activeWorkers)} />
                 <DetailRow label="Cobertura" value={`${selectedCoverage.coveragePercent}%`} />
@@ -1292,6 +1297,8 @@ function CoverageSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser
                 <DetailRow label="Déficit" value={String(selectedCoverage.deficit)} />
                 <DetailRow label="Excedente" value={String(selectedCoverage.surplus)} />
                 <DetailRow label="Umbral" value={selectedCoverage.criticalThresholdPercent} />
+                <DetailRow label="Crítica" value={selectedCoverage.isCritical ? 'Sí' : 'No'} />
+                <DetailRow label="En riesgo" value={selectedCoverage.isAtRisk ? 'Sí' : 'No'} />
               </div>
             </div>
           ) : (
