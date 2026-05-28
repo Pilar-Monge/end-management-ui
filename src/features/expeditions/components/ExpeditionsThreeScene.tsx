@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable react-hooks/set-state-in-effect */
 // @ts-nocheck
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import {
@@ -12,7 +9,7 @@ import {
   Html,
   useProgress,
 } from '@react-three/drei'
-import { Suspense, useRef, useMemo, useState, useEffect, useCallback } from 'react'
+import { memo, Suspense, useRef, useMemo, useState, useEffect, useCallback } from 'react'
 import * as THREE from 'three'
 
 const MODEL_URL =
@@ -36,7 +33,7 @@ const CHAIR_URL =
 const CARDBOARD_BOXES_URL =
   'https://auvhrmznrhchqtqddawq.supabase.co/storage/v1/object/public/gestorExpediciones/cardboard_box_set-_low_poly%20(1).glb'
 
-function Model({
+const Model = memo(function Model({
   onLoaded,
   scale = 1.5,
 }: {
@@ -62,9 +59,9 @@ function Model({
   }, [scene, onLoaded])
 
   return <primitive object={scene} scale={scale} />
-}
+})
 
-function Vehicle({
+const Vehicle = memo(function Vehicle({
   url,
   position,
   rotation,
@@ -88,7 +85,7 @@ function Vehicle({
   }, [clonedScene])
 
   return <primitive object={clonedScene} position={position} rotation={rotation} scale={scale} />
-}
+})
 
 const CAMERA_ZOOM_TARGET_STATION = [-6.2, 2.8, 0] as [number, number, number]
 const CAMERA_LOOK_TARGET_STATION = [-11, 2.3, 0] as [number, number, number]
@@ -134,45 +131,43 @@ function ExpeditionLoadingOverlay() {
   )
 }
 
-function SyncOverlay({ 
-  isSyncing, 
-  onComplete 
-}: { 
-  isSyncing: boolean, 
-  onComplete: () => void 
-}) {
-  const [progress, setProgress] = useState(0);
-  const completedRef = useRef(false);
+function SyncOverlay({ isSyncing, onComplete }: { isSyncing: boolean; onComplete: () => void }) {
+  const [progress, setProgress] = useState(0)
+  const completedRef = useRef(false)
 
   useEffect(() => {
     if (!isSyncing) {
-      setProgress(0);
-      completedRef.current = false;
-      return;
+      setProgress(0)
+      completedRef.current = false
+      return
     }
 
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          return 100
-        }
-        return prev + 2
-      })
-    }, 20)
+    const durationMs = 1000
+    const startedAt = performance.now()
+    let frameId = 0
 
-    return () => clearInterval(interval)
+    const animate = (now: number) => {
+      const nextProgress = Math.min(Math.round(((now - startedAt) / durationMs) * 100), 100)
+      setProgress(nextProgress)
+      if (nextProgress < 100) {
+        frameId = requestAnimationFrame(animate)
+      }
+    }
+
+    frameId = requestAnimationFrame(animate)
+
+    return () => cancelAnimationFrame(frameId)
   }, [isSyncing])
 
   useEffect(() => {
     if (isSyncing && progress >= 100 && !completedRef.current) {
-      completedRef.current = true;
-      const timeout = window.setTimeout(onComplete, 500);
-      return () => window.clearTimeout(timeout);
+      completedRef.current = true
+      const timeout = window.setTimeout(onComplete, 500)
+      return () => window.clearTimeout(timeout)
     }
-  }, [isSyncing, progress, onComplete]);
+  }, [isSyncing, progress, onComplete])
 
-  if (!isSyncing) return null;
+  if (!isSyncing) return null
 
   return (
     <div className="expedition-sync-overlay">
@@ -316,16 +311,19 @@ function InteractionStation({
 }
 
 interface ExpeditionsThreeSceneProps {
-  onExit?: () => void;
-  onSyncComplete?: () => void;
+  onExit?: () => void
+  onSyncComplete?: () => void
 }
 
-export default function ExpeditionsThreeScene({ onExit, onSyncComplete }: ExpeditionsThreeSceneProps) {
-  const modelRef = useRef<THREE.Group>(null);
-  const [hoveredStation, setHoveredStation] = useState(false);
-  const [hoveredMap, setHoveredMap] = useState(false);
-  const [zoomedTarget, setZoomedTarget] = useState<'station' | 'map' | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
+export default function ExpeditionsThreeScene({
+  onExit,
+  onSyncComplete,
+}: ExpeditionsThreeSceneProps) {
+  const modelRef = useRef<THREE.Group>(null)
+  const [hoveredStation, setHoveredStation] = useState(false)
+  const [hoveredMap, setHoveredMap] = useState(false)
+  const [zoomedTarget, setZoomedTarget] = useState<'station' | 'map' | null>(null)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   useEffect(() => {
     useGLTF.preload(MODEL_URL)
@@ -384,11 +382,11 @@ export default function ExpeditionsThreeScene({ onExit, onSyncComplete }: Expedi
   )
 
   const handleSyncComplete = useCallback(() => {
-    setIsSyncing(false);
+    setIsSyncing(false)
     if (onSyncComplete) {
-      onSyncComplete();
+      onSyncComplete()
     }
-  }, [onSyncComplete]);
+  }, [onSyncComplete])
 
   const handleBack = useCallback(() => {
     if (isSyncing) {
@@ -545,11 +543,8 @@ export default function ExpeditionsThreeScene({ onExit, onSyncComplete }: Expedi
         </Canvas>
       </Suspense>
 
-      {}
       <div className="expedition-hud">
-        {}
         <div className="expedition-hud-left">
-          {}
           <button
             className="expedition-hud-button expedition-hud-button--back"
             onClick={handleBack}
@@ -582,9 +577,7 @@ export default function ExpeditionsThreeScene({ onExit, onSyncComplete }: Expedi
           </button>
         </div>
 
-        {}
         <div className="expedition-hud-actions">
-          {}
           <button className="expedition-hud-icon-button">
             <div
               className="expedition-hud-button-bg"
@@ -612,7 +605,6 @@ export default function ExpeditionsThreeScene({ onExit, onSyncComplete }: Expedi
             </svg>
           </button>
 
-          {}
           <button className="expedition-hud-icon-button">
             <div
               className="expedition-hud-button-bg"
@@ -638,7 +630,6 @@ export default function ExpeditionsThreeScene({ onExit, onSyncComplete }: Expedi
             </svg>
           </button>
 
-          {}
           <button className="expedition-hud-icon-button" onClick={onExit}>
             <div
               className="expedition-hud-button-bg"

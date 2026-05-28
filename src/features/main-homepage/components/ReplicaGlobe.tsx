@@ -12,83 +12,63 @@ interface ParticleSystemProps {
   isReady: boolean
 }
 
-const ParticleSystem: React.FC<ParticleSystemProps> = ({ progress, isReady }) => {
-  const formationCount = 20000
-  const cyberCount = 2000
+type ParticleWorkerData = {
+  start: Float32Array
+  end: Float32Array
+  colors: Float32Array
+  cyberPositions: Float32Array
+  cyberVelocities: Float32Array
+}
 
-  const initialSwarmPositions = useMemo(() => new Float32Array(formationCount * 3), [])
+const FORMATION_COUNT = 20000
+const CYBER_COUNT = 2000
 
+const ParticleSystem: React.FC<ParticleSystemProps> = React.memo(({ progress, isReady }) => {
+  const [particleData, setParticleData] = useState<ParticleWorkerData | null>(null)
   const swarmRef = useRef<THREE.Points>(null!)
   const swarmMaterialRef = useRef<THREE.PointsMaterial>(null!)
-  const swarmPositions = useMemo(() => {
-    const start = new Float32Array(formationCount * 3)
-    const end = new Float32Array(formationCount * 3)
-    const colors = new Float32Array(formationCount * 3)
-
-    for (let i = 0; i < formationCount; i++) {
-      start[i * 3] = (Math.random() - 0.5) * 1000
-      start[i * 3 + 1] = (Math.random() - 0.5) * 1000
-      start[i * 3 + 2] = (Math.random() - 0.5) * 1000
-
-      const phi = Math.acos(-1 + (2 * i) / formationCount)
-      const theta = Math.sqrt(formationCount * Math.PI) * phi
-      const radius = 65
-
-      end[i * 3] = radius * Math.cos(theta) * Math.sin(phi)
-      end[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi)
-      end[i * 3 + 2] = radius * Math.cos(phi)
-
-      const color = new THREE.Color()
-      color.setHSL(0.5 + (i / formationCount) * 0.2, 0.8, 0.5)
-      colors[i * 3] = color.r
-      colors[i * 3 + 1] = color.g
-      colors[i * 3 + 2] = color.b
-    }
-    return { start, end, colors }
-  }, [])
-
   const cyberRef = useRef<THREE.Points>(null!)
-  const cyberData = useMemo(() => {
-    const positions = new Float32Array(cyberCount * 3)
-    const velocities = new Float32Array(cyberCount * 3)
-    for (let i = 0; i < cyberCount; i++) {
-      const radius = 160 + Math.random() * 250
-      const phi = Math.acos(-1 + 2 * Math.random())
-      const theta = Math.random() * Math.PI * 2
-
-      positions[i * 3] = radius * Math.cos(theta) * Math.sin(phi)
-      positions[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi)
-      positions[i * 3 + 2] = radius * Math.cos(phi)
-
-      velocities[i * 3] = (Math.random() - 0.5) * 0.2
-      velocities[i * 3 + 1] = (Math.random() - 0.5) * 0.2
-      velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.2
-    }
-    return { positions, velocities }
-  }, [])
-
+  const initialSwarmPositions = useMemo(() => new Float32Array(FORMATION_COUNT * 3), [particleData])
+  const fallbackColors = useMemo(() => new Float32Array(FORMATION_COUNT * 3), [])
+  const fallbackCyberPositions = useMemo(() => new Float32Array(CYBER_COUNT * 3), [])
   const readyTimestamp = useRef<number | null>(null)
 
+  useEffect(() => {
+    const worker = new Worker(new URL('../workers/particleDataWorker.ts', import.meta.url), {
+      type: 'module',
+    })
+
+    worker.onmessage = ({ data }: MessageEvent<ParticleWorkerData>) => {
+      setParticleData(data)
+    }
+
+    worker.postMessage({ formationCount: FORMATION_COUNT, cyberCount: CYBER_COUNT })
+
+    return () => worker.terminate()
+  }, [])
+
   useFrame((state) => {
+    if (!particleData) return
+
     const time = state.clock.getElapsedTime()
 
     if (swarmRef.current) {
       const currentPositions = swarmRef.current.geometry.attributes.position.array as Float32Array
-      for (let i = 0; i < formationCount; i++) {
+      for (let i = 0; i < FORMATION_COUNT; i++) {
         const idx = i * 3
         currentPositions[idx] = THREE.MathUtils.lerp(
-          swarmPositions.start[idx],
-          swarmPositions.end[idx],
+          particleData.start[idx],
+          particleData.end[idx],
           progress,
         )
         currentPositions[idx + 1] = THREE.MathUtils.lerp(
-          swarmPositions.start[idx + 1],
-          swarmPositions.end[idx + 1],
+          particleData.start[idx + 1],
+          particleData.end[idx + 1],
           progress,
         )
         currentPositions[idx + 2] = THREE.MathUtils.lerp(
-          swarmPositions.start[idx + 2],
-          swarmPositions.end[idx + 2],
+          particleData.start[idx + 2],
+          particleData.end[idx + 2],
           progress,
         )
       }
@@ -119,11 +99,11 @@ const ParticleSystem: React.FC<ParticleSystemProps> = ({ progress, isReady }) =>
 
     if (cyberRef.current) {
       const cyberPositions = cyberRef.current.geometry.attributes.position.array as Float32Array
-      for (let i = 0; i < cyberCount; i++) {
+      for (let i = 0; i < CYBER_COUNT; i++) {
         const idx = i * 3
-        cyberPositions[idx] += Math.sin(time + cyberData.velocities[idx]) * 0.1
-        cyberPositions[idx + 1] += Math.cos(time + cyberData.velocities[idx + 1]) * 0.1
-        cyberPositions[idx + 2] += Math.sin(time + cyberData.velocities[idx + 2]) * 0.1
+        cyberPositions[idx] += Math.sin(time + particleData.cyberVelocities[idx]) * 0.1
+        cyberPositions[idx + 1] += Math.cos(time + particleData.cyberVelocities[idx + 1]) * 0.1
+        cyberPositions[idx + 2] += Math.sin(time + particleData.cyberVelocities[idx + 2]) * 0.1
       }
       cyberRef.current.geometry.attributes.position.needsUpdate = true
       cyberRef.current.rotation.y += 0.001
@@ -141,14 +121,14 @@ const ParticleSystem: React.FC<ParticleSystemProps> = ({ progress, isReady }) =>
         null,
         React.createElement('bufferAttribute' as any, {
           attach: 'attributes-position',
-          count: formationCount,
+          count: FORMATION_COUNT,
           array: initialSwarmPositions,
           itemSize: 3,
         }),
         React.createElement('bufferAttribute' as any, {
           attach: 'attributes-color',
-          count: formationCount,
-          array: swarmPositions.colors,
+          count: FORMATION_COUNT,
+          array: particleData?.colors ?? fallbackColors,
           itemSize: 3,
         }),
       ),
@@ -170,8 +150,8 @@ const ParticleSystem: React.FC<ParticleSystemProps> = ({ progress, isReady }) =>
         null,
         React.createElement('bufferAttribute' as any, {
           attach: 'attributes-position',
-          count: cyberCount,
-          array: cyberData.positions,
+          count: CYBER_COUNT,
+          array: particleData?.cyberPositions ?? fallbackCyberPositions,
           itemSize: 3,
         }),
       ),
@@ -185,7 +165,7 @@ const ParticleSystem: React.FC<ParticleSystemProps> = ({ progress, isReady }) =>
       }),
     ),
   )
-}
+})
 
 interface Campamento {
   id: number
@@ -502,7 +482,6 @@ const ReplicaGlobe = ({
         }
       `}</style>
 
-      {}
       <div
         className={`absolute inset-0 pointer-events-none transition-all duration-1000 ${isReady ? 'z-[15] opacity-50' : 'z-[80]'}`}
       >
@@ -515,7 +494,6 @@ const ReplicaGlobe = ({
         </Canvas>
       </div>
 
-      {}
       <AnimatePresence>
         {!isReady && (
           <motion.div
@@ -528,7 +506,6 @@ const ReplicaGlobe = ({
         )}
       </AnimatePresence>
 
-      {}
       <AnimatePresence>
         {isLoading && (
           <motion.div
@@ -758,11 +735,9 @@ const ReplicaGlobe = ({
         />
       </motion.div>
 
-      {}
       <AnimatePresence>
         {isReady && !isLoading && (
           <>
-            {}
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -869,7 +844,6 @@ const ReplicaGlobe = ({
               </AnimatePresence>
             </motion.div>
 
-            {}
             <motion.button
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -890,7 +864,6 @@ const ReplicaGlobe = ({
         )}
       </AnimatePresence>
 
-      {}
       <AnimatePresence>
         {isGuideOpen && (
           <motion.div
@@ -955,4 +928,4 @@ const ReplicaGlobe = ({
   )
 }
 
-export default ReplicaGlobe
+export default React.memo(ReplicaGlobe)
