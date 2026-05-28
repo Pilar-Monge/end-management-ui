@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { memo, useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
@@ -22,15 +22,17 @@ const TEAM_MEMBERS = [
   { name: 'Jeison Saldaña Rios', git: 'https://github.com/JeisonSaldanaRios' },
 ]
 
-function GitHubIcon({ className = '' }: { className?: string }) {
+const BACKGROUND_IMAGE_URL = '/images/bg2.jpg'
+
+const GitHubIcon = memo(function GitHubIcon({ className = '' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M12 2C6.48 2 2 6.58 2 12.26c0 4.54 2.87 8.39 6.84 9.75.5.09.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.3 9.3 0 0 1 12 7.01c.85 0 1.7.12 2.5.34 1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.8 0 .27.18.59.69.49A10.14 10.14 0 0 0 22 12.26C22 6.58 17.52 2 12 2Z" />
     </svg>
   )
-}
+})
 
-function SoundWave({ isActive }: { isActive: boolean }) {
+const SoundWave = memo(function SoundWave({ isActive }: { isActive: boolean }) {
   return (
     <div className="flex items-end gap-[3px] h-5 px-1">
       {[4, 12, 12, 8, 7].map((h, i) => (
@@ -50,9 +52,9 @@ function SoundWave({ isActive }: { isActive: boolean }) {
       ))}
     </div>
   )
-}
+})
 
-export default function LandingPage({
+const LandingPage = memo(function LandingPage({
   onIntro,
   onMenu,
   volume,
@@ -70,6 +72,7 @@ export default function LandingPage({
   const [isDecoding, setIsDecoding] = useState(true)
   const [decodedTitle, setDecodedTitle] = useState('END MANAGEMENT')
   const [subtitleText, setSubtitleText] = useState('')
+  const [isBackgroundReady, setIsBackgroundReady] = useState(false)
   const subtitleFull = 'SURVIVAL SYSTEM — PROJECT X'
   const subtitleStarted = useRef(false)
 
@@ -79,6 +82,41 @@ export default function LandingPage({
     return () => {
       window.clearTimeout(uiTimer)
       window.clearTimeout(menuTimer)
+    }
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+    const loadBackground = () => {
+      const image = new Image()
+      image.decoding = 'async'
+      image.onload = () => {
+        if (isMounted) setIsBackgroundReady(true)
+      }
+      image.src = BACKGROUND_IMAGE_URL
+    }
+
+    const scheduler = window as Window &
+      typeof globalThis & {
+        requestIdleCallback?: (
+          callback: IdleRequestCallback,
+          options?: IdleRequestOptions,
+        ) => number
+        cancelIdleCallback?: (handle: number) => void
+      }
+
+    if (scheduler.requestIdleCallback && scheduler.cancelIdleCallback) {
+      const idleId = scheduler.requestIdleCallback(loadBackground, { timeout: 700 })
+      return () => {
+        isMounted = false
+        scheduler.cancelIdleCallback?.(idleId)
+      }
+    }
+
+    const timeoutId = window.setTimeout(loadBackground, 250)
+    return () => {
+      isMounted = false
+      window.clearTimeout(timeoutId)
     }
   }, [])
 
@@ -123,21 +161,22 @@ export default function LandingPage({
     return () => window.clearTimeout(startDelay)
   }, [])
 
-  const [titleTop, ...titleRest] = decodedTitle.split(' ')
-  const titleBottom = titleRest.join(' ')
+  const [titleTop, titleBottom] = useMemo(() => {
+    const [top, ...rest] = decodedTitle.split(' ')
+    return [top, rest.join(' ')]
+  }, [decodedTitle])
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black text-white select-none">
-      {}
       <div
-        className="absolute inset-0 bg-cover bg-center anim-bg-reveal"
+        className={`absolute inset-0 bg-cover bg-center transition-opacity duration-700 ${isBackgroundReady ? 'opacity-100 anim-bg-reveal' : 'opacity-0'}`}
         style={{
-          backgroundImage: "url('/images/bg2.jpg')",
+          backgroundImage: isBackgroundReady ? `url('${BACKGROUND_IMAGE_URL}')` : undefined,
           filter: 'contrast(1.15) brightness(0.8) saturate(0.95)',
         }}
       />
+      {!isBackgroundReady && <div className="absolute inset-0 bg-[#050607]" />}
 
-      {}
       <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/20 to-black/80" />
       <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-black/40" />
       <div
@@ -147,12 +186,10 @@ export default function LandingPage({
         }}
       />
 
-      {}
       <div className="background-depth-light" />
       <div className="background-depth-fog" />
       <div className="background-depth-shadow" />
 
-      {}
       <div
         className="absolute inset-0 opacity-[0.18] mix-blend-overlay pointer-events-none"
         style={{
@@ -161,10 +198,8 @@ export default function LandingPage({
         }}
       />
 
-      {}
       <div className="absolute inset-0 pointer-events-none z-30 scanlines" />
 
-      {}
       <div
         className={`absolute top-5 right-6 flex items-start gap-5 z-20 transition-all duration-1000 ${
           showUI ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
@@ -289,7 +324,7 @@ export default function LandingPage({
               NIVEL: {volume}%
             </div>
           </motion.div>,
-          document.body
+          document.body,
         )}
       <div
         className="absolute top-[5%] left-[3.5%] z-20"
@@ -330,7 +365,6 @@ export default function LandingPage({
         </div>
       </div>
 
-      {}
       <div
         className="absolute bottom-10 right-10 z-20 text-right"
         style={{ fontFamily: "'Oswald', sans-serif" }}
@@ -369,7 +403,6 @@ export default function LandingPage({
         </ul>
       </div>
 
-      {}
       <div
         className={`absolute bottom-6 left-6 z-40 transition-all duration-1000 delay-[1600ms] ${
           showMenu ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
@@ -457,7 +490,6 @@ export default function LandingPage({
         )}
       </AnimatePresence>
 
-      {}
       <svg
         className="absolute inset-0 w-full h-full pointer-events-none z-10 opacity-60"
         viewBox="0 0 1920 1080"
@@ -469,7 +501,6 @@ export default function LandingPage({
         </g>
       </svg>
 
-      {}
       <svg className="absolute" style={{ width: 0, height: 0 }}>
         <defs>
           <filter id="grunge">
@@ -490,4 +521,6 @@ export default function LandingPage({
       </svg>
     </div>
   )
-}
+})
+
+export default LandingPage

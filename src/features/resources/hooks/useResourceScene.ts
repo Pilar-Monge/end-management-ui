@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import type { ResourceZoomTarget } from '../constants/resourceSceneConfigs'
 
 export function useResourceScene() {
-  const controlsRef = useRef(null)
+  const controlsRef = useRef<any>(null)
   const [hoveredTarget, setHoveredTarget] = useState<{
     type: Exclude<ResourceZoomTarget, null>
     name: string
