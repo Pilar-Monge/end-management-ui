@@ -1218,7 +1218,7 @@ function CollectionSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUs
       const nextRecord = await fetchWorkerDailyCollectionRecord(numericId)
       setRecord(nextRecord)
     } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar el registro')
+      setError(fetchError instanceof Error ? translateDailyCollectionError(fetchError.message) : 'No se pudo cargar el registro')
       setRecord(null)
     } finally {
       setLoading(false)
@@ -1249,7 +1249,6 @@ function CollectionSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUs
             Cargar registro
           </button>
         </div>
-        <p className="worker-helper-text">Se muestran solo registros reales y la vista respeta el campamento del usuario autenticado.</p>
       </article>
 
       <article className="worker-card worker-card-wide">
@@ -1271,9 +1270,7 @@ function CollectionSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUs
               <DetailRow label="Movimiento" value={record.movementId ? `#${record.movementId}` : 'Sin vínculo'} />
             </div>
           </div>
-        ) : (
-          <ModuleStateCard title="Sin registro cargado" message="Ingresa un id para ver el detalle de la recolección diaria." />
-        )}
+        ) : null}
       </article>
     </div>
   )
@@ -1340,6 +1337,20 @@ function formatDateLabel(value: string): string {
     month: 'short',
     year: 'numeric',
   }).format(date)
+}
+
+function translateDailyCollectionError(message: string): string {
+  const normalizedMessage = message.trim().toLowerCase()
+
+  if (normalizedMessage === 'daily collection record not found') {
+    return 'No se encontró el registro de recolección diaria.'
+  }
+
+  if (normalizedMessage === 'you do not have permission to view this record') {
+    return 'No tienes permiso para ver este registro.'
+  }
+
+  return message
 }
 
 function IconSvg({ children }: { children: ReactNode }) {
