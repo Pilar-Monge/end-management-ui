@@ -6,7 +6,6 @@ import {
   fetchWorkerCoverageSuggestions,
   fetchWorkerCriticalCoverage,
   fetchWorkerDailyCollectionRecord,
-  fetchWorkerDashboardPersonal,
   fetchWorkerNotificationById,
   fetchWorkerNotifications,
   fetchWorkerOccupationById,
@@ -19,7 +18,6 @@ import type {
   PaginationInfo,
   WorkerAuthenticatedUser,
   WorkerAutoAssignmentResult,
-  WorkerDashboardPersonalData,
   WorkerDailyCollectionRecord,
   WorkerNotification,
   WorkerOccupation,
@@ -29,7 +27,7 @@ import type {
 } from '../types'
 import '../pages/worker-main-view.css'
 
-type WorkerSectionId = 'dashboard' | 'recoleccion' | 'notificaciones' | 'ocupaciones' | 'cobertura'
+type WorkerSectionId = 'recoleccion' | 'notificaciones' | 'ocupaciones' | 'cobertura'
 
 type WorkerSection = {
   id: WorkerSectionId
@@ -39,22 +37,11 @@ type WorkerSection = {
 }
 
 const WORKER_NAV_DATA: WorkerSection[] = [
-  { id: 'dashboard', label: 'Dashboard personal', shortLabel: 'DB', icon: <DashboardIcon /> },
   { id: 'recoleccion', label: 'Recolección diaria', shortLabel: 'RC', icon: <CollectionIcon /> },
   { id: 'notificaciones', label: 'Notificaciones', shortLabel: 'NT', icon: <NotificationIcon /> },
   { id: 'ocupaciones', label: 'Ocupaciones', shortLabel: 'OC', icon: <OccupationIcon /> },
   { id: 'cobertura', label: 'Cobertura de oficio', shortLabel: 'CB', icon: <CoverageIcon /> },
 ]
-
-const EXPEDITION_STATUS_LABELS: Record<string, string> = {
-  PLANNED: 'Planeadas',
-  IN_PROGRESS: 'En curso',
-  DELAYED: 'Retrasadas',
-  COMPLETED: 'Completadas',
-  LOST: 'Perdidas',
-  RETURNED_AFTER_LOST: 'Recuperadas',
-  CANCELED: 'Canceladas',
-}
 
 const WORKER_LOADING_ART = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" fill="none">
@@ -107,7 +94,7 @@ export function WorkerMainViewPage() {
   const [showLoading, setShowLoading] = useState(true)
   const [isLoaded, setIsLoaded] = useState(false)
   const [hasEntered, setHasEntered] = useState(false)
-  const [activeSectionId, setActiveSectionId] = useState<WorkerSectionId>('dashboard')
+  const [activeSectionId, setActiveSectionId] = useState<WorkerSectionId>('recoleccion')
 
   const sessionUser = useMemo<WorkerAuthenticatedUser | null>(() => {
     const raw = localStorage.getItem('user')
@@ -435,8 +422,6 @@ function GenericWorkerContent({
   sessionUser: WorkerAuthenticatedUser | null
 }) {
   switch (section.id) {
-    case 'dashboard':
-      return <DashboardSection />
     case 'recoleccion':
       return <CollectionSection sessionUser={sessionUser} />
     case 'notificaciones':
@@ -452,120 +437,6 @@ function GenericWorkerContent({
     default:
       return <ModuleStateCard title={section.label} message="Sin datos disponibles para este módulo." />
   }
-}
-
-function DashboardSection() {
-  const [data, setData] = useState<WorkerDashboardPersonalData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let isMounted = true
-
-    async function loadDashboard() {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const nextData = await fetchWorkerDashboardPersonal()
-        if (isMounted) setData(nextData)
-      } catch (fetchError) {
-        if (isMounted) setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar el tablero')
-      } finally {
-        if (isMounted) setLoading(false)
-      }
-    }
-
-    void loadDashboard()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  if (loading) return <ModuleStateCard title="Cargando tablero" message="Obteniendo indicadores reales del trabajador..." />
-  if (error) return <ModuleStateCard title="No se pudo cargar el tablero" message={error} />
-  if (!data) return <ModuleStateCard title="Sin información" message="No se obtuvo respuesta del tablero personal." />
-
-  return (
-    <div className="worker-content-grid worker-content-grid-single">
-      <article className="worker-card worker-card-wide">
-        <div className="worker-card-label">Resumen general</div>
-        <div className="worker-metric-grid worker-metric-grid-dashboard">
-          <MetricBox label="Alertas sin leer" value={String(data.general.unreadNotifications)} />
-          <MetricBox label="Personas registradas" value={String(data.general.totalPersons)} />
-          <MetricBox label="Solicitudes pendientes" value={String(data.general.pendingAdmissionRequests)} />
-        </div>
-      </article>
-
-      <article className="worker-card worker-card-wide">
-        <div className="worker-card-label">Inventario visible</div>
-        <div className="worker-note-grid worker-note-grid-dashboard">
-          <div>
-            <h4>Recursos actuales</h4>
-            <ul className="worker-status-list">
-              {data.inventory.resources.length > 0 ? (
-                data.inventory.resources.map((resource) => (
-                  <li key={resource.resourceName}>
-                    <span>{resource.resourceName}</span>
-                    <strong>{String(resource.currentAmount)}</strong>
-                  </li>
-                ))
-              ) : (
-                <li>
-                  <span>Sin recursos registrados</span>
-                  <strong>-</strong>
-                </li>
-              )}
-            </ul>
-          </div>
-          <div>
-            <h4>Stock crítico</h4>
-            <p>{data.inventory.criticalStockCount} recurso(s) en nivel crítico</p>
-          </div>
-        </div>
-      </article>
-
-      <article className="worker-card worker-card-wide">
-        <div className="worker-card-label">Expediciones</div>
-        <div className="worker-chart-list">
-          {Object.entries(data.expeditions).map(([status, count]) => (
-            <div className="worker-chart-row" key={status}>
-              <div className="worker-chart-row-head">
-                <span>{EXPEDITION_STATUS_LABELS[status] ?? status}</span>
-                <strong>{count}</strong>
-              </div>
-              <div className="worker-chart-track">
-                <div
-                  className="worker-chart-fill"
-                  style={{ width: `${Math.min(100, Math.max(4, count * 10))}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </article>
-
-      <article className="worker-card worker-card-wide">
-        <div className="worker-card-label">Consumo diario</div>
-        <div className="worker-note-grid worker-note-grid-dashboard">
-          {data.consumptionTrend.length > 0 ? (
-            data.consumptionTrend.map((item) => (
-              <div key={item.date}>
-                <h4>{formatDateLabel(item.date)}</h4>
-                <p>{String(item.totalConsumed)} consumidos</p>
-              </div>
-            ))
-          ) : (
-            <div>
-              <h4>Sin historial</h4>
-              <p>No hay datos de consumo todavía.</p>
-            </div>
-          )}
-        </div>
-      </article>
-    </div>
-  )
 }
 
 function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser | null }) {
@@ -813,17 +684,14 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
             <div className="worker-detail-stack">
               <h3>{selected.title}</h3>
               <p>{selected.message}</p>
-              <div className="worker-detail-grid">
-                <DetailRow label="ID" value={String(selected.id)} />
-                <DetailRow label="Campamento" value={`#${selected.campId}`} />
-                <DetailRow label="Usuario" value={selected.userId ? `#${selected.userId}` : 'Sin usuario'} />
+              <div className="worker-detail-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
                 <DetailRow label="Destino" value={selected.targetRole || 'Todos'} />
-                <DetailRow label="Tipo" value={selected.type} />
-                <DetailRow label="Leída" value={selected.read ? 'Sí' : 'No'} />
-                <DetailRow label="Fecha creación" value={formatDateLabel(selected.createdDate)} />
-                <DetailRow label="Fecha lectura" value={selected.readDate ? formatDateLabel(selected.readDate) : 'Sin lectura'} />
-                <DetailRow label="Origen" value={selected.sourceType || 'Sin origen'} />
-                <DetailRow label="Origen ID" value={selected.sourceId ? `#${selected.sourceId}` : 'Sin origen'} />
+                <DetailRow label="Fecha" value={formatDateLabel(selected.createdDate)} />
+              </div>
+              <div className="worker-detail-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+                <DetailRow label="Fecha" value={formatDateLabel(selected.createdDate)} />
+                <DetailRow label="Estado" value={selected.read ? 'Leída' : 'Sin leer'} />
+                <DetailRow label="Origen" value={selected.sourceType ? `${selected.sourceType} #${selected.sourceId ?? '-'}` : 'Sin origen'} />
               </div>
               <div className="worker-action-row">
                 <button type="button" className="worker-primary-btn" onClick={markAsRead} disabled={selected.read}>
@@ -1287,8 +1155,6 @@ function CoverageSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser
             <div className="worker-detail-stack">
               <h3>{selectedCoverage.occupationName}</h3>
               <div className="worker-detail-grid">
-                <DetailRow label="Ocupación ID" value={String(selectedCoverage.occupationId)} />
-                <DetailRow label="Campamento" value={`#${selectedCoverage.campId}`} />
                 <DetailRow label="Disponibles" value={String(selectedCoverage.availableWorkers)} />
                 <DetailRow label="Activos" value={String(selectedCoverage.activeWorkers)} />
                 <DetailRow label="Cobertura" value={`${selectedCoverage.coveragePercent}%`} />
@@ -1297,8 +1163,6 @@ function CoverageSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser
                 <DetailRow label="Déficit" value={String(selectedCoverage.deficit)} />
                 <DetailRow label="Excedente" value={String(selectedCoverage.surplus)} />
                 <DetailRow label="Umbral" value={selectedCoverage.criticalThresholdPercent} />
-                <DetailRow label="Crítica" value={selectedCoverage.isCritical ? 'Sí' : 'No'} />
-                <DetailRow label="En riesgo" value={selectedCoverage.isAtRisk ? 'Sí' : 'No'} />
               </div>
             </div>
           ) : (
@@ -1529,17 +1393,6 @@ function IconSvg({ children }: { children: ReactNode }) {
     <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" className="worker-svg-icon">
       {children}
     </svg>
-  )
-}
-
-function DashboardIcon() {
-  return (
-    <IconSvg>
-      <rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.7" />
-      <rect x="13" y="4" width="7" height="4" rx="1.5" stroke="currentColor" strokeWidth="1.7" />
-      <rect x="13" y="10" width="7" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.7" />
-      <rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.7" />
-    </IconSvg>
   )
 }
 
