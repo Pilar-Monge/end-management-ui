@@ -639,11 +639,8 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
             <div className="worker-detail-stack">
               <h3>{selected.title}</h3>
               <p>{selected.message}</p>
-              <div className="worker-detail-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+              <div className="worker-detail-grid worker-detail-grid-two-up">
                 <DetailRow label="Destino" value={selected.targetRole || 'Todos'} />
-                <DetailRow label="Fecha" value={formatDateLabel(selected.createdDate)} />
-              </div>
-              <div className="worker-detail-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
                 <DetailRow label="Fecha" value={formatDateLabel(selected.createdDate)} />
                 <DetailRow label="Estado" value={selected.read ? 'Leída' : 'Sin leer'} />
                 <DetailRow label="Origen" value={selected.sourceType ? `${selected.sourceType} #${selected.sourceId ?? '-'}` : 'Sin origen'} />
@@ -1318,9 +1315,9 @@ class ErrorBoundary extends Component<{ children?: ReactNode }, { hasError: bool
 
 function MetricBox({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
+    <div className="worker-detail-row">
+      <span className="worker-detail-label">{label}</span>
+      <strong className="worker-detail-value">{value}</strong>
     </div>
   )
 }
@@ -1328,8 +1325,8 @@ function MetricBox({ label, value }: { label: string; value: string }) {
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="worker-detail-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <span className="worker-detail-label">{label}</span>
+      <strong className="worker-detail-value">{value}</strong>
     </div>
   )
 }

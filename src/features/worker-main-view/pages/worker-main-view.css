@@ -967,20 +967,38 @@ body {
   grid-template-columns: repeat(2, 1fr) !important;
 }
 
-.worker-detail-row {
-  border-bottom: 1px solid rgba(103, 172, 169, 0.1) !important;
-  padding-bottom: 6px !important;
+.worker-detail-grid-two-up {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
 
-.worker-detail-row span {
+.worker-detail-row {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  min-width: 0;
+  padding: 12px 14px !important;
+  background: rgba(4, 14, 14, 0.45) !important;
+  border: 1px solid rgba(103, 172, 169, 0.12) !important;
+  border-radius: 10px !important;
+}
+
+.worker-detail-label {
   font-size: 9px !important;
   font-weight: 700 !important;
   color: rgba(164, 194, 197, 0.55) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
 }
 
-.worker-detail-row strong {
-  font-size: 11px !important;
+.worker-detail-value {
+  font-size: 12px !important;
+  font-weight: 700 !important;
   color: #A4C2C5 !important;
+  overflow-wrap: anywhere;
+}
+
+.worker-detail-value::first-letter {
+  text-transform: uppercase;
 }
 
 
