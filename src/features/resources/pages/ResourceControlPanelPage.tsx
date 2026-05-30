@@ -606,6 +606,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   };
 
   const handleAddNotification = async (data: Omit<OperationalNotification, "id">) => {
+    const currentHudUser = getStoredHudUser();
     const optimisticRecord: OperationalNotification = {
       ...data,
       id: `not-${Date.now().toString().slice(-4)}`,
@@ -615,7 +616,15 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
 
     try {
       const created = await resourceApi.createNotification(data);
-      setNotifications(prev => [created, ...prev.filter(item => item.id !== optimisticRecord.id)]);
+      const createdUserId = Number(created.userId);
+      const belongsToCurrentUser = Number.isFinite(createdUserId) && createdUserId === currentHudUser.userId;
+      const belongsToCurrentRole = created.targetRole === currentHudUser.role;
+
+      setNotifications(prev => (
+        belongsToCurrentUser || belongsToCurrentRole
+          ? [created, ...prev.filter(item => item.id !== optimisticRecord.id)]
+          : prev.filter(item => item.id !== optimisticRecord.id)
+      ));
       return;
     } catch (error) {
       console.warn("Could not create notification.", error);
@@ -978,7 +987,9 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
 function getStoredHudUser() {
   if (typeof window === "undefined") {
     return {
+      userId: 0,
       username: "OPERADOR",
+      role: "RESOURCE_MANAGEMENT",
       roleLabel: "ADMINISTRADOR DE RECURSOS",
     };
   }
@@ -991,6 +1002,8 @@ function getStoredHudUser() {
       username?: unknown;
       name?: unknown;
       fullName?: unknown;
+      userId?: unknown;
+      id?: unknown;
       rol?: unknown;
       role?: unknown;
     } : null;
@@ -1000,14 +1013,19 @@ function getStoredHudUser() {
     const roleLabel = role === "RESOURCE_MANAGEMENT"
       ? "ADMINISTRADOR DE RECURSOS"
       : role.replace(/_/g, " ");
+    const userId = Number(parsed?.userId ?? parsed?.id ?? 0);
 
     return {
+      userId: Number.isFinite(userId) ? userId : 0,
       username: sessionName || savedDisplayName || "OPERADOR",
+      role,
       roleLabel,
     };
   } catch {
     return {
+      userId: 0,
       username: savedDisplayName || "OPERADOR",
+      role: "RESOURCE_MANAGEMENT",
       roleLabel: "ADMINISTRADOR DE RECURSOS",
     };
   }
