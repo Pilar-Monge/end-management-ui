@@ -829,7 +829,7 @@ function OccupationsSection({ sessionUser }: { sessionUser: WorkerAuthenticatedU
                 onClick={() => setSelectedId(item.id)}
               >
                 <div className="worker-list-item-head">
-                  <strong>{translateOccupationName(item.name)}</strong>
+                  <strong>{item.name}</strong>
                 </div>
               </button>
             ))}
@@ -871,9 +871,9 @@ function OccupationsSection({ sessionUser }: { sessionUser: WorkerAuthenticatedU
           {detailLoading ? <ModuleStateCard title="Cargando detalle" message="Obteniendo la ocupación seleccionada..." /> : null}
           {selected ? (
             <div className="worker-detail-stack">
-              <h3>{translateOccupationName(selected.name)}</h3>
+              <h3>{selected.name}</h3>
               <p>ID #{selected.id}</p>
-              <p>{translateOccupationDescription(selected.description) || 'Sin descripción registrada'}</p>
+              <p>{selected.description || 'Sin descripción registrada'}</p>
               <div className="worker-detail-grid">
                 <DetailRow label="Recolección" value={selected.collectsResources ? 'Sí' : 'No'} />
                 <DetailRow label="Expediciones" value={selected.participatesInExpeditions ? 'Sí' : 'No'} />
@@ -1354,64 +1354,6 @@ function translateOccupationError(message: string): { message: string; requiresS
     message: 'No se pudieron cargar las ocupaciones. Intenta de nuevo más tarde.',
     requiresSession: false,
   }
-}
-
-function translateOccupationName(value: string): string {
-  const normalized = value.trim().toLowerCase()
-
-  const translations: Record<string, string> = {
-    'water collector': 'Recolector de agua',
-    'food gatherer': 'Recolector de alimentos',
-    'scout': 'Explorador',
-    'hunter': 'Cazador',
-    'gardener': 'Jardinero',
-    'fisher': 'Pescador',
-    'woodcutter': 'Leñador',
-    'medic': 'Médico',
-    'builder': 'Constructor',
-    'miner': 'Minero',
-    'cook': 'Cocinero',
-    'herbalist': 'Herbolario',
-    'supply runner': 'Mensajero de suministros',
-    'sanitation worker': 'Encargado de saneamiento',
-  }
-
-  return translations[normalized] ?? value
-}
-
-function translateOccupationDescription(value: string | null): string {
-  if (!value) return ''
-
-  const normalized = value.trim().toLowerCase()
-
-  const translations: Record<string, string> = {
-    'collects and purifies water daily': 'Recolecta y purifica agua diariamente.',
-    'goes on expeditions. gathers food when at camp': 'Va a expediciones. Recolecta alimentos cuando está en el campamento.',
-    'gathers food when at camp': 'Recolecta alimentos cuando está en el campamento.',
-    'collects food from nearby areas': 'Recolecta alimentos en zonas cercanas.',
-    'protects the camp from threats': 'Protege el campamento de amenazas.',
-    'helps with construction tasks': 'Ayuda con tareas de construcción.',
-    'takes care of crops and gardens': 'Cuida cultivos y huertos.',
-    'prepares meals for the camp': 'Prepara alimentos para el campamento.',
-  }
-
-  if (translations[normalized]) return translations[normalized]
-
-  return value
-    .replace(/\bWater Collector\b/gi, 'Recolector de agua')
-    .replace(/\bFood Gatherer\b/gi, 'Recolector de alimentos')
-    .replace(/\bScout\b/gi, 'Explorador')
-    .replace(/\bHunter\b/gi, 'Cazador')
-    .replace(/\bGardener\b/gi, 'Jardinero')
-    .replace(/\bFisher\b/gi, 'Pescador')
-    .replace(/\bWoodcutter\b/gi, 'Leñador')
-    .replace(/\bMedic\b/gi, 'Médico')
-    .replace(/\bBuilder\b/gi, 'Constructor')
-    .replace(/\bMiner\b/gi, 'Minero')
-    .replace(/\bCook\b/gi, 'Cocinero')
-    .replace(/\bHerbalist\b/gi, 'Herbolario')
-    .replace(/\bSupply Runner\b/gi, 'Mensajero de suministros')
-    .replace(/\bSanitation Worker\b/gi, 'Encargado de saneamiento')
 }
 
 function IconSvg({ children }: { children: ReactNode }) {
