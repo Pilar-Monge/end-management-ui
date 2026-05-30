@@ -471,7 +471,8 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
         setPagination(result.pagination)
       } catch (fetchError) {
         if (isMounted) {
-          setError(fetchError instanceof Error ? fetchError.message : 'No se pudieron cargar las notificaciones')
+          const friendly = fetchError instanceof Error ? translateNotificationError(fetchError.message) : 'No se pudieron cargar las notificaciones.'
+          setError(friendly)
           setItems([])
           setPagination(null)
           setSelectedId(null)
@@ -515,7 +516,10 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
         const record = await fetchWorkerNotificationById(selectedId)
         if (isMounted) setSelected(record)
       } catch (fetchError) {
-        if (isMounted) setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar el detalle de la notificación')
+        if (isMounted) {
+          const friendly = fetchError instanceof Error ? translateNotificationError(fetchError.message) : 'No se pudo cargar el detalle de la notificación.'
+          setError(friendly)
+        }
       } finally {
         if (isMounted) setDetailLoading(false)
       }
@@ -604,32 +608,29 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
             {!items.length && !error ? <ModuleStateCard title="Sin resultados" message="No hay notificaciones para los filtros actuales." /> : null}
           </div>
 
-          <div className="worker-pagination-bar">
-            <span>{pagination ? `${pagination.page} / ${pagination.pages} páginas` : 'Sin paginación'}</span>
-            <div className="worker-pagination-actions">
-              <button
-                type="button"
-                className="worker-secondary-btn"
-                disabled={!pagination || pagination.page <= 1}
-                onClick={() => setAppliedFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
-              >
-                Anterior
-              </button>
-              <button
-                type="button"
-                className="worker-secondary-btn"
-                disabled={!pagination || pagination.page >= pagination.pages}
-                onClick={() =>
-                  setAppliedFilters((prev) => ({
-                    ...prev,
-                    page: pagination ? Math.min(pagination.pages, prev.page + 1) : prev.page + 1,
-                  }))
-                }
-              >
-                Siguiente
-              </button>
+          {pagination ? (
+            <div className="worker-pagination-bar">
+              <span>{`${pagination.page} / ${pagination.pages} páginas`}</span>
+              <div className="worker-pagination-actions">
+                <button
+                  type="button"
+                  className="worker-secondary-btn"
+                  disabled={pagination.page <= 1}
+                  onClick={() => setAppliedFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  className="worker-secondary-btn"
+                  disabled={pagination.page >= pagination.pages}
+                  onClick={() => setAppliedFilters((prev) => ({ ...prev, page: Math.min(pagination.pages, prev.page + 1) }))}
+                >
+                  Siguiente
+                </button>
+              </div>
             </div>
-          </div>
+          ) : null}
         </article>
 
         <article className="worker-card">
@@ -1259,15 +1260,10 @@ function CollectionSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUs
           <div className="worker-detail-stack">
             <h3>Registro #{record.id}</h3>
             <div className="worker-detail-grid">
-              <DetailRow label="Campamento" value={`#${record.campId}`} />
-              <DetailRow label="Persona" value={`#${record.personId}`} />
-              <DetailRow label="Tipo de recurso" value={`#${record.resourceTypeId}`} />
               <DetailRow label="Fecha" value={formatDateLabel(record.date)} />
               <DetailRow label="Esperado" value={record.expectedAmount} />
               <DetailRow label="Real" value={record.actualAmount} />
               <DetailRow label="Motivo" value={record.differenceReason || 'Sin observaciones'} />
-              <DetailRow label="Registrado por" value={`#${record.recordedBy}`} />
-              <DetailRow label="Movimiento" value={record.movementId ? `#${record.movementId}` : 'Sin vínculo'} />
             </div>
           </div>
         ) : null}
@@ -1351,6 +1347,21 @@ function translateDailyCollectionError(message: string): string {
   }
 
   return message
+}
+
+function translateNotificationError(message: string): string {
+  const normalized = message.trim().toLowerCase()
+
+  if (normalized.includes('token') || normalized.includes('authorization') || normalized.includes('unauthorized') || normalized.includes('no token')) {
+    return 'Sesión no válida o expirada. Por favor inicia sesión.'
+  }
+
+  if (normalized.includes('not found')) {
+    return 'No se encontraron notificaciones.'
+  }
+
+  // Fallback: provide a friendly, non-technical message
+  return 'No se pudieron cargar las notificaciones. Intenta de nuevo más tarde.'
 }
 
 function IconSvg({ children }: { children: ReactNode }) {
