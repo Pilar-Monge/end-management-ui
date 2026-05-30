@@ -664,7 +664,8 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
 }
 
 function OccupationsSection() {
-  const [draftFilters, setDraftFilters] = useState({ collectsResources: 'all', participatesInExpeditions: 'all', resourceTypeId: '', page: 1, limit: 8 })
+  const OCCUPATIONS_PAGE_SIZE = 5
+  const [draftFilters, setDraftFilters] = useState({ collectsResources: 'all', participatesInExpeditions: 'all', resourceTypeId: '' })
   const [appliedFilters, setAppliedFilters] = useState(draftFilters)
   const [items, setItems] = useState<WorkerOccupation[]>([])
   const [pagination, setPagination] = useState<PaginationInfo | null>(null)
@@ -688,7 +689,7 @@ function OccupationsSection() {
             appliedFilters.participatesInExpeditions === 'all' ? null : appliedFilters.participatesInExpeditions === 'true',
           resourceTypeId: appliedFilters.resourceTypeId ? Number(appliedFilters.resourceTypeId) : null,
           page: appliedFilters.page,
-          limit: appliedFilters.limit,
+          limit: OCCUPATIONS_PAGE_SIZE,
         })
 
         if (!isMounted) return
@@ -800,27 +801,6 @@ function OccupationsSection() {
               placeholder="Opcional"
             />
           </label>
-          <label className="worker-field">
-            <span>Página</span>
-            <input
-              className="worker-input"
-              type="number"
-              min={1}
-              value={draftFilters.page}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, page: Number(event.target.value) || 1 }))}
-            />
-          </label>
-          <label className="worker-field">
-            <span>Límite</span>
-            <input
-              className="worker-input"
-              type="number"
-              min={1}
-              max={50}
-              value={draftFilters.limit}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, limit: Number(event.target.value) || 8 }))}
-            />
-          </label>
           <button type="button" className="worker-primary-btn" onClick={applyFilters}>
             Buscar
           </button>
@@ -862,32 +842,34 @@ function OccupationsSection() {
             {!items.length && !error ? <ModuleStateCard title="Sin resultados" message="No hay ocupaciones para los filtros actuales." /> : null}
           </div>
 
-          <div className="worker-pagination-bar">
-            <span>{pagination ? `${pagination.page} / ${pagination.pages} páginas` : 'Sin paginación'}</span>
-            <div className="worker-pagination-actions">
-              <button
-                type="button"
-                className="worker-secondary-btn"
-                disabled={!pagination || pagination.page <= 1}
-                onClick={() => setAppliedFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
-              >
-                Anterior
-              </button>
-              <button
-                type="button"
-                className="worker-secondary-btn"
-                disabled={!pagination || pagination.page >= pagination.pages}
-                onClick={() =>
-                  setAppliedFilters((prev) => ({
-                    ...prev,
-                    page: pagination ? Math.min(pagination.pages, prev.page + 1) : prev.page + 1,
-                  }))
-                }
-              >
-                Siguiente
-              </button>
+          {pagination ? (
+            <div className="worker-pagination-bar">
+              <span>{`${pagination.page} / ${pagination.pages} páginas`}</span>
+              <div className="worker-pagination-actions">
+                <button
+                  type="button"
+                  className="worker-secondary-btn"
+                  disabled={pagination.page <= 1}
+                  onClick={() => setAppliedFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  className="worker-secondary-btn"
+                  disabled={pagination.page >= pagination.pages}
+                  onClick={() =>
+                    setAppliedFilters((prev) => ({
+                      ...prev,
+                      page: Math.min(pagination.pages, prev.page + 1),
+                    }))
+                  }
+                >
+                  Siguiente
+                </button>
+              </div>
             </div>
-          </div>
+          ) : null}
         </article>
 
         <article className="worker-card">
@@ -1360,7 +1342,7 @@ function translateNotificationError(message: string): string {
     return 'No se encontraron notificaciones.'
   }
 
-  // Fallback: provide a friendly, non-technical message
+  
   return 'No se pudieron cargar las notificaciones. Intenta de nuevo más tarde.'
 }
 
