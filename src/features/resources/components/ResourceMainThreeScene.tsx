@@ -319,7 +319,7 @@ const ResourceSceneContent = memo(function ResourceSceneContent({
         <meshBasicMaterial attach="material" color="#22d3ee" transparent opacity={0.4} />
       </gridHelper>
 
-      <LazyResourceModel url={GLTF_URLS.hangar} position={[0, 0, 0]} targetSize={24} />
+      <LazyResourceModel url={GLTF_URLS.hangar} position={[0, 0, 0]} />
       <LazyResourceModel
         url={GLTF_URLS.monitoringStation}
         position={[-60, 1, -60]}
