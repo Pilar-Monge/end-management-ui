@@ -648,11 +648,13 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
                 <DetailRow label="Estado" value={selected.read ? 'Leída' : 'Sin leer'} />
                 <DetailRow label="Origen" value={selected.sourceType ? `${selected.sourceType} #${selected.sourceId ?? '-'}` : 'Sin origen'} />
               </div>
-              <div className="worker-action-row">
-                <button type="button" className="worker-primary-btn" onClick={markAsRead} disabled={selected.read}>
-                  Marcar como leída
-                </button>
-              </div>
+              {!selected.read ? (
+                <div className="worker-action-row">
+                  <button type="button" className="worker-primary-btn" onClick={markAsRead}>
+                    Marcar como leída
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : (
             <ModuleStateCard title="Sin selección" message="Selecciona una notificación para ver su detalle." />
