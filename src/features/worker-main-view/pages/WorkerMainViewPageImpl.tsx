@@ -593,15 +593,7 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
                 onClick={() => setSelectedId(item.id)}
               >
                 <div className="worker-list-item-head">
-                  <strong>{item.title}</strong>
-                  <span className={`worker-pill ${item.read ? 'is-muted' : 'is-highlight'}`}>
-                    {item.read ? 'Leída' : 'Sin leer'}
-                  </span>
-                </div>
-                <p>{item.message}</p>
-                <div className="worker-list-item-foot">
-                  <span>{item.type}</span>
-                  <span>{formatDateLabel(item.createdDate)}</span>
+                  <strong>ID #{item.id}</strong>
                 </div>
               </button>
             ))}
@@ -641,6 +633,7 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
               <h3>{selected.title}</h3>
               <p>{selected.message}</p>
               <div className="worker-detail-grid worker-detail-grid-two-up">
+                <DetailRow label="Tipo" value={selected.type} />
                 <DetailRow label="Destino" value={selected.targetRole || 'Todos'} />
                 <DetailRow label="Fecha" value={formatDateLabel(selected.createdDate)} />
                 <DetailRow label="Estado" value={selected.read ? 'Leída' : 'Sin leer'} />
