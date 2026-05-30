@@ -951,6 +951,18 @@ body {
   color: #A4C2C5 !important;
 }
 
+.worker-list-item-description {
+  margin: 0 !important;
+  color: rgba(164, 194, 197, 0.78) !important;
+  font-size: 10px !important;
+  line-height: 1.35 !important;
+  line-clamp: 2 !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
 .worker-detail-stack {
   display: flex;
   flex-direction: column;

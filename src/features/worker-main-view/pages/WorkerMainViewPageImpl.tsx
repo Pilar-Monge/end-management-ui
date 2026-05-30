@@ -427,7 +427,7 @@ function GenericWorkerContent({
     case 'notificaciones':
       return <NotificationsSection sessionUser={sessionUser} />
     case 'ocupaciones':
-      return <OccupationsSection />
+      return <OccupationsSection sessionUser={sessionUser} />
     case 'cobertura':
       return (
         <ErrorBoundary>
@@ -663,9 +663,9 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
   )
 }
 
-function OccupationsSection() {
+function OccupationsSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser | null }) {
   const OCCUPATIONS_PAGE_SIZE = 5
-  const [draftFilters, setDraftFilters] = useState({ collectsResources: 'all', participatesInExpeditions: 'all', resourceTypeId: '' })
+  const [draftFilters, setDraftFilters] = useState({ collectsResources: 'all', participatesInExpeditions: 'all', resourceTypeId: '', page: 1 })
   const [appliedFilters, setAppliedFilters] = useState(draftFilters)
   const [items, setItems] = useState<WorkerOccupation[]>([])
   const [pagination, setPagination] = useState<PaginationInfo | null>(null)
@@ -674,6 +674,7 @@ function OccupationsSection() {
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sessionIssue, setSessionIssue] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -681,6 +682,7 @@ function OccupationsSection() {
     async function loadOccupations() {
       setLoading(true)
       setError(null)
+      setSessionIssue(false)
 
       try {
         const result = await fetchWorkerOccupations({
@@ -698,7 +700,13 @@ function OccupationsSection() {
         setPagination(result.pagination)
       } catch (fetchError) {
         if (isMounted) {
-          setError(fetchError instanceof Error ? fetchError.message : 'No se pudieron cargar las ocupaciones')
+          const translatedError = translateOccupationError(fetchError instanceof Error ? fetchError.message : 'No se pudieron cargar las ocupaciones.')
+          if (translatedError.requiresSession) {
+            setSessionIssue(true)
+            setError(null)
+          } else {
+            setError(translatedError.message)
+          }
           setItems([])
           setPagination(null)
           setSelectedId(null)
@@ -742,7 +750,15 @@ function OccupationsSection() {
         const record = await fetchWorkerOccupationById(selectedId)
         if (isMounted) setSelected(record)
       } catch (fetchError) {
-        if (isMounted) setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar el detalle de la ocupación')
+        if (isMounted) {
+          const translatedError = fetchError instanceof Error ? translateOccupationError(fetchError.message) : { message: 'No se pudo cargar el detalle de la ocupación.', requiresSession: false }
+          if (translatedError.requiresSession) {
+            setSessionIssue(true)
+            setError(null)
+          } else {
+            setError(translatedError.message)
+          }
+        }
       } finally {
         if (isMounted) setDetailLoading(false)
       }
@@ -757,6 +773,10 @@ function OccupationsSection() {
 
   const applyFilters = () => {
     setAppliedFilters({ ...draftFilters, page: 1 })
+  }
+
+  if (!sessionUser || sessionIssue) {
+    return <ModuleStateCard title="Sesión no disponible" message="Inicia sesión otra vez para consultar las notificaciones." />
   }
 
   if (loading) return <ModuleStateCard title="Cargando ocupaciones" message="Obteniendo ocupaciones reales del sistema..." />
@@ -790,17 +810,6 @@ function OccupationsSection() {
               <option value="false">No</option>
             </select>
           </label>
-          <label className="worker-field">
-            <span>Tipo de recurso</span>
-            <input
-              className="worker-input"
-              type="number"
-              min={1}
-              value={draftFilters.resourceTypeId}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, resourceTypeId: event.target.value }))}
-              placeholder="Opcional"
-            />
-          </label>
           <button type="button" className="worker-primary-btn" onClick={applyFilters}>
             Buscar
           </button>
@@ -820,22 +829,7 @@ function OccupationsSection() {
                 onClick={() => setSelectedId(item.id)}
               >
                 <div className="worker-list-item-head">
-                  <strong>{item.name}</strong>
-                  <span className={`worker-pill ${item.collectsResources ? 'is-highlight' : 'is-muted'}`}>
-                    {item.collectsResources ? 'Recolección' : 'No recolecta'}
-                  </span>
-                </div>
-                <p>ID #{item.id} · Recurso {item.resourceTypeId ? `#${item.resourceTypeId}` : 'sin tipo'}</p>
-                <p>{item.description || 'Sin descripción registrada'}</p>
-                <p>
-                  Produce {item.dailyAmountProduced} · Consume {item.dailyRationConsumed} · Mínimo {item.minimumRequiredWorkers}
-                </p>
-                <p>
-                  Preferido {item.preferredWorkers ? String(item.preferredWorkers) : 'sin preferencia'} · Umbral {item.criticalThresholdPercent}
-                </p>
-                <div className="worker-list-item-foot">
-                  <span>{item.participatesInExpeditions ? 'Participa en expediciones' : 'Solo operaciones locales'}</span>
-                  <span>{formatDateLabel(item.createdAt)}</span>
+                  <strong>{translateOccupationName(item.name)}</strong>
                 </div>
               </button>
             ))}
@@ -877,9 +871,9 @@ function OccupationsSection() {
           {detailLoading ? <ModuleStateCard title="Cargando detalle" message="Obteniendo la ocupación seleccionada..." /> : null}
           {selected ? (
             <div className="worker-detail-stack">
-              <h3>{selected.name}</h3>
+              <h3>{translateOccupationName(selected.name)}</h3>
               <p>ID #{selected.id}</p>
-              <p>{selected.description || 'Sin descripción registrada'}</p>
+              <p>{translateOccupationDescription(selected.description) || 'Sin descripción registrada'}</p>
               <div className="worker-detail-grid">
                 <DetailRow label="Recolección" value={selected.collectsResources ? 'Sí' : 'No'} />
                 <DetailRow label="Expediciones" value={selected.participatesInExpeditions ? 'Sí' : 'No'} />
@@ -1344,6 +1338,80 @@ function translateNotificationError(message: string): string {
 
   
   return 'No se pudieron cargar las notificaciones. Intenta de nuevo más tarde.'
+}
+
+function translateOccupationError(message: string): { message: string; requiresSession: boolean } {
+  const normalized = message.trim().toLowerCase()
+
+  if (normalized.includes('token') || normalized.includes('authorization') || normalized.includes('unauthorized') || normalized.includes('no token')) {
+    return {
+      message: 'Sesión no disponible',
+      requiresSession: true,
+    }
+  }
+
+  return {
+    message: 'No se pudieron cargar las ocupaciones. Intenta de nuevo más tarde.',
+    requiresSession: false,
+  }
+}
+
+function translateOccupationName(value: string): string {
+  const normalized = value.trim().toLowerCase()
+
+  const translations: Record<string, string> = {
+    'water collector': 'Recolector de agua',
+    'food gatherer': 'Recolector de alimentos',
+    'scout': 'Explorador',
+    'hunter': 'Cazador',
+    'gardener': 'Jardinero',
+    'fisher': 'Pescador',
+    'woodcutter': 'Leñador',
+    'medic': 'Médico',
+    'builder': 'Constructor',
+    'miner': 'Minero',
+    'cook': 'Cocinero',
+    'herbalist': 'Herbolario',
+    'supply runner': 'Mensajero de suministros',
+    'sanitation worker': 'Encargado de saneamiento',
+  }
+
+  return translations[normalized] ?? value
+}
+
+function translateOccupationDescription(value: string | null): string {
+  if (!value) return ''
+
+  const normalized = value.trim().toLowerCase()
+
+  const translations: Record<string, string> = {
+    'collects and purifies water daily': 'Recolecta y purifica agua diariamente.',
+    'goes on expeditions. gathers food when at camp': 'Va a expediciones. Recolecta alimentos cuando está en el campamento.',
+    'gathers food when at camp': 'Recolecta alimentos cuando está en el campamento.',
+    'collects food from nearby areas': 'Recolecta alimentos en zonas cercanas.',
+    'protects the camp from threats': 'Protege el campamento de amenazas.',
+    'helps with construction tasks': 'Ayuda con tareas de construcción.',
+    'takes care of crops and gardens': 'Cuida cultivos y huertos.',
+    'prepares meals for the camp': 'Prepara alimentos para el campamento.',
+  }
+
+  if (translations[normalized]) return translations[normalized]
+
+  return value
+    .replace(/\bWater Collector\b/gi, 'Recolector de agua')
+    .replace(/\bFood Gatherer\b/gi, 'Recolector de alimentos')
+    .replace(/\bScout\b/gi, 'Explorador')
+    .replace(/\bHunter\b/gi, 'Cazador')
+    .replace(/\bGardener\b/gi, 'Jardinero')
+    .replace(/\bFisher\b/gi, 'Pescador')
+    .replace(/\bWoodcutter\b/gi, 'Leñador')
+    .replace(/\bMedic\b/gi, 'Médico')
+    .replace(/\bBuilder\b/gi, 'Constructor')
+    .replace(/\bMiner\b/gi, 'Minero')
+    .replace(/\bCook\b/gi, 'Cocinero')
+    .replace(/\bHerbalist\b/gi, 'Herbolario')
+    .replace(/\bSupply Runner\b/gi, 'Mensajero de suministros')
+    .replace(/\bSanitation Worker\b/gi, 'Encargado de saneamiento')
 }
 
 function IconSvg({ children }: { children: ReactNode }) {
