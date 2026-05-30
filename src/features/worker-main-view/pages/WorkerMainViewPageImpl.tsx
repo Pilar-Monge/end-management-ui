@@ -440,8 +440,9 @@ function GenericWorkerContent({
 }
 
 function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser | null }) {
-  const [draftFilters, setDraftFilters] = useState({ targetRole: '', type: '', read: 'all', page: 1, limit: 5 })
-  const [appliedFilters, setAppliedFilters] = useState(draftFilters)
+  const NOTIFICATION_PAGE_SIZE = 5
+  const [draftFilters, setDraftFilters] = useState({ read: 'all' })
+  const [appliedFilters, setAppliedFilters] = useState({ read: 'all', page: 1 })
   const [items, setItems] = useState<WorkerNotification[]>([])
   const [pagination, setPagination] = useState<PaginationInfo | null>(null)
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -459,11 +460,9 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
 
       try {
         const result = await fetchWorkerNotifications({
-          targetRole: appliedFilters.targetRole || undefined,
-          type: appliedFilters.type || undefined,
           read: appliedFilters.read === 'all' ? null : appliedFilters.read === 'true',
           page: appliedFilters.page,
-          limit: appliedFilters.limit,
+          limit: NOTIFICATION_PAGE_SIZE,
         })
 
         if (!isMounted) return
@@ -530,7 +529,7 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
   }, [selectedId])
 
   const applyFilters = () => {
-    setAppliedFilters({ ...draftFilters, page: 1 })
+    setAppliedFilters((prev) => ({ ...prev, read: draftFilters.read, page: 1 }))
   }
 
   const markAsRead = async () => {
@@ -560,29 +559,6 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
         <div className="worker-card-label">Filtros</div>
         <div className="worker-control-grid">
           <label className="worker-field">
-            <span>Tipo</span>
-            <input
-              className="worker-input"
-              value={draftFilters.type}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, type: event.target.value }))}
-              placeholder="Todos"
-            />
-          </label>
-          <label className="worker-field">
-            <span>Rol objetivo</span>
-            <select
-              className="worker-input"
-              value={draftFilters.targetRole}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, targetRole: event.target.value }))}
-            >
-              <option value="">Todos</option>
-              <option value="WORKER">Worker</option>
-              <option value="RESOURCE_MANAGEMENT">Resource management</option>
-              <option value="TRAVEL_MANAGER">Travel manager</option>
-              <option value="SYSTEM_ADMIN">System admin</option>
-            </select>
-          </label>
-          <label className="worker-field">
             <span>Estado</span>
             <select
               className="worker-input"
@@ -593,27 +569,6 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
               <option value="false">Sin leer</option>
               <option value="true">Leídas</option>
             </select>
-          </label>
-          <label className="worker-field">
-            <span>Página</span>
-            <input
-              className="worker-input"
-              type="number"
-              min={1}
-              value={draftFilters.page}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, page: Number(event.target.value) || 1 }))}
-            />
-          </label>
-          <label className="worker-field">
-            <span>Límite</span>
-            <input
-              className="worker-input"
-              type="number"
-              min={1}
-              max={50}
-              value={draftFilters.limit}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, limit: Number(event.target.value) || 5 }))}
-            />
           </label>
           <button type="button" className="worker-primary-btn" onClick={applyFilters}>
             Buscar
