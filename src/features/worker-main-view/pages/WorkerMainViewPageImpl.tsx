@@ -1,33 +1,24 @@
-import { useEffect, useMemo, useState, type ReactNode, Component } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  autoAssignWorkerCoverage,
-  fetchWorkerAtRiskCoverage,
-  fetchWorkerCoverageSuggestions,
-  fetchWorkerCriticalCoverage,
   fetchWorkerDailyCollectionRecord,
   fetchWorkerNotificationById,
   fetchWorkerNotifications,
   fetchWorkerOccupationById,
-  fetchWorkerOccupationCoverage,
-  fetchWorkerOccupationCoverageByOccupation,
   fetchWorkerOccupations,
   updateWorkerNotificationReadState,
 } from '../services/workerMainViewApi'
 import type {
   PaginationInfo,
   WorkerAuthenticatedUser,
-  WorkerAutoAssignmentResult,
   WorkerDailyCollectionRecord,
   WorkerNotification,
   WorkerOccupation,
-  WorkerOccupationAtRisk,
-  WorkerOccupationCoverage,
-  WorkerReplacementSuggestion,
+  
 } from '../types'
 import '../pages/worker-main-view.css'
 
-type WorkerSectionId = 'recoleccion' | 'notificaciones' | 'ocupaciones' | 'cobertura'
+type WorkerSectionId = 'recoleccion' | 'notificaciones' | 'ocupaciones'
 
 type WorkerSection = {
   id: WorkerSectionId
@@ -40,7 +31,6 @@ const WORKER_NAV_DATA: WorkerSection[] = [
   { id: 'recoleccion', label: 'Recolección diaria', shortLabel: 'RC', icon: <CollectionIcon /> },
   { id: 'notificaciones', label: 'Notificaciones', shortLabel: 'NT', icon: <NotificationIcon /> },
   { id: 'ocupaciones', label: 'Ocupaciones', shortLabel: 'OC', icon: <OccupationIcon /> },
-  { id: 'cobertura', label: 'Cobertura de oficio', shortLabel: 'CB', icon: <CoverageIcon /> },
 ]
 
 const WORKER_LOADING_ART = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
@@ -428,12 +418,6 @@ function GenericWorkerContent({
       return <NotificationsSection sessionUser={sessionUser} />
     case 'ocupaciones':
       return <OccupationsSection sessionUser={sessionUser} />
-    case 'cobertura':
-      return (
-        <ErrorBoundary>
-          <CoverageSection sessionUser={sessionUser} />
-        </ErrorBoundary>
-      )
     default:
       return <ModuleStateCard title={section.label} message="Sin datos disponibles para este módulo." />
   }
@@ -888,285 +872,7 @@ function OccupationsSection({ sessionUser }: { sessionUser: WorkerAuthenticatedU
   )
 }
 
-function CoverageSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser | null }) {
-  const campId = sessionUser?.campId ?? null
-  const [occupationOptions, setOccupationOptions] = useState<WorkerOccupation[]>([])
-  const [coverageRows, setCoverageRows] = useState<WorkerOccupationCoverage[]>([])
-  const [criticalRows, setCriticalRows] = useState<WorkerOccupationCoverage[]>([])
-  const [atRiskRows, setAtRiskRows] = useState<WorkerOccupationAtRisk[]>([])
-  const [selectedOccupationId, setSelectedOccupationId] = useState<number | null>(null)
-  const [selectedCoverage, setSelectedCoverage] = useState<WorkerOccupationCoverage | null>(null)
-  const [suggestions, setSuggestions] = useState<WorkerReplacementSuggestion[]>([])
-  const [autoResult, setAutoResult] = useState<WorkerAutoAssignmentResult | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let isMounted = true
-
-    async function loadCoverageData() {
-      if (!campId) {
-        setLoading(false)
-        return
-      }
-
-      setLoading(true)
-      setError(null)
-
-      try {
-        const [occupations, coverage, critical, atRisk] = await Promise.all([
-          fetchWorkerOccupations({ page: 1, limit: 100 }),
-          fetchWorkerOccupationCoverage(campId),
-          fetchWorkerCriticalCoverage(campId),
-          fetchWorkerAtRiskCoverage(campId),
-        ])
-
-        if (!isMounted) return
-
-        setOccupationOptions(occupations.items ?? [])
-        setCoverageRows(coverage ?? [])
-        setCriticalRows(critical ?? [])
-        setAtRiskRows(atRisk ?? [])
-
-        setSelectedOccupationId((current) =>
-          current ?? atRisk?.[0]?.occupationId ?? occupations.items?.[0]?.id ?? null,
-        )
-      } catch (fetchError) {
-        if (isMounted) setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar la cobertura')
-      } finally {
-        if (isMounted) setLoading(false)
-      }
-    }
-
-    void loadCoverageData()
-
-    return () => {
-      isMounted = false
-    }
-  }, [campId, selectedOccupationId])
-
-  useEffect(() => {
-    let isMounted = true
-
-    async function loadSelectedCoverage() {
-      if (!campId || !selectedOccupationId) {
-        setSelectedCoverage(null)
-        setSuggestions([])
-        return
-      }
-
-      setActionLoading(true)
-
-      try {
-        const [coverage, replacementSuggestions] = await Promise.all([
-          fetchWorkerOccupationCoverageByOccupation(campId, selectedOccupationId),
-          fetchWorkerCoverageSuggestions(campId, selectedOccupationId),
-        ])
-
-        if (!isMounted) return
-
-        setSelectedCoverage(coverage ?? null)
-        setSuggestions(replacementSuggestions ?? [])
-      } catch (fetchError) {
-        if (isMounted) setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar la cobertura seleccionada')
-      } finally {
-        if (isMounted) setActionLoading(false)
-      }
-    }
-
-    void loadSelectedCoverage()
-
-    return () => {
-      isMounted = false
-    }
-  }, [campId, selectedOccupationId])
-
-  const handleAutoAssign = async () => {
-    if (!campId || !selectedOccupationId) return
-    const confirmed = window.confirm('¿Deseas ejecutar la autoasignación para esta ocupación?')
-    if (!confirmed) return
-    setActionLoading(true)
-    setAutoResult(null)
-
-    try {
-      const result = await autoAssignWorkerCoverage(campId, selectedOccupationId)
-      setAutoResult(result)
-    } catch (fetchError) {
-      setAutoResult({
-        success: false,
-        message: fetchError instanceof Error ? fetchError.message : 'No se pudo ejecutar la asignación automática',
-      })
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  if (!sessionUser) {
-    return <ModuleStateCard title="Sesión no disponible" message="Inicia sesión otra vez para consultar la cobertura." />
-  }
-
-  if (loading) return <ModuleStateCard title="Cargando cobertura" message="Consultando cobertura y sugerencias reales..." />
-  if (!campId) return <ModuleStateCard title="Campamento no disponible" message="No se encontró un campamento asociado al usuario." />
-
-  return (
-    <div className="worker-content-grid worker-content-grid-single">
-      <article className="worker-card worker-card-wide">
-        <div className="worker-card-label">Cobertura general</div>
-        <div className="worker-metric-grid worker-metric-grid-dashboard">
-          <MetricBox label="Campamento" value={`#${campId}`} />
-          <MetricBox label="Críticas" value={String(criticalRows.length)} />
-          <MetricBox label="En riesgo" value={String(atRiskRows.length)} />
-          <MetricBox label="Ocupaciones analizadas" value={String(coverageRows.length)} />
-        </div>
-      </article>
-
-      <article className="worker-card worker-card-wide">
-        <div className="worker-card-label">Elegir ocupación</div>
-        {error ? <ModuleStateCard title="Cobertura con observaciones" message={error} /> : null}
-        <div className="worker-control-grid">
-          <label className="worker-field worker-field-wide">
-            <span>Ocupación</span>
-            <select className="worker-input" value={selectedOccupationId ?? ''} onChange={(event) => setSelectedOccupationId(Number(event.target.value) || null)}>
-              <option value="">Selecciona una ocupación</option>
-              {occupationOptions.map((occupation) => (
-                <option key={occupation.id} value={occupation.id}>
-                  {occupation.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="button" className="worker-primary-btn" onClick={handleAutoAssign} disabled={!selectedOccupationId}>
-            Auto asignar reemplazo
-          </button>
-        </div>
-      </article>
-
-      <div className="worker-two-col-grid">
-        <article className="worker-card">
-          <div className="worker-card-label">Cobertura por ocupación</div>
-          <div className="worker-list-stack">
-            {coverageRows.map((row) => (
-              <div key={row.occupationId} className="worker-list-item is-static">
-                <div className="worker-list-item-head">
-                  <strong>{row.occupationName}</strong>
-                  <span className={`worker-pill ${row.isCritical ? 'is-critical' : row.isAtRisk ? 'is-highlight' : 'is-muted'}`}>
-                    {row.isCritical ? 'Crítica' : row.isAtRisk ? 'En riesgo' : 'Estable'}
-                  </span>
-                </div>
-                  <p>ID #{row.occupationId} · Campamento #{row.campId}</p>
-                  <p>
-                    Activos {row.activeWorkers} · Disponibles {row.availableWorkers} · Mínimo {row.minimumRequiredWorkers}
-                  </p>
-                  <p>
-                    Preferido {row.preferredWorkers ? String(row.preferredWorkers) : 'sin preferencia'} · Umbral {row.criticalThresholdPercent}
-                  </p>
-                  <p>
-                    Cobertura {row.coveragePercent}% · Déficit {row.deficit} · Excedente {row.surplus}
-                  </p>
-                <div className="worker-chart-track">
-                  <div className="worker-chart-fill" style={{ width: `${Math.min(100, row.coveragePercent)}%` }} />
-                </div>
-              </div>
-            ))}
-            {!coverageRows.length ? <ModuleStateCard title="Sin datos" message="No hay cobertura registrada." /> : null}
-          </div>
-        </article>
-
-        <article className="worker-card">
-          <div className="worker-card-label">Detalle seleccionado</div>
-          {selectedCoverage ? (
-            <div className="worker-detail-stack">
-              <h3>{selectedCoverage.occupationName}</h3>
-              <div className="worker-detail-grid">
-                <DetailRow label="Disponibles" value={String(selectedCoverage.availableWorkers)} />
-                <DetailRow label="Activos" value={String(selectedCoverage.activeWorkers)} />
-                <DetailRow label="Cobertura" value={`${selectedCoverage.coveragePercent}%`} />
-                <DetailRow label="Mínimo" value={String(selectedCoverage.minimumRequiredWorkers)} />
-                <DetailRow label="Preferido" value={selectedCoverage.preferredWorkers ? String(selectedCoverage.preferredWorkers) : 'Sin preferencia'} />
-                <DetailRow label="Déficit" value={String(selectedCoverage.deficit)} />
-                <DetailRow label="Excedente" value={String(selectedCoverage.surplus)} />
-                <DetailRow label="Umbral" value={selectedCoverage.criticalThresholdPercent} />
-              </div>
-            </div>
-          ) : (
-            <ModuleStateCard title="Sin selección" message="Elige una ocupación para ver su cobertura exacta." />
-          )}
-        </article>
-      </div>
-
-      <div className="worker-two-col-grid">
-        <article className="worker-card">
-          <div className="worker-card-label">Ocupaciones críticas y en riesgo</div>
-          <div className="worker-list-stack">
-            {criticalRows.map((row) => (
-              <div key={row.occupationId} className="worker-list-item is-static">
-                <div className="worker-list-item-head">
-                  <strong>{row.occupationName}</strong>
-                  <span className="worker-pill is-critical">Crítica</span>
-                </div>
-                <p>ID #{row.occupationId} · Campamento #{row.campId}</p>
-                <p>
-                  Disponibles {row.availableWorkers} · Activos {row.activeWorkers} · Mínimo {row.minimumRequiredWorkers}
-                </p>
-                <p>Cobertura {row.coveragePercent}% · Déficit {row.deficit} · Excedente {row.surplus}</p>
-              </div>
-            ))}
-            {atRiskRows.map((row) => (
-              <div key={row.occupationId} className="worker-list-item is-static">
-                <div className="worker-list-item-head">
-                  <strong>{row.occupationName}</strong>
-                  <span className="worker-pill is-highlight">En riesgo</span>
-                </div>
-                <p>ID #{row.occupationId} · Campamento #{row.campId}</p>
-                <p>
-                  Disponibles {row.availableWorkers} · Mínimo {row.minimumRequired}
-                </p>
-                <p>Cobertura {row.coveragePercent}%</p>
-                <p>
-                  Sugerencias: {row.suggestedReplacements.length > 0
-                    ? row.suggestedReplacements.map((suggestion) => `${suggestion.personName} (${suggestion.priority})`).join(' · ')
-                    : 'Sin sugerencias'}
-                </p>
-              </div>
-            ))}
-            {!criticalRows.length ? <ModuleStateCard title="Sin alertas críticas" message="No hay ocupaciones críticas en este campamento." /> : null}
-          </div>
-        </article>
-
-        <article className="worker-card">
-          <div className="worker-card-label">Sugerencias de reemplazo</div>
-          <div className="worker-list-stack">
-            {suggestions.map((suggestion) => (
-              <div key={suggestion.personId} className="worker-list-item is-static">
-                <div className="worker-list-item-head">
-                  <strong>{suggestion.personName}</strong>
-                  <span className={`worker-pill priority-${suggestion.priority.toLowerCase()}`}>{suggestion.priority}</span>
-                </div>
-                <p>
-                  Persona #{suggestion.personId} · Origen #{suggestion.currentOccupationId} · Destino #{suggestion.targetOccupationId}
-                </p>
-                <p>{suggestion.currentOccupationName} → {suggestion.targetOccupationName}</p>
-                <p>{suggestion.reason}</p>
-              </div>
-            ))}
-            {!suggestions.length ? <ModuleStateCard title="Sin sugerencias" message="No hay reemplazos sugeridos para la ocupación seleccionada." /> : null}
-          </div>
-          {autoResult ? (
-            <div className={`worker-result-box ${autoResult.success ? 'is-success' : 'is-error'}`}>
-              <strong>{autoResult.success ? 'Asignación completada' : 'No se pudo asignar'}</strong>
-              <p>{autoResult.message}</p>
-              {autoResult.assignedPerson ? (
-                <p>{autoResult.assignedPerson.name}: {autoResult.assignedPerson.fromOccupation} → {autoResult.assignedPerson.toOccupation}</p>
-              ) : null}
-            </div>
-          ) : null}
-          {actionLoading ? <ModuleStateCard title="Procesando" message="Ejecutando la acción solicitada..." /> : null}
-        </article>
-      </div>
-    </div>
-  )
-}
 
 function CollectionSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser | null }) {
   const [recordId, setRecordId] = useState('')
@@ -1250,39 +956,7 @@ function ModuleStateCard({ title, message }: { title: string; message: string })
   )
 }
  
-class ErrorBoundary extends Component<{ children?: ReactNode }, { hasError: boolean; message?: string }> {
-  constructor(props: any) {
-    super(props)
-    this.state = { hasError: false }
-  }
 
-  componentDidCatch(error: unknown) {
-    console.error('Worker coverage error:', error)
-    this.setState({ hasError: true, message: error instanceof Error ? error.message : String(error) })
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="worker-empty-state">
-          <strong>Se produjo un error</strong>
-          <p>{this.state.message ?? 'Error en el módulo de cobertura'}</p>
-        </div>
-      )
-    }
-
-    return this.props.children ?? null
-  }
-}
-
-function MetricBox({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="worker-detail-row">
-      <span className="worker-detail-label">{label}</span>
-      <strong className="worker-detail-value">{value}</strong>
-    </div>
-  )
-}
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -1385,11 +1059,4 @@ function OccupationIcon() {
   )
 }
 
-function CoverageIcon() {
-  return (
-    <IconSvg>
-      <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      <path d="M8 4v16M16 4v16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-    </IconSvg>
-  )
-}
+ 
