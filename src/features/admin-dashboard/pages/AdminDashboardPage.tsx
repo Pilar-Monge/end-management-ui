@@ -22,11 +22,13 @@ import { fetchOccupations } from "../../catalogs/api/queries";
 import type { Occupation } from "../../catalogs/types";
 import {
   completeExpedition,
+  getCampAchievementsProgress,
   getDeliveredTransferResourceById,
   getExpeditionsDashboard,
   getGeneralDashboard,
   getInventoryDashboard,
   getIntercampRequestById,
+  getLatestCampAchievementUnlocks,
   getTransferById,
   getTransferHistoryById,
   getTransferPersonById,
@@ -35,8 +37,11 @@ import {
   listIntercampRequests,
   listInventoryMovements,
   listNotifications,
+  markCampAchievementSeen,
   updateIntercampRequestStatus,
   updateAdmissionRequestStatus,
+  type CampAchievementProgress,
+  type CampAchievementUnlock,
 } from "../services";
 import {
   extractNumberByHint,
@@ -60,9 +65,9 @@ type AdminSectionId =
   | "centro"
   | "poblacion"
   | "admisiones"
-  | "inventario"
   | "expediciones"
   | "intercamp"
+  | "logros"
   | "seguridad"
   | "notificaciones"
   | "configuracion";
@@ -159,7 +164,6 @@ interface SessionAdminUser {
   username?: string;
   displayName?: string;
   firstName?: string;
-  middleName?: string;
   lastName1?: string;
   lastName2?: string;
   role?: string;
@@ -174,7 +178,6 @@ interface AdminProfileSummary {
   username: string;
   displayName: string;
   firstName: string;
-  middleName: string;
   lastName1: string;
   lastName2: string;
   role: string;
@@ -222,20 +225,21 @@ const NAVIGATION_DATA: NavItem[] = [
     subOptions: ["Mapa operativo", "Misiones activas", "Historial", "Recursos"],
   },
   { id: "intercamp", label: "Inter-campamentos", icon: <VehicleIcon />, subOptions: ["Pendientes", "Historial"] },
+  { id: "logros", label: "Logros", icon: <TrophyIcon />, subOptions: ["Progreso", "Desbloqueados", "Historial"] },
   { id: "seguridad", label: "Seguridad", icon: <SecurityIcon />, subOptions: ["En vivo", "Errores", "Sistema"] },
   { id: "notificaciones", label: "Notificaciones", icon: <AlertIcon />, subOptions: ["Todas", "No leídas", "Críticas"] },
   { id: "configuracion", label: "Configuración", icon: <GearIcon />, subOptions: ["Campamento", "Sistema"] },
 ];
 
-const BOTTOM_DOCK_ORDER: AdminSectionId[] = ["poblacion", "admisiones", "expediciones", "intercamp"];
+const BOTTOM_DOCK_ORDER: AdminSectionId[] = ["poblacion", "admisiones", "expediciones", "intercamp", "logros"];
 
 const SECTION_DESCRIPTIONS: Record<AdminSectionId, string> = {
   centro: "Vista global del sistema, alertas y salud operativa del campamento.",
   poblacion: "Gestión de supervivientes, estado individual y asignaciones temporales.",
   admisiones: "Análisis asistido para admisiones nuevas y validación de perfiles.",
-  inventario: "Control de recursos, niveles críticos, movimientos y ajustes.",
   expediciones: "Seguimiento de operaciones de campo, rutas y resultados.",
   intercamp: "Solicitudes y traslados entre campamentos aliados.",
+  logros: "Seguimiento de logros automáticos desbloqueados por desempeño del campamento.",
   seguridad: "Auditoría, trazas y eventos críticos del sistema.",
   notificaciones: "Centro de notificaciones con priorización por severidad.",
   configuracion: "Parámetros operativos y políticas del panel administrativo.",
@@ -399,8 +403,9 @@ function buildResourceLedger(records: Array<Record<string, unknown>>): { consume
 function normalizeStatusLabel(status: Person["status"]): string {
   if (status === "ACTIVE") return "Activo";
   if (status === "INJURED") return "Herido";
-  if (status === "MISSING") return "Desaparecido";
-  return "Fallecido";
+  if (status === "SICK") return "Enfermo";
+  if (status === "OUTSIDE_CAMP" || status === "ON_EXPEDITION") return "Fuera";
+  return "Inactivo";
 }
 
 function legacyPopulationStatus(status: Person["status"]): "Activo" | "Herido" | "Enfermo" | "Fuera" {
@@ -427,6 +432,45 @@ function personFullName(person: Person): string {
   return `${person.firstName} ${person.lastName}`.trim();
 }
 
+function achievementUnlockKey(item: Pick<CampAchievementUnlock, "achievementId" | "unlockedAt">): string {
+  return `${item.achievementId}:${item.unlockedAt}`;
+}
+
+function achievementProgressRatio(item: CampAchievementProgress): number {
+  if (item.isUnlocked) return 1;
+  if (!Number.isFinite(item.targetValue) || item.targetValue <= 0) return 0;
+  if (item.progressSnapshot === null || item.progressSnapshot === undefined || !Number.isFinite(item.progressSnapshot)) return 0;
+  const normalized = Math.max(0, item.progressSnapshot / item.targetValue);
+  return Math.max(0, Math.min(1, normalized));
+}
+
+function achievementValueLabel(item: CampAchievementProgress): string {
+  const progressRaw = item.progressSnapshot;
+  if (progressRaw === null || progressRaw === undefined || !Number.isFinite(progressRaw)) {
+    return "En evaluacion por cron";
+  }
+
+  const progress = Number(progressRaw);
+  const metric = item.metricKey.toLowerCase();
+  if (metric.includes("rate") || item.targetValue <= 1) {
+    return `${Math.round(progress * 100)}% de ${Math.round(item.targetValue * 100)}%`;
+  }
+  return `${Math.round(progress)} de ${Math.round(item.targetValue)}`;
+}
+
+function achievementDateLabel(value?: string | null): string {
+  if (!value) return "Sin fecha";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("es-CR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function readSessionAdminUser(): SessionAdminUser {
   try {
     const rawUser = localStorage.getItem("user");
@@ -439,15 +483,8 @@ function readSessionAdminUser(): SessionAdminUser {
       parsedUser && typeof parsedUser === "object" ? parsedUser : {};
 
     if (parsedSettings && typeof parsedSettings === "object") {
-      if (typeof parsedSettings.adminName === "string" && parsedSettings.adminName.trim()) {
-        resolvedUser.username = parsedSettings.adminName.trim();
-        resolvedUser.displayName = parsedSettings.adminName.trim();
-      }
       if (typeof parsedSettings.firstName === "string") {
         resolvedUser.firstName = parsedSettings.firstName;
-      }
-      if (typeof parsedSettings.middleName === "string") {
-        resolvedUser.middleName = parsedSettings.middleName;
       }
       if (typeof parsedSettings.lastName1 === "string") {
         resolvedUser.lastName1 = parsedSettings.lastName1;
@@ -515,6 +552,9 @@ export default function AdminDashboardPage() {
   const [resourceTrendData, setResourceTrendData] = useState<ResourceTrendPoint[]>([]);
   const [consumedResources, setConsumedResources] = useState<ResourceLedgerEntry[]>([]);
   const [gainedResources, setGainedResources] = useState<ResourceLedgerEntry[]>([]);
+  const [achievementProgress, setAchievementProgress] = useState<CampAchievementProgress[]>([]);
+  const [achievementUnlockQueue, setAchievementUnlockQueue] = useState<CampAchievementUnlock[]>([]);
+  const [activeAchievementUnlock, setActiveAchievementUnlock] = useState<CampAchievementUnlock | null>(null);
   const [lookupId, setLookupId] = useState("");
   const [sessionState, setSessionState] = useState<"ACTIVA" | "INACTIVA">("INACTIVA");
   const [lastActivityAt, setLastActivityAt] = useState(Date.now());
@@ -527,12 +567,36 @@ export default function AdminDashboardPage() {
   const [bootDataProgress, setBootDataProgress] = useState(0);
   const [bootVisualProgress, setBootVisualProgress] = useState(0);
   const [bootPhase, setBootPhase] = useState("Inicializando consola tactica...");
+  const seenAchievementKeysRef = useRef<Set<string>>(new Set());
 
   const notifyModule = useCallback(
     (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => {
       setModuleFeedback({ section, type, message, id: Date.now() });
     },
     [],
+  );
+
+  const enqueueAchievementUnlocks = useCallback(
+    (items: CampAchievementUnlock[]) => {
+      if (items.length === 0) return;
+
+      setAchievementUnlockQueue((prev) => {
+        const queuedKeys = new Set(prev.map((item) => achievementUnlockKey(item)));
+        const activeKey = activeAchievementUnlock ? achievementUnlockKey(activeAchievementUnlock) : null;
+        const nextQueue = [...prev];
+
+        for (const item of items) {
+          if (item.isSeen) continue;
+          const key = achievementUnlockKey(item);
+          if (seenAchievementKeysRef.current.has(key) || queuedKeys.has(key) || key === activeKey) continue;
+          queuedKeys.add(key);
+          nextQueue.push(item);
+        }
+
+        return nextQueue;
+      });
+    },
+    [activeAchievementUnlock],
   );
 
   useEffect(() => {
@@ -575,59 +639,63 @@ export default function AdminDashboardPage() {
     };
 
     try {
-      const trackedTasks = [
-        {
-          run: async () => {
-            const value = await fetchPersons();
-            completeBootStep("persons", "Sincronizando poblacion...");
-            return value;
-          },
-        },
-        { run: fetchCamps },
-        { run: fetchOccupations },
-        {
-          run: async () => {
-            const value = await listAdmissionRequests();
-            completeBootStep("admissions", "Procesando admisiones IA...");
-            return value;
-          },
-        },
-        { run: listExpeditions },
-        {
-          run: async () => {
-            const value = await listIntercampRequests();
-            completeBootStep("intercamp", "Conectando inter-campamentos...");
-            return value;
-          },
-        },
-        { run: getGeneralDashboard },
-        { run: getInventoryDashboard },
-        { run: getExpeditionsDashboard },
-        {
-          run: async () => {
-            const value = await listNotifications();
-            completeBootStep("notifications", "Cargando notificaciones...");
-            return value;
-          },
-        },
-        { run: listInventoryMovements },
-      ] as const;
+      let failedCount = 0;
 
-      const results = await Promise.allSettled(trackedTasks.map((task) => task.run()));
+      const safeRun = async <T,>(runner: () => Promise<T>, fallback: T): Promise<T> => {
+        try {
+          return await runner();
+        } catch {
+          failedCount += 1;
+          return fallback;
+        }
+      };
 
-      const personsData = results[0].status === "fulfilled" ? results[0].value : [];
-      const campsData = results[1].status === "fulfilled" ? results[1].value : [];
-      const occupationsData = results[2].status === "fulfilled" ? results[2].value : [];
-      const admissionsData = results[3].status === "fulfilled" ? results[3].value : [];
-      const expeditionsData = results[4].status === "fulfilled" ? results[4].value : [];
-      const intercampData = results[5].status === "fulfilled" ? results[5].value : [];
-      const generalDashboard = results[6].status === "fulfilled" ? results[6].value : {};
-      const inventoryDashboard = results[7].status === "fulfilled" ? results[7].value : {};
-      const expeditionsDashboard = results[8].status === "fulfilled" ? results[8].value : {};
-      const notificationRecords = results[9].status === "fulfilled" ? results[9].value : [];
-      const inventoryMovements = results[10].status === "fulfilled" ? results[10].value : [];
+      const [
+        personsData,
+        campsData,
+        occupationsData,
+        admissionsData,
+        expeditionsData,
+        intercampData,
+        generalDashboard,
+        inventoryDashboard,
+        expeditionsDashboard,
+        notificationRecords,
+        inventoryMovements,
+        achievementProgressRecords,
+        latestAchievementUnlocks,
+      ] = await Promise.all([
+        safeRun(async () => {
+          const value = await fetchPersons();
+          completeBootStep("persons", "Sincronizando poblacion...");
+          return value;
+        }, [] as Awaited<ReturnType<typeof fetchPersons>>),
+        safeRun(fetchCamps, [] as Awaited<ReturnType<typeof fetchCamps>>),
+        safeRun(fetchOccupations, [] as Awaited<ReturnType<typeof fetchOccupations>>),
+        safeRun(async () => {
+          const value = await listAdmissionRequests();
+          completeBootStep("admissions", "Procesando admisiones IA...");
+          return value;
+        }, [] as Awaited<ReturnType<typeof listAdmissionRequests>>),
+        safeRun(listExpeditions, [] as Awaited<ReturnType<typeof listExpeditions>>),
+        safeRun(async () => {
+          const value = await listIntercampRequests();
+          completeBootStep("intercamp", "Conectando inter-campamentos...");
+          return value;
+        }, [] as Awaited<ReturnType<typeof listIntercampRequests>>),
+        safeRun(getGeneralDashboard, {} as Awaited<ReturnType<typeof getGeneralDashboard>>),
+        safeRun(getInventoryDashboard, {} as Awaited<ReturnType<typeof getInventoryDashboard>>),
+        safeRun(getExpeditionsDashboard, {} as Awaited<ReturnType<typeof getExpeditionsDashboard>>),
+        safeRun(async () => {
+          const value = await listNotifications();
+          completeBootStep("notifications", "Cargando notificaciones...");
+          return value;
+        }, [] as Awaited<ReturnType<typeof listNotifications>>),
+        safeRun(listInventoryMovements, [] as Awaited<ReturnType<typeof listInventoryMovements>>),
+        safeRun(getCampAchievementsProgress, [] as Awaited<ReturnType<typeof getCampAchievementsProgress>>),
+        safeRun(() => getLatestCampAchievementUnlocks(5), [] as Awaited<ReturnType<typeof getLatestCampAchievementUnlocks>>),
+      ]);
 
-      const failedCount = results.filter((result) => result.status === "rejected").length;
       if (failedCount > 0) {
         notifyModule("global", "warning", `Se cargaron datos parciales: ${failedCount} modulo(s) fallaron en backend.`);
       }
@@ -644,6 +712,8 @@ export default function AdminDashboardPage() {
       const ledger = buildResourceLedger(inventoryMovementRecords);
       setConsumedResources(ledger.consumed);
       setGainedResources(ledger.gained);
+      setAchievementProgress(achievementProgressRecords);
+      enqueueAchievementUnlocks(latestAchievementUnlocks);
       setDashboardKpi({
         populationTotal: extractNumberByHint(generalDashboard, ["population", "persons", "totalpeople", "total"], personsData.length),
         criticalResources: extractNumberByHint(inventoryDashboard, ["critical", "alert", "low"], 0),
@@ -652,7 +722,11 @@ export default function AdminDashboardPage() {
         activePopulation: extractNumberByHint(generalDashboard, ["active", "healthy"], personsData.filter((person) => person.status === "ACTIVE").length),
         injuredPopulation: extractNumberByHint(generalDashboard, ["injured"], personsData.filter((person) => person.status === "INJURED").length),
         sickPopulation: extractNumberByHint(generalDashboard, ["sick", "ill"], 0),
-        outPopulation: extractNumberByHint(generalDashboard, ["missing", "outside", "out"], personsData.filter((person) => person.status === "MISSING").length),
+        outPopulation: extractNumberByHint(
+          generalDashboard,
+          ["missing", "outside", "out"],
+          personsData.filter((person) => person.status === "OUTSIDE_CAMP" || person.status === "ON_EXPEDITION").length,
+        ),
       });
       completeBootStep("session", "Validando sesion y perfil...");
     } catch (error) {
@@ -668,7 +742,21 @@ export default function AdminDashboardPage() {
       }
       setIsBootstrapping(false);
     }
-  }, [notifyModule]);
+  }, [enqueueAchievementUnlocks, notifyModule]);
+
+  const dismissAchievementUnlock = useCallback(async () => {
+    if (!activeAchievementUnlock) return;
+    const item = activeAchievementUnlock;
+    const unlockKey = achievementUnlockKey(item);
+    seenAchievementKeysRef.current.add(unlockKey);
+    setActiveAchievementUnlock(null);
+
+    try {
+      await markCampAchievementSeen(item.achievementId);
+    } catch {
+      notifyModule("logros", "warning", `No se pudo marcar como visto el logro #${item.achievementId}.`);
+    }
+  }, [activeAchievementUnlock, notifyModule]);
 
   useEffect(() => {
     if (!isBootstrapping) {
@@ -691,6 +779,40 @@ export default function AdminDashboardPage() {
     if (!hasEntered) return;
     void loadCoreData();
   }, [hasEntered, loadCoreData]);
+
+  useEffect(() => {
+    if (activeAchievementUnlock || achievementUnlockQueue.length === 0) return;
+    const [nextUnlock, ...rest] = achievementUnlockQueue;
+    setAchievementUnlockQueue(rest);
+    setActiveAchievementUnlock(nextUnlock);
+  }, [activeAchievementUnlock, achievementUnlockQueue]);
+
+  useEffect(() => {
+    if (!activeAchievementUnlock) return;
+    const timer = window.setTimeout(() => {
+      void dismissAchievementUnlock();
+    }, 4200);
+    return () => window.clearTimeout(timer);
+  }, [activeAchievementUnlock, dismissAchievementUnlock]);
+
+  useEffect(() => {
+    if (!hasEntered) return;
+
+    const pollUnlocks = async () => {
+      try {
+        const latest = await getLatestCampAchievementUnlocks(5);
+        enqueueAchievementUnlocks(latest);
+      } catch {
+        // Ignore transient polling errors
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      void pollUnlocks();
+    }, 75000);
+
+    return () => window.clearInterval(interval);
+  }, [enqueueAchievementUnlocks, hasEntered]);
 
   useEffect(() => {
     const markActivity = () => {
@@ -760,10 +882,9 @@ export default function AdminDashboardPage() {
     const sessionUser = sessionAdminUser;
     const matchedPerson = typeof sessionUser.id === "number" ? (persons.find((person) => person.id === sessionUser.id) ?? null) : null;
     const firstName = sessionUser.firstName?.trim() || matchedPerson?.firstName || "Administrador";
-    const middleName = sessionUser.middleName?.trim() || "";
     const lastName1 = sessionUser.lastName1?.trim() || matchedPerson?.lastName || "";
     const lastName2 = sessionUser.lastName2?.trim() || "";
-    const fullName = [firstName, middleName, lastName1, lastName2].filter(Boolean).join(" ").trim();
+    const fullName = [firstName, lastName1, lastName2].filter(Boolean).join(" ").trim();
     const displayName = fullName || sessionUser.username?.trim() || (matchedPerson ? personFullName(matchedPerson) : "Administrador");
     const occupation = matchedPerson ? occupationNameById.get(matchedPerson.occupationId) ?? `Ocupación #${matchedPerson.occupationId}` : "No disponible";
     const campId = matchedPerson?.campId ?? sessionUser.campId;
@@ -775,7 +896,6 @@ export default function AdminDashboardPage() {
       username: sessionUser.username ?? "sin-usuario",
       displayName,
       firstName,
-      middleName,
       lastName1,
       lastName2,
       role: normalizeRoleLabel(sessionUser.role),
@@ -791,7 +911,7 @@ export default function AdminDashboardPage() {
     const total = persons.length;
     const active = persons.filter((person) => person.status === "ACTIVE").length;
     const injured = persons.filter((person) => person.status === "INJURED").length;
-    const missing = persons.filter((person) => person.status === "MISSING").length;
+    const missing = persons.filter((person) => person.status === "OUTSIDE_CAMP" || person.status === "ON_EXPEDITION").length;
     return { total, active, injured, missing };
   }, [persons]);
 
@@ -930,6 +1050,7 @@ export default function AdminDashboardPage() {
                       notifications={notifications}
                       threatLevel={threatLevel}
                       populationStats={populationStats}
+                      achievementProgress={achievementProgress}
                       admissions={admissions}
                       admissionsQueue={admissionsQueue}
                       admissionsHistory={admissionsHistory}
@@ -971,6 +1092,7 @@ export default function AdminDashboardPage() {
                         notifications={notifications}
                         threatLevel={threatLevel}
                         populationStats={populationStats}
+                        achievementProgress={achievementProgress}
                         admissions={admissions}
                         admissionsQueue={admissionsQueue}
                         admissionsHistory={admissionsHistory}
@@ -1014,6 +1136,37 @@ export default function AdminDashboardPage() {
       )}
 
       <AdminBootOverlay visible={isBootstrapping} progress={Math.max(bootDataProgress, bootVisualProgress)} phase={bootPhase} />
+      <AnimatePresence>
+        {activeAchievementUnlock && (
+          <motion.div
+            className="admin-ui-v2-achievement-unlock-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            <motion.div
+              className="admin-ui-v2-achievement-unlock-card"
+              initial={{ opacity: 0, scale: 0.9, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 10 }}
+              transition={{ duration: 0.24, ease: "easeOut" }}
+            >
+              <div className="admin-ui-v2-achievement-unlock-badge">LOGRO DESBLOQUEADO</div>
+              <div className="admin-ui-v2-achievement-unlock-icon">{activeAchievementUnlock.icon ?? "🏆"}</div>
+              <h3>{activeAchievementUnlock.name}</h3>
+              <p>{activeAchievementUnlock.description}</p>
+              <div className="admin-ui-v2-achievement-unlock-meta">
+                <span>{activeAchievementUnlock.category ?? "GENERAL"}</span>
+                <span>{typeof activeAchievementUnlock.points === "number" ? `+${activeAchievementUnlock.points} pts` : "Sin puntaje"}</span>
+              </div>
+              <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void dismissAchievementUnlock()}>
+                Entendido
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <PopupMessage
         message={dashboardPopup?.message ?? null}
         onClose={() => setDashboardPopup(null)}
@@ -1113,7 +1266,6 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
 
             <div className="admin-ui-v2-profile-popover-grid">
               <div><small>Primer nombre</small><strong>{profile.firstName || "-"}</strong></div>
-              <div><small>Segundo nombre</small><strong>{profile.middleName || "-"}</strong></div>
               <div><small>Primer apellido</small><strong>{profile.lastName1 || "-"}</strong></div>
               <div><small>Segundo apellido</small><strong>{profile.lastName2 || "-"}</strong></div>
               <div><small>Rol</small><strong>{profile.role}</strong></div>
@@ -1211,6 +1363,7 @@ function ContentArea({
   notifications,
   threatLevel,
   resourceTrendData,
+  achievementProgress,
   populationStats,
   admissions,
   admissionsQueue,
@@ -1243,6 +1396,7 @@ function ContentArea({
   notifications: UiNotification[];
   threatLevel: number;
   resourceTrendData: ResourceTrendPoint[];
+  achievementProgress: CampAchievementProgress[];
   populationStats: { total: number; active: number; injured: number; missing: number };
   admissions: UiAdmission[];
   admissionsQueue: UiAdmission[];
@@ -1314,13 +1468,6 @@ function ContentArea({
       return [];
     }
 
-    if (section === "inventario") {
-      if (dashboardKpi.criticalResources > 0) {
-        return [`Se detectaron ${dashboardKpi.criticalResources} recurso(s) en estado critico.`];
-      }
-      return [];
-    }
-
     if (section === "expediciones") {
       if (activeExpeditionsCount === 0) {
         return ["No hay expediciones activas. Valida si necesitas programar una operacion."];
@@ -1331,6 +1478,13 @@ function ContentArea({
     if (section === "intercamp") {
       if (pendingIntercampCount > 0) {
         return [`Hay ${pendingIntercampCount} solicitud(es) inter-campamento pendiente(s).`];
+      }
+      return [];
+    }
+
+    if (section === "logros") {
+      if (achievementProgress.length === 0) {
+        return ["Aun no hay logros cargados para este campamento."];
       }
       return [];
     }
@@ -1360,9 +1514,9 @@ function ContentArea({
     criticalUnreadCount,
     persons.length,
     admissionsQueue.length,
-    dashboardKpi.criticalResources,
     activeExpeditionsCount,
     pendingIntercampCount,
+    achievementProgress.length,
     unreadNotificationsCount,
   ]);
 
@@ -1397,6 +1551,7 @@ function ContentArea({
           persons={persons}
           camps={campNameById}
           occupations={occupationNameById}
+          currentAdminId={sessionAdminUser.id ?? null}
           onReload={onPopulationReload}
           onError={onSetDataError}
           onNotice={onSetModuleFeedback}
@@ -1494,6 +1649,10 @@ function ContentArea({
           onNotice={onSetModuleFeedback}
           onProfileRefresh={onRefreshAdminProfile}
         />
+      )}
+
+      {section === "logros" && (
+        <AchievementsModule sub={sub} achievements={achievementProgress} />
       )}
 
       {(section === "seguridad" || section === "notificaciones") && (
@@ -1792,6 +1951,7 @@ function PopulationModule({
   persons,
   camps,
   occupations,
+  currentAdminId,
   onReload,
   onError,
   onNotice,
@@ -1800,6 +1960,7 @@ function PopulationModule({
   persons: Person[];
   camps: Map<number, string>;
   occupations: Map<number, string>;
+  currentAdminId: number | null;
   onReload: () => Promise<void>;
   onError: (message: string | null) => void;
   onNotice: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
@@ -1813,10 +1974,10 @@ function PopulationModule({
   const [isSaving, setIsSaving] = useState(false);
   const [editForm, setEditForm] = useState({
     firstName: "",
-    lastName: "",
+    lastName1: "",
+    lastName2: "",
     age: 0,
     status: "ACTIVE" as Person["status"],
-    campId: 0,
     occupationId: 0,
     notes: "",
     accountStatus: "ACTIVE" as "ACTIVE" | "BLOCKED" | "INACTIVE",
@@ -1911,14 +2072,19 @@ function PopulationModule({
   }, [userPage, userTotalPages]);
 
   const openPersonModal = (person: Person, editMode: boolean) => {
+    const normalizedLastName = String(person.lastName ?? "").trim();
+    const lastNameParts = normalizedLastName.split(/\s+/).filter(Boolean);
+    const lastName1 = lastNameParts[0] ?? "";
+    const lastName2 = lastNameParts.slice(1).join(" ");
+
     setSelectedPerson(person);
     setIsEditMode(editMode);
     setEditForm({
       firstName: person.firstName,
-      lastName: person.lastName,
+      lastName1,
+      lastName2,
       age: person.age,
       status: person.status,
-      campId: person.campId,
       occupationId: person.occupationId,
       notes: person.notes ?? "",
       accountStatus: person.accountStatus ?? "ACTIVE",
@@ -1950,20 +2116,38 @@ function PopulationModule({
   const handleSavePerson = async () => {
     if (!selectedPerson) return;
 
+    const isSelfAccountEdit = currentAdminId !== null && selectedPerson.id === currentAdminId;
+    const originalAccountStatus = normalizeAccountStatus(selectedPerson.accountStatus);
+    const requestedAccountStatus = normalizeAccountStatus(editForm.accountStatus);
+
+    if (isSelfAccountEdit && requestedAccountStatus !== originalAccountStatus) {
+      onNotice("poblacion", "error", "No puedes cambiar el estado de tu propia cuenta. Debe hacerlo otro administrador.");
+      return;
+    }
+
     setIsSaving(true);
     onError(null);
     try {
       const normalizedFirstName = String(editForm.firstName ?? "").trim();
-      const normalizedLastName = String(editForm.lastName ?? "").trim();
+      const normalizedLastName1 = String(editForm.lastName1 ?? "").trim();
+      const normalizedLastName2 = String(editForm.lastName2 ?? "").trim();
+      const normalizedLastName = [normalizedLastName1, normalizedLastName2].filter(Boolean).join(" ");
       const normalizedNotes = String(editForm.notes ?? "").trim();
 
       const payload = {
         firstName: normalizedFirstName,
+        nombre: normalizedFirstName,
+        first_name: normalizedFirstName,
+        primer_nombre: normalizedFirstName,
         lastName: normalizedLastName,
+        lastName1: normalizedLastName1,
+        lastName2: normalizedLastName2 || null,
+        primer_apellido: normalizedLastName1,
+        segundo_apellido: normalizedLastName2 || null,
         age: Number(editForm.age),
         status: editForm.status,
         currentStatus: editForm.status,
-        campId: Number(editForm.campId),
+        campId: selectedPerson.campId,
         occupationId: Number(editForm.occupationId),
         notes: normalizedNotes || undefined,
       };
@@ -2042,6 +2226,19 @@ function PopulationModule({
     if (value === "Activo") return "is-ok";
     if (value === "Herido") return "is-warn";
     if (value === "Enfermo") return "is-warn";
+    return "is-danger";
+  };
+
+  const normalizeAccountStatus = (value: unknown): "ACTIVE" | "BLOCKED" | "INACTIVE" => {
+    const normalized = String(value ?? "ACTIVE").toUpperCase();
+    if (normalized === "ACTIVE" || normalized === "BLOCKED" || normalized === "INACTIVE") return normalized;
+    return "INACTIVE";
+  };
+
+  const accountStatusPill = (value: unknown) => {
+    const normalized = normalizeAccountStatus(value);
+    if (normalized === "ACTIVE") return "is-ok";
+    if (normalized === "BLOCKED") return "is-warn";
     return "is-danger";
   };
 
@@ -2142,8 +2339,8 @@ function PopulationModule({
                     </span>
                   </td>
                   <td>
-                    <span className={`admin-ui-v2-pill ${person.accountStatus === "ACTIVE" ? "is-ok" : person.accountStatus === "BLOCKED" ? "is-warn" : "is-danger"}`}>
-                      {person.accountStatus ?? "ACTIVE"}
+                    <span className={`admin-ui-v2-pill ${accountStatusPill(person.accountStatus)}`}>
+                      {normalizeAccountStatus(person.accountStatus)}
                     </span>
                   </td>
                   <td>{person.age}</td>
@@ -2293,7 +2490,8 @@ function PopulationModule({
             {isEditMode ? (
               <div className="admin-ui-v2-form-grid">
                 <input className="v-input" value={editForm.firstName} onChange={(event) => setEditForm((prev) => ({ ...prev, firstName: event.target.value }))} placeholder="Nombre" />
-                <input className="v-input" value={editForm.lastName} onChange={(event) => setEditForm((prev) => ({ ...prev, lastName: event.target.value }))} placeholder="Apellido" />
+                <input className="v-input" value={editForm.lastName1} onChange={(event) => setEditForm((prev) => ({ ...prev, lastName1: event.target.value }))} placeholder="Primer apellido" />
+                <input className="v-input" value={editForm.lastName2} onChange={(event) => setEditForm((prev) => ({ ...prev, lastName2: event.target.value }))} placeholder="Segundo apellido" />
                 <input className="v-input" type="number" value={editForm.age} onChange={(event) => setEditForm((prev) => ({ ...prev, age: Number(event.target.value) }))} placeholder="Edad" />
                 <select className="v-select" value={editForm.status} onChange={(event) => setEditForm((prev) => ({ ...prev, status: event.target.value as Person["status"] }))}>
                   <option value="ACTIVE">Activo</option>
@@ -2301,16 +2499,22 @@ function PopulationModule({
                   <option value="MISSING">Desaparecido</option>
                   <option value="DECEASED">Fallecido</option>
                 </select>
-                <select className="v-select" value={editForm.accountStatus} onChange={(event) => setEditForm((prev) => ({ ...prev, accountStatus: event.target.value as "ACTIVE" | "BLOCKED" | "INACTIVE" }))}>
+                <select
+                  className="v-select"
+                  value={editForm.accountStatus}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, accountStatus: event.target.value as "ACTIVE" | "BLOCKED" | "INACTIVE" }))}
+                  disabled={currentAdminId !== null && selectedPerson.id === currentAdminId}
+                >
                   <option value="ACTIVE">Cuenta activa</option>
                   <option value="BLOCKED">Cuenta bloqueada</option>
                   <option value="INACTIVE">Cuenta inactiva</option>
                 </select>
-                <select className="v-select" value={editForm.campId} onChange={(event) => setEditForm((prev) => ({ ...prev, campId: Number(event.target.value) }))}>
-                  {Array.from(camps.entries()).map(([id, name]) => (
-                    <option key={id} value={id}>{name}</option>
-                  ))}
-                </select>
+                {currentAdminId !== null && selectedPerson.id === currentAdminId && (
+                  <div className="admin-ui-v2-muted">No puedes cambiar el estado de tu propia cuenta.</div>
+                )}
+                <div className="v-input" aria-readonly="true">
+                  {camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}
+                </div>
                 <select className="v-select" value={editForm.occupationId} onChange={(event) => setEditForm((prev) => ({ ...prev, occupationId: Number(event.target.value) }))}>
                   {Array.from(occupations.entries()).map(([id, name]) => (
                     <option key={id} value={id}>{name}</option>
@@ -2534,6 +2738,78 @@ function AdmissionsModule({
   );
 }
 
+function AchievementsModule({
+  sub,
+  achievements,
+}: {
+  sub: string;
+  achievements: CampAchievementProgress[];
+}) {
+  const unlocked = useMemo(
+    () => achievements.filter((item) => item.isUnlocked).sort((a, b) => String(b.unlockedAt ?? "").localeCompare(String(a.unlockedAt ?? ""))),
+    [achievements],
+  );
+
+  const locked = useMemo(() => achievements.filter((item) => !item.isUnlocked), [achievements]);
+
+  const activeList =
+    sub === "Desbloqueados"
+      ? unlocked
+      : sub === "Historial"
+        ? unlocked
+        : achievements;
+
+  return (
+    <div className="admin-ui-v2-achievements-wrap">
+      <div className="admin-ui-v2-grid admin-ui-v2-grid-3 admin-ui-v2-achievement-kpi-grid">
+        <MetricCard label="Totales" value={achievements.length} tone="info" />
+        <MetricCard label="Desbloqueados" value={unlocked.length} tone="ok" />
+        <MetricCard label="Pendientes" value={locked.length} tone="warn" />
+      </div>
+
+      <div className="admin-ui-v2-achievement-grid">
+        {activeList.map((item) => {
+          const ratio = achievementProgressRatio(item);
+          const progressPercent = Math.round(ratio * 100);
+          const isUnlocked = item.isUnlocked;
+
+          return (
+            <article key={`${item.achievementId}-${item.metricKey}`} className={`admin-ui-v2-achievement-card ${isUnlocked ? "is-unlocked" : "is-locked"}`}>
+              <div className="admin-ui-v2-achievement-head">
+                <div>
+                  <h3>{item.name}</h3>
+                  <p>{item.description}</p>
+                </div>
+                <span className={`admin-ui-v2-pill ${isUnlocked ? "is-ok" : "is-warn"}`}>{isUnlocked ? "Desbloqueado" : "Bloqueado"}</span>
+              </div>
+
+              <div className="admin-ui-v2-achievement-meta">
+                <span>Metrica: {item.metricKey || "no definida"}</span>
+                <span>{achievementValueLabel(item)}</span>
+              </div>
+
+              {!isUnlocked && (
+                <div className="admin-ui-v2-achievement-progress">
+                  <div className="admin-ui-v2-achievement-progress-fill" style={{ width: `${progressPercent}%` }} />
+                </div>
+              )}
+
+              <div className="admin-ui-v2-achievement-foot">
+                <span>Meta: {Number.isFinite(item.targetValue) ? item.targetValue : 0}</span>
+                <span>{isUnlocked ? `Desbloqueado: ${achievementDateLabel(item.unlockedAt)}` : "En evaluacion"}</span>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      {activeList.length === 0 && (
+        <div className="admin-ui-v2-empty-cell">No hay logros para mostrar en esta vista.</div>
+      )}
+    </div>
+  );
+}
+
 function SettingsModule({
   sub,
   profile,
@@ -2547,9 +2823,7 @@ function SettingsModule({
 }) {
   const [settings, setSettings] = useState(() => {
     const base = {
-      adminName: profile.username ?? "Administrador",
       firstName: profile.firstName ?? "",
-      middleName: profile.middleName ?? "",
       lastName1: profile.lastName1 ?? "",
       lastName2: profile.lastName2 ?? "",
       autoBackup: true,
@@ -2569,23 +2843,20 @@ function SettingsModule({
     }
   });
 
-  const handleSave = () => {
-    localStorage.setItem("admin_settings_v2", JSON.stringify(settings));
+  const persistSettings = (nextSettings: typeof settings) => {
+    localStorage.setItem("admin_settings_v2", JSON.stringify(nextSettings));
 
     const rawUser = localStorage.getItem("user");
     if (rawUser) {
       try {
         const parsed = JSON.parse(rawUser) as Record<string, unknown>;
-        const updated = {
+        const updated: Record<string, unknown> = {
           ...parsed,
-          username: settings.adminName,
-          displayName: settings.adminName,
-          firstName: settings.firstName,
-          middleName: settings.middleName,
-          lastName1: settings.lastName1,
-          lastName2: settings.lastName2,
+          firstName: nextSettings.firstName,
+          lastName1: nextSettings.lastName1,
+          lastName2: nextSettings.lastName2,
         };
-        const profileName = [settings.firstName, settings.middleName, settings.lastName1, settings.lastName2]
+        const profileName = [nextSettings.firstName, nextSettings.lastName1, nextSettings.lastName2]
           .map((part) => String(part ?? "").trim())
           .filter(Boolean)
           .join(" ");
@@ -2600,6 +2871,10 @@ function SettingsModule({
 
     onProfileRefresh();
     onNotice("configuracion", "success", "Configuracion guardada correctamente.");
+  };
+
+  const handleSave = () => {
+    persistSettings(settings);
   };
 
   const handleReset = () => {
@@ -2622,25 +2897,16 @@ function SettingsModule({
                 {`Campamento #${profile.campId ?? 1}`}
               </div>
 
-              <label className="admin-ui-v2-muted">Nombre del administrador</label>
-              <input
-                className="v-input"
-                value={settings.adminName}
-                onChange={(event) => setSettings((prev) => ({ ...prev, adminName: event.target.value }))}
-              />
+              <label className="admin-ui-v2-muted">Nombre de usuario</label>
+              <div className="v-input" aria-readonly="true">
+                {profile.username ?? "sin-usuario"}
+              </div>
 
               <label className="admin-ui-v2-muted">Primer nombre</label>
               <input
                 className="v-input"
                 value={settings.firstName}
                 onChange={(event) => setSettings((prev) => ({ ...prev, firstName: event.target.value }))}
-              />
-
-              <label className="admin-ui-v2-muted">Segundo nombre</label>
-              <input
-                className="v-input"
-                value={settings.middleName}
-                onChange={(event) => setSettings((prev) => ({ ...prev, middleName: event.target.value }))}
               />
 
               <label className="admin-ui-v2-muted">Primer apellido</label>
@@ -3272,6 +3538,19 @@ function AlertIcon() {
       <path d="M16 5 3 27h26L16 5Z" />
       <path d="M16 13v7" />
       <circle cx="16" cy="23" r="1" />
+    </IconSvg>
+  );
+}
+
+function TrophyIcon() {
+  return (
+    <IconSvg>
+      <path d="M9 6h14v2a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5V6Z" />
+      <path d="M9 8H6a3 3 0 0 0 3 3" />
+      <path d="M23 8h3a3 3 0 0 1-3 3" />
+      <path d="M16 13v6" />
+      <path d="M12 27h8" />
+      <path d="M13 19h6" />
     </IconSvg>
   );
 }

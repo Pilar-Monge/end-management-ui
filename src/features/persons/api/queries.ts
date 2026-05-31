@@ -42,6 +42,36 @@ function normalizePersonStatus(value: unknown): PersonStatus {
 
 function mapPersonRecord(record: unknown): Person {
   const source = record as Record<string, unknown>
+
+  const firstName = String(
+    source.firstName
+    ?? source.nombre
+    ?? source.name
+    ?? source.first_name
+    ?? source.primerNombre
+    ?? source.primer_nombre
+    ?? '',
+  ).trim()
+
+  const lastNamePrimary = String(
+    source.lastName
+    ?? source.primer_apellido
+    ?? source.last_name
+    ?? source.apellido
+    ?? source.apellido1
+    ?? source.lastName1
+    ?? '',
+  ).trim()
+
+  const lastNameSecondary = String(
+    source.segundo_apellido
+    ?? source.apellido2
+    ?? source.lastName2
+    ?? '',
+  ).trim()
+
+  const lastName = [lastNamePrimary, lastNameSecondary].filter(Boolean).join(' ').trim()
+
   const statusValue = source.status ?? source.currentStatus
   const admissionDateValue =
     source.admissionDate
@@ -53,8 +83,8 @@ function mapPersonRecord(record: unknown): Person {
     ...(record as Person),
     status: normalizePersonStatus(statusValue),
     currentStatus: normalizePersonStatus(statusValue),
-    firstName: String(source.firstName ?? ''),
-    lastName: String(source.lastName ?? ''),
+    firstName,
+    lastName,
     admissionDate: String(admissionDateValue),
     notes: typeof source.notes === 'string' ? source.notes : undefined,
   }

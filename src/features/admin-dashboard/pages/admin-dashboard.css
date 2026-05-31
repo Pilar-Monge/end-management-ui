@@ -1533,6 +1533,153 @@
   padding-left: 16px;
 }
 
+.admin-ui-v2-achievements-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-ui-v2-achievement-kpi-grid .admin-ui-v2-metric {
+  min-height: 82px;
+}
+
+.admin-ui-v2-achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 10px;
+}
+
+.admin-ui-v2-achievement-card {
+  border: 1px solid rgba(103, 172, 169, 0.35);
+  background: rgba(6, 18, 18, 0.5);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-ui-v2-achievement-card.is-unlocked {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(10, 28, 22, 0.58);
+}
+
+.admin-ui-v2-achievement-card.is-locked {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.admin-ui-v2-achievement-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-ui-v2-achievement-head h3 {
+  margin: 0;
+  font-size: 12px;
+  color: #d5eeee;
+  letter-spacing: 0.03em;
+}
+
+.admin-ui-v2-achievement-head p {
+  margin: 5px 0 0;
+  font-size: 10px;
+  color: rgba(164, 194, 197, 0.86);
+  line-height: 1.4;
+}
+
+.admin-ui-v2-achievement-meta,
+.admin-ui-v2-achievement-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 9px;
+  color: rgba(164, 194, 197, 0.85);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.admin-ui-v2-achievement-progress {
+  position: relative;
+  height: 6px;
+  background: rgba(9, 29, 29, 0.75);
+  border: 1px solid rgba(103, 172, 169, 0.32);
+  overflow: hidden;
+}
+
+.admin-ui-v2-achievement-progress-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, rgba(95, 164, 162, 0.95), rgba(118, 215, 176, 0.95));
+}
+
+.admin-ui-v2-achievement-unlock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4200;
+  background: rgba(2, 10, 12, 0.6);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.admin-ui-v2-achievement-unlock-card {
+  width: min(480px, 100%);
+  border: 1px solid rgba(99, 221, 174, 0.52);
+  background: radial-gradient(circle at top, rgba(27, 56, 49, 0.96), rgba(8, 18, 21, 0.96));
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46);
+  padding: 18px 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-ui-v2-achievement-unlock-badge {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #7ce4a9;
+}
+
+.admin-ui-v2-achievement-unlock-icon {
+  font-size: 44px;
+  line-height: 1;
+}
+
+.admin-ui-v2-achievement-unlock-card h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #e5fff8;
+  letter-spacing: 0.04em;
+}
+
+.admin-ui-v2-achievement-unlock-card p {
+  margin: 0;
+  font-size: 11px;
+  color: rgba(199, 230, 224, 0.92);
+  line-height: 1.5;
+}
+
+.admin-ui-v2-achievement-unlock-meta {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-ui-v2-achievement-unlock-meta span {
+  border: 1px solid rgba(130, 217, 197, 0.45);
+  background: rgba(10, 33, 33, 0.6);
+  padding: 4px 7px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 @media (max-width: 1200px) {
   .admin-ui-v2-grid-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1558,6 +1705,7 @@
   .admin-ui-v2-grid-4,
   .admin-ui-v2-grid-2,
   .admin-ui-v2-grid-roles,
+  .admin-ui-v2-achievement-grid,
   .admin-ui-v2-expeditions-grid,
   .admin-ui-v2-dashboard-main-grid,
   .admin-ui-v2-overview-band,

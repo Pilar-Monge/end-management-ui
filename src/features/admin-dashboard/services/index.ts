@@ -45,6 +45,12 @@ export {
   getUserRoleHistoryById,
 } from './security.service'
 
+export {
+  getCampAchievementsProgress,
+  getLatestCampAchievementUnlocks,
+  markCampAchievementSeen,
+} from './achievements.service'
+
 export type {
   AdminAdmissionRequest,
   AdminExpeditionRecord,
@@ -56,4 +62,6 @@ export type {
   InventoryDashboardPayload,
   IntercampRecord,
   InventoryMovementRecord,
+  CampAchievementProgress,
+  CampAchievementUnlock,
 } from './types'
