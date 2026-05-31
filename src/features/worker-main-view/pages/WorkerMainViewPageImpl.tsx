@@ -159,8 +159,6 @@ export function WorkerMainViewPage() {
           </div>
 
           <BottomDock activeDock={activeSectionId} onSelect={(id) => setActiveSectionId(id)} />
-          <SupportLink />
-          <SettingsHint />
         </>
       ) : null}
     </div>
@@ -262,21 +260,7 @@ function BottomDock({
   )
 }
 
-function SupportLink() {
-  return (
-    <button className="support-link" type="button">
-      <span className="btn-text"><span>?</span> Soporte</span>
-    </button>
-  )
-}
-
-function SettingsHint() {
-  return (
-    <button className="settings-hint" type="button">
-      <span className="btn-text">Ajustes <GearIcon /></span>
-    </button>
-  )
-}
+ 
 
 function ChevronLeft() {
   return (
@@ -286,19 +270,7 @@ function ChevronLeft() {
   )
 }
 
-function GearIcon() {
-  return (
-    <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
-      <path
-        d="M12 8.2A3.8 3.8 0 1 0 12 15.8 3.8 3.8 0 0 0 12 8.2Zm8.5 4.6v-1.6l-2.3-.8a6.8 6.8 0 0 0-.7-1.6l1-2.2-1.1-1.1-2.2 1a7 7 0 0 0-1.6-.7L12.8 3h-1.6l-.8 2.3a7 7 0 0 0-1.6.7l-2.2-1-1.1 1.1 1 2.2a6.8 6.8 0 0 0-.7 1.6l-2.3.8v1.6l2.3.8c.2.6.4 1.1.7 1.6l-1 2.2 1.1 1.1 2.2-1c.5.3 1 .5 1.6.7l.8 2.3h1.6l.8-2.3c.6-.2 1.1-.4 1.6-.7l2.2 1 1.1-1.1-1-2.2c.3-.5.5-1 .7-1.6l2.3-.8Z"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    </svg>
-  )
-}
+ 
 
 function LoadingOverlay({
   show,
