@@ -24,6 +24,15 @@ export async function fetchResourceTypes(): Promise<ResourceType[]> {
   return Array.isArray(data) ? data : (data.data ?? [])
 }
 
+export async function fetchResourceTypeById(id: number): Promise<ResourceType> {
+  const res = await fetch(`${ENDPOINTS.resourceTypes}/${id}`, {
+    headers: getHeaders(),
+  })
+  if (!res.ok) throw new Error('Failed to fetch resource type')
+  const data = await res.json()
+  return Array.isArray(data) ? (data[0] as ResourceType) : (data.data ?? data)
+}
+
 export function useResourceTypes(
   options?: Omit<UseQueryOptions<ResourceType[], ApiError>, 'queryKey' | 'queryFn'>,
 ) {

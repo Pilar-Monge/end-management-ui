@@ -1,35 +1,24 @@
-import { useEffect, useMemo, useState, type ReactNode, Component } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  autoAssignWorkerCoverage,
-  fetchWorkerAtRiskCoverage,
-  fetchWorkerCoverageSuggestions,
-  fetchWorkerCriticalCoverage,
   fetchWorkerDailyCollectionRecord,
-  fetchWorkerDashboardPersonal,
   fetchWorkerNotificationById,
   fetchWorkerNotifications,
   fetchWorkerOccupationById,
-  fetchWorkerOccupationCoverage,
-  fetchWorkerOccupationCoverageByOccupation,
   fetchWorkerOccupations,
   updateWorkerNotificationReadState,
 } from '../services/workerMainViewApi'
 import type {
   PaginationInfo,
   WorkerAuthenticatedUser,
-  WorkerAutoAssignmentResult,
-  WorkerDashboardPersonalData,
   WorkerDailyCollectionRecord,
   WorkerNotification,
   WorkerOccupation,
-  WorkerOccupationAtRisk,
-  WorkerOccupationCoverage,
-  WorkerReplacementSuggestion,
+  
 } from '../types'
 import '../pages/worker-main-view.css'
 
-type WorkerSectionId = 'dashboard' | 'recoleccion' | 'notificaciones' | 'ocupaciones' | 'cobertura'
+type WorkerSectionId = 'recoleccion' | 'notificaciones' | 'ocupaciones'
 
 type WorkerSection = {
   id: WorkerSectionId
@@ -39,22 +28,10 @@ type WorkerSection = {
 }
 
 const WORKER_NAV_DATA: WorkerSection[] = [
-  { id: 'dashboard', label: 'Dashboard personal', shortLabel: 'DB', icon: <DashboardIcon /> },
   { id: 'recoleccion', label: 'Recolección diaria', shortLabel: 'RC', icon: <CollectionIcon /> },
   { id: 'notificaciones', label: 'Notificaciones', shortLabel: 'NT', icon: <NotificationIcon /> },
   { id: 'ocupaciones', label: 'Ocupaciones', shortLabel: 'OC', icon: <OccupationIcon /> },
-  { id: 'cobertura', label: 'Cobertura de oficio', shortLabel: 'CB', icon: <CoverageIcon /> },
 ]
-
-const EXPEDITION_STATUS_LABELS: Record<string, string> = {
-  PLANNED: 'Planeadas',
-  IN_PROGRESS: 'En curso',
-  DELAYED: 'Retrasadas',
-  COMPLETED: 'Completadas',
-  LOST: 'Perdidas',
-  RETURNED_AFTER_LOST: 'Recuperadas',
-  CANCELED: 'Canceladas',
-}
 
 const WORKER_LOADING_ART = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" fill="none">
@@ -107,7 +84,7 @@ export function WorkerMainViewPage() {
   const [showLoading, setShowLoading] = useState(true)
   const [isLoaded, setIsLoaded] = useState(false)
   const [hasEntered, setHasEntered] = useState(false)
-  const [activeSectionId, setActiveSectionId] = useState<WorkerSectionId>('dashboard')
+  const [activeSectionId, setActiveSectionId] = useState<WorkerSectionId>('recoleccion')
 
   const sessionUser = useMemo<WorkerAuthenticatedUser | null>(() => {
     const raw = localStorage.getItem('user')
@@ -147,51 +124,41 @@ export function WorkerMainViewPage() {
   }
 
   return (
-    <div className="worker-screen-layout">
+    <div className="worker-screen-layout text-[#A4C2C5]">
       <div className="worker-holo-grid" aria-hidden="true" />
 
       <LoadingOverlay show={showLoading} isLoaded={isLoaded} onEnter={handleEnter} />
 
       {hasEntered ? (
         <>
-          <header className="worker-top-hud">
-            <button className="worker-hud-btn" type="button">
-              Centro operativo
-            </button>
-            <span className="worker-hud-chip">Panel trabajador</span>
-          </header>
+          <TopHud />
 
-          <main className="worker-main-area">
-            <div className="worker-title-row">
-              <div className="worker-title-copy">
-                <span className="worker-section-kicker">Consola de campo</span>
-                <h1>{activeSection.label}</h1>
-              </div>
-              <span className="worker-title-badge">Módulo {activeSection.shortLabel}</span>
+          <div className="main-area">
+            <div className="content-scroll">
+              <SectionTitle title={activeSection.label} />
+              <section aria-label="Panel principal" className="settings-shell h-full w-full">
+                <div className="paint-glow" aria-hidden="true" />
+                <div className="settings-inner h-full" style={{ padding: '42px 0 0 0', overflow: 'hidden' }}>
+                  <div className="watermark-x" aria-hidden="true" />
+                  <div className="inner-layout">
+                    <aside className="inner-sidebar">
+                      <SideMenu
+                        items={WORKER_NAV_DATA}
+                        activeId={activeSectionId}
+                        onSelect={(id) => setActiveSectionId(id)}
+                      />
+                    </aside>
+                    <div className="inner-divider" />
+                    <div className="inner-content">
+                      <GenericWorkerContent section={activeSection} sessionUser={sessionUser} />
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
+          </div>
 
-            <section className="worker-shell" aria-label="Panel de trabajador">
-              <div className="worker-shell-glow" aria-hidden="true" />
-              <div className="worker-content">
-                <GenericWorkerContent section={activeSection} sessionUser={sessionUser} />
-              </div>
-            </section>
-          </main>
-
-          <footer className="worker-dock" aria-label="Modulos de trabajador">
-            {WORKER_NAV_DATA.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                aria-label={item.label}
-                className={`worker-dock-item ${activeSectionId === item.id ? 'is-active' : ''}`}
-                onClick={() => setActiveSectionId(item.id)}
-              >
-                <span className="worker-dock-icon">{item.icon}</span>
-                <span className="worker-dock-text">{item.shortLabel}</span>
-              </button>
-            ))}
-          </footer>
+          <BottomDock activeDock={activeSectionId} onSelect={(id) => setActiveSectionId(id)} />
         </>
       ) : null}
     </div>
@@ -199,6 +166,111 @@ export function WorkerMainViewPage() {
 }
 
 export default WorkerMainViewPage
+
+function TopHud() {
+  return (
+    <header className="worker-top-hud pointer-events-none flex items-center justify-between px-3 pt-3 pb-2 text-[10px] font-black uppercase tracking-[-0.02em] text-[#A4C2C5]/80">
+      <button className="pointer-events-auto worker-hud-btn" type="button">
+        <span className="btn-text">
+          <span className="flex items-center gap-[1px] text-[#69BFB7]">
+            <ChevronLeft />
+            <ChevronLeft />
+          </span>
+          Centro operativo
+        </span>
+      </button>
+      <button className="pointer-events-auto worker-hud-btn" type="button">
+        <span className="btn-text">
+          Panel trabajador
+          <span className="logout-mark" aria-hidden="true" />
+        </span>
+      </button>
+    </header>
+  )
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return (
+    <div className="section-header">
+      <div
+        className="section-title-brush"
+        style={{
+          transformStyle: 'preserve-3d',
+          transform: 'rotateY(25deg) translateZ(10px)',
+        }}
+      >
+        <span className="btn-text">{title}</span>
+      </div>
+    </div>
+  )
+}
+
+function SideMenu({
+  items,
+  activeId,
+  onSelect,
+}: {
+  items: WorkerSection[]
+  activeId: WorkerSectionId
+  onSelect: (id: WorkerSectionId) => void
+}) {
+  return (
+    <nav aria-label="Settings sections" className="w-full pl-2 pt-6 h-full flex flex-col">
+      <div className="flex flex-col gap-[18px] perspective-[800px]">
+        {items.map((item) => (
+          <button
+            className={`side-button ${activeId === item.id ? 'is-active' : ''} relative`}
+            key={item.id}
+            onClick={() => onSelect(item.id)}
+            type="button"
+            style={{
+              transformStyle: 'preserve-3d',
+              transform: 'rotateY(25deg) translateZ(10px)',
+            }}
+          >
+            <span className="btn-text whitespace-nowrap overflow-visible drop-shadow-md">{item.label}</span>
+          </button>
+        ))}
+      </div>
+    </nav>
+  )
+}
+
+function BottomDock({
+  activeDock,
+  onSelect,
+}: {
+  activeDock: WorkerSectionId
+  onSelect: (id: WorkerSectionId) => void
+}) {
+  return (
+    <footer aria-label="Game navigation" className="dock">
+      {WORKER_NAV_DATA.map((item) => (
+        <button
+          aria-label={item.label}
+          className={`dock-item ${activeDock === item.id ? 'is-active' : ''}`}
+          key={item.id}
+          onClick={() => onSelect(item.id)}
+          type="button"
+        >
+          <span className="dock-content">{item.icon}</span>
+        </button>
+      ))}
+    </footer>
+  )
+}
+
+ 
+
+function ChevronLeft() {
+  return (
+    <svg aria-hidden="true" className="h-4 w-3" fill="none" viewBox="0 0 10 16">
+      <path d="M8 2 2 8l6 6" stroke="currentColor" strokeLinecap="square" strokeWidth="3" />
+    </svg>
+  )
+}
+
+ 
 
 function LoadingOverlay({
   show,
@@ -312,143 +384,21 @@ function GenericWorkerContent({
   sessionUser: WorkerAuthenticatedUser | null
 }) {
   switch (section.id) {
-    case 'dashboard':
-      return <DashboardSection />
     case 'recoleccion':
       return <CollectionSection sessionUser={sessionUser} />
     case 'notificaciones':
       return <NotificationsSection sessionUser={sessionUser} />
     case 'ocupaciones':
-      return <OccupationsSection />
-    case 'cobertura':
-      return (
-        <ErrorBoundary>
-          <CoverageSection sessionUser={sessionUser} />
-        </ErrorBoundary>
-      )
+      return <OccupationsSection sessionUser={sessionUser} />
     default:
       return <ModuleStateCard title={section.label} message="Sin datos disponibles para este módulo." />
   }
 }
 
-function DashboardSection() {
-  const [data, setData] = useState<WorkerDashboardPersonalData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let isMounted = true
-
-    async function loadDashboard() {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const nextData = await fetchWorkerDashboardPersonal()
-        if (isMounted) setData(nextData)
-      } catch (fetchError) {
-        if (isMounted) setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar el tablero')
-      } finally {
-        if (isMounted) setLoading(false)
-      }
-    }
-
-    void loadDashboard()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  if (loading) return <ModuleStateCard title="Cargando tablero" message="Obteniendo indicadores reales del trabajador..." />
-  if (error) return <ModuleStateCard title="No se pudo cargar el tablero" message={error} />
-  if (!data) return <ModuleStateCard title="Sin información" message="No se obtuvo respuesta del tablero personal." />
-
-  return (
-    <div className="worker-content-grid worker-content-grid-single">
-      <article className="worker-card worker-card-wide">
-        <div className="worker-card-label">Resumen general</div>
-        <div className="worker-metric-grid worker-metric-grid-dashboard">
-          <MetricBox label="Usuario" value={data.userId ? `#${data.userId}` : 'No asignado'} />
-          <MetricBox label="Alertas sin leer" value={String(data.general.unreadNotifications)} />
-          <MetricBox label="Personas registradas" value={String(data.general.totalPersons)} />
-          <MetricBox label="Solicitudes pendientes" value={String(data.general.pendingAdmissionRequests)} />
-        </div>
-      </article>
-
-      <article className="worker-card worker-card-wide">
-        <div className="worker-card-label">Inventario visible</div>
-        <div className="worker-note-grid worker-note-grid-dashboard">
-          <div>
-            <h4>Recursos actuales</h4>
-            <ul className="worker-status-list">
-              {data.inventory.resources.length > 0 ? (
-                data.inventory.resources.map((resource) => (
-                  <li key={resource.resourceName}>
-                    <span>{resource.resourceName}</span>
-                    <strong>{String(resource.currentAmount)}</strong>
-                  </li>
-                ))
-              ) : (
-                <li>
-                  <span>Sin recursos registrados</span>
-                  <strong>-</strong>
-                </li>
-              )}
-            </ul>
-          </div>
-          <div>
-            <h4>Stock crítico</h4>
-            <p>{data.inventory.criticalStockCount} recurso(s) en nivel crítico</p>
-          </div>
-        </div>
-      </article>
-
-      <article className="worker-card worker-card-wide">
-        <div className="worker-card-label">Expediciones</div>
-        <div className="worker-chart-list">
-          {Object.entries(data.expeditions).map(([status, count]) => (
-            <div className="worker-chart-row" key={status}>
-              <div className="worker-chart-row-head">
-                <span>{EXPEDITION_STATUS_LABELS[status] ?? status}</span>
-                <strong>{count}</strong>
-              </div>
-              <div className="worker-chart-track">
-                <div
-                  className="worker-chart-fill"
-                  style={{ width: `${Math.min(100, Math.max(4, count * 10))}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </article>
-
-      <article className="worker-card worker-card-wide">
-        <div className="worker-card-label">Consumo diario</div>
-        <div className="worker-note-grid worker-note-grid-dashboard">
-          {data.consumptionTrend.length > 0 ? (
-            data.consumptionTrend.map((item) => (
-              <div key={item.date}>
-                <h4>{formatDateLabel(item.date)}</h4>
-                <p>{String(item.totalConsumed)} consumidos</p>
-              </div>
-            ))
-          ) : (
-            <div>
-              <h4>Sin historial</h4>
-              <p>No hay datos de consumo todavía.</p>
-            </div>
-          )}
-        </div>
-      </article>
-    </div>
-  )
-}
-
 function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser | null }) {
-  const [draftFilters, setDraftFilters] = useState({ targetRole: '', type: '', read: 'all', page: 1, limit: 5 })
-  const [appliedFilters, setAppliedFilters] = useState(draftFilters)
+  const NOTIFICATION_PAGE_SIZE = 5
+  const [draftFilters, setDraftFilters] = useState({ read: 'all' })
+  const [appliedFilters, setAppliedFilters] = useState({ read: 'all', page: 1 })
   const [items, setItems] = useState<WorkerNotification[]>([])
   const [pagination, setPagination] = useState<PaginationInfo | null>(null)
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -466,11 +416,9 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
 
       try {
         const result = await fetchWorkerNotifications({
-          targetRole: appliedFilters.targetRole || undefined,
-          type: appliedFilters.type || undefined,
           read: appliedFilters.read === 'all' ? null : appliedFilters.read === 'true',
           page: appliedFilters.page,
-          limit: appliedFilters.limit,
+          limit: NOTIFICATION_PAGE_SIZE,
         })
 
         if (!isMounted) return
@@ -479,7 +427,8 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
         setPagination(result.pagination)
       } catch (fetchError) {
         if (isMounted) {
-          setError(fetchError instanceof Error ? fetchError.message : 'No se pudieron cargar las notificaciones')
+          const friendly = fetchError instanceof Error ? translateNotificationError(fetchError.message) : 'No se pudieron cargar las notificaciones.'
+          setError(friendly)
           setItems([])
           setPagination(null)
           setSelectedId(null)
@@ -523,7 +472,10 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
         const record = await fetchWorkerNotificationById(selectedId)
         if (isMounted) setSelected(record)
       } catch (fetchError) {
-        if (isMounted) setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar el detalle de la notificación')
+        if (isMounted) {
+          const friendly = fetchError instanceof Error ? translateNotificationError(fetchError.message) : 'No se pudo cargar el detalle de la notificación.'
+          setError(friendly)
+        }
       } finally {
         if (isMounted) setDetailLoading(false)
       }
@@ -537,7 +489,7 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
   }, [selectedId])
 
   const applyFilters = () => {
-    setAppliedFilters({ ...draftFilters, page: 1 })
+    setAppliedFilters((prev) => ({ ...prev, read: draftFilters.read, page: 1 }))
   }
 
   const markAsRead = async () => {
@@ -567,29 +519,6 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
         <div className="worker-card-label">Filtros</div>
         <div className="worker-control-grid">
           <label className="worker-field">
-            <span>Tipo</span>
-            <input
-              className="worker-input"
-              value={draftFilters.type}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, type: event.target.value }))}
-              placeholder="Todos"
-            />
-          </label>
-          <label className="worker-field">
-            <span>Rol objetivo</span>
-            <select
-              className="worker-input"
-              value={draftFilters.targetRole}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, targetRole: event.target.value }))}
-            >
-              <option value="">Todos</option>
-              <option value="WORKER">Worker</option>
-              <option value="RESOURCE_MANAGEMENT">Resource management</option>
-              <option value="TRAVEL_MANAGER">Travel manager</option>
-              <option value="SYSTEM_ADMIN">System admin</option>
-            </select>
-          </label>
-          <label className="worker-field">
             <span>Estado</span>
             <select
               className="worker-input"
@@ -600,27 +529,6 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
               <option value="false">Sin leer</option>
               <option value="true">Leídas</option>
             </select>
-          </label>
-          <label className="worker-field">
-            <span>Página</span>
-            <input
-              className="worker-input"
-              type="number"
-              min={1}
-              value={draftFilters.page}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, page: Number(event.target.value) || 1 }))}
-            />
-          </label>
-          <label className="worker-field">
-            <span>Límite</span>
-            <input
-              className="worker-input"
-              type="number"
-              min={1}
-              max={50}
-              value={draftFilters.limit}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, limit: Number(event.target.value) || 5 }))}
-            />
           </label>
           <button type="button" className="worker-primary-btn" onClick={applyFilters}>
             Buscar
@@ -641,47 +549,36 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
                 onClick={() => setSelectedId(item.id)}
               >
                 <div className="worker-list-item-head">
-                  <strong>{item.title}</strong>
-                  <span className={`worker-pill ${item.read ? 'is-muted' : 'is-highlight'}`}>
-                    {item.read ? 'Leída' : 'Sin leer'}
-                  </span>
-                </div>
-                <p>{item.message}</p>
-                <div className="worker-list-item-foot">
-                  <span>{item.type}</span>
-                  <span>{formatDateLabel(item.createdDate)}</span>
+                  <strong>ID #{item.id}</strong>
                 </div>
               </button>
             ))}
             {!items.length && !error ? <ModuleStateCard title="Sin resultados" message="No hay notificaciones para los filtros actuales." /> : null}
           </div>
 
-          <div className="worker-pagination-bar">
-            <span>{pagination ? `${pagination.page} / ${pagination.pages} páginas` : 'Sin paginación'}</span>
-            <div className="worker-pagination-actions">
-              <button
-                type="button"
-                className="worker-secondary-btn"
-                disabled={!pagination || pagination.page <= 1}
-                onClick={() => setAppliedFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
-              >
-                Anterior
-              </button>
-              <button
-                type="button"
-                className="worker-secondary-btn"
-                disabled={!pagination || pagination.page >= pagination.pages}
-                onClick={() =>
-                  setAppliedFilters((prev) => ({
-                    ...prev,
-                    page: pagination ? Math.min(pagination.pages, prev.page + 1) : prev.page + 1,
-                  }))
-                }
-              >
-                Siguiente
-              </button>
+          {pagination ? (
+            <div className="worker-pagination-bar">
+              <span>{`${pagination.page} / ${pagination.pages} páginas`}</span>
+              <div className="worker-pagination-actions">
+                <button
+                  type="button"
+                  className="worker-secondary-btn"
+                  disabled={pagination.page <= 1}
+                  onClick={() => setAppliedFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  className="worker-secondary-btn"
+                  disabled={pagination.page >= pagination.pages}
+                  onClick={() => setAppliedFilters((prev) => ({ ...prev, page: Math.min(pagination.pages, prev.page + 1) }))}
+                >
+                  Siguiente
+                </button>
+              </div>
             </div>
-          </div>
+          ) : null}
         </article>
 
         <article className="worker-card">
@@ -691,19 +588,20 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
             <div className="worker-detail-stack">
               <h3>{selected.title}</h3>
               <p>{selected.message}</p>
-              <div className="worker-detail-grid">
-                <DetailRow label="Campamento" value={`#${selected.campId}`} />
-                <DetailRow label="Destino" value={selected.targetRole || 'Todos'} />
+              <div className="worker-detail-grid worker-detail-grid-two-up">
                 <DetailRow label="Tipo" value={selected.type} />
+                <DetailRow label="Destino" value={selected.targetRole || 'Todos'} />
                 <DetailRow label="Fecha" value={formatDateLabel(selected.createdDate)} />
                 <DetailRow label="Estado" value={selected.read ? 'Leída' : 'Sin leer'} />
                 <DetailRow label="Origen" value={selected.sourceType ? `${selected.sourceType} #${selected.sourceId ?? '-'}` : 'Sin origen'} />
               </div>
-              <div className="worker-action-row">
-                <button type="button" className="worker-primary-btn" onClick={markAsRead} disabled={selected.read}>
-                  Marcar como leída
-                </button>
-              </div>
+              {!selected.read ? (
+                <div className="worker-action-row">
+                  <button type="button" className="worker-primary-btn" onClick={markAsRead}>
+                    Marcar como leída
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : (
             <ModuleStateCard title="Sin selección" message="Selecciona una notificación para ver su detalle." />
@@ -714,8 +612,9 @@ function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticate
   )
 }
 
-function OccupationsSection() {
-  const [draftFilters, setDraftFilters] = useState({ collectsResources: 'all', participatesInExpeditions: 'all', resourceTypeId: '', page: 1, limit: 8 })
+function OccupationsSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser | null }) {
+  const OCCUPATIONS_PAGE_SIZE = 5
+  const [draftFilters, setDraftFilters] = useState({ collectsResources: 'all', participatesInExpeditions: 'all', resourceTypeId: '', page: 1 })
   const [appliedFilters, setAppliedFilters] = useState(draftFilters)
   const [items, setItems] = useState<WorkerOccupation[]>([])
   const [pagination, setPagination] = useState<PaginationInfo | null>(null)
@@ -724,6 +623,7 @@ function OccupationsSection() {
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sessionIssue, setSessionIssue] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -731,6 +631,7 @@ function OccupationsSection() {
     async function loadOccupations() {
       setLoading(true)
       setError(null)
+      setSessionIssue(false)
 
       try {
         const result = await fetchWorkerOccupations({
@@ -739,7 +640,7 @@ function OccupationsSection() {
             appliedFilters.participatesInExpeditions === 'all' ? null : appliedFilters.participatesInExpeditions === 'true',
           resourceTypeId: appliedFilters.resourceTypeId ? Number(appliedFilters.resourceTypeId) : null,
           page: appliedFilters.page,
-          limit: appliedFilters.limit,
+          limit: OCCUPATIONS_PAGE_SIZE,
         })
 
         if (!isMounted) return
@@ -748,7 +649,13 @@ function OccupationsSection() {
         setPagination(result.pagination)
       } catch (fetchError) {
         if (isMounted) {
-          setError(fetchError instanceof Error ? fetchError.message : 'No se pudieron cargar las ocupaciones')
+          const translatedError = translateOccupationError(fetchError instanceof Error ? fetchError.message : 'No se pudieron cargar las ocupaciones.')
+          if (translatedError.requiresSession) {
+            setSessionIssue(true)
+            setError(null)
+          } else {
+            setError(translatedError.message)
+          }
           setItems([])
           setPagination(null)
           setSelectedId(null)
@@ -792,7 +699,15 @@ function OccupationsSection() {
         const record = await fetchWorkerOccupationById(selectedId)
         if (isMounted) setSelected(record)
       } catch (fetchError) {
-        if (isMounted) setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar el detalle de la ocupación')
+        if (isMounted) {
+          const translatedError = fetchError instanceof Error ? translateOccupationError(fetchError.message) : { message: 'No se pudo cargar el detalle de la ocupación.', requiresSession: false }
+          if (translatedError.requiresSession) {
+            setSessionIssue(true)
+            setError(null)
+          } else {
+            setError(translatedError.message)
+          }
+        }
       } finally {
         if (isMounted) setDetailLoading(false)
       }
@@ -807,6 +722,10 @@ function OccupationsSection() {
 
   const applyFilters = () => {
     setAppliedFilters({ ...draftFilters, page: 1 })
+  }
+
+  if (!sessionUser || sessionIssue) {
+    return <ModuleStateCard title="Sesión no disponible" message="Inicia sesión otra vez para consultar las notificaciones." />
   }
 
   if (loading) return <ModuleStateCard title="Cargando ocupaciones" message="Obteniendo ocupaciones reales del sistema..." />
@@ -840,38 +759,6 @@ function OccupationsSection() {
               <option value="false">No</option>
             </select>
           </label>
-          <label className="worker-field">
-            <span>Tipo de recurso</span>
-            <input
-              className="worker-input"
-              type="number"
-              min={1}
-              value={draftFilters.resourceTypeId}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, resourceTypeId: event.target.value }))}
-              placeholder="Opcional"
-            />
-          </label>
-          <label className="worker-field">
-            <span>Página</span>
-            <input
-              className="worker-input"
-              type="number"
-              min={1}
-              value={draftFilters.page}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, page: Number(event.target.value) || 1 }))}
-            />
-          </label>
-          <label className="worker-field">
-            <span>Límite</span>
-            <input
-              className="worker-input"
-              type="number"
-              min={1}
-              max={50}
-              value={draftFilters.limit}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, limit: Number(event.target.value) || 8 }))}
-            />
-          </label>
           <button type="button" className="worker-primary-btn" onClick={applyFilters}>
             Buscar
           </button>
@@ -892,46 +779,40 @@ function OccupationsSection() {
               >
                 <div className="worker-list-item-head">
                   <strong>{item.name}</strong>
-                  <span className={`worker-pill ${item.collectsResources ? 'is-highlight' : 'is-muted'}`}>
-                    {item.collectsResources ? 'Recolección' : 'No recolecta'}
-                  </span>
-                </div>
-                <p>{item.description || 'Sin descripción registrada'}</p>
-                <div className="worker-list-item-foot">
-                  <span>{item.participatesInExpeditions ? 'Participa en expediciones' : 'Solo operaciones locales'}</span>
-                  <span>{formatDateLabel(item.createdAt)}</span>
                 </div>
               </button>
             ))}
             {!items.length && !error ? <ModuleStateCard title="Sin resultados" message="No hay ocupaciones para los filtros actuales." /> : null}
           </div>
 
-          <div className="worker-pagination-bar">
-            <span>{pagination ? `${pagination.page} / ${pagination.pages} páginas` : 'Sin paginación'}</span>
-            <div className="worker-pagination-actions">
-              <button
-                type="button"
-                className="worker-secondary-btn"
-                disabled={!pagination || pagination.page <= 1}
-                onClick={() => setAppliedFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
-              >
-                Anterior
-              </button>
-              <button
-                type="button"
-                className="worker-secondary-btn"
-                disabled={!pagination || pagination.page >= pagination.pages}
-                onClick={() =>
-                  setAppliedFilters((prev) => ({
-                    ...prev,
-                    page: pagination ? Math.min(pagination.pages, prev.page + 1) : prev.page + 1,
-                  }))
-                }
-              >
-                Siguiente
-              </button>
+          {pagination ? (
+            <div className="worker-pagination-bar">
+              <span>{`${pagination.page} / ${pagination.pages} páginas`}</span>
+              <div className="worker-pagination-actions">
+                <button
+                  type="button"
+                  className="worker-secondary-btn"
+                  disabled={pagination.page <= 1}
+                  onClick={() => setAppliedFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  className="worker-secondary-btn"
+                  disabled={pagination.page >= pagination.pages}
+                  onClick={() =>
+                    setAppliedFilters((prev) => ({
+                      ...prev,
+                      page: Math.min(pagination.pages, prev.page + 1),
+                    }))
+                  }
+                >
+                  Siguiente
+                </button>
+              </div>
             </div>
-          </div>
+          ) : null}
         </article>
 
         <article className="worker-card">
@@ -940,6 +821,7 @@ function OccupationsSection() {
           {selected ? (
             <div className="worker-detail-stack">
               <h3>{selected.name}</h3>
+              <p>ID #{selected.id}</p>
               <p>{selected.description || 'Sin descripción registrada'}</p>
               <div className="worker-detail-grid">
                 <DetailRow label="Recolección" value={selected.collectsResources ? 'Sí' : 'No'} />
@@ -962,249 +844,7 @@ function OccupationsSection() {
   )
 }
 
-function CoverageSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser | null }) {
-  const campId = sessionUser?.campId ?? null
-  const [occupationOptions, setOccupationOptions] = useState<WorkerOccupation[]>([])
-  const [coverageRows, setCoverageRows] = useState<WorkerOccupationCoverage[]>([])
-  const [criticalRows, setCriticalRows] = useState<WorkerOccupationCoverage[]>([])
-  const [atRiskRows, setAtRiskRows] = useState<WorkerOccupationAtRisk[]>([])
-  const [selectedOccupationId, setSelectedOccupationId] = useState<number | null>(null)
-  const [selectedCoverage, setSelectedCoverage] = useState<WorkerOccupationCoverage | null>(null)
-  const [suggestions, setSuggestions] = useState<WorkerReplacementSuggestion[]>([])
-  const [autoResult, setAutoResult] = useState<WorkerAutoAssignmentResult | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let isMounted = true
-
-    async function loadCoverageData() {
-      if (!campId) {
-        setLoading(false)
-        return
-      }
-
-      setLoading(true)
-      setError(null)
-
-      try {
-        const [occupations, coverage, critical, atRisk] = await Promise.all([
-          fetchWorkerOccupations({ page: 1, limit: 100 }),
-          fetchWorkerOccupationCoverage(campId),
-          fetchWorkerCriticalCoverage(campId),
-          fetchWorkerAtRiskCoverage(campId),
-        ])
-
-        if (!isMounted) return
-
-        setOccupationOptions(occupations.items ?? [])
-        setCoverageRows(coverage ?? [])
-        setCriticalRows(critical ?? [])
-        setAtRiskRows(atRisk ?? [])
-
-        setSelectedOccupationId((current) =>
-          current ?? atRisk?.[0]?.occupationId ?? occupations.items?.[0]?.id ?? null,
-        )
-      } catch (fetchError) {
-        if (isMounted) setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar la cobertura')
-      } finally {
-        if (isMounted) setLoading(false)
-      }
-    }
-
-    void loadCoverageData()
-
-    return () => {
-      isMounted = false
-    }
-  }, [campId, selectedOccupationId])
-
-  useEffect(() => {
-    let isMounted = true
-
-    async function loadSelectedCoverage() {
-      if (!campId || !selectedOccupationId) {
-        setSelectedCoverage(null)
-        setSuggestions([])
-        return
-      }
-
-      setActionLoading(true)
-
-      try {
-        const [coverage, replacementSuggestions] = await Promise.all([
-          fetchWorkerOccupationCoverageByOccupation(campId, selectedOccupationId),
-          fetchWorkerCoverageSuggestions(campId, selectedOccupationId),
-        ])
-
-        if (!isMounted) return
-
-        setSelectedCoverage(coverage ?? null)
-        setSuggestions(replacementSuggestions ?? [])
-      } catch (fetchError) {
-        if (isMounted) setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar la cobertura seleccionada')
-      } finally {
-        if (isMounted) setActionLoading(false)
-      }
-    }
-
-    void loadSelectedCoverage()
-
-    return () => {
-      isMounted = false
-    }
-  }, [campId, selectedOccupationId])
-
-  const handleAutoAssign = async () => {
-    if (!campId || !selectedOccupationId) return
-    setActionLoading(true)
-    setAutoResult(null)
-
-    try {
-      const result = await autoAssignWorkerCoverage(campId, selectedOccupationId)
-      setAutoResult(result)
-    } catch (fetchError) {
-      setAutoResult({
-        success: false,
-        message: fetchError instanceof Error ? fetchError.message : 'No se pudo ejecutar la asignación automática',
-      })
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  if (!sessionUser) {
-    return <ModuleStateCard title="Sesión no disponible" message="Inicia sesión otra vez para consultar la cobertura." />
-  }
-
-  if (loading) return <ModuleStateCard title="Cargando cobertura" message="Consultando cobertura y sugerencias reales..." />
-  if (!campId) return <ModuleStateCard title="Campamento no disponible" message="No se encontró un campamento asociado al usuario." />
-
-  return (
-    <div className="worker-content-grid worker-content-grid-single">
-      <article className="worker-card worker-card-wide">
-        <div className="worker-card-label">Cobertura general</div>
-        <div className="worker-metric-grid worker-metric-grid-dashboard">
-          <MetricBox label="Campamento" value={`#${campId}`} />
-          <MetricBox label="Críticas" value={String(criticalRows.length)} />
-          <MetricBox label="En riesgo" value={String(atRiskRows.length)} />
-          <MetricBox label="Ocupaciones analizadas" value={String(coverageRows.length)} />
-        </div>
-      </article>
-
-      <article className="worker-card worker-card-wide">
-        <div className="worker-card-label">Elegir ocupación</div>
-        {error ? <ModuleStateCard title="Cobertura con observaciones" message={error} /> : null}
-        <div className="worker-control-grid">
-          <label className="worker-field worker-field-wide">
-            <span>Ocupación</span>
-            <select className="worker-input" value={selectedOccupationId ?? ''} onChange={(event) => setSelectedOccupationId(Number(event.target.value) || null)}>
-              <option value="">Selecciona una ocupación</option>
-              {occupationOptions.map((occupation) => (
-                <option key={occupation.id} value={occupation.id}>
-                  {occupation.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="button" className="worker-primary-btn" onClick={handleAutoAssign} disabled={!selectedOccupationId}>
-            Auto asignar reemplazo
-          </button>
-        </div>
-      </article>
-
-      <div className="worker-two-col-grid">
-        <article className="worker-card">
-          <div className="worker-card-label">Cobertura por ocupación</div>
-          <div className="worker-list-stack">
-            {coverageRows.map((row) => (
-              <div key={row.occupationId} className="worker-list-item is-static">
-                <div className="worker-list-item-head">
-                  <strong>{row.occupationName}</strong>
-                  <span className={`worker-pill ${row.isCritical ? 'is-critical' : row.isAtRisk ? 'is-highlight' : 'is-muted'}`}>
-                    {row.isCritical ? 'Crítica' : row.isAtRisk ? 'En riesgo' : 'Estable'}
-                  </span>
-                </div>
-                <p>{row.activeWorkers} activos / {row.minimumRequiredWorkers} mínimos</p>
-                <div className="worker-chart-track">
-                  <div className="worker-chart-fill" style={{ width: `${Math.min(100, row.coveragePercent)}%` }} />
-                </div>
-              </div>
-            ))}
-            {!coverageRows.length ? <ModuleStateCard title="Sin datos" message="No hay cobertura registrada." /> : null}
-          </div>
-        </article>
-
-        <article className="worker-card">
-          <div className="worker-card-label">Detalle seleccionado</div>
-          {selectedCoverage ? (
-            <div className="worker-detail-stack">
-              <h3>{selectedCoverage.occupationName}</h3>
-              <div className="worker-detail-grid">
-                <DetailRow label="Disponibles" value={String(selectedCoverage.availableWorkers)} />
-                <DetailRow label="Activos" value={String(selectedCoverage.activeWorkers)} />
-                <DetailRow label="Cobertura" value={`${selectedCoverage.coveragePercent}%`} />
-                <DetailRow label="Mínimo" value={String(selectedCoverage.minimumRequiredWorkers)} />
-                <DetailRow label="Preferido" value={selectedCoverage.preferredWorkers ? String(selectedCoverage.preferredWorkers) : 'Sin preferencia'} />
-                <DetailRow label="Déficit" value={String(selectedCoverage.deficit)} />
-                <DetailRow label="Excedente" value={String(selectedCoverage.surplus)} />
-                <DetailRow label="Umbral" value={selectedCoverage.criticalThresholdPercent} />
-              </div>
-            </div>
-          ) : (
-            <ModuleStateCard title="Sin selección" message="Elige una ocupación para ver su cobertura exacta." />
-          )}
-        </article>
-      </div>
-
-      <div className="worker-two-col-grid">
-        <article className="worker-card">
-          <div className="worker-card-label">Ocupaciones críticas</div>
-          <div className="worker-list-stack">
-            {criticalRows.map((row) => (
-              <div key={row.occupationId} className="worker-list-item is-static">
-                <div className="worker-list-item-head">
-                  <strong>{row.occupationName}</strong>
-                  <span className="worker-pill is-critical">Crítica</span>
-                </div>
-                <p>{row.availableWorkers} disponibles, cobertura {row.coveragePercent}%</p>
-              </div>
-            ))}
-            {!criticalRows.length ? <ModuleStateCard title="Sin alertas críticas" message="No hay ocupaciones críticas en este campamento." /> : null}
-          </div>
-        </article>
-
-        <article className="worker-card">
-          <div className="worker-card-label">Sugerencias de reemplazo</div>
-          <div className="worker-list-stack">
-            {suggestions.map((suggestion) => (
-              <div key={suggestion.personId} className="worker-list-item is-static">
-                <div className="worker-list-item-head">
-                  <strong>{suggestion.personName}</strong>
-                  <span className={`worker-pill priority-${suggestion.priority.toLowerCase()}`}>{suggestion.priority}</span>
-                </div>
-                <p>{suggestion.currentOccupationName} → {suggestion.targetOccupationName}</p>
-                <p>{suggestion.reason}</p>
-              </div>
-            ))}
-            {!suggestions.length ? <ModuleStateCard title="Sin sugerencias" message="No hay reemplazos sugeridos para la ocupación seleccionada." /> : null}
-          </div>
-          {autoResult ? (
-            <div className={`worker-result-box ${autoResult.success ? 'is-success' : 'is-error'}`}>
-              <strong>{autoResult.success ? 'Asignación completada' : 'No se pudo asignar'}</strong>
-              <p>{autoResult.message}</p>
-              {autoResult.assignedPerson ? (
-                <p>{autoResult.assignedPerson.name}: {autoResult.assignedPerson.fromOccupation} → {autoResult.assignedPerson.toOccupation}</p>
-              ) : null}
-            </div>
-          ) : null}
-          {actionLoading ? <ModuleStateCard title="Procesando" message="Ejecutando la acción solicitada..." /> : null}
-        </article>
-      </div>
-    </div>
-  )
-}
 
 function CollectionSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser | null }) {
   const [recordId, setRecordId] = useState('')
@@ -1226,7 +866,7 @@ function CollectionSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUs
       const nextRecord = await fetchWorkerDailyCollectionRecord(numericId)
       setRecord(nextRecord)
     } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError.message : 'No se pudo cargar el registro')
+      setError(fetchError instanceof Error ? translateDailyCollectionError(fetchError.message) : 'No se pudo cargar el registro')
       setRecord(null)
     } finally {
       setLoading(false)
@@ -1257,7 +897,6 @@ function CollectionSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUs
             Cargar registro
           </button>
         </div>
-        <p className="worker-helper-text">Se muestran solo registros reales y la vista respeta el campamento del usuario autenticado.</p>
       </article>
 
       <article className="worker-card worker-card-wide">
@@ -1268,20 +907,13 @@ function CollectionSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUs
           <div className="worker-detail-stack">
             <h3>Registro #{record.id}</h3>
             <div className="worker-detail-grid">
-              <DetailRow label="Campamento" value={`#${record.campId}`} />
-              <DetailRow label="Persona" value={`#${record.personId}`} />
-              <DetailRow label="Tipo de recurso" value={`#${record.resourceTypeId}`} />
               <DetailRow label="Fecha" value={formatDateLabel(record.date)} />
               <DetailRow label="Esperado" value={record.expectedAmount} />
               <DetailRow label="Real" value={record.actualAmount} />
               <DetailRow label="Motivo" value={record.differenceReason || 'Sin observaciones'} />
-              <DetailRow label="Registrado por" value={`#${record.recordedBy}`} />
-              <DetailRow label="Movimiento" value={record.movementId ? `#${record.movementId}` : 'Sin vínculo'} />
             </div>
           </div>
-        ) : (
-          <ModuleStateCard title="Sin registro cargado" message="Ingresa un id para ver el detalle de la recolección diaria." />
-        )}
+        ) : null}
       </article>
     </div>
   )
@@ -1296,45 +928,13 @@ function ModuleStateCard({ title, message }: { title: string; message: string })
   )
 }
  
-class ErrorBoundary extends Component<{ children?: ReactNode }, { hasError: boolean; message?: string }> {
-  constructor(props: any) {
-    super(props)
-    this.state = { hasError: false }
-  }
 
-  componentDidCatch(error: unknown) {
-    console.error('Worker coverage error:', error)
-    this.setState({ hasError: true, message: error instanceof Error ? error.message : String(error) })
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="worker-empty-state">
-          <strong>Se produjo un error</strong>
-          <p>{this.state.message ?? 'Error en el módulo de cobertura'}</p>
-        </div>
-      )
-    }
-
-    return this.props.children ?? null
-  }
-}
-
-function MetricBox({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  )
-}
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="worker-detail-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <span className="worker-detail-label">{label}</span>
+      <strong className="worker-detail-value">{value}</strong>
     </div>
   )
 }
@@ -1350,22 +950,56 @@ function formatDateLabel(value: string): string {
   }).format(date)
 }
 
+function translateDailyCollectionError(message: string): string {
+  const normalizedMessage = message.trim().toLowerCase()
+
+  if (normalizedMessage === 'daily collection record not found') {
+    return 'No se encontró el registro de recolección diaria.'
+  }
+
+  if (normalizedMessage === 'you do not have permission to view this record') {
+    return 'No tienes permiso para ver este registro.'
+  }
+
+  return message
+}
+
+function translateNotificationError(message: string): string {
+  const normalized = message.trim().toLowerCase()
+
+  if (normalized.includes('token') || normalized.includes('authorization') || normalized.includes('unauthorized') || normalized.includes('no token')) {
+    return 'Sesión no válida o expirada. Por favor inicia sesión.'
+  }
+
+  if (normalized.includes('not found')) {
+    return 'No se encontraron notificaciones.'
+  }
+
+  
+  return 'No se pudieron cargar las notificaciones. Intenta de nuevo más tarde.'
+}
+
+function translateOccupationError(message: string): { message: string; requiresSession: boolean } {
+  const normalized = message.trim().toLowerCase()
+
+  if (normalized.includes('token') || normalized.includes('authorization') || normalized.includes('unauthorized') || normalized.includes('no token')) {
+    return {
+      message: 'Sesión no disponible',
+      requiresSession: true,
+    }
+  }
+
+  return {
+    message: 'No se pudieron cargar las ocupaciones. Intenta de nuevo más tarde.',
+    requiresSession: false,
+  }
+}
+
 function IconSvg({ children }: { children: ReactNode }) {
   return (
     <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" className="worker-svg-icon">
       {children}
     </svg>
-  )
-}
-
-function DashboardIcon() {
-  return (
-    <IconSvg>
-      <rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.7" />
-      <rect x="13" y="4" width="7" height="4" rx="1.5" stroke="currentColor" strokeWidth="1.7" />
-      <rect x="13" y="10" width="7" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.7" />
-      <rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.7" />
-    </IconSvg>
   )
 }
 
@@ -1397,11 +1031,4 @@ function OccupationIcon() {
   )
 }
 
-function CoverageIcon() {
-  return (
-    <IconSvg>
-      <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      <path d="M8 4v16M16 4v16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-    </IconSvg>
-  )
-}
+ 

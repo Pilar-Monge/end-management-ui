@@ -14,27 +14,6 @@ export type ExpeditionStatus =
   | 'RETURNED_AFTER_LOST'
   | 'CANCELED'
 
-export interface WorkerDashboardPersonalData {
-  userId: number | null
-  general: {
-    unreadNotifications: number
-    totalPersons: number
-    pendingAdmissionRequests: number
-  }
-  inventory: {
-    resources: Array<{
-      resourceName: string
-      currentAmount: number | string
-    }>
-    criticalStockCount: number
-  }
-  expeditions: Record<ExpeditionStatus, number>
-  consumptionTrend: Array<{
-    date: string
-    totalConsumed: number | string
-  }>
-}
-
 export interface WorkerNotification {
   id: number
   campId: number

@@ -1,7 +1,6 @@
 import type {
   PaginationInfo,
   WorkerAutoAssignmentResult,
-  WorkerDashboardPersonalData,
   WorkerDailyCollectionRecord,
   WorkerNotification,
   WorkerOccupation,
@@ -49,14 +48,6 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return payload as T
-}
-
-export async function fetchWorkerDashboardPersonal(): Promise<WorkerDashboardPersonalData> {
-  const payload = await requestJson<{ success: boolean; data: WorkerDashboardPersonalData }>('/dashboard/personal', {
-    method: 'GET',
-  })
-
-  return payload.data
 }
 
 export async function fetchWorkerNotifications(params: {
