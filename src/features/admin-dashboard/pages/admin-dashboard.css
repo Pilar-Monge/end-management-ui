@@ -424,6 +424,51 @@
   position: relative;
 }
 
+.admin-ui-v2-time-hud {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(103, 172, 169, 0.28);
+  background: rgba(4, 12, 12, 0.75);
+  padding: 4px 8px;
+  color: #f0fafa;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.admin-ui-v2-time-day,
+.admin-ui-v2-time-clock {
+  white-space: nowrap;
+}
+
+.admin-ui-v2-time-sep {
+  color: rgba(164, 194, 197, 0.42);
+}
+
+.admin-ui-v2-time-status {
+  border: 1px solid rgba(164, 194, 197, 0.32);
+  padding: 1px 5px;
+  font-size: 8px;
+}
+
+.admin-ui-v2-time-status.is-synced {
+  color: #8ef0bb;
+  border-color: rgba(72, 197, 143, 0.55);
+}
+
+.admin-ui-v2-time-status.is-syncing {
+  color: #fbd38d;
+  border-color: rgba(239, 193, 110, 0.58);
+}
+
+.admin-ui-v2-time-status.is-error {
+  color: #fca5a5;
+  border-color: rgba(243, 123, 123, 0.55);
+}
+
 .admin-ui-v2-profile-hud-btn.is-open {
   color: #f0fafa;
 }
@@ -665,6 +710,10 @@
 }
 
 @media (max-width: 900px) {
+  .admin-ui-v2-time-hud {
+    display: none;
+  }
+
   .admin-ui-v2-profile-card {
     grid-template-columns: auto minmax(0, 1fr);
   }

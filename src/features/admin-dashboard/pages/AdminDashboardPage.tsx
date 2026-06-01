@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -27,6 +27,7 @@ import {
   getExpeditionsDashboard,
   getGeneralDashboard,
   getInventoryDashboard,
+  getServerTime,
   getIntercampRequestById,
   getLatestCampAchievementUnlocks,
   getTransferById,
@@ -50,7 +51,7 @@ import {
   mapIntercampFromApi,
   mapNotificationFromApi,
 } from "../mappers/adminMappers";
-import { ExpeditionsWorldMap } from "../expeditions/components/ExpeditionsWorldMap";
+import { ExpeditionsWorldMap, prefetchExpeditionsWorldMap } from "../expeditions/components/ExpeditionsWorldMap";
 import type { MappedCampPoint } from "../expeditions/types";
 import { AdminBootOverlay } from "../components/AdminBootOverlay";
 import { SESSION_TOKEN_CHANGED_EVENT } from "../../../shared/services/sessionService";
@@ -186,6 +187,12 @@ interface AdminProfileSummary {
   status: string;
   avatarUrl: string;
   sessionState: "ACTIVA" | "INACTIVA";
+}
+
+interface GlobalTimeState {
+  baseServerTime: Date;
+  syncedAtClientMs: number;
+  status: "synced" | "syncing" | "error";
 }
 
 const SESSION_TIMEOUT_MS = 20 * 60 * 1000;
@@ -531,6 +538,12 @@ function resolveAdminProfileImage(sessionUser: SessionAdminUser, matchedPerson: 
   return "https://i.pravatar.cc/80?img=12";
 }
 
+function formatHudDateTime(date: Date): { day: string; time: string } {
+  const day = `${String(date.getUTCDate()).padStart(2, "0")}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`;
+  const time = `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(date.getUTCSeconds()).padStart(2, "0")} UTC`;
+  return { day, time };
+}
+
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
 
@@ -557,11 +570,16 @@ export default function AdminDashboardPage() {
   const [activeAchievementUnlock, setActiveAchievementUnlock] = useState<CampAchievementUnlock | null>(null);
   const [lookupId, setLookupId] = useState("");
   const [sessionState, setSessionState] = useState<"ACTIVA" | "INACTIVA">("INACTIVA");
-  const [lastActivityAt, setLastActivityAt] = useState(Date.now());
   const [moduleFeedback, setModuleFeedback] = useState<ModuleFeedback | null>(null);
   const [sessionAdminUser, setSessionAdminUser] = useState<SessionAdminUser>(() => readSessionAdminUser());
   const [dashboardPopup, setDashboardPopup] = useState<{ id: number; message: string; type: ModuleMessageType } | null>(null);
+  const [globalTimeState, setGlobalTimeState] = useState<GlobalTimeState>({
+    baseServerTime: new Date(),
+    syncedAtClientMs: Date.now(),
+    status: "syncing",
+  });
   const lastActivityUpdateRef = useRef(0);
+  const lastActivityAtRef = useRef(Date.now());
   const bootStartedAtRef = useRef<number>(Date.now());
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [bootDataProgress, setBootDataProgress] = useState(0);
@@ -639,13 +657,13 @@ export default function AdminDashboardPage() {
     };
 
     try {
-      let failedCount = 0;
+      let criticalFailedCount = 0;
 
-      const safeRun = async <T,>(runner: () => Promise<T>, fallback: T): Promise<T> => {
+      const safeRunCritical = async <T,>(runner: () => Promise<T>, fallback: T): Promise<T> => {
         try {
           return await runner();
         } catch {
-          failedCount += 1;
+          criticalFailedCount += 1;
           return fallback;
         }
       };
@@ -660,44 +678,32 @@ export default function AdminDashboardPage() {
         generalDashboard,
         inventoryDashboard,
         expeditionsDashboard,
-        notificationRecords,
-        inventoryMovements,
-        achievementProgressRecords,
-        latestAchievementUnlocks,
       ] = await Promise.all([
-        safeRun(async () => {
+        safeRunCritical(async () => {
           const value = await fetchPersons();
           completeBootStep("persons", "Sincronizando poblacion...");
           return value;
         }, [] as Awaited<ReturnType<typeof fetchPersons>>),
-        safeRun(fetchCamps, [] as Awaited<ReturnType<typeof fetchCamps>>),
-        safeRun(fetchOccupations, [] as Awaited<ReturnType<typeof fetchOccupations>>),
-        safeRun(async () => {
+        safeRunCritical(fetchCamps, [] as Awaited<ReturnType<typeof fetchCamps>>),
+        safeRunCritical(fetchOccupations, [] as Awaited<ReturnType<typeof fetchOccupations>>),
+        safeRunCritical(async () => {
           const value = await listAdmissionRequests();
           completeBootStep("admissions", "Procesando admisiones IA...");
           return value;
         }, [] as Awaited<ReturnType<typeof listAdmissionRequests>>),
-        safeRun(listExpeditions, [] as Awaited<ReturnType<typeof listExpeditions>>),
-        safeRun(async () => {
+        safeRunCritical(listExpeditions, [] as Awaited<ReturnType<typeof listExpeditions>>),
+        safeRunCritical(async () => {
           const value = await listIntercampRequests();
           completeBootStep("intercamp", "Conectando inter-campamentos...");
           return value;
         }, [] as Awaited<ReturnType<typeof listIntercampRequests>>),
-        safeRun(getGeneralDashboard, {} as Awaited<ReturnType<typeof getGeneralDashboard>>),
-        safeRun(getInventoryDashboard, {} as Awaited<ReturnType<typeof getInventoryDashboard>>),
-        safeRun(getExpeditionsDashboard, {} as Awaited<ReturnType<typeof getExpeditionsDashboard>>),
-        safeRun(async () => {
-          const value = await listNotifications();
-          completeBootStep("notifications", "Cargando notificaciones...");
-          return value;
-        }, [] as Awaited<ReturnType<typeof listNotifications>>),
-        safeRun(listInventoryMovements, [] as Awaited<ReturnType<typeof listInventoryMovements>>),
-        safeRun(getCampAchievementsProgress, [] as Awaited<ReturnType<typeof getCampAchievementsProgress>>),
-        safeRun(() => getLatestCampAchievementUnlocks(5), [] as Awaited<ReturnType<typeof getLatestCampAchievementUnlocks>>),
+        safeRunCritical(getGeneralDashboard, {} as Awaited<ReturnType<typeof getGeneralDashboard>>),
+        safeRunCritical(getInventoryDashboard, {} as Awaited<ReturnType<typeof getInventoryDashboard>>),
+        safeRunCritical(getExpeditionsDashboard, {} as Awaited<ReturnType<typeof getExpeditionsDashboard>>),
       ]);
 
-      if (failedCount > 0) {
-        notifyModule("global", "warning", `Se cargaron datos parciales: ${failedCount} modulo(s) fallaron en backend.`);
+      if (criticalFailedCount > 0) {
+        notifyModule("global", "warning", `Carga inicial parcial: ${criticalFailedCount} modulo(s) critico(s) fallaron en backend.`);
       }
 
       setPersons(personsData);
@@ -706,14 +712,6 @@ export default function AdminDashboardPage() {
       setAdmissions(admissionsData.map((item) => mapAdmissionFromApi(item) as UiAdmission));
       setExpeditions(expeditionsData.map((item) => mapExpeditionFromApi(item) as UiExpedition));
       setIntercampRequests(intercampData.map((item) => mapIntercampFromApi(item) as UiIntercampRequest));
-      setNotifications(notificationRecords.map((item) => mapNotificationFromApi(item) as UiNotification));
-      const inventoryMovementRecords = inventoryMovements as unknown as Array<Record<string, unknown>>;
-      setResourceTrendData(buildResourceTrendData(inventoryMovementRecords));
-      const ledger = buildResourceLedger(inventoryMovementRecords);
-      setConsumedResources(ledger.consumed);
-      setGainedResources(ledger.gained);
-      setAchievementProgress(achievementProgressRecords);
-      enqueueAchievementUnlocks(latestAchievementUnlocks);
       setDashboardKpi({
         populationTotal: extractNumberByHint(generalDashboard, ["population", "persons", "totalpeople", "total"], personsData.length),
         criticalResources: extractNumberByHint(inventoryDashboard, ["critical", "alert", "low"], 0),
@@ -729,6 +727,43 @@ export default function AdminDashboardPage() {
         ),
       });
       completeBootStep("session", "Validando sesion y perfil...");
+
+      void (async () => {
+        let deferredFailedCount = 0;
+
+        const safeRunDeferred = async <T,>(runner: () => Promise<T>, fallback: T): Promise<T> => {
+          try {
+            return await runner();
+          } catch {
+            deferredFailedCount += 1;
+            return fallback;
+          }
+        };
+
+        const [notificationRecords, inventoryMovements, achievementProgressRecords, latestAchievementUnlocks] = await Promise.all([
+          safeRunDeferred(async () => {
+            const value = await listNotifications();
+            completeBootStep("notifications", "Cargando notificaciones...");
+            return value;
+          }, [] as Awaited<ReturnType<typeof listNotifications>>),
+          safeRunDeferred(listInventoryMovements, [] as Awaited<ReturnType<typeof listInventoryMovements>>),
+          safeRunDeferred(getCampAchievementsProgress, [] as Awaited<ReturnType<typeof getCampAchievementsProgress>>),
+          safeRunDeferred(() => getLatestCampAchievementUnlocks(5), [] as Awaited<ReturnType<typeof getLatestCampAchievementUnlocks>>),
+        ]);
+
+        setNotifications(notificationRecords.map((item) => mapNotificationFromApi(item) as UiNotification));
+        const inventoryMovementRecords = inventoryMovements as unknown as Array<Record<string, unknown>>;
+        setResourceTrendData(buildResourceTrendData(inventoryMovementRecords));
+        const ledger = buildResourceLedger(inventoryMovementRecords);
+        setConsumedResources(ledger.consumed);
+        setGainedResources(ledger.gained);
+        setAchievementProgress(achievementProgressRecords);
+        enqueueAchievementUnlocks(latestAchievementUnlocks);
+
+        if (deferredFailedCount > 0) {
+          notifyModule("global", "warning", `Carga diferida parcial: ${deferredFailedCount} modulo(s) secundarios fallaron.`);
+        }
+      })();
     } catch (error) {
       setDataError(getErrorMessage(error, "load_dashboard"));
       notifyModule("global", "error", "No se logro completar la sincronizacion general de modulos.");
@@ -781,6 +816,41 @@ export default function AdminDashboardPage() {
   }, [hasEntered, loadCoreData]);
 
   useEffect(() => {
+    if (!hasEntered) return;
+
+    const syncGlobalTime = async () => {
+      setGlobalTimeState((prev) => ({ ...prev, status: "syncing" }));
+      try {
+        const data = await getServerTime();
+        const parsed = new Date(data.serverTime);
+        if (Number.isNaN(parsed.getTime())) {
+          throw new Error("Invalid server time");
+        }
+
+        setGlobalTimeState({
+          baseServerTime: parsed,
+          syncedAtClientMs: Date.now(),
+          status: "synced",
+        });
+      } catch {
+        setGlobalTimeState((prev) => ({
+          ...prev,
+          baseServerTime: new Date(),
+          syncedAtClientMs: Date.now(),
+          status: "error",
+        }));
+      }
+    };
+
+    void syncGlobalTime();
+    const syncInterval = window.setInterval(() => {
+      void syncGlobalTime();
+    }, 60000);
+
+    return () => window.clearInterval(syncInterval);
+  }, [hasEntered]);
+
+  useEffect(() => {
     if (activeAchievementUnlock || achievementUnlockQueue.length === 0) return;
     const [nextUnlock, ...rest] = achievementUnlockQueue;
     setAchievementUnlockQueue(rest);
@@ -819,7 +889,7 @@ export default function AdminDashboardPage() {
       const now = Date.now();
       if (now - lastActivityUpdateRef.current < 500) return;
       lastActivityUpdateRef.current = now;
-      setLastActivityAt(now);
+      lastActivityAtRef.current = now;
     };
     const events: Array<keyof WindowEventMap> = ["mousemove", "mousedown", "click", "keydown", "touchstart", "scroll"];
     events.forEach((eventName) => window.addEventListener(eventName, markActivity, { passive: true }));
@@ -830,17 +900,18 @@ export default function AdminDashboardPage() {
     const evaluateSession = () => {
       const hasToken = Boolean(localStorage.getItem("token") ?? localStorage.getItem("accessToken"));
       if (!hasToken) {
-        setSessionState("INACTIVA");
+        setSessionState((prev) => (prev === "INACTIVA" ? prev : "INACTIVA"));
         return;
       }
 
-      const idleMs = Date.now() - lastActivityAt;
-      setSessionState(idleMs >= SESSION_TIMEOUT_MS ? "INACTIVA" : "ACTIVA");
+      const idleMs = Date.now() - lastActivityAtRef.current;
+      const nextSessionState = idleMs >= SESSION_TIMEOUT_MS ? "INACTIVA" : "ACTIVA";
+      setSessionState((prev) => (prev === nextSessionState ? prev : nextSessionState));
     };
 
     evaluateSession();
 
-    const interval = setInterval(evaluateSession, 1000);
+    const interval = setInterval(evaluateSession, 5000);
     const onTokenChanged = () => evaluateSession();
     window.addEventListener(SESSION_TOKEN_CHANGED_EVENT, onTokenChanged);
 
@@ -848,7 +919,7 @@ export default function AdminDashboardPage() {
       clearInterval(interval);
       window.removeEventListener(SESSION_TOKEN_CHANGED_EVENT, onTokenChanged);
     };
-  }, [lastActivityAt]);
+  }, []);
 
   const handleNavClick = (navId: AdminSectionId) => {
     const nextNavId: AdminSectionId = activeNav === navId ? "centro" : navId;
@@ -1030,7 +1101,14 @@ export default function AdminDashboardPage() {
     <div className="game-screen-layout text-[#A4C2C5]">
       <div className="holo-grid" />
 
-      {hasEntered && <TopHud onBack={() => navigate("/admin-main-view-ui")} onLogout={handleLogout} profile={adminProfile} />}
+      {hasEntered && (
+        <TopHud
+          onBack={() => navigate("/admin-main-view-ui")}
+          onLogout={handleLogout}
+          profile={adminProfile}
+          globalTimeState={globalTimeState}
+        />
+      )}
 
       {hasEntered && (
         <div className="main-area">
@@ -1184,9 +1262,23 @@ export default function AdminDashboardPage() {
   );
 }
 
-function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: () => void; profile: AdminProfileSummary }) {
+function TopHud({
+  onBack,
+  onLogout,
+  profile,
+  globalTimeState,
+}: {
+  onBack: () => void;
+  onLogout: () => void;
+  profile: AdminProfileSummary;
+  globalTimeState: GlobalTimeState;
+}) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProfilePreviewOpen, setIsProfilePreviewOpen] = useState(false);
+  const [currentGlobalTime, setCurrentGlobalTime] = useState<Date>(() => {
+    const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
+    return new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs);
+  });
   const profileWrapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -1222,6 +1314,18 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isProfilePreviewOpen]);
 
+  useEffect(() => {
+    const tickInterval = window.setInterval(() => {
+      const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
+      setCurrentGlobalTime(new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs));
+    }, 1000);
+
+    return () => window.clearInterval(tickInterval);
+  }, [globalTimeState.baseServerTime, globalTimeState.syncedAtClientMs]);
+
+  const hudDateTime = useMemo(() => formatHudDateTime(currentGlobalTime), [currentGlobalTime]);
+  const profileButtonLabel = `${profile.role} · @${profile.username}`;
+
   return (
     <header className="game-hud-header pointer-events-none flex items-center justify-between px-3 pt-3 pb-2 text-[10px] font-black uppercase tracking-[-0.02em] text-[#A4C2C5]/80">
       <button className="pointer-events-auto top-hud-btn" type="button" onClick={onBack}>
@@ -1233,6 +1337,14 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
           Volver al Centro
         </span>
       </button>
+      <div className="admin-ui-v2-time-hud pointer-events-auto" aria-live="polite">
+        <span className="admin-ui-v2-time-day">{hudDateTime.day}</span>
+        <span className="admin-ui-v2-time-sep" aria-hidden="true">|</span>
+        <span className="admin-ui-v2-time-clock">{hudDateTime.time}</span>
+        <span className={`admin-ui-v2-time-status is-${globalTimeState.status}`}>
+          {globalTimeState.status === "synced" ? "Sincronizado" : globalTimeState.status === "syncing" ? "Sincronizando" : "Hora local"}
+        </span>
+      </div>
       <div className="admin-ui-v2-profile-hud-wrap pointer-events-auto" ref={profileWrapRef}>
         <button
           className={`top-hud-btn admin-ui-v2-profile-hud-btn ${isProfileOpen ? "is-open" : ""}`}
@@ -1242,7 +1354,7 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
           aria-haspopup="dialog"
         >
           <span className="btn-text">
-            Perfil
+            {profileButtonLabel}
             <span className="admin-ui-v2-profile-session-dot" data-state={profile.sessionState} aria-hidden="true" />
           </span>
         </button>
@@ -1256,7 +1368,14 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
                 onClick={() => setIsProfilePreviewOpen(true)}
                 aria-label="Ver foto de perfil ampliada"
               >
-                <img className="admin-ui-v2-profile-popover-avatar" src={profile.avatarUrl} alt={`Perfil de ${profile.displayName}`} />
+                <img
+                  className="admin-ui-v2-profile-popover-avatar"
+                  src={profile.avatarUrl}
+                  alt={`Perfil de ${profile.displayName}`}
+                  loading="lazy"
+                  decoding="async"
+                  referrerPolicy="no-referrer"
+                />
               </button>
               <div>
                 <strong>{profile.displayName}</strong>
@@ -1307,7 +1426,13 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
               >
                 CERRAR
               </button>
-              <img src={profile.avatarUrl} alt={`Perfil ampliado de ${profile.displayName}`} />
+              <img
+                src={profile.avatarUrl}
+                alt={`Perfil ampliado de ${profile.displayName}`}
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+              />
             </motion.div>
           </motion.div>
         )}
@@ -1665,7 +1790,36 @@ function ContentArea({
   );
 }
 
-function DashboardModule({
+const CountdownClock = memo(function CountdownClock() {
+  const [countdown, setCountdown] = useState({ h: 0, m: 0, s: 0 });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      const target = new Date(now);
+      target.setHours(18, 0, 0, 0);
+      if (target.getTime() <= now.getTime()) {
+        target.setDate(target.getDate() + 1);
+      }
+      const remainingMs = Math.max(0, target.getTime() - now.getTime());
+      const totalSeconds = Math.floor(remainingMs / 1000);
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      setCountdown({ h, m, s });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="admin-ui-v2-countdown">
+      {String(countdown.h).padStart(2, "0")}:{String(countdown.m).padStart(2, "0")}:{String(countdown.s).padStart(2, "0")}
+    </div>
+  );
+});
+
+const DashboardModule = memo(function DashboardModule({
   kpi,
   populationStats,
   admissionsQueue,
@@ -1688,25 +1842,6 @@ function DashboardModule({
   onReload: () => Promise<void>;
   onQuickNav: (id: AdminSectionId) => void;
 }) {
-  const [countdown, setCountdown] = useState({ h: 0, m: 0, s: 0 });
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date();
-      const target = new Date(now);
-      target.setHours(18, 0, 0, 0);
-      if (target.getTime() <= now.getTime()) {
-        target.setDate(target.getDate() + 1);
-      }
-      const remainingMs = Math.max(0, target.getTime() - now.getTime());
-      const totalSeconds = Math.floor(remainingMs / 1000);
-      const h = Math.floor(totalSeconds / 3600);
-      const m = Math.floor((totalSeconds % 3600) / 60);
-      const s = totalSeconds % 60;
-      setCountdown({ h, m, s });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
   const populationTotal = kpi.populationTotal || populationStats.total;
   const activePopulation = kpi.activePopulation || populationStats.active;
   const injuredPopulation = kpi.injuredPopulation || populationStats.injured;
@@ -1915,9 +2050,7 @@ function DashboardModule({
         </div>
         <div className="admin-ui-v2-cycle-layout">
           <div>
-            <div className="admin-ui-v2-countdown">
-              {String(countdown.h).padStart(2, "0")}:{String(countdown.m).padStart(2, "0")}:{String(countdown.s).padStart(2, "0")}
-            </div>
+            <CountdownClock />
             <p>Automatización de consumo, colecta, alertas de inventario y reporte nocturno.</p>
           </div>
           <div className="admin-ui-v2-cycle-signals">
@@ -1930,7 +2063,7 @@ function DashboardModule({
       </div>
     </div>
   );
-}
+});
 
 function DashboardMetricCard({ label, value, detail, tone }: { label: string; value: number; detail: string; tone: "info" | "ok" | "warn" | "danger" }) {
   return (
@@ -1946,7 +2079,7 @@ function SignalTile({ label, tone }: { label: string; tone: "ok" | "warn" | "dan
   return <div className={`admin-ui-v2-signal is-${tone}`}>{label}</div>;
 }
 
-function PopulationModule({
+const PopulationModule = memo(function PopulationModule({
   sub,
   persons,
   camps,
@@ -2328,6 +2461,9 @@ function PopulationModule({
                         src={`https://i.pravatar.cc/60?img=${(person.id % 69) + 1}`}
                         alt={`Perfil de ${personFullName(person)}`}
                         className="admin-ui-v2-person-avatar"
+                        loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
                       />
                       <span>{personFullName(person)}</span>
                     </div>
@@ -2547,9 +2683,9 @@ function PopulationModule({
       )}
     </div>
   );
-}
+});
 
-function AdmissionsModule({
+const AdmissionsModule = memo(function AdmissionsModule({
   sub,
   admissions,
   admissionsQueue,
@@ -2736,9 +2872,9 @@ function AdmissionsModule({
       )}
     </div>
   );
-}
+});
 
-function AchievementsModule({
+const AchievementsModule = memo(function AchievementsModule({
   sub,
   achievements,
 }: {
@@ -2808,9 +2944,9 @@ function AchievementsModule({
       )}
     </div>
   );
-}
+});
 
-function SettingsModule({
+const SettingsModule = memo(function SettingsModule({
   sub,
   profile,
   onNotice,
@@ -2975,7 +3111,7 @@ function SettingsModule({
       </div>
     </div>
   );
-}
+});
 
 function AdmissionReviewModal({
   admission,
@@ -3119,7 +3255,7 @@ function AdmissionReviewModal({
   );
 }
 
-function ExpeditionsModule({
+const ExpeditionsModule = memo(function ExpeditionsModule({
   sub,
   expeditions,
   campCatalog,
@@ -3184,6 +3320,27 @@ function ExpeditionsModule({
 
   const selectedExpedition = visibleExpeditions.find((item) => item.id === selectedExpeditionId) ?? null;
   const selectedExpeditionRoute = selectedExpedition ? buildExpeditionRoute(selectedExpedition, mappedCamps) : null;
+
+  useEffect(() => {
+    if (sub !== "Mapa operativo") return;
+
+    const idleApi = window as Window & {
+      requestIdleCallback?: (callback: () => void) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    if (typeof idleApi.requestIdleCallback === "function") {
+      const idleCallbackId = idleApi.requestIdleCallback(() => prefetchExpeditionsWorldMap());
+      return () => {
+        if (typeof idleApi.cancelIdleCallback === "function") {
+          idleApi.cancelIdleCallback(idleCallbackId);
+        }
+      };
+    }
+
+    const timer = window.setTimeout(() => prefetchExpeditionsWorldMap(), 120);
+    return () => window.clearTimeout(timer);
+  }, [sub]);
 
   useEffect(() => {
     setSelectedExpeditionId((prev) => {
@@ -3378,7 +3535,7 @@ function ExpeditionsModule({
       )}
     </div>
   );
-}
+});
 
 function ResourceLedgerRow({
   entry,

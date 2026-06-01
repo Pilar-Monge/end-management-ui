@@ -101,7 +101,7 @@ export function usePersonForm(onSuccess?: () => void) {
           notes: formData.notes || undefined,
           status: formData.status,
         }
-        await updateMutation.mutateAsync({ id: formData.id, ...payload })
+        await updateMutation.mutateAsync({ id: formData.id, data: payload })
       } else {
         const payload: CreatePersonRequest = {
           firstName: formData.firstName,
@@ -111,7 +111,6 @@ export function usePersonForm(onSuccess?: () => void) {
           campId: formData.campId,
           occupationId: formData.occupationId,
           notes: formData.notes || undefined,
-          status: formData.status,
         }
         await createMutation.mutateAsync(payload)
       }

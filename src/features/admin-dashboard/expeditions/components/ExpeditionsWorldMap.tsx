@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo } from 'react'
+import { Suspense, lazy, useMemo, useEffect, useState } from 'react'
 import { AlertTriangle, MapPin, ShieldAlert, Users } from 'lucide-react'
 import type { MappedCampPoint } from '../types'
 
@@ -52,6 +52,23 @@ export function ExpeditionsWorldMap({
   selectedCampId,
   onSelectCamp,
 }: ExpeditionsWorldMapProps) {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const syncPreference = () => setPrefersReducedMotion(mediaQuery.matches)
+
+    syncPreference()
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', syncPreference)
+      return () => mediaQuery.removeEventListener('change', syncPreference)
+    }
+
+    mediaQuery.addListener(syncPreference)
+    return () => mediaQuery.removeListener(syncPreference)
+  }, [])
+
   const baseCamp = camps[0]
 
   const dots = useMemo<DotPath[]>(() => {
@@ -83,6 +100,7 @@ export function ExpeditionsWorldMap({
           <LazyWorldMap
             dots={dots}
             lineColor="#69BFB7"
+            lowMotion={prefersReducedMotion}
             onZoneClick={(dot) => {
               const hit = camps.find(
                 (camp) =>

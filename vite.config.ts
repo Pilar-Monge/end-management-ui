@@ -13,13 +13,35 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          if (id.includes('node_modules/three') || id.includes('node_modules/@react-three')) {
+          const normalizedId = id.replace(/\\/g, '/')
+
+          if (
+            normalizedId.includes('/node_modules/three/') ||
+            normalizedId.includes('/node_modules/@react-three/')
+          ) {
             return 'three-vendor'
           }
-          if (id.includes('node_modules/framer-motion') || id.includes('node_modules/gsap')) {
+
+          if (
+            normalizedId.includes('/node_modules/react-globe.gl/') ||
+            normalizedId.includes('/node_modules/three-globe/') ||
+            normalizedId.includes('/node_modules/dotted-map/')
+          ) {
+            return 'globe-vendor'
+          }
+
+          if (
+            normalizedId.includes('/node_modules/framer-motion/') ||
+            normalizedId.includes('/node_modules/gsap/')
+          ) {
             return 'animation-vendor'
           }
-          if (id.includes('node_modules/@tanstack/react-query')) {
+
+          if (normalizedId.includes('/node_modules/recharts/')) {
+            return 'charts-vendor'
+          }
+
+          if (normalizedId.includes('/node_modules/@tanstack/react-query/')) {
             return 'query-vendor'
           }
         },

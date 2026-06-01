@@ -18,6 +18,7 @@ interface WorldMapProps {
   dots?: Dot[]
   lineColor?: string
   onZoneClick?: (dot: Dot) => void
+  lowMotion?: boolean
 }
 
 let cachedSvgMap: string | null = null;
@@ -69,8 +70,10 @@ export function WorldMap({
   dots = [],
   lineColor = "#69BFB7",
   onZoneClick,
+  lowMotion = false,
 }: WorldMapProps) {
   const id = useId();
+  const shouldReduceMotion = lowMotion || dots.length > 12;
 
   const svgMap = useMemo(() => {
     primeWorldMapCache();
@@ -135,7 +138,7 @@ export function WorldMap({
                 transition={{ duration: 1.2, delay, ease: "easeOut" }}
               />
 
-              {route.speed > 0 && (
+              {route.speed > 0 && !shouldReduceMotion && (
                 <motion.path
                   d={createCurvedPath(startPoint, endPoint)}
                   fill="none"
@@ -170,14 +173,18 @@ export function WorldMap({
             <g key={`pins-${i}`}>
               <g>
                 <circle cx={startPoint.x} cy={startPoint.y} r="3" fill={color} opacity="0.9">
-                  <animate attributeName="r" from="3" to="9" dur="2s" repeatCount="indefinite" />
-                  <animate
-                    attributeName="opacity"
-                    from="0.5"
-                    to="0"
-                    dur="2s"
-                    repeatCount="indefinite"
-                  />
+                  {!shouldReduceMotion && (
+                    <>
+                      <animate attributeName="r" from="3" to="9" dur="2s" repeatCount="indefinite" />
+                      <animate
+                        attributeName="opacity"
+                        from="0.5"
+                        to="0"
+                        dur="2s"
+                        repeatCount="indefinite"
+                      />
+                    </>
+                  )}
                 </circle>
                 <circle cx={startPoint.x} cy={startPoint.y} r="3" fill={color} />
                 {dot.start.label && (
@@ -204,17 +211,23 @@ export function WorldMap({
                 className="hover:opacity-80 transition-opacity"
               >
                 <circle cx={endPoint.x} cy={endPoint.y} r="6" fill={color} opacity="0.24">
-                  <animate attributeName="r" from="4" to="12" dur="2s" repeatCount="indefinite" />
-                  <animate
-                    attributeName="opacity"
-                    from="0.4"
-                    to="0"
-                    dur="2s"
-                    repeatCount="indefinite"
-                  />
+                  {!shouldReduceMotion && (
+                    <>
+                      <animate attributeName="r" from="4" to="12" dur="2s" repeatCount="indefinite" />
+                      <animate
+                        attributeName="opacity"
+                        from="0.4"
+                        to="0"
+                        dur="2s"
+                        repeatCount="indefinite"
+                      />
+                    </>
+                  )}
                 </circle>
                 <circle cx={endPoint.x} cy={endPoint.y} r="10" fill="none" stroke={color} strokeOpacity="0.3" strokeDasharray="2 3">
-                  <animate attributeName="transform" attributeType="XML" type="rotate" from={`0 ${endPoint.x} ${endPoint.y}`} to={`360 ${endPoint.x} ${endPoint.y}`} dur="7s" repeatCount="indefinite" />
+                  {!shouldReduceMotion && (
+                    <animate attributeName="transform" attributeType="XML" type="rotate" from={`0 ${endPoint.x} ${endPoint.y}`} to={`360 ${endPoint.x} ${endPoint.y}`} dur="7s" repeatCount="indefinite" />
+                  )}
                 </circle>
                 <circle cx={endPoint.x} cy={endPoint.y} r="4" fill={color} />
                 {dot.end.label && (

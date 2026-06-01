@@ -1471,6 +1471,8 @@ export function MainHomePage() {
                     ref={bridgeVideoRef}
                     autoPlay
                     playsInline
+                    preload="metadata"
+                    poster={MEDIA_URLS.branding.background}
                     onLoadedMetadata={(e) => setBridgeVideoDuration(e.currentTarget.duration)}
                     onTimeUpdate={(e) => {
                       if (
@@ -1523,6 +1525,8 @@ export function MainHomePage() {
                     ref={mainVideoRef}
                     autoPlay
                     playsInline
+                    preload="metadata"
+                    poster={MEDIA_URLS.branding.background}
                     onCanPlay={(e) => (e.currentTarget.volume = 0.3)}
                     onTimeUpdate={(e) => {
                       if (e.currentTarget.currentTime >= 6.0) {

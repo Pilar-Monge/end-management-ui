@@ -5,8 +5,8 @@ export const STATUS_OPTIONS: Array<PersonStatus | 'ALL'> = [
   'ALL',
   'ACTIVE',
   'INJURED',
-  'MISSING',
-  'DECEASED',
+  'OUTSIDE_CAMP',
+  'INACTIVE',
 ]
 
 export function usePersonFiltering(persons: Person[]) {

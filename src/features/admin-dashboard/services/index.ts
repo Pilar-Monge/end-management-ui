@@ -13,6 +13,7 @@ export {
   getGeneralDashboard,
   getInventoryDashboard,
   getExpeditionsDashboard,
+  getServerTime,
 } from './dashboard.service'
 
 export {
