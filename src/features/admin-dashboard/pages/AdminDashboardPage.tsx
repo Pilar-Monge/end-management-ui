@@ -21,25 +21,17 @@ import type { Camp } from "../../camps/types";
 import { fetchOccupations } from "../../catalogs/api/queries";
 import type { Occupation } from "../../catalogs/types";
 import {
-  completeExpedition,
   getCampAchievementsProgress,
-  getDeliveredTransferResourceById,
   getExpeditionsDashboard,
   getGeneralDashboard,
   getInventoryDashboard,
   getServerTime,
-  getIntercampRequestById,
   getLatestCampAchievementUnlocks,
-  getTransferById,
-  getTransferHistoryById,
-  getTransferPersonById,
   listExpeditions,
   listAdmissionRequests,
   listIntercampRequests,
-  listInventoryMovements,
   listNotifications,
   markCampAchievementSeen,
-  updateIntercampRequestStatus,
   updateAdmissionRequestStatus,
   type CampAchievementProgress,
   type CampAchievementUnlock,
@@ -568,7 +560,6 @@ export default function AdminDashboardPage() {
   const [achievementProgress, setAchievementProgress] = useState<CampAchievementProgress[]>([]);
   const [achievementUnlockQueue, setAchievementUnlockQueue] = useState<CampAchievementUnlock[]>([]);
   const [activeAchievementUnlock, setActiveAchievementUnlock] = useState<CampAchievementUnlock | null>(null);
-  const [lookupId, setLookupId] = useState("");
   const [sessionState, setSessionState] = useState<"ACTIVA" | "INACTIVA">("INACTIVA");
   const [moduleFeedback, setModuleFeedback] = useState<ModuleFeedback | null>(null);
   const [sessionAdminUser, setSessionAdminUser] = useState<SessionAdminUser>(() => readSessionAdminUser());
@@ -658,6 +649,7 @@ export default function AdminDashboardPage() {
 
     try {
       let criticalFailedCount = 0;
+      let readOnlySkippedCount = 0;
 
       const safeRunCritical = async <T,>(runner: () => Promise<T>, fallback: T): Promise<T> => {
         try {
@@ -665,6 +657,18 @@ export default function AdminDashboardPage() {
         } catch {
           criticalFailedCount += 1;
           return fallback;
+        }
+      };
+
+      const safeRunReadOnly = async <T,>(runner: () => Promise<T>, fallback: T): Promise<T> => {
+        try {
+          return await runner();
+        } catch (error) {
+          if (error instanceof ApiHttpError && (error.statusCode === 401 || error.statusCode === 403 || error.statusCode === 404)) {
+            readOnlySkippedCount += 1;
+            return fallback;
+          }
+          throw error;
         }
       };
 
@@ -691,8 +695,11 @@ export default function AdminDashboardPage() {
           completeBootStep("admissions", "Procesando admisiones IA...");
           return value;
         }, [] as Awaited<ReturnType<typeof listAdmissionRequests>>),
-        safeRunCritical(listExpeditions, [] as Awaited<ReturnType<typeof listExpeditions>>),
-        safeRunCritical(async () => {
+        safeRunReadOnly(async () => {
+          const value = await listExpeditions();
+          return value;
+        }, [] as Awaited<ReturnType<typeof listExpeditions>>),
+        safeRunReadOnly(async () => {
           const value = await listIntercampRequests();
           completeBootStep("intercamp", "Conectando inter-campamentos...");
           return value;
@@ -704,6 +711,9 @@ export default function AdminDashboardPage() {
 
       if (criticalFailedCount > 0) {
         notifyModule("global", "warning", `Carga inicial parcial: ${criticalFailedCount} modulo(s) critico(s) fallaron en backend.`);
+      }
+      if (readOnlySkippedCount > 0) {
+        notifyModule("global", "info", `Algunos modulos de consulta no estan disponibles para este rol (${readOnlySkippedCount}).`);
       }
 
       setPersons(personsData);
@@ -740,23 +750,20 @@ export default function AdminDashboardPage() {
           }
         };
 
-        const [notificationRecords, inventoryMovements, achievementProgressRecords, latestAchievementUnlocks] = await Promise.all([
+        const [notificationRecords, achievementProgressRecords, latestAchievementUnlocks] = await Promise.all([
           safeRunDeferred(async () => {
             const value = await listNotifications();
             completeBootStep("notifications", "Cargando notificaciones...");
             return value;
           }, [] as Awaited<ReturnType<typeof listNotifications>>),
-          safeRunDeferred(listInventoryMovements, [] as Awaited<ReturnType<typeof listInventoryMovements>>),
           safeRunDeferred(getCampAchievementsProgress, [] as Awaited<ReturnType<typeof getCampAchievementsProgress>>),
           safeRunDeferred(() => getLatestCampAchievementUnlocks(5), [] as Awaited<ReturnType<typeof getLatestCampAchievementUnlocks>>),
         ]);
 
         setNotifications(notificationRecords.map((item) => mapNotificationFromApi(item) as UiNotification));
-        const inventoryMovementRecords = inventoryMovements as unknown as Array<Record<string, unknown>>;
-        setResourceTrendData(buildResourceTrendData(inventoryMovementRecords));
-        const ledger = buildResourceLedger(inventoryMovementRecords);
-        setConsumedResources(ledger.consumed);
-        setGainedResources(ledger.gained);
+        setResourceTrendData([]);
+        setConsumedResources([]);
+        setGainedResources([]);
         setAchievementProgress(achievementProgressRecords);
         enqueueAchievementUnlocks(latestAchievementUnlocks);
 
@@ -1024,66 +1031,6 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleCompleteExpedition = async (id: number) => {
-    try {
-      await completeExpedition(id);
-      setExpeditions((prev) => prev.map((expedition) => (expedition.id === id ? { ...expedition, status: "COMPLETADA" } : expedition)));
-      notifyModule("expediciones", "success", `Expedicion #${id} marcada como completada.`);
-    } catch (error) {
-      setDataError(getErrorMessage(error, "complete_expedition"));
-    }
-  };
-
-  const handleLookupIntercamp = async () => {
-    const id = Number(lookupId);
-    if (!Number.isFinite(id) || id <= 0) {
-      notifyModule("intercamp", "warning", "Ingresa un ID valido para buscar registros inter-campamento.");
-      return;
-    }
-
-    setDataError(null);
-
-    const loaders = [
-      () => getIntercampRequestById(id),
-      () => getTransferById(id),
-      () => getTransferHistoryById(id),
-      () => getTransferPersonById(id),
-      () => getDeliveredTransferResourceById(id),
-    ];
-
-    for (const load of loaders) {
-      try {
-        const record = await load();
-        const mapped = mapIntercampFromApi(record) as UiIntercampRequest;
-        setIntercampRequests((prev) => [mapped, ...prev.filter((item) => item.id !== mapped.id)]);
-        notifyModule("intercamp", "success", `Registro inter-campamento #${mapped.id} sincronizado.`);
-        return;
-      } catch {
-        // Keep trying remaining endpoints
-      }
-    }
-
-    notifyModule("intercamp", "warning", "No se encontro un registro inter-campamento con ese ID.");
-  };
-
-  const handleIntercampDecision = async (id: number, status: "APROBADO" | "RECHAZADO") => {
-    const backendStatus = status === "APROBADO" ? "APPROVED" : "REJECTED";
-    try {
-      const updated = await updateIntercampRequestStatus(id, backendStatus);
-      const mapped = mapIntercampFromApi(updated) as UiIntercampRequest;
-      setIntercampRequests((prev) => prev.map((item) => (item.id === id ? mapped : item)));
-      notifyModule(
-        "intercamp",
-        "success",
-        status === "APROBADO"
-          ? `Solicitud #${id} aprobada correctamente.`
-          : `Solicitud #${id} rechazada correctamente.`,
-      );
-    } catch (error) {
-      setDataError(getErrorMessage(error, "update_intercamp"));
-    }
-  };
-
   const threatLevel = Math.max(
     0,
     Math.min(
@@ -1136,15 +1083,10 @@ export default function AdminDashboardPage() {
                       consumedResources={consumedResources}
                       gainedResources={gainedResources}
                       intercampRequests={intercampRequests}
-                      lookupId={lookupId}
-                      setLookupId={setLookupId}
-                      onLookupIntercamp={handleLookupIntercamp}
                       campCatalog={camps}
                       campNameById={campNameById}
                       occupationNameById={occupationNameById}
                       onAdmissionDecision={handleAdmissionDecision}
-                      onCompleteExpedition={handleCompleteExpedition}
-                      onIntercampDecision={handleIntercampDecision}
                       onPopulationReload={loadCoreData}
                       onDashboardReload={loadCoreData}
                       resourceTrendData={resourceTrendData}
@@ -1178,15 +1120,10 @@ export default function AdminDashboardPage() {
                         consumedResources={consumedResources}
                         gainedResources={gainedResources}
                         intercampRequests={intercampRequests}
-                        lookupId={lookupId}
-                        setLookupId={setLookupId}
-                        onLookupIntercamp={handleLookupIntercamp}
                         campCatalog={camps}
                         campNameById={campNameById}
                         occupationNameById={occupationNameById}
                         onAdmissionDecision={handleAdmissionDecision}
-                        onCompleteExpedition={handleCompleteExpedition}
-                        onIntercampDecision={handleIntercampDecision}
                         onPopulationReload={loadCoreData}
                         onDashboardReload={loadCoreData}
                         resourceTrendData={resourceTrendData}
@@ -1497,15 +1434,10 @@ function ContentArea({
   consumedResources,
   gainedResources,
   intercampRequests,
-  lookupId,
-  setLookupId,
-  onLookupIntercamp,
   campCatalog,
   campNameById,
   occupationNameById,
   onAdmissionDecision,
-  onCompleteExpedition,
-  onIntercampDecision,
   onPopulationReload,
   onDashboardReload,
   onQuickNav,
@@ -1530,9 +1462,6 @@ function ContentArea({
   consumedResources: ResourceLedgerEntry[];
   gainedResources: ResourceLedgerEntry[];
   intercampRequests: UiIntercampRequest[];
-  lookupId: string;
-  setLookupId: (value: string) => void;
-  onLookupIntercamp: () => void;
   campCatalog: Camp[];
   campNameById: Map<number, string>;
   occupationNameById: Map<number, string>;
@@ -1541,8 +1470,6 @@ function ContentArea({
     decision: "approved" | "rejected",
     options?: { finalOccupationId?: number; finalRole?: string; rejectionReason?: string },
   ) => Promise<void>;
-  onCompleteExpedition: (id: number) => Promise<void>;
-  onIntercampDecision: (id: number, status: "APROBADO" | "RECHAZADO") => Promise<void>;
   onPopulationReload: () => Promise<void>;
   onDashboardReload: () => Promise<void>;
   onQuickNav: (id: AdminSectionId) => void;
@@ -1701,22 +1628,13 @@ function ContentArea({
           campCatalog={campCatalog}
           consumedResources={consumedResources}
           gainedResources={gainedResources}
-          onCompleteExpedition={onCompleteExpedition}
         />
       )}
 
       {section === "intercamp" && (
         <>
-          <div className="admin-ui-v2-toolbar">
-            <input
-              className="v-input admin-ui-v2-search"
-              placeholder="Buscar por ID de solicitud/traslado"
-              value={lookupId}
-              onChange={(event) => setLookupId(event.target.value)}
-            />
-            <button className="admin-ui-v2-btn is-info" onClick={() => void onLookupIntercamp()}>
-              Sincronizar por ID
-            </button>
+          <div className="admin-ui-v2-module-card">
+            <p className="admin-ui-v2-muted">Módulo en modo solo lectura para el rol administrador del sistema.</p>
           </div>
 
           <table className="v-table admin-ui-v2-table">
@@ -1727,7 +1645,7 @@ function ContentArea({
                 <th>Tipo</th>
                 <th>Estado</th>
                 <th>Tiempo</th>
-                <th>Acción</th>
+                <th>Acceso</th>
               </tr>
             </thead>
             <tbody>
@@ -1740,26 +1658,7 @@ function ContentArea({
                     <td>{request.type}</td>
                     <td><span className={`admin-ui-v2-pill ${intercampPillClass(request.status)}`}>{request.status}</span></td>
                     <td>{request.time}</td>
-                    <td>
-                      {request.status === "PENDIENTE" ? (
-                        <div className="admin-ui-v2-actions">
-                            <button
-                              className="admin-ui-v2-btn is-ok"
-                              onClick={() => void onIntercampDecision(request.id, "APROBADO")}
-                            >
-                              Aprobar
-                            </button>
-                            <button
-                              className="admin-ui-v2-btn is-danger"
-                              onClick={() => void onIntercampDecision(request.id, "RECHAZADO")}
-                            >
-                              Rechazar
-                            </button>
-                        </div>
-                      ) : (
-                        <span className="admin-ui-v2-muted">Sin acción</span>
-                      )}
-                    </td>
+                    <td><span className="admin-ui-v2-muted">Solo lectura</span></td>
                   </tr>
                 ))}
             </tbody>
@@ -3261,18 +3160,15 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
   campCatalog,
   consumedResources,
   gainedResources,
-  onCompleteExpedition,
 }: {
   sub: string;
   expeditions: UiExpedition[];
   campCatalog: Camp[];
   consumedResources: ResourceLedgerEntry[];
   gainedResources: ResourceLedgerEntry[];
-  onCompleteExpedition: (id: number) => Promise<void>;
 }) {
   const [selectedCampId, setSelectedCampId] = useState<number | null>(null);
   const [selectedExpeditionId, setSelectedExpeditionId] = useState<number | null>(null);
-  const [completingId, setCompletingId] = useState<number | null>(null);
   const effectiveExpeditions = expeditions;
 
   const mappedCamps = useMemo<MappedCampPoint[]>(() => {
@@ -3348,15 +3244,6 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
       return visibleExpeditions[0]?.id ?? null;
     });
   }, [visibleExpeditions]);
-
-  const handleComplete = async (expeditionId: number) => {
-    setCompletingId(expeditionId);
-    try {
-      await onCompleteExpedition(expeditionId);
-    } finally {
-      setCompletingId(null);
-    }
-  };
 
   const deployedPeopleCount = activeExpeditions.reduce((sum, expedition) => sum + expedition.participants.length, 0);
   const averageProgress =
@@ -3512,20 +3399,7 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
                     ))}
                   </div>
                 )}
-                {selectedExpedition.status !== "COMPLETADA" ? (
-                  <div className="admin-ui-v2-actions">
-                    <button
-                      className="admin-ui-v2-btn is-ok"
-                      onClick={() => void handleComplete(selectedExpedition.id)}
-                      type="button"
-                      disabled={completingId === selectedExpedition.id}
-                    >
-                      {completingId === selectedExpedition.id ? "Completando..." : "Completar expedición"}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="admin-ui-v2-muted">Misión cerrada y transferida a historial.</div>
-                )}
+                <div className="admin-ui-v2-muted">Vista de consulta habilitada para administración.</div>
               </div>
             ) : (
               <div className="admin-ui-v2-empty-cell">Selecciona una expedición para ver detalle.</div>
