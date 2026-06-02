@@ -6,7 +6,10 @@
   height: 100%;
   overflow-y: auto;
   padding: 16px 20px 24px;
-  width: 100%;
+  width: calc(100% - 26px);
+  margin-left: 26px;
+  margin-right: 0;
+  box-sizing: border-box;
 }
 
 .admin-ui-v2-content {
@@ -1748,6 +1751,8 @@
 
   .admin-ui-v2-content-wrap-full {
     padding: 10px;
+    width: calc(100% - 20px);
+    margin-left: 20px;
   }
 
   .admin-ui-v2-grid-3,
