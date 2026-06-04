@@ -533,11 +533,34 @@
   border: 2px solid rgba(105, 191, 183, 0.45);
 }
 
+.admin-ui-v2-avatar-fallback {
+  display: grid;
+  place-items: center;
+  color: #d7f5f3;
+  background:
+    radial-gradient(circle at 32% 24%, rgba(146, 220, 212, 0.35), transparent 62%),
+    linear-gradient(145deg, rgba(11, 34, 33, 0.96), rgba(8, 21, 21, 0.92));
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-ui-v2-profile-popover-avatar.admin-ui-v2-avatar-fallback {
+  font-size: 13px;
+}
+
 .admin-ui-v2-profile-avatar-button {
   border: 0;
   background: transparent;
   padding: 0;
+}
+
+.admin-ui-v2-profile-avatar-button.is-clickable {
   cursor: zoom-in;
+}
+
+.admin-ui-v2-profile-avatar-button.is-static {
+  cursor: default;
 }
 
 .admin-ui-v2-profile-popover-head strong {
@@ -1061,6 +1084,58 @@
   object-fit: cover;
   border-radius: 50%;
   border: 1px solid rgba(103, 172, 169, 0.35);
+}
+
+.admin-ui-v2-person-avatar.admin-ui-v2-avatar-fallback {
+  font-size: 9px;
+}
+
+.admin-ui-v2-settings-photo-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-ui-v2-settings-photo-preview-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.admin-ui-v2-settings-photo-preview {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 2px solid rgba(103, 172, 169, 0.4);
+  object-fit: cover;
+}
+
+.admin-ui-v2-settings-photo-preview.admin-ui-v2-avatar-fallback {
+  font-size: 22px;
+}
+
+.admin-ui-v2-settings-photo-message {
+  border: 1px solid rgba(103, 172, 169, 0.28);
+  background: rgba(5, 12, 20, 0.5);
+  color: rgba(164, 194, 197, 0.82);
+  font-family: "Courier New", monospace;
+  font-size: 10px;
+  line-height: 1.45;
+  padding: 8px 10px;
+}
+
+.admin-ui-v2-settings-photo-message.is-success {
+  border-color: rgba(55, 220, 130, 0.42);
+  color: rgba(145, 245, 180, 0.92);
+}
+
+.admin-ui-v2-settings-photo-message.is-warning {
+  border-color: rgba(255, 190, 80, 0.42);
+  color: rgba(255, 216, 155, 0.92);
+}
+
+.admin-ui-v2-settings-photo-message.is-error {
+  border-color: rgba(255, 90, 110, 0.42);
+  color: rgba(255, 170, 180, 0.94);
 }
 
 .admin-ui-v2-pagination {
@@ -1730,6 +1805,241 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/* --- TACTICAL ROLES UI --- */
+.admin-ui-v2-tactical-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.admin-ui-v2-roles-kpi {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-ui-v2-roles-kpi .admin-ui-v2-metric {
+  background: rgba(4, 14, 14, 0.6);
+  border: 1px solid rgba(103, 172, 169, 0.35);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.admin-ui-v2-assignment-card {
+  border: 1px solid rgba(103, 172, 169, 0.25);
+  background: rgba(4, 14, 14, 0.45);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-ui-v2-assignment-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+  border-color: rgba(105, 191, 183, 0.6);
+}
+
+.admin-ui-v2-assignment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-ui-v2-assignment-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-ui-v2-assignment-role-flow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(3, 10, 10, 0.5);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(103, 172, 169, 0.15);
+}
+
+.admin-ui-v2-assignment-role-flow span {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #f0fafa;
+}
+
+.admin-ui-v2-assignment-role-flow svg {
+  color: #69bfb7;
+  width: 14px;
+  height: 14px;
+}
+
+.admin-ui-v2-assignment-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.admin-ui-v2-assignment-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-ui-v2-assignment-dates small {
+  color: rgba(164, 194, 197, 0.65);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.admin-ui-v2-assignment-dates strong {
+  color: #e9f6f6;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.admin-ui-v2-timeline-bar-wrap {
+  width: 100%;
+  height: 4px;
+  background: rgba(164, 194, 197, 0.15);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 8px;
+  position: relative;
+}
+
+.admin-ui-v2-timeline-bar {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(105, 191, 183, 0.4), #69bfb7);
+  border-radius: 2px;
+  transition: width 0.3s ease-out;
+}
+
+.admin-ui-v2-timeline-bar.is-urgent {
+  background: linear-gradient(90deg, rgba(243, 123, 123, 0.4), #f37b7b);
+}
+
+.admin-ui-v2-tab-header {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid rgba(103, 172, 169, 0.2);
+  margin-bottom: 16px;
+}
+
+.admin-ui-v2-tab-btn {
+  background: transparent;
+  border: 0;
+  color: rgba(164, 194, 197, 0.6);
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s;
+}
+
+.admin-ui-v2-tab-btn:hover {
+  color: #a4c2c5;
+}
+
+.admin-ui-v2-tab-btn.is-active {
+  color: #69bfb7;
+}
+
+.admin-ui-v2-tab-btn.is-active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #69bfb7;
+}
+
+.admin-ui-v2-candidate-pill-list {
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.admin-ui-v2-candidate-pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: rgba(3, 10, 10, 0.45);
+  border: 1px solid rgba(103, 172, 169, 0.2);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.admin-ui-v2-candidate-pill:hover {
+  background: rgba(105, 191, 183, 0.1);
+  border-color: rgba(105, 191, 183, 0.4);
+}
+
+.admin-ui-v2-candidate-pill.is-selected {
+  background: rgba(105, 191, 183, 0.2);
+  border-color: #69bfb7;
+}
+
+.admin-ui-v2-candidate-pill-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-ui-v2-candidate-pill-info strong {
+  color: #f0fafa;
+  font-size: 12px;
+}
+
+.admin-ui-v2-candidate-pill-info span {
+  color: rgba(164, 194, 197, 0.7);
+  font-size: 10px;
+}
+
+.admin-ui-v2-tactical-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.admin-ui-v2-tactical-history-item {
+  border-left: 2px solid rgba(103, 172, 169, 0.4);
+  background: rgba(3, 10, 10, 0.3);
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-ui-v2-tactical-history-item h4 {
+  color: #e9f6f6;
+  font-size: 11px;
+  margin: 0 0 4px 0;
+  text-transform: uppercase;
+}
+
+.admin-ui-v2-tactical-history-item p {
+  color: rgba(164, 194, 197, 0.7);
+  font-size: 10px;
+  margin: 0;
 }
 
 @media (max-width: 1200px) {

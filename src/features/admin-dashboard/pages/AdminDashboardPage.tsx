@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -15,7 +15,7 @@ import {
 import { WorldMap } from "../../expeditions-ui/components/WorldMap";
 import { fetchPersons } from "../../persons/api/queries";
 import type { Person } from "../../persons/types";
-import { deletePerson, updatePerson } from "../../persons/api/mutations";
+import { deletePerson, updatePerson, updatePersonPhoto } from "../../persons/api/mutations";
 import { fetchCamps } from "../../camps/api/queries";
 import type { Camp } from "../../camps/types";
 import { fetchOccupations } from "../../catalogs/api/queries";
@@ -154,6 +154,9 @@ interface ResourceLedgerEntry {
 
 interface SessionAdminUser {
   id?: number;
+  personId?: number;
+  person_id?: number;
+  userId?: number;
   username?: string;
   displayName?: string;
   firstName?: string;
@@ -161,6 +164,8 @@ interface SessionAdminUser {
   lastName2?: string;
   role?: string;
   campId?: number;
+  photoUrl?: string;
+  imageUrl?: string;
   profileImage?: string;
   avatar?: string;
   photo?: string;
@@ -177,7 +182,7 @@ interface AdminProfileSummary {
   occupation: string;
   camp: string;
   status: string;
-  avatarUrl: string;
+  avatarUrl: string | null;
   sessionState: "ACTIVA" | "INACTIVA";
 }
 
@@ -227,7 +232,7 @@ const NAVIGATION_DATA: NavItem[] = [
   { id: "logros", label: "Logros", icon: <TrophyIcon />, subOptions: ["Progreso", "Desbloqueados", "Historial"] },
   { id: "seguridad", label: "Seguridad", icon: <SecurityIcon />, subOptions: ["En vivo", "Errores", "Sistema"] },
   { id: "notificaciones", label: "Notificaciones", icon: <AlertIcon />, subOptions: ["Todas", "No leídas", "Críticas"] },
-  { id: "configuracion", label: "Configuración", icon: <GearIcon />, subOptions: ["Campamento", "Sistema"] },
+  { id: "configuracion", label: "Configuración", icon: <GearIcon />, subOptions: ["Campamento"] },
 ];
 
 const BOTTOM_DOCK_ORDER: AdminSectionId[] = ["poblacion", "admisiones", "expediciones", "intercamp", "logros"];
@@ -431,6 +436,74 @@ function personFullName(person: Person): string {
   return `${person.firstName} ${person.lastName}`.trim();
 }
 
+function resolveInitials(parts: Array<string | null | undefined>, maxLetters = 3): string {
+  const initials = parts
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .filter(Boolean)
+    .slice(0, maxLetters)
+    .join("");
+  return initials || "USR";
+}
+
+function personInitials(person: Person): string {
+  const lastNameTokens = String(person.lastName ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  return resolveInitials([person.firstName, lastNameTokens[0], lastNameTokens[1]], 3);
+}
+
+function resolvePersonProfileImage(person: Person | null): string | null {
+  if (!person) return null;
+  const candidate =
+    (typeof person.photoUrl === "string" && person.photoUrl.trim()) ||
+    (typeof person.profileImage === "string" && person.profileImage.trim()) ||
+    (typeof person.avatar === "string" && person.avatar.trim()) ||
+    (typeof person.photo === "string" && person.photo.trim()) ||
+    (typeof person.imageUrl === "string" && person.imageUrl.trim()) ||
+    "";
+  return candidate || null;
+}
+
+function resolveSessionPerson(profile: SessionAdminUser, persons: Person[]): Person | null {
+  const explicitPersonId =
+    typeof profile.personId === "number"
+      ? profile.personId
+      : typeof profile.person_id === "number"
+        ? profile.person_id
+        : null;
+  if (explicitPersonId !== null) {
+    return persons.find((person) => person.id === explicitPersonId) ?? null;
+  }
+
+  const sessionId = typeof profile.id === "number" ? profile.id : typeof profile.userId === "number" ? profile.userId : null;
+  if (sessionId !== null) {
+    const linkedPerson = persons.find(
+      (person) => person.userId === sessionId || person.systemUserId === sessionId || person.accountId === sessionId,
+    );
+    if (linkedPerson) return linkedPerson;
+  }
+
+  const username = profile.username?.trim().toLowerCase();
+  if (username) {
+    return persons.find((person) => person.username?.trim().toLowerCase() === username) ?? null;
+  }
+
+  if (sessionId !== null) {
+    return persons.find((person) => person.id === sessionId) ?? null;
+  }
+
+  return null;
+}
+
+function resolveSessionPersonId(profile: SessionAdminUser, persons: Person[]): number | null {
+  if (typeof profile.personId === "number") return profile.personId;
+  if (typeof profile.person_id === "number") return profile.person_id;
+  return resolveSessionPerson(profile, persons)?.id ?? null;
+}
+
 function achievementUnlockKey(item: Pick<CampAchievementUnlock, "achievementId" | "unlockedAt">): string {
   return `${item.achievementId}:${item.unlockedAt}`;
 }
@@ -508,8 +581,10 @@ function normalizeRoleLabel(role?: string): string {
   return role.replace(/_/g, " ");
 }
 
-function resolveAdminProfileImage(sessionUser: SessionAdminUser, matchedPerson: Person | null): string {
+function resolveAdminProfileImage(sessionUser: SessionAdminUser, matchedPerson: Person | null): string | null {
   const storedProfileImage =
+    (typeof sessionUser.photoUrl === "string" && sessionUser.photoUrl.trim()) ||
+    (typeof sessionUser.imageUrl === "string" && sessionUser.imageUrl.trim()) ||
     (typeof sessionUser.profileImage === "string" && sessionUser.profileImage.trim()) ||
     (typeof sessionUser.avatar === "string" && sessionUser.avatar.trim()) ||
     (typeof sessionUser.photo === "string" && sessionUser.photo.trim()) ||
@@ -519,15 +594,7 @@ function resolveAdminProfileImage(sessionUser: SessionAdminUser, matchedPerson: 
     return storedProfileImage;
   }
 
-  if (typeof sessionUser.id === "number") {
-    return `https://i.pravatar.cc/96?img=${(sessionUser.id % 69) + 1}`;
-  }
-
-  if (matchedPerson) {
-    return `https://i.pravatar.cc/96?img=${(matchedPerson.id % 69) + 1}`;
-  }
-
-  return "https://i.pravatar.cc/80?img=12";
+  return resolvePersonProfileImage(matchedPerson);
 }
 
 function formatHudDateTime(date: Date): { day: string; time: string } {
@@ -958,7 +1025,7 @@ export default function AdminDashboardPage() {
 
   const adminProfile = useMemo<AdminProfileSummary>(() => {
     const sessionUser = sessionAdminUser;
-    const matchedPerson = typeof sessionUser.id === "number" ? (persons.find((person) => person.id === sessionUser.id) ?? null) : null;
+    const matchedPerson = resolveSessionPerson(sessionUser, persons);
     const firstName = sessionUser.firstName?.trim() || matchedPerson?.firstName || "Administrador";
     const lastName1 = sessionUser.lastName1?.trim() || matchedPerson?.lastName || "";
     const lastName2 = sessionUser.lastName2?.trim() || "";
@@ -1145,7 +1212,6 @@ export default function AdminDashboardPage() {
       {hasEntered && (
         <>
           <BottomDock activeDock={activeNav} onSelect={handleNavClick} />
-          <SupportLink />
           <SettingsHint onOpen={() => handleNavClick("configuracion")} />
         </>
       )}
@@ -1262,6 +1328,11 @@ function TopHud({
 
   const hudDateTime = useMemo(() => formatHudDateTime(currentGlobalTime), [currentGlobalTime]);
   const profileButtonLabel = `${profile.role} · @${profile.username}`;
+  const profileInitials = useMemo(
+    () => resolveInitials([profile.firstName, profile.lastName1, profile.lastName2, profile.displayName], 3),
+    [profile.firstName, profile.lastName1, profile.lastName2, profile.displayName],
+  );
+  const hasProfileImage = Boolean(profile.avatarUrl);
 
   return (
     <header className="game-hud-header pointer-events-none flex items-center justify-between px-3 pt-3 pb-2 text-[10px] font-black uppercase tracking-[-0.02em] text-[#A4C2C5]/80">
@@ -1300,19 +1371,29 @@ function TopHud({
           <div className="admin-ui-v2-profile-popover" role="dialog" aria-label="Información del perfil administrativo">
             <div className="admin-ui-v2-profile-popover-head">
               <button
-                className="admin-ui-v2-profile-avatar-button"
+                className={`admin-ui-v2-profile-avatar-button ${hasProfileImage ? "is-clickable" : "is-static"}`}
                 type="button"
-                onClick={() => setIsProfilePreviewOpen(true)}
-                aria-label="Ver foto de perfil ampliada"
+                onClick={() => {
+                  if (hasProfileImage) {
+                    setIsProfilePreviewOpen(true);
+                  }
+                }}
+                aria-label={hasProfileImage ? "Ver foto de perfil ampliada" : `Iniciales de ${profile.displayName}`}
               >
-                <img
-                  className="admin-ui-v2-profile-popover-avatar"
-                  src={profile.avatarUrl}
-                  alt={`Perfil de ${profile.displayName}`}
-                  loading="lazy"
-                  decoding="async"
-                  referrerPolicy="no-referrer"
-                />
+                {hasProfileImage ? (
+                  <img
+                    className="admin-ui-v2-profile-popover-avatar"
+                    src={profile.avatarUrl ?? undefined}
+                    alt={`Perfil de ${profile.displayName}`}
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="admin-ui-v2-profile-popover-avatar admin-ui-v2-avatar-fallback" aria-hidden="true">
+                    {profileInitials}
+                  </span>
+                )}
               </button>
               <div>
                 <strong>{profile.displayName}</strong>
@@ -1339,7 +1420,7 @@ function TopHud({
       </div>
 
       <AnimatePresence>
-        {isProfilePreviewOpen && (
+        {isProfilePreviewOpen && hasProfileImage && (
           <motion.div
             className="admin-ui-v2-photo-preview-overlay pointer-events-auto"
             role="dialog"
@@ -1364,7 +1445,7 @@ function TopHud({
                 CERRAR
               </button>
               <img
-                src={profile.avatarUrl}
+                src={profile.avatarUrl ?? undefined}
                 alt={`Perfil ampliado de ${profile.displayName}`}
                 loading="lazy"
                 decoding="async"
@@ -1670,8 +1751,10 @@ function ContentArea({
         <SettingsModule
           sub={sub}
           profile={sessionAdminUser}
+          persons={persons}
           onNotice={onSetModuleFeedback}
           onProfileRefresh={onRefreshAdminProfile}
+          onReloadPersons={onPopulationReload}
         />
       )}
 
@@ -2017,6 +2100,7 @@ const PopulationModule = memo(function PopulationModule({
 
   const [assignments, setAssignments] = useState<TempRoleAssignment[]>(INITIAL_TEMP_ASSIGNMENTS);
   const [assignSearch, setAssignSearch] = useState("");
+  const [tacticalTab, setTacticalTab] = useState<"crear" | "historial">("crear");
   const [newAssignment, setNewAssignment] = useState({
     personId: 0,
     tempRole: "",
@@ -2352,44 +2436,53 @@ const PopulationModule = memo(function PopulationModule({
               </tr>
             </thead>
             <tbody>
-              {pagedPersons.map((person) => (
-                <tr key={person.id}>
-                  <td>
-                    <div className="admin-ui-v2-person-cell">
-                      <img
-                        src={`https://i.pravatar.cc/60?img=${(person.id % 69) + 1}`}
-                        alt={`Perfil de ${personFullName(person)}`}
-                        className="admin-ui-v2-person-avatar"
-                        loading="lazy"
-                        decoding="async"
-                        referrerPolicy="no-referrer"
-                      />
-                      <span>{personFullName(person)}</span>
-                    </div>
-                  </td>
-                  <td>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`}</td>
-                  <td>
-                    <span className={`admin-ui-v2-pill ${statusPillFromLegacy(legacyPopulationStatus(person.status))}`}>
-                      {legacyPopulationStatus(person.status)}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`admin-ui-v2-pill ${accountStatusPill(person.accountStatus)}`}>
-                      {normalizeAccountStatus(person.accountStatus)}
-                    </span>
-                  </td>
-                  <td>{person.age}</td>
-                  <td>{camps.get(person.campId) ?? `Camp #${person.campId}`}</td>
-                  <td>{new Date(person.admissionDate).toLocaleDateString("es-CR")}</td>
-                  <td>
-                    <div className="admin-ui-v2-actions">
-                      <button className="admin-ui-v2-btn" onClick={() => openPersonModal(person, false)} type="button">Ver</button>
-                      <button className="admin-ui-v2-btn is-info" onClick={() => openPersonModal(person, true)} type="button">Editar</button>
-                      <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(person.id)} type="button">Eliminar</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {pagedPersons.map((person) => {
+                const profileImage = resolvePersonProfileImage(person);
+                return (
+                  <tr key={person.id}>
+                    <td>
+                      <div className="admin-ui-v2-person-cell">
+                        {profileImage ? (
+                          <img
+                            src={profileImage}
+                            alt={`Perfil de ${personFullName(person)}`}
+                            className="admin-ui-v2-person-avatar"
+                            loading="lazy"
+                            decoding="async"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <span className="admin-ui-v2-person-avatar admin-ui-v2-avatar-fallback" aria-hidden="true">
+                            {personInitials(person)}
+                          </span>
+                        )}
+                        <span>{personFullName(person)}</span>
+                      </div>
+                    </td>
+                    <td>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`}</td>
+                    <td>
+                      <span className={`admin-ui-v2-pill ${statusPillFromLegacy(legacyPopulationStatus(person.status))}`}>
+                        {legacyPopulationStatus(person.status)}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`admin-ui-v2-pill ${accountStatusPill(person.accountStatus)}`}>
+                        {normalizeAccountStatus(person.accountStatus)}
+                      </span>
+                    </td>
+                    <td>{person.age}</td>
+                    <td>{camps.get(person.campId) ?? `Camp #${person.campId}`}</td>
+                    <td>{new Date(person.admissionDate).toLocaleDateString("es-CR")}</td>
+                    <td>
+                      <div className="admin-ui-v2-actions">
+                        <button className="admin-ui-v2-btn" onClick={() => openPersonModal(person, false)} type="button">Ver</button>
+                        <button className="admin-ui-v2-btn is-info" onClick={() => openPersonModal(person, true)} type="button">Editar</button>
+                        <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(person.id)} type="button">Eliminar</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredPersons.length === 0 && (
                 <tr>
                   <td colSpan={8} className="admin-ui-v2-empty-cell">No hay personas para mostrar con esos filtros.</td>
@@ -2424,94 +2517,191 @@ const PopulationModule = memo(function PopulationModule({
       )}
 
       {sub === "Roles temporales" && (
-        <div className="admin-ui-v2-grid admin-ui-v2-grid-roles">
-          <div className="admin-ui-v2-module-card">
-            <h3>Asignaciones Activas</h3>
-            <div className="admin-ui-v2-role-list">
-              {activeAssignments.map((assignment) => (
-                <div key={assignment.id} className="admin-ui-v2-role-item">
-                  <div>
-                    <strong>{assignment.personName}</strong>
-                    <p>{assignment.fromRole} {"->"} {assignment.tempRole}</p>
-                    <p>{assignment.startDate} - {assignment.endDate}</p>
-                  </div>
-                  <button className="admin-ui-v2-btn is-ok" onClick={() => handleFinishAssignment(assignment.id)} type="button">
-                    Finalizar
-                  </button>
-                </div>
-              ))}
-              {activeAssignments.length === 0 && <div className="admin-ui-v2-muted">No hay coberturas temporales activas.</div>}
-            </div>
+        <>
+          <div className="admin-ui-v2-roles-kpi">
+            <MetricCard label="Activas" value={activeAssignments.length} tone="info" />
+            <MetricCard label="Candidatos Disponibles" value={assignCandidates.length} tone="ok" />
+            <MetricCard label="Finalizadas" value={historicalAssignments.length} tone="warn" />
           </div>
+          <div className="admin-ui-v2-tactical-grid">
+            <div className="admin-ui-v2-module-card" style={{ padding: 0, background: "transparent", border: 0 }}>
+              <h3 style={{ marginBottom: "12px", color: "#69bfb7", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                Gestor Táctico
+              </h3>
+              <AnimatePresence>
+                {activeAssignments.map((assignment) => {
+                  const s = new Date(assignment.startDate).getTime();
+                  const e = new Date(assignment.endDate).getTime();
+                  const n = Date.now();
+                  const isUrgent = e > 0 && e - n < 24 * 60 * 60 * 1000 && n < e;
+                  const duration = e - s;
+                  const elapsed = n - s;
+                  const progress = duration > 0 ? Math.max(0, Math.min(100, (elapsed / duration) * 100)) : 0;
+                  
+                  return (
+                    <motion.div
+                      layout
+                      initial={{ opacity: 0, scale: 0.95, x: -20 }}
+                      animate={{ opacity: 1, scale: 1, x: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, x: 20 }}
+                      transition={{ duration: 0.25 }}
+                      key={assignment.id}
+                      className="admin-ui-v2-assignment-card"
+                    >
+                      <div className="admin-ui-v2-assignment-header">
+                        <div className="admin-ui-v2-assignment-user">
+                          <span className="admin-ui-v2-person-avatar admin-ui-v2-avatar-fallback">
+                            {assignment.personName.slice(0, 2).toUpperCase()}
+                          </span>
+                          <strong>{assignment.personName}</strong>
+                        </div>
+                        <button className="admin-ui-v2-btn is-ok" onClick={() => handleFinishAssignment(assignment.id)} type="button">
+                          Desvincular
+                        </button>
+                      </div>
+                      
+                      <div className="admin-ui-v2-assignment-details">
+                        <div className="admin-ui-v2-assignment-role-flow">
+                          <span>{assignment.fromRole}</span>
+                          <IconSvg className="w-3 h-3"><path d="m14 8 8 8-8 8M6 16h16" strokeWidth="2" /></IconSvg>
+                          <span style={{ color: "#69bfb7" }}>{assignment.tempRole}</span>
+                        </div>
+                        <div className="admin-ui-v2-assignment-dates" style={{ textAlign: "right" }}>
+                          <small>Finaliza</small>
+                          <strong style={{ color: isUrgent ? "#f37b7b" : "#e9f6f6" }}>
+                            {new Date(assignment.endDate).toLocaleDateString("es-CR")}
+                          </strong>
+                        </div>
+                      </div>
 
-          <div className="admin-ui-v2-module-card">
-            <h3>Nueva Asignación</h3>
-            <input
-              className="v-input admin-ui-v2-search"
-              placeholder="Buscar persona activa"
-              value={assignSearch}
-              onChange={(event) => setAssignSearch(event.target.value)}
-            />
-            <div className="admin-ui-v2-candidate-list">
-              {assignCandidates.map((person) => (
+                      <div className="admin-ui-v2-timeline-bar-wrap">
+                        <div
+                          className={`admin-ui-v2-timeline-bar ${isUrgent ? "is-urgent" : ""}`}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+              {activeAssignments.length === 0 && (
+                <div className="admin-ui-v2-empty-cell" style={{ border: "1px dashed rgba(103,172,169,0.3)" }}>
+                  Ninguna asignación activa en progreso.
+                </div>
+              )}
+            </div>
+
+            <div className="admin-ui-v2-module-card">
+              <div className="admin-ui-v2-tab-header">
                 <button
-                  key={person.id}
+                  className={`admin-ui-v2-tab-btn ${tacticalTab === "crear" ? "is-active" : ""}`}
+                  onClick={() => setTacticalTab("crear")}
                   type="button"
-                  className={`admin-ui-v2-candidate ${newAssignment.personId === person.id ? "is-selected" : ""}`}
-                  onClick={() => setNewAssignment((prev) => ({ ...prev, personId: person.id }))}
                 >
-                  <span>{personFullName(person)}</span>
-                  <small>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`}</small>
+                  Asignar Rol
                 </button>
-              ))}
-            </div>
+                <button
+                  className={`admin-ui-v2-tab-btn ${tacticalTab === "historial" ? "is-active" : ""}`}
+                  onClick={() => setTacticalTab("historial")}
+                  type="button"
+                >
+                  Historial
+                </button>
+              </div>
 
-            <div className="admin-ui-v2-form-grid">
-              <input
-                className="v-input"
-                placeholder="Oficio temporal"
-                value={newAssignment.tempRole}
-                onChange={(event) => setNewAssignment((prev) => ({ ...prev, tempRole: event.target.value }))}
-              />
-              <input
-                className="v-input"
-                type="date"
-                value={newAssignment.startDate}
-                onChange={(event) => setNewAssignment((prev) => ({ ...prev, startDate: event.target.value }))}
-              />
-              <input
-                className="v-input"
-                type="date"
-                value={newAssignment.endDate}
-                onChange={(event) => setNewAssignment((prev) => ({ ...prev, endDate: event.target.value }))}
-              />
-              <textarea
-                className="v-textarea"
-                placeholder="Motivo"
-                value={newAssignment.reason}
-                onChange={(event) => setNewAssignment((prev) => ({ ...prev, reason: event.target.value }))}
-              />
-              <button className="admin-ui-v2-btn is-info" onClick={handleCreateTempAssignment} type="button">
-                Asignar Temporalmente
-              </button>
-            </div>
+              <AnimatePresence mode="wait">
+                {tacticalTab === "crear" ? (
+                  <motion.div
+                    key="crear"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <input
+                      className="v-input admin-ui-v2-search mb-2"
+                      placeholder="Buscar candidato..."
+                      value={assignSearch}
+                      onChange={(event) => setAssignSearch(event.target.value)}
+                    />
+                    <div className="admin-ui-v2-candidate-pill-list mb-3">
+                      {assignCandidates.map((person) => (
+                        <div
+                          key={person.id}
+                          className={`admin-ui-v2-candidate-pill ${newAssignment.personId === person.id ? "is-selected" : ""}`}
+                          onClick={() => setNewAssignment((prev) => ({ ...prev, personId: person.id }))}
+                        >
+                          <span className="admin-ui-v2-person-avatar admin-ui-v2-avatar-fallback">
+                            {personInitials(person)}
+                          </span>
+                          <div className="admin-ui-v2-candidate-pill-info">
+                            <strong>{personFullName(person)}</strong>
+                            <span>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
 
-            <h3 className="admin-ui-v2-subtitle">Histórico</h3>
-            <div className="admin-ui-v2-role-list">
-              {historicalAssignments.map((assignment) => (
-                <div key={assignment.id} className="admin-ui-v2-role-item is-historical">
-                  <div>
-                    <strong>{assignment.personName}</strong>
-                    <p>{assignment.fromRole} {"->"} {assignment.tempRole}</p>
-                    <p>{assignment.startDate} - {assignment.endDate}</p>
-                  </div>
-                  <span className="admin-ui-v2-pill is-neutral">Finalizada</span>
-                </div>
-              ))}
-              {historicalAssignments.length === 0 && <div className="admin-ui-v2-muted">Aún no hay asignaciones finalizadas.</div>}
+                    <div className="admin-ui-v2-form-grid">
+                      <input
+                        className="v-input"
+                        placeholder="Nuevo rol temporal"
+                        value={newAssignment.tempRole}
+                        onChange={(event) => setNewAssignment((prev) => ({ ...prev, tempRole: event.target.value }))}
+                      />
+                      <div className="flex gap-2">
+                        <input
+                          className="v-input w-full"
+                          type="date"
+                          title="Fecha de Inicio"
+                          value={newAssignment.startDate}
+                          onChange={(event) => setNewAssignment((prev) => ({ ...prev, startDate: event.target.value }))}
+                        />
+                        <input
+                          className="v-input w-full"
+                          type="date"
+                          title="Fecha de Fin"
+                          value={newAssignment.endDate}
+                          onChange={(event) => setNewAssignment((prev) => ({ ...prev, endDate: event.target.value }))}
+                        />
+                      </div>
+                      <textarea
+                        className="v-textarea"
+                        placeholder="Razón de la asignación"
+                        value={newAssignment.reason}
+                        onChange={(event) => setNewAssignment((prev) => ({ ...prev, reason: event.target.value }))}
+                      />
+                      <button className="admin-ui-v2-btn is-info" onClick={handleCreateTempAssignment} type="button" disabled={!newAssignment.personId || !newAssignment.tempRole}>
+                        Ejecutar Asignación
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="historial"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                    className="admin-ui-v2-tactical-history-list"
+                  >
+                    {historicalAssignments.map((assignment) => (
+                      <div key={assignment.id} className="admin-ui-v2-tactical-history-item">
+                        <div>
+                          <h4>{assignment.personName}</h4>
+                          <p>{assignment.fromRole} {"->"} {assignment.tempRole}</p>
+                          <p>{new Date(assignment.startDate).toLocaleDateString("es-CR")} - {new Date(assignment.endDate).toLocaleDateString("es-CR")}</p>
+                        </div>
+                        <span className="admin-ui-v2-pill is-neutral" style={{ fontSize: "8px" }}>Completada</span>
+                      </div>
+                    ))}
+                    {historicalAssignments.length === 0 && <div className="admin-ui-v2-muted text-center pt-4">No hay historial registrado.</div>}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {selectedPerson && (
@@ -2848,23 +3038,26 @@ const AchievementsModule = memo(function AchievementsModule({
 const SettingsModule = memo(function SettingsModule({
   sub,
   profile,
+  persons,
   onNotice,
   onProfileRefresh,
+  onReloadPersons,
 }: {
   sub: string;
   profile: SessionAdminUser;
+  persons: Person[];
   onNotice: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
   onProfileRefresh: () => void;
+  onReloadPersons: () => Promise<void>;
 }) {
+  const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+  const ALLOWED_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+
   const [settings, setSettings] = useState(() => {
     const base = {
       firstName: profile.firstName ?? "",
       lastName1: profile.lastName1 ?? "",
       lastName2: profile.lastName2 ?? "",
-      autoBackup: true,
-      soundAlerts: true,
-      nightReport: true,
-      dailyConsumption: true,
     };
 
     const stored = localStorage.getItem("admin_settings_v2");
@@ -2877,6 +3070,37 @@ const SettingsModule = memo(function SettingsModule({
       return base;
     }
   });
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [photoInputKey, setPhotoInputKey] = useState(0);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoMessage, setPhotoMessage] = useState<{ type: ModuleMessageType; text: string } | null>(null);
+  const resolvedProfilePerson = useMemo(() => resolveSessionPerson(profile, persons), [profile, persons]);
+  const resolvedProfilePersonId = useMemo(() => resolveSessionPersonId(profile, persons), [profile, persons]);
+
+  const currentProfilePhoto = useMemo(
+    () =>
+      resolvePersonProfileImage(resolvedProfilePerson) ||
+      (typeof profile.photoUrl === "string" && profile.photoUrl.trim()) ||
+      (typeof profile.imageUrl === "string" && profile.imageUrl.trim()) ||
+      (typeof profile.profileImage === "string" && profile.profileImage.trim()) ||
+      (typeof profile.avatar === "string" && profile.avatar.trim()) ||
+      (typeof profile.photo === "string" && profile.photo.trim()) ||
+      null,
+    [resolvedProfilePerson, profile.photoUrl, profile.imageUrl, profile.profileImage, profile.avatar, profile.photo],
+  );
+  const currentProfileInitials = useMemo(
+    () => resolveInitials([profile.firstName, profile.lastName1, profile.lastName2, profile.displayName, profile.username], 3),
+    [profile.firstName, profile.lastName1, profile.lastName2, profile.displayName, profile.username],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl);
+      }
+    };
+  }, [photoPreviewUrl]);
 
   const persistSettings = (nextSettings: typeof settings) => {
     localStorage.setItem("admin_settings_v2", JSON.stringify(nextSettings));
@@ -2917,90 +3141,208 @@ const SettingsModule = memo(function SettingsModule({
     onNotice("configuracion", "info", "Se restablecio la configuracion local del panel.");
   };
 
+  const handlePhotoSelection = (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0] ?? null;
+
+    if (!selectedFile) {
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl);
+      }
+      setPhotoFile(null);
+      setPhotoPreviewUrl(null);
+      setPhotoMessage({ type: "info", text: "Selecciona una imagen para habilitar la actualizacion." });
+      return;
+    }
+
+    if (!ALLOWED_PROFILE_PHOTO_TYPES.has(selectedFile.type)) {
+      event.target.value = "";
+      setPhotoMessage({ type: "warning", text: "Formato no permitido. Usa JPG, PNG o WEBP." });
+      onNotice("configuracion", "warning", "Formato no permitido. Usa JPG, PNG o WEBP.");
+      return;
+    }
+
+    if (selectedFile.size > PROFILE_PHOTO_MAX_BYTES) {
+      event.target.value = "";
+      setPhotoMessage({ type: "warning", text: "La imagen supera 5 MB. Selecciona un archivo mas liviano." });
+      onNotice("configuracion", "warning", "La imagen supera 5 MB. Selecciona un archivo mas liviano.");
+      return;
+    }
+
+    if (photoPreviewUrl) {
+      URL.revokeObjectURL(photoPreviewUrl);
+    }
+
+    setPhotoFile(selectedFile);
+    setPhotoPreviewUrl(URL.createObjectURL(selectedFile));
+    setPhotoMessage({ type: "info", text: `Imagen lista: ${selectedFile.name}. Presiona Actualizar foto.` });
+  };
+
+  const handlePhotoUpdate = async () => {
+    if (isUploadingPhoto) return;
+    if (!photoFile) {
+      setPhotoMessage({ type: "warning", text: "Primero selecciona una imagen." });
+      onNotice("configuracion", "warning", "Primero selecciona una imagen.");
+      return;
+    }
+    if (resolvedProfilePersonId === null) {
+      const message = "No se pudo identificar la persona enlazada a este usuario. Revisa que la cuenta tenga personId o username asociado.";
+      setPhotoMessage({ type: "error", text: message });
+      onNotice("configuracion", "error", message);
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    setPhotoMessage({ type: "info", text: "Subiendo imagen de perfil..." });
+    try {
+      const updatedPerson = await updatePersonPhoto(resolvedProfilePersonId, photoFile);
+      const resolvedPhotoUrl = resolvePersonProfileImage(updatedPerson);
+
+      const rawUser = localStorage.getItem("user");
+      if (rawUser) {
+        try {
+          const parsed = JSON.parse(rawUser) as Record<string, unknown>;
+          const updated: Record<string, unknown> = {
+            ...parsed,
+            personId: resolvedProfilePersonId,
+          };
+          if (resolvedPhotoUrl) {
+            updated.photoUrl = resolvedPhotoUrl;
+            updated.imageUrl = resolvedPhotoUrl;
+            updated.profileImage = resolvedPhotoUrl;
+            updated.avatar = resolvedPhotoUrl;
+            updated.photo = resolvedPhotoUrl;
+          }
+          localStorage.setItem("user", JSON.stringify(updated));
+        } catch {
+          // Ignore malformed cached user
+        }
+      }
+
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl);
+      }
+      setPhotoFile(null);
+      setPhotoPreviewUrl(null);
+      setPhotoInputKey((prev) => prev + 1);
+
+      await onReloadPersons();
+      onProfileRefresh();
+      setPhotoMessage({ type: "success", text: "Foto de perfil actualizada correctamente." });
+      onNotice("configuracion", "success", "Foto de perfil actualizada correctamente.");
+    } catch (error) {
+      const message = error instanceof Error && error.message.trim()
+        ? error.message
+        : getErrorMessage(error, "update_person");
+      setPhotoMessage({ type: "error", text: message });
+      onNotice("configuracion", "error", message);
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const settingsProfilePreview = photoPreviewUrl || currentProfilePhoto;
+
   return (
     <div className="admin-ui-v2-dashboard">
       <div className="admin-ui-v2-grid admin-ui-v2-grid-2">
-        {(sub === "Campamento" || sub === "Sistema") && (
-          <div className="admin-ui-v2-module-card">
-            <div className="admin-ui-v2-section-head">
-              <span>Configuracion del campamento</span>
-              <span>Operativa</span>
-            </div>
-            <div className="admin-ui-v2-form-grid">
-              <label className="admin-ui-v2-muted">Campamento asignado</label>
-              <div className="v-input" aria-readonly="true">
-                {`Campamento #${profile.campId ?? 1}`}
+        {sub === "Campamento" && (
+          <>
+            <div className="admin-ui-v2-module-card">
+              <div className="admin-ui-v2-section-head">
+                <span>Configuracion del campamento</span>
+                <span>Operativa</span>
               </div>
+              <div className="admin-ui-v2-form-grid">
+                <label className="admin-ui-v2-muted">Campamento asignado</label>
+                <div className="v-input" aria-readonly="true">
+                  {`Campamento #${profile.campId ?? 1}`}
+                </div>
 
-              <label className="admin-ui-v2-muted">Nombre de usuario</label>
-              <div className="v-input" aria-readonly="true">
-                {profile.username ?? "sin-usuario"}
-              </div>
+                <label className="admin-ui-v2-muted">Nombre de usuario</label>
+                <div className="v-input" aria-readonly="true">
+                  {profile.username ?? "sin-usuario"}
+                </div>
 
-              <label className="admin-ui-v2-muted">Primer nombre</label>
-              <input
-                className="v-input"
-                value={settings.firstName}
-                onChange={(event) => setSettings((prev) => ({ ...prev, firstName: event.target.value }))}
-              />
+                <label className="admin-ui-v2-muted">Primer nombre</label>
+                <input
+                  className="v-input"
+                  value={settings.firstName}
+                  onChange={(event) => setSettings((prev) => ({ ...prev, firstName: event.target.value }))}
+                />
 
-              <label className="admin-ui-v2-muted">Primer apellido</label>
-              <input
-                className="v-input"
-                value={settings.lastName1}
-                onChange={(event) => setSettings((prev) => ({ ...prev, lastName1: event.target.value }))}
-              />
+                <label className="admin-ui-v2-muted">Primer apellido</label>
+                <input
+                  className="v-input"
+                  value={settings.lastName1}
+                  onChange={(event) => setSettings((prev) => ({ ...prev, lastName1: event.target.value }))}
+                />
 
-              <label className="admin-ui-v2-muted">Segundo apellido</label>
-              <input
-                className="v-input"
-                value={settings.lastName2}
-                onChange={(event) => setSettings((prev) => ({ ...prev, lastName2: event.target.value }))}
-              />
+                <label className="admin-ui-v2-muted">Segundo apellido</label>
+                <input
+                  className="v-input"
+                  value={settings.lastName2}
+                  onChange={(event) => setSettings((prev) => ({ ...prev, lastName2: event.target.value }))}
+                />
 
-            </div>
-          </div>
-        )}
-
-        {sub === "Sistema" && (
-          <div className="admin-ui-v2-module-card">
-            <div className="admin-ui-v2-section-head">
-              <span>Preferencias del sistema</span>
-              <span>Entorno</span>
-            </div>
-            <div className="admin-ui-v2-form-grid">
-              <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
-                <button
-                  className={`admin-ui-v2-btn ${settings.autoBackup ? "is-ok" : ""}`}
-                  type="button"
-                  onClick={() => setSettings((prev) => ({ ...prev, autoBackup: !prev.autoBackup }))}
-                >
-                  Auto-backup: {settings.autoBackup ? "ON" : "OFF"}
-                </button>
-                <button
-                  className={`admin-ui-v2-btn ${settings.soundAlerts ? "is-ok" : ""}`}
-                  type="button"
-                  onClick={() => setSettings((prev) => ({ ...prev, soundAlerts: !prev.soundAlerts }))}
-                >
-                  Alertas sonoras: {settings.soundAlerts ? "ON" : "OFF"}
-                </button>
-                <button
-                  className={`admin-ui-v2-btn ${settings.nightReport ? "is-ok" : ""}`}
-                  type="button"
-                  onClick={() => setSettings((prev) => ({ ...prev, nightReport: !prev.nightReport }))}
-                >
-                  Reporte nocturno: {settings.nightReport ? "ON" : "OFF"}
-                </button>
-                <button
-                  className={`admin-ui-v2-btn ${settings.dailyConsumption ? "is-ok" : ""}`}
-                  type="button"
-                  onClick={() => setSettings((prev) => ({ ...prev, dailyConsumption: !prev.dailyConsumption }))}
-                >
-                  Consumo diario: {settings.dailyConsumption ? "ON" : "OFF"}
-                </button>
               </div>
             </div>
-          </div>
+
+            <div className="admin-ui-v2-module-card">
+              <div className="admin-ui-v2-section-head">
+                <span>Foto de perfil</span>
+                <span>Cuenta</span>
+              </div>
+              <div className="admin-ui-v2-settings-photo-panel">
+                <div className="admin-ui-v2-settings-photo-preview-wrap">
+                  {settingsProfilePreview ? (
+                    <img
+                      src={settingsProfilePreview}
+                      alt={`Foto de perfil de ${profile.displayName ?? profile.username ?? "usuario"}`}
+                      className="admin-ui-v2-settings-photo-preview"
+                      loading="lazy"
+                      decoding="async"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <span className="admin-ui-v2-settings-photo-preview admin-ui-v2-avatar-fallback" aria-hidden="true">
+                      {currentProfileInitials}
+                    </span>
+                  )}
+                </div>
+
+                <div className="admin-ui-v2-form-grid">
+                  <label className="admin-ui-v2-muted" htmlFor="admin-profile-photo-input">Seleccionar nueva imagen</label>
+                  <input
+                    id="admin-profile-photo-input"
+                    key={photoInputKey}
+                    className="v-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handlePhotoSelection}
+                  />
+                  <small className="admin-ui-v2-muted">Formatos permitidos: JPG, PNG, WEBP. Límite de tamaño: 5MB.</small>
+                </div>
+
+                <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
+                  <button
+                    className="admin-ui-v2-btn is-info"
+                    type="button"
+                    disabled={isUploadingPhoto}
+                    onClick={() => void handlePhotoUpdate()}
+                  >
+                    {isUploadingPhoto ? "Actualizando foto..." : "Actualizar foto"}
+                  </button>
+                </div>
+
+                <div className={`admin-ui-v2-settings-photo-message is-${photoMessage?.type ?? "info"}`}>
+                  {photoMessage?.text ??
+                    (resolvedProfilePersonId === null
+                      ? "No se encontro una persona enlazada para este usuario."
+                      : "Selecciona una imagen JPG, PNG o WEBP para actualizarla.")}
+                </div>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
@@ -3458,16 +3800,6 @@ function BottomDock({ activeDock, onSelect }: { activeDock: AdminSectionId; onSe
         </button>
       ))}
     </footer>
-  );
-}
-
-function SupportLink() {
-  return (
-    <button className="support-link" type="button">
-      <span className="btn-text">
-        <span>?</span> Support
-      </span>
-    </button>
   );
 }
 

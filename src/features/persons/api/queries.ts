@@ -4,6 +4,15 @@ import { ENDPOINTS, personsKeys } from './keys'
 
 const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('accessToken')
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+const API_ORIGIN = (() => {
+  try {
+    return new URL(API_BASE).origin
+  } catch {
+    return 'http://localhost:3000'
+  }
+})()
+
 function buildHeaders() {
   return {
     'Content-Type': 'application/json',
@@ -38,6 +47,19 @@ function normalizePersonStatus(value: unknown): PersonStatus {
   if (normalized === 'OUTSIDE_CAMP') return 'OUTSIDE_CAMP'
   if (normalized === 'INACTIVE') return 'INACTIVE'
   return 'INACTIVE'
+}
+
+function normalizeMediaUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+
+  try {
+    return new URL(trimmed, API_ORIGIN).toString()
+  } catch {
+    return null
+  }
 }
 
 function mapPersonRecord(record: unknown): Person {
@@ -79,12 +101,34 @@ function mapPersonRecord(record: unknown): Person {
     ?? source.joinDate
     ?? source.createdAt
     ?? new Date().toISOString()
+
+  const photoUrl = normalizeMediaUrl(source.photoUrl ?? source.photo_url)
+  const profileImage = normalizeMediaUrl(source.profileImage ?? source.profile_image ?? source.profilePhoto ?? source.profile_photo)
+  const avatar = normalizeMediaUrl(source.avatar)
+  const photo = normalizeMediaUrl(source.photo)
+  const imageUrl = normalizeMediaUrl(source.imageUrl ?? source.image_url)
+  const resolvedProfileImage = photoUrl ?? profileImage ?? avatar ?? photo ?? imageUrl
+
   return {
     ...(record as Person),
+    userId: typeof source.userId === 'number' ? source.userId : typeof source.user_id === 'number' ? source.user_id : undefined,
+    systemUserId:
+      typeof source.systemUserId === 'number'
+        ? source.systemUserId
+        : typeof source.system_user_id === 'number'
+          ? source.system_user_id
+          : undefined,
+    accountId: typeof source.accountId === 'number' ? source.accountId : typeof source.account_id === 'number' ? source.account_id : undefined,
+    username: typeof source.username === 'string' ? source.username : typeof source.userName === 'string' ? source.userName : undefined,
     status: normalizePersonStatus(statusValue),
     currentStatus: normalizePersonStatus(statusValue),
     firstName,
     lastName,
+    photoUrl: resolvedProfileImage,
+    profileImage: resolvedProfileImage,
+    avatar: resolvedProfileImage,
+    photo: resolvedProfileImage,
+    imageUrl: resolvedProfileImage,
     admissionDate: String(admissionDateValue),
     notes: typeof source.notes === 'string' ? source.notes : undefined,
   }

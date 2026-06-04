@@ -10,8 +10,17 @@ export type AccountStatus = 'ACTIVE' | 'BLOCKED' | 'INACTIVE'
 
 export interface Person {
   id: number
+  userId?: number | null
+  systemUserId?: number | null
+  accountId?: number | null
+  username?: string | null
   firstName: string
   lastName: string
+  photoUrl?: string | null
+  profileImage?: string | null
+  avatar?: string | null
+  photo?: string | null
+  imageUrl?: string | null
   alias?: string
   age: number
   status: PersonStatus
