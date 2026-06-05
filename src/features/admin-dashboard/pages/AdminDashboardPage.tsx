@@ -373,9 +373,19 @@ function temporarySectorForRole(roleName: string): TemporarySector {
     ?? TEMPORARY_SECTORS[TEMPORARY_SECTORS.length - 1];
 }
 
+function parseTemporaryDate(value: string): Date {
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  return new Date(value);
+}
+
 function temporaryAssignmentProgress(startDate: string, endDate: string): { value: number; urgent: boolean; label: string } {
-  const start = new Date(startDate).getTime();
-  const end = new Date(endDate).getTime();
+  const start = parseTemporaryDate(startDate).getTime();
+  const end = parseTemporaryDate(endDate).getTime();
   const now = Date.now();
 
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
@@ -388,9 +398,26 @@ function temporaryAssignmentProgress(startDate: string, endDate: string): { valu
 }
 
 function temporaryDateLabel(value: string): string {
-  const parsed = new Date(value);
+  const parsed = parseTemporaryDate(value);
   if (Number.isNaN(parsed.getTime())) return "Sin fecha";
   return parsed.toLocaleDateString("es-CR");
+}
+
+function dateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateInputFromToday(daysToAdd = 0): string {
+  const date = new Date();
+  date.setDate(date.getDate() + daysToAdd);
+  return dateInputValue(date);
+}
+
+function startOfLocalDay(value: Date): number {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
 }
 
 function temporaryNameInitials(name: string): string {
@@ -2201,8 +2228,8 @@ const PopulationModule = memo(function PopulationModule({
   const [newAssignment, setNewAssignment] = useState({
     personId: 0,
     tempRole: "",
-    startDate: "",
-    endDate: "",
+    startDate: dateInputFromToday(),
+    endDate: dateInputFromToday(7),
     reason: "",
   });
 
@@ -2475,9 +2502,33 @@ const PopulationModule = memo(function PopulationModule({
     }
   };
 
-  const submitTempAssignment = async (person: Person, tempOccupationId: number, reason: string): Promise<boolean> => {
+  const submitTempAssignment = async (person: Person, tempOccupationId: number, reason: string, startDate: string, endDate: string): Promise<boolean> => {
     if (!Number.isFinite(tempOccupationId) || tempOccupationId <= 0) {
       onNotice("poblacion", "warning", "Selecciona un oficio temporal válido antes de continuar.");
+      return false;
+    }
+
+    const normalizedStartDate = startDate.trim();
+    const normalizedEndDate = endDate.trim();
+    if (!normalizedStartDate || !normalizedEndDate) {
+      onNotice("poblacion", "warning", "Indica la fecha de inicio y la fecha de finalización antes de continuar.");
+      return false;
+    }
+
+    const startTime = parseTemporaryDate(normalizedStartDate).getTime();
+    const endTime = parseTemporaryDate(normalizedEndDate).getTime();
+    if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) {
+      onNotice("poblacion", "warning", "Las fechas de la asignación temporal no son válidas.");
+      return false;
+    }
+
+    if (startTime < startOfLocalDay(new Date())) {
+      onNotice("poblacion", "warning", "La fecha de inicio no puede ser menor al día actual.");
+      return false;
+    }
+
+    if (endTime < startTime) {
+      onNotice("poblacion", "warning", "La fecha de finalización no puede ser anterior a la fecha de inicio.");
       return false;
     }
 
@@ -2489,6 +2540,8 @@ const PopulationModule = memo(function PopulationModule({
           temporaryOccupationId: tempOccupationId,
           reason: reason.trim() || "Asignación temporal",
           assignedBy: currentAdminId ?? 1,
+          startDate: normalizedStartDate,
+          endDate: normalizedEndDate,
         }),
       });
 
@@ -2508,9 +2561,9 @@ const PopulationModule = memo(function PopulationModule({
     if (!newAssignment.tempRole.trim()) return;
 
     const tempOccupationId = Number(newAssignment.tempRole);
-    const created = await submitTempAssignment(selectedCandidate, tempOccupationId, newAssignment.reason);
+    const created = await submitTempAssignment(selectedCandidate, tempOccupationId, newAssignment.reason, newAssignment.startDate, newAssignment.endDate);
     if (created) {
-      setNewAssignment({ personId: 0, tempRole: "", startDate: "", endDate: "", reason: "" });
+      setNewAssignment({ personId: 0, tempRole: "", startDate: dateInputFromToday(), endDate: dateInputFromToday(7), reason: "" });
       setAssignSearch("");
     }
   };
@@ -2519,11 +2572,12 @@ const PopulationModule = memo(function PopulationModule({
     if (!quickSelectedPerson || quickOccupationId === null) return;
     const sector = temporarySectorForRole(quickSelectedOccupation ?? "");
     const reason = quickReason.trim() || `Refuerzo operacional sugerido para ${sector.name}`;
-    const created = await submitTempAssignment(quickSelectedPerson, quickOccupationId, reason);
+    const created = await submitTempAssignment(quickSelectedPerson, quickOccupationId, reason, newAssignment.startDate, newAssignment.endDate);
     if (created) {
       setQuickPersonId(null);
       setQuickOccupationId(null);
       setQuickReason("");
+      setNewAssignment({ personId: 0, tempRole: "", startDate: dateInputFromToday(), endDate: dateInputFromToday(7), reason: "" });
     }
   };
 
@@ -2541,6 +2595,9 @@ const PopulationModule = memo(function PopulationModule({
     try {
       await apiRequest(`/temporary-occupation-assignments/${assignmentId}`, {
         method: "DELETE",
+        body: JSON.stringify({
+          reason: normalizedReason,
+        }),
       });
 
       setAssignments(await loadTempAssignments());
@@ -2971,6 +3028,32 @@ const PopulationModule = memo(function PopulationModule({
                     <option value="">Crear manualmente: seleccionar oficio...</option>
                     {occupationOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                   </select>
+                  <div className="admin-ui-v2-temp-date-grid">
+                    <label>
+                      <span>Fecha de inicio</span>
+                      <input
+                        className="v-input admin-ui-v2-temp-field"
+                        type="date"
+                        min={dateInputFromToday()}
+                        value={newAssignment.startDate}
+                        onChange={(event) => setNewAssignment((prev) => ({
+                          ...prev,
+                          startDate: event.target.value,
+                          endDate: prev.endDate && prev.endDate < event.target.value ? event.target.value : prev.endDate,
+                        }))}
+                      />
+                    </label>
+                    <label>
+                      <span>Fecha de finalización</span>
+                      <input
+                        className="v-input admin-ui-v2-temp-field"
+                        type="date"
+                        min={newAssignment.startDate || undefined}
+                        value={newAssignment.endDate}
+                        onChange={(event) => setNewAssignment((prev) => ({ ...prev, endDate: event.target.value }))}
+                      />
+                    </label>
+                  </div>
                   <textarea className="v-textarea admin-ui-v2-temp-field" placeholder="Motivo operacional para el enlace rápido o manual" value={quickReason || newAssignment.reason} onChange={(event) => { setQuickReason(event.target.value); setNewAssignment((prev) => ({ ...prev, reason: event.target.value })); }} />
                   <div className="admin-ui-v2-temp-link-preview">
                     <div><span>Operario</span><strong>{quickSelectedPerson ? personFullName(quickSelectedPerson) : selectedCandidate ? personFullName(selectedCandidate) : "Sin selección"}</strong></div>

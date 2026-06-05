@@ -2044,12 +2044,11 @@
 
 /* --- TEMPORARY OCCUPATIONS CONSOLE --- */
 .admin-ui-v2-temp-shell {
-  border: 1px solid rgba(103, 172, 169, 0.24);
+  border: 1px solid rgba(103, 172, 169, 0.2);
   background:
-    radial-gradient(circle at 18% 0%, rgba(105, 191, 183, 0.12), transparent 34%),
-    radial-gradient(circle at 100% 18%, rgba(72, 197, 143, 0.08), transparent 30%),
-    rgba(5, 16, 18, 0.64);
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.24);
+    radial-gradient(circle at 18% 0%, rgba(103, 172, 169, 0.08), transparent 34%),
+    rgba(4, 14, 14, 0.42);
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -2066,7 +2065,7 @@
 }
 
 .admin-ui-v2-temp-kicker {
-  color: rgba(105, 191, 183, 0.86);
+  color: rgba(103, 172, 169, 0.78);
   display: block;
   font-size: 10px;
   font-weight: 900;
@@ -2075,7 +2074,7 @@
 }
 
 .admin-ui-v2-temp-hero h2 {
-  color: #f0fafa;
+  color: #dff1f1;
   font-size: 24px;
   font-weight: 950;
   letter-spacing: 0.09em;
@@ -2119,12 +2118,12 @@
 
 .admin-ui-v2-temp-nav-btn:hover,
 .admin-ui-v2-temp-nav-btn.is-active {
-  color: #69bfb7;
+  color: #9bd8d6;
 }
 
 .admin-ui-v2-temp-nav-btn.is-active {
-  border-bottom-color: #69bfb7;
-  background: rgba(105, 191, 183, 0.08);
+  border-bottom-color: rgba(103, 172, 169, 0.86);
+  background: rgba(103, 172, 169, 0.1);
 }
 
 .admin-ui-v2-temp-sector-grid {
@@ -2137,7 +2136,7 @@
 .admin-ui-v2-temp-panel,
 .admin-ui-v2-temp-assignment-card {
   border: 1px solid rgba(103, 172, 169, 0.22);
-  background: rgba(3, 12, 14, 0.58);
+  background: rgba(4, 14, 14, 0.38);
   padding: 14px;
 }
 
@@ -2149,8 +2148,8 @@
 }
 
 .admin-ui-v2-temp-sector-card.is-danger {
-  border-color: rgba(243, 123, 123, 0.38);
-  background: linear-gradient(145deg, rgba(75, 18, 18, 0.16), rgba(3, 12, 14, 0.58));
+  border-color: rgba(243, 123, 123, 0.3);
+  background: linear-gradient(145deg, rgba(70, 22, 22, 0.1), rgba(4, 14, 14, 0.38));
 }
 
 .admin-ui-v2-temp-sector-card.is-ok {
@@ -2179,7 +2178,7 @@
 }
 
 .admin-ui-v2-temp-sector-head h3 {
-  color: #f0fafa;
+  color: #dff1f1;
   font-size: 14px;
   font-weight: 950;
   letter-spacing: 0.08em;
@@ -2208,7 +2207,7 @@
 }
 
 .admin-ui-v2-temp-sector-meter span {
-  background: linear-gradient(90deg, rgba(105, 191, 183, 0.28), #69bfb7);
+  background: linear-gradient(90deg, rgba(103, 172, 169, 0.28), #67aca9);
   display: block;
   height: 100%;
 }
@@ -2249,9 +2248,9 @@
 
 .admin-ui-v2-temp-avatar {
   align-items: center;
-  border: 1px solid rgba(105, 191, 183, 0.38);
-  background: rgba(105, 191, 183, 0.08);
-  color: #69bfb7;
+  border: 1px solid rgba(103, 172, 169, 0.34);
+  background: rgba(103, 172, 169, 0.08);
+  color: #9bd8d6;
   display: inline-flex;
   flex: 0 0 auto;
   font-family: var(--mono);
@@ -2286,7 +2285,7 @@
 }
 
 .admin-ui-v2-temp-assignment-card {
-  border-left: 3px solid #69bfb7;
+  border-left: 3px solid #67aca9;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -2330,7 +2329,7 @@
 
 .admin-ui-v2-temp-role-flow i,
 .admin-ui-v2-temp-link-preview i {
-  color: #69bfb7;
+  color: #9bd8d6;
   font-style: normal;
   font-weight: 950;
 }
@@ -2348,7 +2347,7 @@
 }
 
 .admin-ui-v2-temp-progress-row strong {
-  color: #69bfb7;
+  color: #9bd8d6;
 }
 
 .admin-ui-v2-temp-revoke-box {
@@ -2376,6 +2375,26 @@
   width: 100%;
 }
 
+.admin-ui-v2-temp-date-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
+.admin-ui-v2-temp-date-grid label {
+  display: grid;
+  gap: 5px;
+}
+
+.admin-ui-v2-temp-date-grid span {
+  color: rgba(164, 194, 197, 0.68);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .admin-ui-v2-temp-choice-list {
   max-height: 320px;
   overflow-y: auto;
@@ -2397,8 +2416,8 @@
 .admin-ui-v2-temp-vacancy:hover,
 .admin-ui-v2-temp-choice.is-selected,
 .admin-ui-v2-temp-vacancy.is-selected {
-  border-color: rgba(105, 191, 183, 0.58);
-  background: rgba(105, 191, 183, 0.12);
+  border-color: rgba(103, 172, 169, 0.52);
+  background: rgba(103, 172, 169, 0.1);
 }
 
 .admin-ui-v2-temp-vacancy {
@@ -2504,7 +2523,8 @@
   }
 
   .admin-ui-v2-temp-kpis,
-  .admin-ui-v2-temp-quick {
+  .admin-ui-v2-temp-quick,
+  .admin-ui-v2-temp-date-grid {
     grid-template-columns: 1fr;
   }
 
