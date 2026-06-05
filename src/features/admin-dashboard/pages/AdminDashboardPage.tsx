@@ -37,7 +37,7 @@ import {
 } from "../mappers/adminMappers";
 import { ExpeditionsWorldMap, prefetchExpeditionsWorldMap } from "../expeditions/components/ExpeditionsWorldMap";
 import type { MappedCampPoint } from "../expeditions/types";
-import { AdminBootOverlay } from "../components/AdminBootOverlay";
+import { AdminSyncOverlay } from "../components/AdminSyncOverlay";
 import { SESSION_TOKEN_CHANGED_EVENT } from "../../../shared/services/sessionService";
 import { ApiHttpError, apiRequest } from "../../../shared/services/httpClient";
 import { getErrorMessage } from "../../../shared/services/errorMessages";
@@ -1203,7 +1203,14 @@ export default function AdminDashboardPage() {
         </>
       )}
 
-      <AdminBootOverlay visible={isBootstrapping} progress={Math.max(bootDataProgress, bootVisualProgress)} phase={bootPhase} />
+      <AdminSyncOverlay
+        visible={isBootstrapping}
+        isReady={false}
+        progress={Math.max(bootDataProgress, bootVisualProgress)}
+        phase={bootPhase}
+        presetName="CENTRO DE MANDO"
+        showActions={false}
+      />
       <AnimatePresence>
         {activeAchievementUnlock && (
           <motion.div
