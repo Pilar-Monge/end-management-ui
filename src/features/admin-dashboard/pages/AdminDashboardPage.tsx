@@ -198,9 +198,69 @@ interface TempRoleAssignment {
   status: "ACTIVA" | "FINALIZADA";
 }
 
+type TemporaryView = "sectors" | "timeline" | "quick" | "history";
+
+interface TemporarySector {
+  id: string;
+  name: string;
+  tag: string;
+  description: string;
+  primaryRole: string;
+  basePerformance: number;
+  keywords: string[];
+}
+
+const TEMPORARY_SECTORS: TemporarySector[] = [
+  {
+    id: "alfa",
+    name: "Sector Alfa",
+    tag: "ALFA_DEF",
+    description: "Guardia perimetral, seguridad interna y cobertura defensiva del campamento.",
+    primaryRole: "Centinela de Perímetro",
+    basePerformance: 68,
+    keywords: ["centinela", "guardia", "defensa", "perimetro", "perímetro", "seguridad", "explorador"],
+  },
+  {
+    id: "delta",
+    name: "Sector Delta",
+    tag: "DELTA_LOG",
+    description: "Logística, inventario, reparaciones críticas y soporte técnico operativo.",
+    primaryRole: "Operador de Suministros",
+    basePerformance: 62,
+    keywords: ["suministro", "logistica", "logística", "mecanico", "mecánico", "tecnico", "técnico", "redes", "estructural"],
+  },
+  {
+    id: "omega",
+    name: "Sector Omega",
+    tag: "OMEGA_MED",
+    description: "Unidad clínica, contención sanitaria y respuesta médica de emergencia.",
+    primaryRole: "Soporte Sanitario de Campo",
+    basePerformance: 76,
+    keywords: ["clinico", "clínico", "medico", "médico", "sanitario", "salud", "enfermer", "farmacia", "cirugia", "cirugía"],
+  },
+  {
+    id: "sigma",
+    name: "Sector Sigma",
+    tag: "SIGMA_AGR",
+    description: "Producción alimentaria, agua, cultivos protegidos y estabilidad ambiental.",
+    primaryRole: "Ingeniero Hidropónico",
+    basePerformance: 54,
+    keywords: ["hidropon", "agr", "cultivo", "botan", "agua", "alimento", "invernadero"],
+  },
+  {
+    id: "general",
+    name: "Reserva General",
+    tag: "GEN_POOL",
+    description: "Asignaciones sin sector específico derivado del oficio temporal.",
+    primaryRole: "Operario General",
+    basePerformance: 50,
+    keywords: [],
+  },
+];
+
 const NAVIGATION_DATA: NavItem[] = [
   { id: "centro", label: "Centro de Mando", icon: <RadarIcon />, subOptions: ["Resumen táctico", "Monitoreo general"] },
-  { id: "poblacion", label: "Población", icon: <ProfileIcon />, subOptions: ["Estadísticas", "Usuarios", "Roles temporales"] },
+  { id: "poblacion", label: "Población", icon: <ProfileIcon />, subOptions: ["Estadísticas", "Usuarios", "Oficios temporales"] },
   { id: "admisiones", label: "Admisiones IA", icon: <ShieldIcon />, subOptions: ["Pendientes", "Historial"] },
   {
     id: "expediciones",
@@ -298,6 +358,43 @@ function assignmentStatusFromApi(item: Record<string, unknown>): TempRoleAssignm
   }
 
   return "ACTIVA";
+}
+
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function temporarySectorForRole(roleName: string): TemporarySector {
+  const normalized = normalizeSearchText(roleName);
+  return TEMPORARY_SECTORS.find((sector) => sector.keywords.some((keyword) => normalized.includes(normalizeSearchText(keyword))))
+    ?? TEMPORARY_SECTORS[TEMPORARY_SECTORS.length - 1];
+}
+
+function temporaryAssignmentProgress(startDate: string, endDate: string): { value: number; urgent: boolean; label: string } {
+  const start = new Date(startDate).getTime();
+  const end = new Date(endDate).getTime();
+  const now = Date.now();
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return { value: 0, urgent: false, label: "Sin ventana definida" };
+  }
+
+  const value = Math.max(0, Math.min(100, Math.round(((now - start) / (end - start)) * 100)));
+  const urgent = now < end && end - now < 24 * 60 * 60 * 1000;
+  return { value, urgent, label: `${value}% completado` };
+}
+
+function temporaryDateLabel(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Sin fecha";
+  return parsed.toLocaleDateString("es-CR");
+}
+
+function temporaryNameInitials(name: string): string {
+  return resolveInitials(name.split(/\s+/), 2);
 }
 
 function nestedName(record: Record<string, unknown>, keys: string[]): string | null {
@@ -2094,10 +2191,13 @@ const PopulationModule = memo(function PopulationModule({
 
   const [assignments, setAssignments] = useState<TempRoleAssignment[]>(INITIAL_TEMP_ASSIGNMENTS);
   const [assignSearch, setAssignSearch] = useState("");
-  const [tacticalTab, setTacticalTab] = useState<"crear" | "historial">("crear");
+  const [temporaryView, setTemporaryView] = useState<TemporaryView>("sectors");
   const [revokingId, setRevokingId] = useState<number | null>(null);
   const [revocationTargetId, setRevocationTargetId] = useState<number | null>(null);
   const [revocationReason, setRevocationReason] = useState("");
+  const [quickPersonId, setQuickPersonId] = useState<number | null>(null);
+  const [quickOccupationId, setQuickOccupationId] = useState<number | null>(null);
+  const [quickReason, setQuickReason] = useState("");
   const [newAssignment, setNewAssignment] = useState({
     personId: 0,
     tempRole: "",
@@ -2156,7 +2256,7 @@ const PopulationModule = memo(function PopulationModule({
   }, [occupations, persons]);
 
   useEffect(() => {
-    if (sub !== "Roles temporales") return;
+    if (sub !== "Oficios temporales") return;
 
     let isMounted = true;
     loadTempAssignments()
@@ -2219,6 +2319,29 @@ const PopulationModule = memo(function PopulationModule({
   const selectedCandidate = persons.find((person) => person.id === newAssignment.personId) ?? null;
   const activeAssignments = assignments.filter((item) => item.status === "ACTIVA");
   const historicalAssignments = assignments.filter((item) => item.status === "FINALIZADA");
+  const activeAssignedPersonIds = new Set(activeAssignments.map((assignment) => assignment.personId));
+  const availableTempCandidates = assignCandidates.filter((person) => !activeAssignedPersonIds.has(person.id));
+  const occupationOptions = Array.from(occupations.entries());
+  const quickSelectedPerson = quickPersonId === null ? null : availableTempCandidates.find((person) => person.id === quickPersonId) ?? null;
+  const quickSelectedOccupation = quickOccupationId === null ? null : occupations.get(quickOccupationId) ?? null;
+  const sectorSummaries = TEMPORARY_SECTORS.map((sector) => {
+    const workers = activeAssignments.filter((assignment) => temporarySectorForRole(assignment.tempRole).id === sector.id);
+    const performance = Math.min(100, sector.basePerformance + workers.length * 11);
+    const tone = workers.length === 0 ? "danger" : performance >= 80 ? "ok" : "warn";
+    return { sector, workers, performance, tone };
+  });
+  const quickVacancies = TEMPORARY_SECTORS.filter((sector) => sector.id !== "general").map((sector) => {
+    const matchedOccupation = occupationOptions.find(([, name]) => temporarySectorForRole(name).id === sector.id)
+      ?? occupationOptions.find(([, name]) => normalizeSearchText(name) === normalizeSearchText(sector.primaryRole))
+      ?? occupationOptions[0]
+      ?? null;
+    return {
+      sector,
+      occupationId: matchedOccupation?.[0] ?? 0,
+      occupationName: matchedOccupation?.[1] ?? sector.primaryRole,
+      activeCount: activeAssignments.filter((assignment) => temporarySectorForRole(assignment.tempRole).id === sector.id).length,
+    };
+  });
 
   const pagedPersons = useMemo(() => {
     const start = (userPage - 1) * usersPerPage;
@@ -2352,33 +2475,55 @@ const PopulationModule = memo(function PopulationModule({
     }
   };
 
-  const handleCreateTempAssignment = async () => {
-    if (!selectedCandidate) return;
-    if (!newAssignment.tempRole.trim()) return;
-
-    const tempOccupationId = Number(newAssignment.tempRole);
+  const submitTempAssignment = async (person: Person, tempOccupationId: number, reason: string): Promise<boolean> => {
     if (!Number.isFinite(tempOccupationId) || tempOccupationId <= 0) {
       onNotice("poblacion", "warning", "Selecciona un oficio temporal válido antes de continuar.");
-      return;
+      return false;
     }
 
     try {
       await apiRequest("/temporary-occupation-assignments", {
         method: "POST",
         body: JSON.stringify({
-          personId: selectedCandidate.id,
+          personId: person.id,
           temporaryOccupationId: tempOccupationId,
-          reason: newAssignment.reason.trim() || "Asignación temporal",
+          reason: reason.trim() || "Asignación temporal",
           assignedBy: currentAdminId ?? 1,
         }),
       });
 
       setAssignments(await loadTempAssignments());
-      setNewAssignment({ personId: 0, tempRole: "", startDate: "", endDate: "", reason: "" });
-      setAssignSearch("");
+      setRevocationTargetId(null);
+      setRevocationReason("");
       onNotice("poblacion", "success", "Asignación creada y usuario notificado por correo.");
+      return true;
     } catch (error) {
       onError(error instanceof Error ? error.message : "Error al crear la asignación temporal");
+      return false;
+    }
+  };
+
+  const handleCreateTempAssignment = async () => {
+    if (!selectedCandidate) return;
+    if (!newAssignment.tempRole.trim()) return;
+
+    const tempOccupationId = Number(newAssignment.tempRole);
+    const created = await submitTempAssignment(selectedCandidate, tempOccupationId, newAssignment.reason);
+    if (created) {
+      setNewAssignment({ personId: 0, tempRole: "", startDate: "", endDate: "", reason: "" });
+      setAssignSearch("");
+    }
+  };
+
+  const handleCreateQuickAssignment = async () => {
+    if (!quickSelectedPerson || quickOccupationId === null) return;
+    const sector = temporarySectorForRole(quickSelectedOccupation ?? "");
+    const reason = quickReason.trim() || `Refuerzo operacional sugerido para ${sector.name}`;
+    const created = await submitTempAssignment(quickSelectedPerson, quickOccupationId, reason);
+    if (created) {
+      setQuickPersonId(null);
+      setQuickOccupationId(null);
+      setQuickReason("");
     }
   };
 
@@ -2612,306 +2757,261 @@ const PopulationModule = memo(function PopulationModule({
         </>
       )}
 
-      {sub === "Roles temporales" && (
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "24px",
-          background: "rgba(10, 18, 20, 0.6)",
-          padding: "24px",
-          borderRadius: "16px",
-          border: "1px solid rgba(105, 191, 183, 0.2)",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.2)"
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(105, 191, 183, 0.3)", paddingBottom: "16px", flexWrap: "wrap", gap: "16px" }}>
+      {sub === "Oficios temporales" && (
+        <div className="admin-ui-v2-temp-shell">
+          <div className="admin-ui-v2-temp-hero">
             <div>
-              <h2 style={{ margin: 0, color: "#69bfb7", fontSize: "24px", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" }}>
-                Gestión Táctica de Oficios
-              </h2>
-              <p style={{ margin: 0, color: "#a4c2c5", fontSize: "12px", letterSpacing: "1px" }}>REASIGNACIÓN Y CONTROL DE RECURSOS HUMANOS</p>
+              <span className="admin-ui-v2-temp-kicker">Consola de población</span>
+              <h2>Gestión Táctica de Oficios</h2>
+              <p>Reasignación temporal de personal sin turnos ni campos no soportados por el backend.</p>
             </div>
-            <div style={{ display: "flex", gap: "16px" }}>
-              <div style={{ textAlign: "center", background: "rgba(105, 191, 183, 0.1)", padding: "8px 16px", borderRadius: "8px", border: "1px solid rgba(105, 191, 183, 0.3)" }}>
-                <div style={{ fontSize: "10px", color: "#a4c2c5", textTransform: "uppercase" }}>Asignaciones Activas</div>
-                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#69bfb7" }}>{activeAssignments.length}</div>
-              </div>
-              <div style={{ textAlign: "center", background: "rgba(72, 197, 143, 0.1)", padding: "8px 16px", borderRadius: "8px", border: "1px solid rgba(72, 197, 143, 0.3)" }}>
-                <div style={{ fontSize: "10px", color: "#a4c2c5", textTransform: "uppercase" }}>Disponibles</div>
-                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#48c58f" }}>{assignCandidates.length}</div>
-              </div>
+            <div className="admin-ui-v2-temp-kpis">
+              <MetricCard label="Activas" value={activeAssignments.length} tone="info" />
+              <MetricCard label="Disponibles" value={availableTempCandidates.length} tone="ok" />
+              <MetricCard label="Historial" value={historicalAssignments.length} tone="warn" />
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "24px" }}>
-            <div style={{ background: "rgba(6, 16, 18, 0.8)", border: "1px solid rgba(105, 191, 183, 0.2)", borderRadius: "12px", padding: "20px", position: "relative" }}>
-              <div style={{ position: "absolute", top: "-10px", left: "16px", background: "#061012", padding: "0 8px", color: "#69bfb7", fontSize: "12px", fontWeight: "bold", letterSpacing: "1px" }}>
-                TERMINAL DE COMANDOS
-              </div>
-              
-              <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-                <button
-                  style={{ flex: 1, padding: "8px", background: tacticalTab === "crear" ? "rgba(105, 191, 183, 0.15)" : "transparent", color: tacticalTab === "crear" ? "#69bfb7" : "#a4c2c5", border: tacticalTab === "crear" ? "1px solid rgba(105, 191, 183, 0.5)" : "1px solid rgba(105, 191, 183, 0.2)", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", textTransform: "uppercase", fontSize: "11px", transition: "all 0.2s" }}
-                  onClick={() => setTacticalTab("crear")}
-                  type="button"
-                >
-                  NUEVO ROL
-                </button>
-                <button
-                  style={{ flex: 1, padding: "8px", background: tacticalTab === "historial" ? "rgba(105, 191, 183, 0.15)" : "transparent", color: tacticalTab === "historial" ? "#69bfb7" : "#a4c2c5", border: tacticalTab === "historial" ? "1px solid rgba(105, 191, 183, 0.5)" : "1px solid rgba(105, 191, 183, 0.2)", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", textTransform: "uppercase", fontSize: "11px", transition: "all 0.2s" }}
-                  onClick={() => setTacticalTab("historial")}
-                  type="button"
-                >
-                  HISTÓRICO
-                </button>
-              </div>
+          <div className="admin-ui-v2-temp-nav" role="tablist" aria-label="Vistas de oficios temporales">
+            {([
+              ["sectors", "Cuadrícula de Sectores"],
+              ["timeline", "Cronograma de Asignaciones"],
+              ["quick", "Acoplamiento Rápido"],
+              ["history", "Historial"],
+            ] as Array<[TemporaryView, string]>).map(([view, label]) => (
+              <button
+                key={view}
+                className={`admin-ui-v2-temp-nav-btn ${temporaryView === view ? "is-active" : ""}`}
+                type="button"
+                onClick={() => setTemporaryView(view)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
-              <AnimatePresence mode="wait">
-                {tacticalTab === "crear" ? (
-                  <motion.div
-                    key="crear"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <input
-                      className="v-input"
-                      style={{ width: "100%", marginBottom: "12px", background: "rgba(255,255,255,0.02)" }}
-                      placeholder="Buscar sujeto..."
-                      value={assignSearch}
-                      onChange={(event) => setAssignSearch(event.target.value)}
-                    />
-                    
-                    <div style={{ maxHeight: "160px", overflowY: "auto", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px", paddingRight: "4px" }}>
-                      {assignCandidates.map((person) => (
-                        <div
-                          key={person.id}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            padding: "8px 12px",
-                            background: newAssignment.personId === person.id ? "rgba(105, 191, 183, 0.1)" : "rgba(255,255,255,0.02)",
-                            borderLeft: newAssignment.personId === person.id ? "4px solid #69bfb7" : "4px solid transparent",
-                            cursor: "pointer",
-                            transition: "all 0.2s",
-                            borderRadius: "4px"
-                          }}
-                          onClick={() => setNewAssignment((prev) => ({ ...prev, personId: person.id }))}
-                        >
-                          <div className="admin-ui-v2-person-avatar admin-ui-v2-avatar-fallback" style={{ width: "32px", height: "32px", fontSize: "12px" }}>
-                            {personInitials(person)}
-                          </div>
+          <AnimatePresence mode="wait">
+            {temporaryView === "sectors" && (
+              <motion.div
+                key="temp-sectors"
+                className="admin-ui-v2-temp-sector-grid"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {sectorSummaries.map(({ sector, workers, performance, tone }) => (
+                  <div key={sector.id} className={`admin-ui-v2-temp-sector-card is-${tone}`}>
+                    <div className="admin-ui-v2-temp-sector-head">
+                      <div>
+                        <span>{sector.tag}</span>
+                        <h3>{sector.name}</h3>
+                      </div>
+                      <span className={`admin-ui-v2-pill ${tone === "ok" ? "is-ok" : tone === "warn" ? "is-warn" : "is-danger"}`}>
+                        {workers.length === 0 ? "Déficit" : `${workers.length} activo${workers.length === 1 ? "" : "s"}`}
+                      </span>
+                    </div>
+                    <p>{sector.description}</p>
+                    <div className="admin-ui-v2-temp-sector-meter">
+                      <div><span style={{ width: `${performance}%` }} /></div>
+                      <strong>{performance}% eficacia estimada</strong>
+                    </div>
+                    <div className="admin-ui-v2-temp-worker-list">
+                      {workers.slice(0, 4).map((assignment) => (
+                        <div key={assignment.id} className="admin-ui-v2-temp-worker-row">
+                          <span className="admin-ui-v2-temp-avatar">{temporaryNameInitials(assignment.personName)}</span>
                           <div>
-                            <div style={{ color: "#e9f6f6", fontSize: "13px", fontWeight: "bold" }}>{personFullName(person)}</div>
-                            <div style={{ color: "#a4c2c5", fontSize: "11px" }}>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`}</div>
+                            <strong>{assignment.personName}</strong>
+                            <small>{assignment.tempRole}</small>
                           </div>
                         </div>
                       ))}
+                      {workers.length === 0 && <div className="admin-ui-v2-muted">Sin operarios temporales en este sector.</div>}
                     </div>
-
-                    <select
-                      className="v-select"
-                      style={{ width: "100%", marginBottom: "12px", background: "rgba(255,255,255,0.02)" }}
-                      value={newAssignment.tempRole}
-                      onChange={(event) => setNewAssignment((prev) => ({ ...prev, tempRole: event.target.value }))}
-                    >
-                      <option value="">Especificar rol temporal...</option>
-                      {Array.from(occupations.entries()).map(([id, name]) => (
-                        <option key={id} value={id}>{name}</option>
-                      ))}
-                    </select>
-                    <div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
-                      <input
-                        className="v-input"
-                        style={{ flex: 1, background: "rgba(255,255,255,0.02)" }}
-                        type="date"
-                        title="Fecha Inicio"
-                        value={newAssignment.startDate}
-                        onChange={(event) => setNewAssignment((prev) => ({ ...prev, startDate: event.target.value }))}
-                      />
-                      <input
-                        className="v-input"
-                        style={{ flex: 1, background: "rgba(255,255,255,0.02)" }}
-                        type="date"
-                        title="Fecha Fin"
-                        value={newAssignment.endDate}
-                        onChange={(event) => setNewAssignment((prev) => ({ ...prev, endDate: event.target.value }))}
-                      />
-                    </div>
-                    <textarea
-                      className="v-textarea"
-                      style={{ width: "100%", marginBottom: "16px", minHeight: "80px", background: "rgba(255,255,255,0.02)" }}
-                      placeholder="Motivo operacional de la reasignación"
-                      value={newAssignment.reason}
-                      onChange={(event) => setNewAssignment((prev) => ({ ...prev, reason: event.target.value }))}
-                    />
                     <button
                       className="admin-ui-v2-btn is-info"
-                      style={{ width: "100%", padding: "12px" }}
-                      onClick={handleCreateTempAssignment}
                       type="button"
-                      disabled={!newAssignment.personId || !newAssignment.tempRole}
-                    >
-                      Ejecutar Asignación
-                    </button>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="historial"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.2 }}
-                    style={{ maxHeight: "400px", overflowY: "auto", paddingRight: "8px" }}
-                  >
-                    {historicalAssignments.map((assignment) => (
-                      <div key={assignment.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "8px", padding: "12px", marginBottom: "12px", position: "relative" }}>
-                        <div style={{ position: "absolute", top: "12px", right: "12px", fontSize: "10px", color: "#a4c2c5", border: "1px solid rgba(164, 194, 197, 0.3)", padding: "2px 6px", borderRadius: "4px", textTransform: "uppercase" }}>Completada</div>
-                        <h4 style={{ margin: "0 0 8px 0", color: "#e9f6f6", fontSize: "14px" }}>{assignment.personName}</h4>
-                        <div style={{ fontSize: "12px", color: "#a4c2c5", marginBottom: "4px" }}><span style={{ textDecoration: "line-through", opacity: 0.7 }}>{assignment.fromRole}</span> ➜ <span style={{ color: "#69bfb7" }}>{assignment.tempRole}</span></div>
-                        <div style={{ fontSize: "10px", color: "rgba(164, 194, 197, 0.6)" }}>{new Date(assignment.startDate).toLocaleDateString("es-CR")} - {new Date(assignment.endDate).toLocaleDateString("es-CR")}</div>
-                      </div>
-                    ))}
-                    {historicalAssignments.length === 0 && <div className="admin-ui-v2-muted" style={{ textAlign: "center", paddingTop: "20px" }}>Sin registros previos.</div>}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div style={{ color: "#69bfb7", fontSize: "12px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px", borderBottom: "1px dashed rgba(105, 191, 183, 0.3)", paddingBottom: "8px" }}>
-                OFICIOS EN EJECUCIÓN
-              </div>
-              <AnimatePresence>
-                {activeAssignments.map((assignment) => {
-                  const s = new Date(assignment.startDate).getTime();
-                  const e = new Date(assignment.endDate).getTime();
-                  const n = Date.now();
-                  const isUrgent = e > 0 && e - n < 24 * 60 * 60 * 1000 && n < e;
-                  const duration = e - s;
-                  const elapsed = n - s;
-                  const progress = duration > 0 ? Math.max(0, Math.min(100, (elapsed / duration) * 100)) : 0;
-                  const cardColor = isUrgent ? "#f37b7b" : "#69bfb7";
-                  const cardBg = isUrgent ? "rgba(243, 123, 123, 0.05)" : "rgba(105, 191, 183, 0.05)";
-                  const borderOpa = isUrgent ? "0.3" : "0.2";
-                  
-                  return (
-                    <motion.div
-                      layout
-                      initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.9, x: 50 }}
-                      transition={{ duration: 0.3 }}
-                      key={assignment.id}
-                      style={{
-                        background: cardBg,
-                        border: `1px solid rgba(${isUrgent ? '243, 123, 123' : '105, 191, 183'}, ${borderOpa})`,
-                        borderLeft: `4px solid ${cardColor}`,
-                        borderRadius: "8px",
-                        padding: "16px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "12px",
-                        position: "relative",
-                        overflow: "hidden"
+                      onClick={() => {
+                        const vacancy = quickVacancies.find((item) => item.sector.id === sector.id);
+                        setQuickOccupationId(vacancy?.occupationId || null);
+                        setTemporaryView("quick");
                       }}
+                      disabled={availableTempCandidates.length === 0 || sector.id === "general"}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", zIndex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                          <div className="admin-ui-v2-person-avatar admin-ui-v2-avatar-fallback" style={{ width: "40px", height: "40px", fontSize: "16px", background: "transparent", border: `2px solid ${cardColor}`, color: cardColor }}>
-                            {assignment.personName.slice(0, 2).toUpperCase()}
-                          </div>
+                      Asignar refuerzo temporal
+                    </button>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+
+            {temporaryView === "timeline" && (
+              <motion.div
+                key="temp-timeline"
+                className="admin-ui-v2-temp-timeline"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {activeAssignments.map((assignment) => {
+                  const progress = temporaryAssignmentProgress(assignment.startDate, assignment.endDate);
+                  const sector = temporarySectorForRole(assignment.tempRole);
+                  return (
+                    <div key={assignment.id} className={`admin-ui-v2-temp-assignment-card ${progress.urgent ? "is-urgent" : ""}`}>
+                      <div className="admin-ui-v2-temp-assignment-head">
+                        <div className="admin-ui-v2-temp-person-line">
+                          <span className="admin-ui-v2-temp-avatar">{temporaryNameInitials(assignment.personName)}</span>
                           <div>
-                            <div style={{ fontSize: "16px", fontWeight: "bold", color: "#e9f6f6" }}>{assignment.personName}</div>
-                            <div style={{ fontSize: "12px", color: "#a4c2c5" }}>ID_ASIGNACIÓN: {assignment.id} · ID_OPERARIO: {assignment.personId}</div>
+                            <strong>{assignment.personName}</strong>
+                            <small>ID_ASIGNACIÓN: {assignment.id} · ID_OPERARIO: {assignment.personId}</small>
                           </div>
                         </div>
-                        <button
-                          className="admin-ui-v2-btn"
-                          style={{ padding: "4px 8px", fontSize: "10px" }}
-                          onClick={() => {
-                            setRevocationTargetId(assignment.id);
-                            setRevocationReason("");
-                          }}
-                          type="button"
-                          disabled={revokingId !== null}
-                        >
-                          {revokingId === assignment.id ? "Revocando..." : "Revocar"}
-                        </button>
+                        <div className="admin-ui-v2-actions">
+                          <span className="admin-ui-v2-pill is-info">{sector.name}</span>
+                          <button
+                            className="admin-ui-v2-btn is-danger"
+                            type="button"
+                            onClick={() => {
+                              setRevocationTargetId(assignment.id);
+                              setRevocationReason("");
+                            }}
+                            disabled={revokingId !== null}
+                          >
+                            {revokingId === assignment.id ? "Revocando" : "Revocar"}
+                          </button>
+                        </div>
                       </div>
-
+                      <div className="admin-ui-v2-temp-role-flow">
+                        <div><span>Oficio base</span><strong>{assignment.fromRole}</strong></div>
+                        <i>»</i>
+                        <div><span>Oficio temporal</span><strong>{assignment.tempRole}</strong></div>
+                      </div>
+                      <p className="admin-ui-v2-temp-reason">{assignment.reason}</p>
+                      <div className="admin-ui-v2-temp-progress-row">
+                        <span>Inicio: {temporaryDateLabel(assignment.startDate)}</span>
+                        <strong>{progress.label}</strong>
+                        <span>Fin: {temporaryDateLabel(assignment.endDate)}</span>
+                      </div>
+                      <div className="admin-ui-v2-timeline-bar-wrap">
+                        <div className={`admin-ui-v2-timeline-bar ${progress.urgent ? "is-urgent" : ""}`} style={{ width: `${progress.value}%` }} />
+                      </div>
                       {revocationTargetId === assignment.id && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", zIndex: 1 }}>
+                        <div className="admin-ui-v2-temp-revoke-box">
                           <textarea
                             className="v-textarea"
-                            style={{ width: "100%", minHeight: "72px", background: "rgba(255,255,255,0.02)" }}
                             placeholder="Motivo de revocación"
                             value={revocationReason}
                             onChange={(event) => setRevocationReason(event.target.value)}
                             disabled={revokingId !== null}
                           />
-                          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                            <button
-                              className="admin-ui-v2-btn is-danger"
-                              style={{ padding: "6px 10px", fontSize: "10px" }}
-                              onClick={() => void handleFinishAssignment(assignment.id)}
-                              type="button"
-                              disabled={revokingId !== null || !revocationReason.trim()}
-                            >
+                          <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
+                            <button className="admin-ui-v2-btn is-danger" onClick={() => void handleFinishAssignment(assignment.id)} type="button" disabled={revokingId !== null || !revocationReason.trim()}>
                               Confirmar revocación
                             </button>
-                            <button
-                              className="admin-ui-v2-btn"
-                              style={{ padding: "6px 10px", fontSize: "10px" }}
-                              onClick={() => {
-                                setRevocationTargetId(null);
-                                setRevocationReason("");
-                              }}
-                              type="button"
-                              disabled={revokingId !== null}
-                            >
+                            <button className="admin-ui-v2-btn" onClick={() => { setRevocationTargetId(null); setRevocationReason(""); }} type="button" disabled={revokingId !== null}>
                               Cancelar
                             </button>
                           </div>
                         </div>
                       )}
-
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)", zIndex: 1 }}>
-                        <div style={{ textAlign: "center", flex: 1 }}>
-                          <div style={{ fontSize: "10px", color: "#a4c2c5", textTransform: "uppercase", marginBottom: "4px" }}>Rol Base</div>
-                          <div style={{ fontSize: "13px", color: "#e9f6f6" }}>{assignment.fromRole}</div>
-                        </div>
-                        <div style={{ padding: "0 16px", color: cardColor, fontSize: "18px", opacity: 0.5 }}>»</div>
-                        <div style={{ textAlign: "center", flex: 1 }}>
-                          <div style={{ fontSize: "10px", color: "#a4c2c5", textTransform: "uppercase", marginBottom: "4px" }}>Rol Temporal</div>
-                          <div style={{ fontSize: "14px", color: cardColor, fontWeight: "bold" }}>{assignment.tempRole}</div>
-                        </div>
-                      </div>
-
-                      <div style={{ zIndex: 1 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "11px", color: "#a4c2c5" }}>
-                          <span>PROGRESO OPERACIONAL</span>
-                          <span style={{ color: cardColor, fontWeight: "bold" }}>FIN: {new Date(assignment.endDate).toLocaleDateString("es-CR")}</span>
-                        </div>
-                        <div className="admin-ui-v2-timeline-bar-wrap" style={{ background: "rgba(255,255,255,0.05)" }}>
-                          <div
-                            className={`admin-ui-v2-timeline-bar ${isUrgent ? "is-urgent" : ""}`}
-                            style={{ width: `${progress}%`, background: cardColor }}
-                          />
-                        </div>
-                      </div>
-                    </motion.div>
+                    </div>
                   );
                 })}
-              </AnimatePresence>
-              {activeAssignments.length === 0 && (
-                <div className="admin-ui-v2-empty-cell" style={{ border: "1px dashed rgba(105, 191, 183, 0.3)" }}>
-                  Ninguna asignación activa en progreso.
+                {activeAssignments.length === 0 && <div className="admin-ui-v2-empty-cell">Ninguna asignación activa en progreso.</div>}
+              </motion.div>
+            )}
+
+            {temporaryView === "quick" && (
+              <motion.div
+                key="temp-quick"
+                className="admin-ui-v2-temp-quick"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="admin-ui-v2-temp-panel">
+                  <div className="admin-ui-v2-section-head"><span>1. Operarios aptos</span><span>{availableTempCandidates.length} disponibles</span></div>
+                  <input className="v-input admin-ui-v2-temp-field" placeholder="Buscar por nombre u oficio base" value={assignSearch} onChange={(event) => setAssignSearch(event.target.value)} />
+                  <div className="admin-ui-v2-temp-choice-list">
+                    {availableTempCandidates.map((person) => (
+                      <button
+                        key={person.id}
+                        className={`admin-ui-v2-temp-choice ${quickPersonId === person.id ? "is-selected" : ""}`}
+                        type="button"
+                        onClick={() => {
+                          setQuickPersonId(person.id);
+                          setNewAssignment((prev) => ({ ...prev, personId: person.id }));
+                        }}
+                      >
+                        <span className="admin-ui-v2-temp-avatar">{personInitials(person)}</span>
+                        <div><strong>{personFullName(person)}</strong><small>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`} · {person.age} años</small></div>
+                      </button>
+                    ))}
+                    {availableTempCandidates.length === 0 && <div className="admin-ui-v2-empty-cell">No hay operarios disponibles con esos filtros.</div>}
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
+
+                <div className="admin-ui-v2-temp-panel">
+                  <div className="admin-ui-v2-section-head"><span>2. Vacantes sugeridas</span><span>Derivadas por oficio</span></div>
+                  <div className="admin-ui-v2-temp-choice-list">
+                    {quickVacancies.map((vacancy) => (
+                      <button key={vacancy.sector.id} className={`admin-ui-v2-temp-vacancy ${quickOccupationId === vacancy.occupationId ? "is-selected" : ""}`} type="button" onClick={() => setQuickOccupationId(vacancy.occupationId)} disabled={vacancy.occupationId <= 0}>
+                        <div><strong>{vacancy.sector.name}</strong><small>{vacancy.sector.description}</small></div>
+                        <span>{vacancy.occupationName}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="admin-ui-v2-temp-panel admin-ui-v2-temp-create-panel">
+                  <div className="admin-ui-v2-section-head"><span>3. Confirmación de enlace</span><span>Payload compatible</span></div>
+                  <select className="v-select admin-ui-v2-temp-field" value={newAssignment.tempRole} onChange={(event) => setNewAssignment((prev) => ({ ...prev, tempRole: event.target.value }))}>
+                    <option value="">Crear manualmente: seleccionar oficio...</option>
+                    {occupationOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                  </select>
+                  <textarea className="v-textarea admin-ui-v2-temp-field" placeholder="Motivo operacional para el enlace rápido o manual" value={quickReason || newAssignment.reason} onChange={(event) => { setQuickReason(event.target.value); setNewAssignment((prev) => ({ ...prev, reason: event.target.value })); }} />
+                  <div className="admin-ui-v2-temp-link-preview">
+                    <div><span>Operario</span><strong>{quickSelectedPerson ? personFullName(quickSelectedPerson) : selectedCandidate ? personFullName(selectedCandidate) : "Sin selección"}</strong></div>
+                    <i>»</i>
+                    <div><span>Oficio temporal</span><strong>{quickSelectedOccupation ?? (newAssignment.tempRole ? occupations.get(Number(newAssignment.tempRole)) : null) ?? "Sin oficio"}</strong></div>
+                  </div>
+                  <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
+                    <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void handleCreateQuickAssignment()} disabled={!quickSelectedPerson || quickOccupationId === null}>
+                      Vincular vacante sugerida
+                    </button>
+                    <button className="admin-ui-v2-btn" type="button" onClick={() => void handleCreateTempAssignment()} disabled={!selectedCandidate || !newAssignment.tempRole}>
+                      Crear asignación manual
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {temporaryView === "history" && (
+              <motion.div
+                key="temp-history"
+                className="admin-ui-v2-temp-history"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {historicalAssignments.map((assignment) => (
+                  <div key={assignment.id} className="admin-ui-v2-tactical-history-item">
+                    <div>
+                      <h4>{assignment.personName}</h4>
+                      <p>{assignment.fromRole} » {assignment.tempRole}</p>
+                      <p>{temporaryDateLabel(assignment.startDate)} - {temporaryDateLabel(assignment.endDate)}</p>
+                    </div>
+                    <span className="admin-ui-v2-pill is-neutral">Finalizada</span>
+                  </div>
+                ))}
+                {historicalAssignments.length === 0 && <div className="admin-ui-v2-empty-cell">Sin registros previos.</div>}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
