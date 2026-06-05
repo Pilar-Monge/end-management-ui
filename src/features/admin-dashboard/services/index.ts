@@ -52,6 +52,13 @@ export {
   markCampAchievementSeen,
 } from './achievements.service'
 
+export {
+  ADMIN_DASHBOARD_BOOT_MAX_VISUAL_LEAD,
+  ADMIN_DASHBOARD_BOOT_MIN_MS,
+  INITIAL_DASHBOARD_KPI,
+  bootstrapAdminDashboard,
+} from './adminDashboardBootstrap'
+
 export type {
   AdminAdmissionRequest,
   AdminExpeditionRecord,
@@ -66,3 +73,12 @@ export type {
   CampAchievementProgress,
   CampAchievementUnlock,
 } from './types'
+
+export type {
+  AdminDashboardBootstrapData,
+  AdminDashboardBootProgress,
+  DashboardKpi,
+  UiAdmission,
+  UiExpedition,
+  UiIntercampRequest,
+} from './adminDashboardBootstrap'

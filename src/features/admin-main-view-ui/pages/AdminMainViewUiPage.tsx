@@ -16,6 +16,12 @@ import { AudioLines, Check, ChevronLeft, LogOut } from 'lucide-react'
 import * as THREE from 'three'
 import './admin-main-view-ui.css'
 import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
+import {
+  ADMIN_DASHBOARD_BOOT_MAX_VISUAL_LEAD,
+  ADMIN_DASHBOARD_BOOT_MIN_MS,
+  bootstrapAdminDashboard,
+  type AdminDashboardBootstrapData,
+} from '../../admin-dashboard/services'
 
 type Vec3 = [number, number, number]
 type ViewMode = 'normal' | 'zoom'
@@ -823,46 +829,24 @@ function SyncOverlay({
   isSyncing,
   syncState,
   presetName,
+  progress,
+  phase,
   onComplete,
   onBack,
 }: {
   isSyncing: boolean
   syncState: SyncState
   presetName: string
+  progress: number
+  phase: string
   onComplete: () => void
   onBack: () => void
 }) {
-  const [progress, setProgress] = useState(0)
-
-  useEffect(() => {
-    if (!isSyncing || syncState !== 'syncing') {
-      setProgress(0)
-      return
-    }
-
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          return 100
-        }
-        return prev + 2
-      })
-    }, 20)
-
-    return () => clearInterval(interval)
-  }, [isSyncing, syncState])
-
-  useEffect(() => {
-    if (progress >= 100 && syncState === 'syncing') {
-      onComplete();
-    }
-  }, [onComplete, progress, syncState]);
-
   if (!isSyncing) return null
 
-  const isReady = syncState === 'ready' || progress >= 100
-  const canAccess = progress >= 100
+  const safeProgress = Math.max(0, Math.min(100, progress))
+  const isReady = syncState === 'ready'
+  const canAccess = isReady
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-700">
@@ -878,7 +862,7 @@ function SyncOverlay({
               <Check className="h-12 w-12 text-emerald-400" strokeWidth={3} />
             ) : (
               <span className="font-mono text-3xl font-black text-white leading-none">
-                {progress}%
+                {Math.round(safeProgress)}%
               </span>
             )}
             <span className="font-mono text-[8px] text-cyan-400/60 uppercase tracking-[0.3em] mt-1">
@@ -893,14 +877,14 @@ function SyncOverlay({
               {presetName}
             </p>
             <p className="font-mono text-[8px] text-white/30 uppercase tracking-widest">
-              {isReady ? 'Conexión establecida' : 'Estableciendo conexión segura...'}
+              {isReady ? 'Conexión establecida' : phase}
             </p>
           </div>
 
           <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
             <div
               className="h-full bg-cyan-400 transition-all duration-300 shadow-[0_0_15px_rgba(34,211,238,0.8)]"
-              style={{ width: `${progress}%` }}
+              style={{ width: `${safeProgress}%` }}
             />
           </div>
         </div>
@@ -932,7 +916,7 @@ function SyncOverlay({
                 />
               ) : (
                 <span className="font-mono text-[10px] font-black text-cyan-400/50">
-                  {progress}%
+                  {Math.round(safeProgress)}%
                 </span>
               )}
               <span
@@ -974,11 +958,16 @@ export default function AdminMainViewUiPage() {
   const [bootProgress, setBootProgress] = useState(0)
   const [appLoaded, setAppLoaded] = useState(false)
   const [syncState, setSyncState] = useState<SyncState>('idle')
+  const [syncDataProgress, setSyncDataProgress] = useState(0)
+  const [syncVisualProgress, setSyncVisualProgress] = useState(0)
+  const [syncPhase, setSyncPhase] = useState('Inicializando consola tactica...')
+  const [preloadedDashboardData, setPreloadedDashboardData] = useState<AdminDashboardBootstrapData | null>(null)
   const [signalEnabled, setSignalEnabled] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
   const [hoveredMonitorId, setHoveredMonitorId] = useState<string | null>(null)
   const [hoveredConsole, setHoveredConsole] = useState(false)
   const [hoveredComms, setHoveredComms] = useState(false)
+  const syncRunIdRef = useRef(0)
 
   const cameraSessionRef = useRef<CameraState>({
     position: cloneVec3(cameraConfig.position),
@@ -1025,6 +1014,31 @@ export default function AdminMainViewUiPage() {
   }, [syncState, viewMode])
 
   useEffect(() => {
+    if (syncState === 'idle') {
+      setSyncDataProgress(0)
+      setSyncVisualProgress(0)
+      setSyncPhase('Inicializando consola tactica...')
+      setPreloadedDashboardData(null)
+      return
+    }
+
+    if (syncState === 'ready') {
+      setSyncVisualProgress(100)
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      setSyncVisualProgress((prev) => {
+        const target = Math.min(99, syncDataProgress + ADMIN_DASHBOARD_BOOT_MAX_VISUAL_LEAD)
+        if (prev >= target) return prev
+        return Math.min(target, prev + 1)
+      })
+    }, 26)
+
+    return () => window.clearInterval(timer)
+  }, [syncDataProgress, syncState])
+
+  useEffect(() => {
     if (!toast) {
       return
     }
@@ -1056,22 +1070,68 @@ export default function AdminMainViewUiPage() {
 
   const handleStartSync = useCallback(
     (presetId: string) => {
-      if (MONITOR_PRESET_IDS.has(presetId) && viewMode === 'zoom') {
-        setSyncState('syncing')
-      }
+      if (!MONITOR_PRESET_IDS.has(presetId) || viewMode !== 'zoom' || syncState !== 'idle') return
+
+      const runId = syncRunIdRef.current + 1
+      syncRunIdRef.current = runId
+      setSyncState('syncing')
+      setSyncDataProgress(0)
+      setSyncVisualProgress(0)
+      setSyncPhase('Inicializando consola tactica...')
+      setPreloadedDashboardData(null)
+
+      void (async () => {
+        const startedAt = Date.now()
+        try {
+          const data = await bootstrapAdminDashboard({
+            onProgress: ({ progress, phase }) => {
+              if (syncRunIdRef.current !== runId) return
+              setSyncDataProgress(progress)
+              setSyncPhase(phase)
+            },
+          })
+
+          const waitMs = Math.max(0, ADMIN_DASHBOARD_BOOT_MIN_MS - (Date.now() - startedAt))
+          if (waitMs > 0) {
+            await new Promise((resolve) => window.setTimeout(resolve, waitMs))
+          }
+
+          if (syncRunIdRef.current !== runId) return
+          setPreloadedDashboardData(data)
+          setSyncDataProgress(100)
+          setSyncPhase('Finalizando despliegue...')
+          setSyncState('ready')
+
+          window.setTimeout(() => {
+            if (syncRunIdRef.current !== runId) return
+            navigate('/admin-dashboard', {
+              state: {
+                bootstrappedDashboardData: data,
+              },
+            })
+          }, 420)
+        } catch {
+          if (syncRunIdRef.current !== runId) return
+          setToast('No se logro completar la sincronizacion general de modulos.')
+          setSyncState('idle')
+        }
+      })()
     },
-    [viewMode],
+    [navigate, syncState, viewMode],
   )
 
   const handleSyncComplete = useCallback(() => {
-    setSyncState('ready');
-    window.setTimeout(() => {
-      navigate('/admin-dashboard');
-    }, 420);
-  }, [navigate]);
+    if (!preloadedDashboardData) return
+    navigate('/admin-dashboard', {
+      state: {
+        bootstrappedDashboardData: preloadedDashboardData,
+      },
+    })
+  }, [navigate, preloadedDashboardData])
 
   const handleBack = useCallback(() => {
     if (syncState !== 'idle') {
+      syncRunIdRef.current += 1
       setSyncState('idle')
       return
     }
@@ -1110,6 +1170,8 @@ export default function AdminMainViewUiPage() {
           isSyncing={isSyncing}
           syncState={syncState}
           presetName={currentPreset.name}
+          progress={Math.max(syncDataProgress, syncVisualProgress)}
+          phase={syncPhase}
           onComplete={handleSyncComplete}
           onBack={handleBack}
         />

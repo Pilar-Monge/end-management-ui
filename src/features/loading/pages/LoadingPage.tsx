@@ -32,7 +32,9 @@ export default function LoadingPage() {
   }, []);
 
   const handleTransitionComplete = useCallback(() => {
-    navigate("/main-homepage", { replace: true });
+    const postLoadingRoute = localStorage.getItem("postLoadingRoute") ?? "/main-homepage";
+    localStorage.removeItem("postLoadingRoute");
+    navigate(postLoadingRoute, { replace: true });
   }, [navigate]);
 
   return (

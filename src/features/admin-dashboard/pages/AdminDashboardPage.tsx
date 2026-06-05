@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Area,
@@ -13,41 +13,33 @@ import {
   YAxis,
 } from "recharts";
 import { WorldMap } from "../../expeditions-ui/components/WorldMap";
-import { fetchPersons } from "../../persons/api/queries";
 import type { Person } from "../../persons/types";
 import { deletePerson, updatePerson, updatePersonPhoto } from "../../persons/api/mutations";
-import { fetchCamps } from "../../camps/api/queries";
 import type { Camp } from "../../camps/types";
-import { fetchOccupations } from "../../catalogs/api/queries";
 import type { Occupation } from "../../catalogs/types";
 import {
   getCampAchievementsProgress,
-  getExpeditionsDashboard,
-  getGeneralDashboard,
-  getInventoryDashboard,
   getServerTime,
   getLatestCampAchievementUnlocks,
-  listExpeditions,
-  listAdmissionRequests,
-  listIntercampRequests,
   listNotifications,
   markCampAchievementSeen,
   updateAdmissionRequestStatus,
+  ADMIN_DASHBOARD_BOOT_MAX_VISUAL_LEAD,
+  ADMIN_DASHBOARD_BOOT_MIN_MS,
+  INITIAL_DASHBOARD_KPI,
+  bootstrapAdminDashboard,
   type CampAchievementProgress,
   type CampAchievementUnlock,
+  type AdminDashboardBootstrapData,
 } from "../services";
 import {
-  extractNumberByHint,
-  mapAdmissionFromApi,
-  mapExpeditionFromApi,
-  mapIntercampFromApi,
   mapNotificationFromApi,
 } from "../mappers/adminMappers";
 import { ExpeditionsWorldMap, prefetchExpeditionsWorldMap } from "../expeditions/components/ExpeditionsWorldMap";
 import type { MappedCampPoint } from "../expeditions/types";
 import { AdminBootOverlay } from "../components/AdminBootOverlay";
 import { SESSION_TOKEN_CHANGED_EVENT } from "../../../shared/services/sessionService";
-import { ApiHttpError } from "../../../shared/services/httpClient";
+import { ApiHttpError, apiRequest } from "../../../shared/services/httpClient";
 import { getErrorMessage } from "../../../shared/services/errorMessages";
 import { PopupMessage } from "../../../shared/components/PopupMessage";
 import "../../expeditions-ui/expeditionsUi.css";
@@ -193,18 +185,6 @@ interface GlobalTimeState {
 }
 
 const SESSION_TIMEOUT_MS = 20 * 60 * 1000;
-const ADMIN_BOOT_MIN_MS = 1400;
-const ADMIN_BOOT_MAX_VISUAL_LEAD = 8;
-
-type BootStep = "persons" | "admissions" | "intercamp" | "notifications" | "session";
-
-const BOOT_STEP_WEIGHTS: Record<BootStep, number> = {
-  persons: 20,
-  admissions: 25,
-  intercamp: 25,
-  notifications: 15,
-  session: 15,
-};
 
 interface TempRoleAssignment {
   id: number;
@@ -249,17 +229,6 @@ const SECTION_DESCRIPTIONS: Record<AdminSectionId, string> = {
   configuracion: "Parámetros operativos y políticas del panel administrativo.",
 };
 
-const INITIAL_DASHBOARD_KPI: DashboardKpi = {
-  populationTotal: 0,
-  criticalResources: 0,
-  activeExpeditions: 0,
-  pendingIntercamp: 0,
-  activePopulation: 0,
-  injuredPopulation: 0,
-  sickPopulation: 0,
-  outPopulation: 0,
-};
-
 function expeditionRouteStatus(status: UiExpedition["status"]): string {
   if (status === "PROGRAMADA") return "PLANNED";
   if (status === "REGRESANDO") return "DELAYED";
@@ -282,6 +251,71 @@ function buildExpeditionRoute(expedition: UiExpedition, points: MappedCampPoint[
 }
 
 const INITIAL_TEMP_ASSIGNMENTS: TempRoleAssignment[] = [];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object";
+}
+
+function firstNumberField(record: Record<string, unknown>, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
+function firstStringField(record: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim() !== "") return value;
+  }
+  return null;
+}
+
+function extractTemporaryAssignmentList(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return [];
+
+  for (const key of ["items", "records", "results", "assignments", "temporaryOccupationAssignments", "temporaryAssignments", "data"]) {
+    const value = payload[key];
+    if (Array.isArray(value)) return value;
+  }
+
+  return [];
+}
+
+function assignmentStatusFromApi(item: Record<string, unknown>): TempRoleAssignment["status"] {
+  const rawStatus = firstStringField(item, ["status", "state", "assignmentStatus"]);
+  const normalizedStatus = rawStatus?.trim().toUpperCase();
+  const revokedAt = firstStringField(item, ["revokedAt", "revoked_at", "deletedAt", "deleted_at", "finishedAt", "finished_at"]);
+
+  if (revokedAt || normalizedStatus === "FINALIZADA" || normalizedStatus === "FINISHED" || normalizedStatus === "REVOKED" || normalizedStatus === "INACTIVE") {
+    return "FINALIZADA";
+  }
+
+  return "ACTIVA";
+}
+
+function nestedName(record: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (!isRecord(value)) continue;
+
+    const directName = firstStringField(value, ["name", "fullName", "displayName", "nombre"]);
+    if (directName) return directName;
+
+    const firstName = firstStringField(value, ["firstName", "nombre", "primerNombre", "first_name"]);
+    const lastName = firstStringField(value, ["lastName", "apellido", "last_name"]);
+    const resolvedName = [firstName, lastName].filter(Boolean).join(" ").trim();
+    if (resolvedName) return resolvedName;
+  }
+
+  return null;
+}
 
 function buildResourceTrendData(records: Array<Record<string, unknown>>): ResourceTrendPoint[] {
   const byDay = new Map<string, ResourceTrendPoint>();
@@ -605,6 +639,11 @@ function formatHudDateTime(date: Date): { day: string; time: string } {
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const initialBootstrapDataRef = useRef(
+    (location.state as { bootstrappedDashboardData?: AdminDashboardBootstrapData } | null)?.bootstrappedDashboardData ?? null,
+  );
+  const initialBootstrapData = initialBootstrapDataRef.current;
 
   const [hasEntered] = useState(true);
 
@@ -613,13 +652,13 @@ export default function AdminDashboardPage() {
 
   const [dataError, setDataError] = useState<string | null>(null);
 
-  const [persons, setPersons] = useState<Person[]>([]);
-  const [camps, setCamps] = useState<Camp[]>([]);
-  const [occupations, setOccupations] = useState<Occupation[]>([]);
-  const [admissions, setAdmissions] = useState<UiAdmission[]>([]);
-  const [expeditions, setExpeditions] = useState<UiExpedition[]>([]);
-  const [intercampRequests, setIntercampRequests] = useState<UiIntercampRequest[]>([]);
-  const [dashboardKpi, setDashboardKpi] = useState<DashboardKpi>(INITIAL_DASHBOARD_KPI);
+  const [persons, setPersons] = useState<Person[]>(initialBootstrapData?.persons ?? []);
+  const [camps, setCamps] = useState<Camp[]>(initialBootstrapData?.camps ?? []);
+  const [occupations, setOccupations] = useState<Occupation[]>(initialBootstrapData?.occupations ?? []);
+  const [admissions, setAdmissions] = useState<UiAdmission[]>(initialBootstrapData?.admissions ?? []);
+  const [expeditions, setExpeditions] = useState<UiExpedition[]>(initialBootstrapData?.expeditions ?? []);
+  const [intercampRequests, setIntercampRequests] = useState<UiIntercampRequest[]>(initialBootstrapData?.intercampRequests ?? []);
+  const [dashboardKpi, setDashboardKpi] = useState<DashboardKpi>(initialBootstrapData?.dashboardKpi ?? INITIAL_DASHBOARD_KPI);
   const [notifications, setNotifications] = useState<UiNotification[]>([]);
   const [resourceTrendData, setResourceTrendData] = useState<ResourceTrendPoint[]>([]);
   const [consumedResources, setConsumedResources] = useState<ResourceLedgerEntry[]>([]);
@@ -639,7 +678,9 @@ export default function AdminDashboardPage() {
   const lastActivityUpdateRef = useRef(0);
   const lastActivityAtRef = useRef(Date.now());
   const bootStartedAtRef = useRef<number>(Date.now());
-  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const initialCoreLoadStartedRef = useRef(false);
+  const preloadedDeferredLoadStartedRef = useRef(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(!initialBootstrapData);
   const [bootDataProgress, setBootDataProgress] = useState(0);
   const [bootVisualProgress, setBootVisualProgress] = useState(0);
   const [bootPhase, setBootPhase] = useState("Inicializando consola tactica...");
@@ -675,6 +716,46 @@ export default function AdminDashboardPage() {
     [activeAchievementUnlock],
   );
 
+  const applyBootstrapData = useCallback((data: AdminDashboardBootstrapData) => {
+    setPersons(data.persons);
+    setCamps(data.camps);
+    setOccupations(data.occupations);
+    setAdmissions(data.admissions);
+    setExpeditions(data.expeditions);
+    setIntercampRequests(data.intercampRequests);
+    setDashboardKpi(data.dashboardKpi);
+  }, []);
+
+  const loadDeferredDashboardData = useCallback(async () => {
+    let deferredFailedCount = 0;
+
+    const safeRunDeferred = async <T,>(runner: () => Promise<T>, fallback: T): Promise<T> => {
+      try {
+        return await runner();
+      } catch {
+        deferredFailedCount += 1;
+        return fallback;
+      }
+    };
+
+    const [notificationRecords, achievementProgressRecords, latestAchievementUnlocks] = await Promise.all([
+      safeRunDeferred(listNotifications, [] as Awaited<ReturnType<typeof listNotifications>>),
+      safeRunDeferred(getCampAchievementsProgress, [] as Awaited<ReturnType<typeof getCampAchievementsProgress>>),
+      safeRunDeferred(() => getLatestCampAchievementUnlocks(5), [] as Awaited<ReturnType<typeof getLatestCampAchievementUnlocks>>),
+    ]);
+
+    setNotifications(notificationRecords.map((item) => mapNotificationFromApi(item) as UiNotification));
+    setResourceTrendData([]);
+    setConsumedResources([]);
+    setGainedResources([]);
+    setAchievementProgress(achievementProgressRecords);
+    enqueueAchievementUnlocks(latestAchievementUnlocks);
+
+    if (deferredFailedCount > 0) {
+      notifyModule("global", "warning", `Carga diferida parcial: ${deferredFailedCount} modulo(s) secundarios fallaron.`);
+    }
+  }, [enqueueAchievementUnlocks, notifyModule]);
+
   useEffect(() => {
     if (!moduleFeedback) return;
     const timeout = window.setTimeout(() => setModuleFeedback(null), 6000);
@@ -707,137 +788,24 @@ export default function AdminDashboardPage() {
     setBootPhase("Inicializando consola tactica...");
     bootStartedAtRef.current = Date.now();
 
-    let progressAccumulator = 0;
-    const completeBootStep = (step: BootStep, phaseLabel: string) => {
-      progressAccumulator = Math.min(100, progressAccumulator + BOOT_STEP_WEIGHTS[step]);
-      setBootDataProgress(progressAccumulator);
-      setBootPhase(phaseLabel);
-    };
-
     try {
-      let criticalFailedCount = 0;
-      let readOnlySkippedCount = 0;
-
-      const safeRunCritical = async <T,>(runner: () => Promise<T>, fallback: T): Promise<T> => {
-        try {
-          return await runner();
-        } catch {
-          criticalFailedCount += 1;
-          return fallback;
-        }
-      };
-
-      const safeRunReadOnly = async <T,>(runner: () => Promise<T>, fallback: T): Promise<T> => {
-        try {
-          return await runner();
-        } catch (error) {
-          if (error instanceof ApiHttpError && (error.statusCode === 401 || error.statusCode === 403 || error.statusCode === 404)) {
-            readOnlySkippedCount += 1;
-            return fallback;
-          }
-          throw error;
-        }
-      };
-
-      const [
-        personsData,
-        campsData,
-        occupationsData,
-        admissionsData,
-        expeditionsData,
-        intercampData,
-        generalDashboard,
-        inventoryDashboard,
-        expeditionsDashboard,
-      ] = await Promise.all([
-        safeRunCritical(async () => {
-          const value = await fetchPersons();
-          completeBootStep("persons", "Sincronizando poblacion...");
-          return value;
-        }, [] as Awaited<ReturnType<typeof fetchPersons>>),
-        safeRunCritical(fetchCamps, [] as Awaited<ReturnType<typeof fetchCamps>>),
-        safeRunCritical(fetchOccupations, [] as Awaited<ReturnType<typeof fetchOccupations>>),
-        safeRunCritical(async () => {
-          const value = await listAdmissionRequests();
-          completeBootStep("admissions", "Procesando admisiones IA...");
-          return value;
-        }, [] as Awaited<ReturnType<typeof listAdmissionRequests>>),
-        safeRunReadOnly(async () => {
-          const value = await listExpeditions();
-          return value;
-        }, [] as Awaited<ReturnType<typeof listExpeditions>>),
-        safeRunReadOnly(async () => {
-          const value = await listIntercampRequests();
-          completeBootStep("intercamp", "Conectando inter-campamentos...");
-          return value;
-        }, [] as Awaited<ReturnType<typeof listIntercampRequests>>),
-        safeRunCritical(getGeneralDashboard, {} as Awaited<ReturnType<typeof getGeneralDashboard>>),
-        safeRunCritical(getInventoryDashboard, {} as Awaited<ReturnType<typeof getInventoryDashboard>>),
-        safeRunCritical(getExpeditionsDashboard, {} as Awaited<ReturnType<typeof getExpeditionsDashboard>>),
-      ]);
-
-      if (criticalFailedCount > 0) {
-        notifyModule("global", "warning", `Carga inicial parcial: ${criticalFailedCount} modulo(s) critico(s) fallaron en backend.`);
-      }
-      if (readOnlySkippedCount > 0) {
-        notifyModule("global", "info", `Algunos modulos de consulta no estan disponibles para este rol (${readOnlySkippedCount}).`);
-      }
-
-      setPersons(personsData);
-      setCamps(campsData);
-      setOccupations(occupationsData);
-      setAdmissions(admissionsData.map((item) => mapAdmissionFromApi(item) as UiAdmission));
-      setExpeditions(expeditionsData.map((item) => mapExpeditionFromApi(item) as UiExpedition));
-      setIntercampRequests(intercampData.map((item) => mapIntercampFromApi(item) as UiIntercampRequest));
-      setDashboardKpi({
-        populationTotal: extractNumberByHint(generalDashboard, ["population", "persons", "totalpeople", "total"], personsData.length),
-        criticalResources: extractNumberByHint(inventoryDashboard, ["critical", "alert", "low"], 0),
-        activeExpeditions: extractNumberByHint(expeditionsDashboard, ["active", "ongoing"], expeditionsData.length),
-        pendingIntercamp: extractNumberByHint(generalDashboard, ["intercamp", "transfer", "pending"], intercampData.length),
-        activePopulation: extractNumberByHint(generalDashboard, ["active", "healthy"], personsData.filter((person) => person.status === "ACTIVE").length),
-        injuredPopulation: extractNumberByHint(generalDashboard, ["injured"], personsData.filter((person) => person.status === "INJURED").length),
-        sickPopulation: extractNumberByHint(generalDashboard, ["sick", "ill"], 0),
-        outPopulation: extractNumberByHint(
-          generalDashboard,
-          ["missing", "outside", "out"],
-          personsData.filter((person) => person.status === "OUTSIDE_CAMP" || person.status === "ON_EXPEDITION").length,
-        ),
+      const data = await bootstrapAdminDashboard({
+        onProgress: ({ progress, phase }) => {
+          setBootDataProgress(progress);
+          setBootPhase(phase);
+        },
       });
-      completeBootStep("session", "Validando sesion y perfil...");
 
-      void (async () => {
-        let deferredFailedCount = 0;
+      applyBootstrapData(data);
 
-        const safeRunDeferred = async <T,>(runner: () => Promise<T>, fallback: T): Promise<T> => {
-          try {
-            return await runner();
-          } catch {
-            deferredFailedCount += 1;
-            return fallback;
-          }
-        };
+      if (data.criticalFailedCount > 0) {
+        notifyModule("global", "warning", `Carga inicial parcial: ${data.criticalFailedCount} modulo(s) critico(s) fallaron en backend.`);
+      }
+      if (data.readOnlySkippedCount > 0) {
+        notifyModule("global", "info", `Algunos modulos de consulta no estan disponibles para este rol (${data.readOnlySkippedCount}).`);
+      }
 
-        const [notificationRecords, achievementProgressRecords, latestAchievementUnlocks] = await Promise.all([
-          safeRunDeferred(async () => {
-            const value = await listNotifications();
-            completeBootStep("notifications", "Cargando notificaciones...");
-            return value;
-          }, [] as Awaited<ReturnType<typeof listNotifications>>),
-          safeRunDeferred(getCampAchievementsProgress, [] as Awaited<ReturnType<typeof getCampAchievementsProgress>>),
-          safeRunDeferred(() => getLatestCampAchievementUnlocks(5), [] as Awaited<ReturnType<typeof getLatestCampAchievementUnlocks>>),
-        ]);
-
-        setNotifications(notificationRecords.map((item) => mapNotificationFromApi(item) as UiNotification));
-        setResourceTrendData([]);
-        setConsumedResources([]);
-        setGainedResources([]);
-        setAchievementProgress(achievementProgressRecords);
-        enqueueAchievementUnlocks(latestAchievementUnlocks);
-
-        if (deferredFailedCount > 0) {
-          notifyModule("global", "warning", `Carga diferida parcial: ${deferredFailedCount} modulo(s) secundarios fallaron.`);
-        }
-      })();
+      void loadDeferredDashboardData();
     } catch (error) {
       setDataError(getErrorMessage(error, "load_dashboard"));
       notifyModule("global", "error", "No se logro completar la sincronizacion general de modulos.");
@@ -845,13 +813,13 @@ export default function AdminDashboardPage() {
       setBootDataProgress(100);
       setBootPhase("Finalizando despliegue...");
       const elapsed = Date.now() - bootStartedAtRef.current;
-      const waitMs = Math.max(0, ADMIN_BOOT_MIN_MS - elapsed);
+      const waitMs = Math.max(0, ADMIN_DASHBOARD_BOOT_MIN_MS - elapsed);
       if (waitMs > 0) {
         await new Promise((resolve) => window.setTimeout(resolve, waitMs));
       }
       setIsBootstrapping(false);
     }
-  }, [enqueueAchievementUnlocks, notifyModule]);
+  }, [applyBootstrapData, loadDeferredDashboardData, notifyModule]);
 
   const dismissAchievementUnlock = useCallback(async () => {
     if (!activeAchievementUnlock) return;
@@ -875,7 +843,7 @@ export default function AdminDashboardPage() {
 
     const timer = window.setInterval(() => {
       setBootVisualProgress((prev) => {
-        const target = Math.min(99, bootDataProgress + ADMIN_BOOT_MAX_VISUAL_LEAD);
+        const target = Math.min(99, bootDataProgress + ADMIN_DASHBOARD_BOOT_MAX_VISUAL_LEAD);
         if (prev >= target) return prev;
         return Math.min(target, prev + 1);
       });
@@ -886,8 +854,27 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (!hasEntered) return;
+    if (initialBootstrapDataRef.current) return;
+    if (initialCoreLoadStartedRef.current) return;
+    initialCoreLoadStartedRef.current = true;
     void loadCoreData();
   }, [hasEntered, loadCoreData]);
+
+  useEffect(() => {
+    const data = initialBootstrapDataRef.current;
+    if (!data) return;
+    if (preloadedDeferredLoadStartedRef.current) return;
+    preloadedDeferredLoadStartedRef.current = true;
+
+    if (data.criticalFailedCount > 0) {
+      notifyModule("global", "warning", `Carga inicial parcial: ${data.criticalFailedCount} modulo(s) critico(s) fallaron en backend.`);
+    }
+    if (data.readOnlySkippedCount > 0) {
+      notifyModule("global", "info", `Algunos modulos de consulta no estan disponibles para este rol (${data.readOnlySkippedCount}).`);
+    }
+
+    void loadDeferredDashboardData();
+  }, [loadDeferredDashboardData, notifyModule]);
 
   useEffect(() => {
     if (!hasEntered) return;
@@ -2101,6 +2088,9 @@ const PopulationModule = memo(function PopulationModule({
   const [assignments, setAssignments] = useState<TempRoleAssignment[]>(INITIAL_TEMP_ASSIGNMENTS);
   const [assignSearch, setAssignSearch] = useState("");
   const [tacticalTab, setTacticalTab] = useState<"crear" | "historial">("crear");
+  const [revokingId, setRevokingId] = useState<number | null>(null);
+  const [revocationTargetId, setRevocationTargetId] = useState<number | null>(null);
+  const [revocationReason, setRevocationReason] = useState("");
   const [newAssignment, setNewAssignment] = useState({
     personId: 0,
     tempRole: "",
@@ -2108,6 +2098,70 @@ const PopulationModule = memo(function PopulationModule({
     endDate: "",
     reason: "",
   });
+
+  const loadTempAssignments = useCallback(async () => {
+    const response = await apiRequest<unknown>("/temporary-occupation-assignments?page=1&limit=100");
+    const list = extractTemporaryAssignmentList(response);
+    const mapped: TempRoleAssignment[] = [];
+
+    list.forEach((rawItem) => {
+      if (!isRecord(rawItem)) return;
+
+      const assignmentId = firstNumberField(rawItem, ["id", "assignmentId", "temporaryOccupationAssignmentId", "temporaryAssignmentId"]);
+      const personId = firstNumberField(rawItem, ["personId", "person_id", "residentId", "survivorId"])
+        ?? (isRecord(rawItem.person) ? firstNumberField(rawItem.person, ["id", "personId"]) : null);
+      if (assignmentId === null || personId === null) return;
+
+      const temporaryOccupationId = firstNumberField(rawItem, ["temporaryOccupationId", "temporary_occupation_id", "occupationId", "occupation_id"])
+        ?? (isRecord(rawItem.temporaryOccupation) ? firstNumberField(rawItem.temporaryOccupation, ["id", "occupationId"]) : null);
+      const originalOccupationId = firstNumberField(rawItem, ["originalOccupationId", "baseOccupationId", "previousOccupationId"]);
+      const person = persons.find((candidate) => candidate.id === personId);
+      const personName = person ? personFullName(person) : nestedName(rawItem, ["person", "resident", "survivor"]) ?? `Usuario #${personId}`;
+      const fromRole = person
+        ? occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`
+        : originalOccupationId !== null
+          ? occupations.get(originalOccupationId) ?? `Ocupación #${originalOccupationId}`
+          : nestedName(rawItem, ["originalOccupation", "baseOccupation", "previousOccupation"]) ?? "Desconocido";
+      const tempRole = temporaryOccupationId !== null
+        ? occupations.get(temporaryOccupationId) ?? `Ocupación #${temporaryOccupationId}`
+        : firstStringField(rawItem, ["temporaryOccupationName", "occupationName", "temporaryRole", "tempRole"])
+          ?? nestedName(rawItem, ["temporaryOccupation", "occupation"])
+          ?? "Desconocido";
+      const startDate = firstStringField(rawItem, ["startDate", "start_date", "assignedAt", "assigned_at", "createdAt", "created_at"])
+        ?? new Date().toISOString();
+      const endDate = firstStringField(rawItem, ["endDate", "end_date", "expiresAt", "expires_at", "finishedAt", "finished_at", "revokedAt", "revoked_at"])
+        ?? startDate;
+
+      mapped.push({
+        id: assignmentId,
+        personId,
+        personName,
+        fromRole,
+        tempRole,
+        startDate,
+        endDate,
+        reason: firstStringField(rawItem, ["reason", "motivo", "description", "details"]) ?? "Sin motivo",
+        status: assignmentStatusFromApi(rawItem),
+      });
+    });
+
+    return mapped.sort((a, b) => b.id - a.id || b.startDate.localeCompare(a.startDate));
+  }, [occupations, persons]);
+
+  useEffect(() => {
+    if (sub !== "Roles temporales") return;
+
+    let isMounted = true;
+    loadTempAssignments()
+      .then((mapped) => {
+        if (isMounted) setAssignments(mapped);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch temporary assignments", err);
+      });
+
+    return () => { isMounted = false; };
+  }, [loadTempAssignments, sub]);
 
   const roleDistribution = useMemo(() => {
     const map = new Map<string, number>();
@@ -2291,37 +2345,72 @@ const PopulationModule = memo(function PopulationModule({
     }
   };
 
-  const handleCreateTempAssignment = () => {
+  const handleCreateTempAssignment = async () => {
     if (!selectedCandidate) return;
-    if (!newAssignment.tempRole.trim() || !newAssignment.startDate || !newAssignment.endDate) return;
+    if (!newAssignment.tempRole.trim()) return;
 
-    const role = occupations.get(selectedCandidate.occupationId) ?? `Ocupación #${selectedCandidate.occupationId}`;
-    setAssignments((prev) => [
-      {
-        id: Date.now(),
-        personId: selectedCandidate.id,
-        personName: personFullName(selectedCandidate),
-        fromRole: role,
-        tempRole: newAssignment.tempRole.trim(),
-        startDate: newAssignment.startDate,
-        endDate: newAssignment.endDate,
-        reason: newAssignment.reason.trim() || "Asignación temporal",
-        status: "ACTIVA",
-      },
-      ...prev,
-    ]);
-    setNewAssignment({ personId: 0, tempRole: "", startDate: "", endDate: "", reason: "" });
-    setAssignSearch("");
+    const tempOccupationId = Number(newAssignment.tempRole);
+    if (!Number.isFinite(tempOccupationId) || tempOccupationId <= 0) {
+      onNotice("poblacion", "warning", "Selecciona un oficio temporal válido antes de continuar.");
+      return;
+    }
+
+    try {
+      await apiRequest("/temporary-occupation-assignments", {
+        method: "POST",
+        body: JSON.stringify({
+          personId: selectedCandidate.id,
+          temporaryOccupationId: tempOccupationId,
+          reason: newAssignment.reason.trim() || "Asignación temporal",
+          assignedBy: currentAdminId ?? 1,
+        }),
+      });
+
+      setAssignments(await loadTempAssignments());
+      setNewAssignment({ personId: 0, tempRole: "", startDate: "", endDate: "", reason: "" });
+      setAssignSearch("");
+      onNotice("poblacion", "success", "Asignación creada y usuario notificado por correo.");
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "Error al crear la asignación temporal");
+    }
   };
 
-  const handleFinishAssignment = (assignmentId: number) => {
-    setAssignments((prev) =>
-      prev.map((assignment) =>
-        assignment.id === assignmentId
-          ? { ...assignment, status: "FINALIZADA" }
-          : assignment,
-      ),
-    );
+  const handleFinishAssignment = async (assignmentId: number) => {
+    if (revokingId !== null) return;
+    const targetAssignment = assignments.find((assignment) => assignment.id === assignmentId);
+    const normalizedReason = revocationReason.trim();
+    if (!normalizedReason) {
+      setRevocationTargetId(assignmentId);
+      onNotice("poblacion", "warning", "Indica el motivo de revocación antes de continuar.");
+      return;
+    }
+
+    setRevokingId(assignmentId);
+    try {
+      await apiRequest(`/temporary-occupation-assignments/${assignmentId}`, {
+        method: "DELETE",
+      });
+
+      setAssignments(await loadTempAssignments());
+      setRevocationTargetId(null);
+      setRevocationReason("");
+      onNotice("poblacion", "success", "Asignación revocada y usuario notificado por correo.");
+    } catch (error) {
+      try {
+        setAssignments(await loadTempAssignments());
+      } catch (reloadError) {
+        console.error("Failed to reload temporary assignments after revoke error", reloadError);
+      }
+
+      if (error instanceof ApiHttpError && error.details) {
+        onError(`${error.message} ID_ASIGNACIÓN: ${assignmentId}${targetAssignment ? `, ID_OPERARIO: ${targetAssignment.personId}` : ""}. Detalle: ${error.details}`);
+      } else {
+        const fallbackMessage = error instanceof Error ? error.message : "Error al revocar la asignación temporal";
+        onError(`${fallbackMessage} ID_ASIGNACIÓN: ${assignmentId}${targetAssignment ? `, ID_OPERARIO: ${targetAssignment.personId}` : ""}.`);
+      }
+    } finally {
+      setRevokingId(null);
+    }
   };
 
   const legacyFilterFromStatus = (value: typeof statusFilter): "Todos" | "Activo" | "Herido" | "Enfermo" | "Fuera" => {
@@ -2517,17 +2606,176 @@ const PopulationModule = memo(function PopulationModule({
       )}
 
       {sub === "Roles temporales" && (
-        <>
-          <div className="admin-ui-v2-roles-kpi">
-            <MetricCard label="Activas" value={activeAssignments.length} tone="info" />
-            <MetricCard label="Candidatos Disponibles" value={assignCandidates.length} tone="ok" />
-            <MetricCard label="Finalizadas" value={historicalAssignments.length} tone="warn" />
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "24px",
+          background: "rgba(10, 18, 20, 0.6)",
+          padding: "24px",
+          borderRadius: "16px",
+          border: "1px solid rgba(105, 191, 183, 0.2)",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.2)"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(105, 191, 183, 0.3)", paddingBottom: "16px", flexWrap: "wrap", gap: "16px" }}>
+            <div>
+              <h2 style={{ margin: 0, color: "#69bfb7", fontSize: "24px", fontWeight: "900", letterSpacing: "2px", textTransform: "uppercase" }}>
+                Gestión Táctica de Oficios
+              </h2>
+              <p style={{ margin: 0, color: "#a4c2c5", fontSize: "12px", letterSpacing: "1px" }}>REASIGNACIÓN Y CONTROL DE RECURSOS HUMANOS</p>
+            </div>
+            <div style={{ display: "flex", gap: "16px" }}>
+              <div style={{ textAlign: "center", background: "rgba(105, 191, 183, 0.1)", padding: "8px 16px", borderRadius: "8px", border: "1px solid rgba(105, 191, 183, 0.3)" }}>
+                <div style={{ fontSize: "10px", color: "#a4c2c5", textTransform: "uppercase" }}>Asignaciones Activas</div>
+                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#69bfb7" }}>{activeAssignments.length}</div>
+              </div>
+              <div style={{ textAlign: "center", background: "rgba(72, 197, 143, 0.1)", padding: "8px 16px", borderRadius: "8px", border: "1px solid rgba(72, 197, 143, 0.3)" }}>
+                <div style={{ fontSize: "10px", color: "#a4c2c5", textTransform: "uppercase" }}>Disponibles</div>
+                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#48c58f" }}>{assignCandidates.length}</div>
+              </div>
+            </div>
           </div>
-          <div className="admin-ui-v2-tactical-grid">
-            <div className="admin-ui-v2-module-card" style={{ padding: 0, background: "transparent", border: 0 }}>
-              <h3 style={{ marginBottom: "12px", color: "#69bfb7", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                Gestor Táctico
-              </h3>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "24px" }}>
+            <div style={{ background: "rgba(6, 16, 18, 0.8)", border: "1px solid rgba(105, 191, 183, 0.2)", borderRadius: "12px", padding: "20px", position: "relative" }}>
+              <div style={{ position: "absolute", top: "-10px", left: "16px", background: "#061012", padding: "0 8px", color: "#69bfb7", fontSize: "12px", fontWeight: "bold", letterSpacing: "1px" }}>
+                TERMINAL DE COMANDOS
+              </div>
+              
+              <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+                <button
+                  style={{ flex: 1, padding: "8px", background: tacticalTab === "crear" ? "rgba(105, 191, 183, 0.15)" : "transparent", color: tacticalTab === "crear" ? "#69bfb7" : "#a4c2c5", border: tacticalTab === "crear" ? "1px solid rgba(105, 191, 183, 0.5)" : "1px solid rgba(105, 191, 183, 0.2)", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", textTransform: "uppercase", fontSize: "11px", transition: "all 0.2s" }}
+                  onClick={() => setTacticalTab("crear")}
+                  type="button"
+                >
+                  NUEVO ROL
+                </button>
+                <button
+                  style={{ flex: 1, padding: "8px", background: tacticalTab === "historial" ? "rgba(105, 191, 183, 0.15)" : "transparent", color: tacticalTab === "historial" ? "#69bfb7" : "#a4c2c5", border: tacticalTab === "historial" ? "1px solid rgba(105, 191, 183, 0.5)" : "1px solid rgba(105, 191, 183, 0.2)", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", textTransform: "uppercase", fontSize: "11px", transition: "all 0.2s" }}
+                  onClick={() => setTacticalTab("historial")}
+                  type="button"
+                >
+                  HISTÓRICO
+                </button>
+              </div>
+
+              <AnimatePresence mode="wait">
+                {tacticalTab === "crear" ? (
+                  <motion.div
+                    key="crear"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <input
+                      className="v-input"
+                      style={{ width: "100%", marginBottom: "12px", background: "rgba(255,255,255,0.02)" }}
+                      placeholder="Buscar sujeto..."
+                      value={assignSearch}
+                      onChange={(event) => setAssignSearch(event.target.value)}
+                    />
+                    
+                    <div style={{ maxHeight: "160px", overflowY: "auto", marginBottom: "16px", display: "flex", flexDirection: "column", gap: "8px", paddingRight: "4px" }}>
+                      {assignCandidates.map((person) => (
+                        <div
+                          key={person.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            padding: "8px 12px",
+                            background: newAssignment.personId === person.id ? "rgba(105, 191, 183, 0.1)" : "rgba(255,255,255,0.02)",
+                            borderLeft: newAssignment.personId === person.id ? "4px solid #69bfb7" : "4px solid transparent",
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                            borderRadius: "4px"
+                          }}
+                          onClick={() => setNewAssignment((prev) => ({ ...prev, personId: person.id }))}
+                        >
+                          <div className="admin-ui-v2-person-avatar admin-ui-v2-avatar-fallback" style={{ width: "32px", height: "32px", fontSize: "12px" }}>
+                            {personInitials(person)}
+                          </div>
+                          <div>
+                            <div style={{ color: "#e9f6f6", fontSize: "13px", fontWeight: "bold" }}>{personFullName(person)}</div>
+                            <div style={{ color: "#a4c2c5", fontSize: "11px" }}>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <select
+                      className="v-select"
+                      style={{ width: "100%", marginBottom: "12px", background: "rgba(255,255,255,0.02)" }}
+                      value={newAssignment.tempRole}
+                      onChange={(event) => setNewAssignment((prev) => ({ ...prev, tempRole: event.target.value }))}
+                    >
+                      <option value="">Especificar rol temporal...</option>
+                      {Array.from(occupations.entries()).map(([id, name]) => (
+                        <option key={id} value={id}>{name}</option>
+                      ))}
+                    </select>
+                    <div style={{ display: "flex", gap: "12px", marginBottom: "12px" }}>
+                      <input
+                        className="v-input"
+                        style={{ flex: 1, background: "rgba(255,255,255,0.02)" }}
+                        type="date"
+                        title="Fecha Inicio"
+                        value={newAssignment.startDate}
+                        onChange={(event) => setNewAssignment((prev) => ({ ...prev, startDate: event.target.value }))}
+                      />
+                      <input
+                        className="v-input"
+                        style={{ flex: 1, background: "rgba(255,255,255,0.02)" }}
+                        type="date"
+                        title="Fecha Fin"
+                        value={newAssignment.endDate}
+                        onChange={(event) => setNewAssignment((prev) => ({ ...prev, endDate: event.target.value }))}
+                      />
+                    </div>
+                    <textarea
+                      className="v-textarea"
+                      style={{ width: "100%", marginBottom: "16px", minHeight: "80px", background: "rgba(255,255,255,0.02)" }}
+                      placeholder="Motivo operacional de la reasignación"
+                      value={newAssignment.reason}
+                      onChange={(event) => setNewAssignment((prev) => ({ ...prev, reason: event.target.value }))}
+                    />
+                    <button
+                      className="admin-ui-v2-btn is-info"
+                      style={{ width: "100%", padding: "12px" }}
+                      onClick={handleCreateTempAssignment}
+                      type="button"
+                      disabled={!newAssignment.personId || !newAssignment.tempRole}
+                    >
+                      Ejecutar Asignación
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="historial"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.2 }}
+                    style={{ maxHeight: "400px", overflowY: "auto", paddingRight: "8px" }}
+                  >
+                    {historicalAssignments.map((assignment) => (
+                      <div key={assignment.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "8px", padding: "12px", marginBottom: "12px", position: "relative" }}>
+                        <div style={{ position: "absolute", top: "12px", right: "12px", fontSize: "10px", color: "#a4c2c5", border: "1px solid rgba(164, 194, 197, 0.3)", padding: "2px 6px", borderRadius: "4px", textTransform: "uppercase" }}>Completada</div>
+                        <h4 style={{ margin: "0 0 8px 0", color: "#e9f6f6", fontSize: "14px" }}>{assignment.personName}</h4>
+                        <div style={{ fontSize: "12px", color: "#a4c2c5", marginBottom: "4px" }}><span style={{ textDecoration: "line-through", opacity: 0.7 }}>{assignment.fromRole}</span> ➜ <span style={{ color: "#69bfb7" }}>{assignment.tempRole}</span></div>
+                        <div style={{ fontSize: "10px", color: "rgba(164, 194, 197, 0.6)" }}>{new Date(assignment.startDate).toLocaleDateString("es-CR")} - {new Date(assignment.endDate).toLocaleDateString("es-CR")}</div>
+                      </div>
+                    ))}
+                    {historicalAssignments.length === 0 && <div className="admin-ui-v2-muted" style={{ textAlign: "center", paddingTop: "20px" }}>Sin registros previos.</div>}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div style={{ color: "#69bfb7", fontSize: "12px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px", borderBottom: "1px dashed rgba(105, 191, 183, 0.3)", paddingBottom: "8px" }}>
+                OFICIOS EN EJECUCIÓN
+              </div>
               <AnimatePresence>
                 {activeAssignments.map((assignment) => {
                   const s = new Date(assignment.startDate).getTime();
@@ -2537,171 +2785,127 @@ const PopulationModule = memo(function PopulationModule({
                   const duration = e - s;
                   const elapsed = n - s;
                   const progress = duration > 0 ? Math.max(0, Math.min(100, (elapsed / duration) * 100)) : 0;
+                  const cardColor = isUrgent ? "#f37b7b" : "#69bfb7";
+                  const cardBg = isUrgent ? "rgba(243, 123, 123, 0.05)" : "rgba(105, 191, 183, 0.05)";
+                  const borderOpa = isUrgent ? "0.3" : "0.2";
                   
                   return (
                     <motion.div
                       layout
-                      initial={{ opacity: 0, scale: 0.95, x: -20 }}
-                      animate={{ opacity: 1, scale: 1, x: 0 }}
-                      exit={{ opacity: 0, scale: 0.9, x: 20 }}
-                      transition={{ duration: 0.25 }}
+                      initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, x: 50 }}
+                      transition={{ duration: 0.3 }}
                       key={assignment.id}
-                      className="admin-ui-v2-assignment-card"
+                      style={{
+                        background: cardBg,
+                        border: `1px solid rgba(${isUrgent ? '243, 123, 123' : '105, 191, 183'}, ${borderOpa})`,
+                        borderLeft: `4px solid ${cardColor}`,
+                        borderRadius: "8px",
+                        padding: "16px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "12px",
+                        position: "relative",
+                        overflow: "hidden"
+                      }}
                     >
-                      <div className="admin-ui-v2-assignment-header">
-                        <div className="admin-ui-v2-assignment-user">
-                          <span className="admin-ui-v2-person-avatar admin-ui-v2-avatar-fallback">
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", zIndex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div className="admin-ui-v2-person-avatar admin-ui-v2-avatar-fallback" style={{ width: "40px", height: "40px", fontSize: "16px", background: "transparent", border: `2px solid ${cardColor}`, color: cardColor }}>
                             {assignment.personName.slice(0, 2).toUpperCase()}
-                          </span>
-                          <strong>{assignment.personName}</strong>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: "16px", fontWeight: "bold", color: "#e9f6f6" }}>{assignment.personName}</div>
+                            <div style={{ fontSize: "12px", color: "#a4c2c5" }}>ID_ASIGNACIÓN: {assignment.id} · ID_OPERARIO: {assignment.personId}</div>
+                          </div>
                         </div>
-                        <button className="admin-ui-v2-btn is-ok" onClick={() => handleFinishAssignment(assignment.id)} type="button">
-                          Desvincular
+                        <button
+                          className="admin-ui-v2-btn"
+                          style={{ padding: "4px 8px", fontSize: "10px" }}
+                          onClick={() => {
+                            setRevocationTargetId(assignment.id);
+                            setRevocationReason("");
+                          }}
+                          type="button"
+                          disabled={revokingId !== null}
+                        >
+                          {revokingId === assignment.id ? "Revocando..." : "Revocar"}
                         </button>
                       </div>
-                      
-                      <div className="admin-ui-v2-assignment-details">
-                        <div className="admin-ui-v2-assignment-role-flow">
-                          <span>{assignment.fromRole}</span>
-                          <IconSvg className="w-3 h-3"><path d="m14 8 8 8-8 8M6 16h16" strokeWidth="2" /></IconSvg>
-                          <span style={{ color: "#69bfb7" }}>{assignment.tempRole}</span>
+
+                      {revocationTargetId === assignment.id && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", zIndex: 1 }}>
+                          <textarea
+                            className="v-textarea"
+                            style={{ width: "100%", minHeight: "72px", background: "rgba(255,255,255,0.02)" }}
+                            placeholder="Motivo de revocación"
+                            value={revocationReason}
+                            onChange={(event) => setRevocationReason(event.target.value)}
+                            disabled={revokingId !== null}
+                          />
+                          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                            <button
+                              className="admin-ui-v2-btn is-danger"
+                              style={{ padding: "6px 10px", fontSize: "10px" }}
+                              onClick={() => void handleFinishAssignment(assignment.id)}
+                              type="button"
+                              disabled={revokingId !== null || !revocationReason.trim()}
+                            >
+                              Confirmar revocación
+                            </button>
+                            <button
+                              className="admin-ui-v2-btn"
+                              style={{ padding: "6px 10px", fontSize: "10px" }}
+                              onClick={() => {
+                                setRevocationTargetId(null);
+                                setRevocationReason("");
+                              }}
+                              type="button"
+                              disabled={revokingId !== null}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
                         </div>
-                        <div className="admin-ui-v2-assignment-dates" style={{ textAlign: "right" }}>
-                          <small>Finaliza</small>
-                          <strong style={{ color: isUrgent ? "#f37b7b" : "#e9f6f6" }}>
-                            {new Date(assignment.endDate).toLocaleDateString("es-CR")}
-                          </strong>
+                      )}
+
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)", zIndex: 1 }}>
+                        <div style={{ textAlign: "center", flex: 1 }}>
+                          <div style={{ fontSize: "10px", color: "#a4c2c5", textTransform: "uppercase", marginBottom: "4px" }}>Rol Base</div>
+                          <div style={{ fontSize: "13px", color: "#e9f6f6" }}>{assignment.fromRole}</div>
+                        </div>
+                        <div style={{ padding: "0 16px", color: cardColor, fontSize: "18px", opacity: 0.5 }}>»</div>
+                        <div style={{ textAlign: "center", flex: 1 }}>
+                          <div style={{ fontSize: "10px", color: "#a4c2c5", textTransform: "uppercase", marginBottom: "4px" }}>Rol Temporal</div>
+                          <div style={{ fontSize: "14px", color: cardColor, fontWeight: "bold" }}>{assignment.tempRole}</div>
                         </div>
                       </div>
 
-                      <div className="admin-ui-v2-timeline-bar-wrap">
-                        <div
-                          className={`admin-ui-v2-timeline-bar ${isUrgent ? "is-urgent" : ""}`}
-                          style={{ width: `${progress}%` }}
-                        />
+                      <div style={{ zIndex: 1 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "11px", color: "#a4c2c5" }}>
+                          <span>PROGRESO OPERACIONAL</span>
+                          <span style={{ color: cardColor, fontWeight: "bold" }}>FIN: {new Date(assignment.endDate).toLocaleDateString("es-CR")}</span>
+                        </div>
+                        <div className="admin-ui-v2-timeline-bar-wrap" style={{ background: "rgba(255,255,255,0.05)" }}>
+                          <div
+                            className={`admin-ui-v2-timeline-bar ${isUrgent ? "is-urgent" : ""}`}
+                            style={{ width: `${progress}%`, background: cardColor }}
+                          />
+                        </div>
                       </div>
                     </motion.div>
                   );
                 })}
               </AnimatePresence>
               {activeAssignments.length === 0 && (
-                <div className="admin-ui-v2-empty-cell" style={{ border: "1px dashed rgba(103,172,169,0.3)" }}>
+                <div className="admin-ui-v2-empty-cell" style={{ border: "1px dashed rgba(105, 191, 183, 0.3)" }}>
                   Ninguna asignación activa en progreso.
                 </div>
               )}
             </div>
-
-            <div className="admin-ui-v2-module-card">
-              <div className="admin-ui-v2-tab-header">
-                <button
-                  className={`admin-ui-v2-tab-btn ${tacticalTab === "crear" ? "is-active" : ""}`}
-                  onClick={() => setTacticalTab("crear")}
-                  type="button"
-                >
-                  Asignar Rol
-                </button>
-                <button
-                  className={`admin-ui-v2-tab-btn ${tacticalTab === "historial" ? "is-active" : ""}`}
-                  onClick={() => setTacticalTab("historial")}
-                  type="button"
-                >
-                  Historial
-                </button>
-              </div>
-
-              <AnimatePresence mode="wait">
-                {tacticalTab === "crear" ? (
-                  <motion.div
-                    key="crear"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <input
-                      className="v-input admin-ui-v2-search mb-2"
-                      placeholder="Buscar candidato..."
-                      value={assignSearch}
-                      onChange={(event) => setAssignSearch(event.target.value)}
-                    />
-                    <div className="admin-ui-v2-candidate-pill-list mb-3">
-                      {assignCandidates.map((person) => (
-                        <div
-                          key={person.id}
-                          className={`admin-ui-v2-candidate-pill ${newAssignment.personId === person.id ? "is-selected" : ""}`}
-                          onClick={() => setNewAssignment((prev) => ({ ...prev, personId: person.id }))}
-                        >
-                          <span className="admin-ui-v2-person-avatar admin-ui-v2-avatar-fallback">
-                            {personInitials(person)}
-                          </span>
-                          <div className="admin-ui-v2-candidate-pill-info">
-                            <strong>{personFullName(person)}</strong>
-                            <span>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="admin-ui-v2-form-grid">
-                      <input
-                        className="v-input"
-                        placeholder="Nuevo rol temporal"
-                        value={newAssignment.tempRole}
-                        onChange={(event) => setNewAssignment((prev) => ({ ...prev, tempRole: event.target.value }))}
-                      />
-                      <div className="flex gap-2">
-                        <input
-                          className="v-input w-full"
-                          type="date"
-                          title="Fecha de Inicio"
-                          value={newAssignment.startDate}
-                          onChange={(event) => setNewAssignment((prev) => ({ ...prev, startDate: event.target.value }))}
-                        />
-                        <input
-                          className="v-input w-full"
-                          type="date"
-                          title="Fecha de Fin"
-                          value={newAssignment.endDate}
-                          onChange={(event) => setNewAssignment((prev) => ({ ...prev, endDate: event.target.value }))}
-                        />
-                      </div>
-                      <textarea
-                        className="v-textarea"
-                        placeholder="Razón de la asignación"
-                        value={newAssignment.reason}
-                        onChange={(event) => setNewAssignment((prev) => ({ ...prev, reason: event.target.value }))}
-                      />
-                      <button className="admin-ui-v2-btn is-info" onClick={handleCreateTempAssignment} type="button" disabled={!newAssignment.personId || !newAssignment.tempRole}>
-                        Ejecutar Asignación
-                      </button>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="historial"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
-                    className="admin-ui-v2-tactical-history-list"
-                  >
-                    {historicalAssignments.map((assignment) => (
-                      <div key={assignment.id} className="admin-ui-v2-tactical-history-item">
-                        <div>
-                          <h4>{assignment.personName}</h4>
-                          <p>{assignment.fromRole} {"->"} {assignment.tempRole}</p>
-                          <p>{new Date(assignment.startDate).toLocaleDateString("es-CR")} - {new Date(assignment.endDate).toLocaleDateString("es-CR")}</p>
-                        </div>
-                        <span className="admin-ui-v2-pill is-neutral" style={{ fontSize: "8px" }}>Completada</span>
-                      </div>
-                    ))}
-                    {historicalAssignments.length === 0 && <div className="admin-ui-v2-muted text-center pt-4">No hay historial registrado.</div>}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
           </div>
-        </>
+        </div>
       )}
 
       {selectedPerson && (

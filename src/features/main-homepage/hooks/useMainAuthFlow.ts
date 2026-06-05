@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { loginRequest } from '../../login/services/authApi'
 import { normalizeUserRole, getPostLoginRoute } from '../../../shared/services/postLoginRouting'
 import { getErrorMessage } from '../../../shared/services/errorMessages'
+import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
 import type { LoginErrors, LoginForm } from '../../login/types'
 
 interface UseMainAuthFlowReturn {
@@ -83,15 +84,15 @@ export function useMainAuthFlow(): UseMainAuthFlowReturn {
 
         localStorage.setItem('token', token)
         localStorage.setItem('accessToken', token)
-        window.dispatchEvent(new Event('SESSION_TOKEN_CHANGED'))
+        window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
         localStorage.setItem('user', JSON.stringify(normalizedUser))
         localStorage.setItem('last_selected_camp_id', String(response.user.campId))
 
-        const defaultRoute = getPostLoginRoute(normalizedUser.role)
-        const redirectPath =
-          normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard')
-            ? savedPath
-            : defaultRoute
+        const sessionMessage = (window.history.state?.usr as { sessionMessage?: string } | undefined)?.sessionMessage
+        const redirectPath = getPostLoginRoute(normalizedUser.role, {
+          savedPath,
+          restoreSavedAdminDashboard: Boolean(sessionMessage),
+        })
         localStorage.removeItem('last_secure_path')
 
         return { redirectPath }

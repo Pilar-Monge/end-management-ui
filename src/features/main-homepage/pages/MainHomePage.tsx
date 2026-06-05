@@ -278,11 +278,10 @@ export function MainHomePage() {
       localStorage.setItem('user', JSON.stringify(normalizedUser))
       localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(response.user.campId))
 
-      const defaultRoute = getPostLoginRoute(normalizedUser.role)
-      const redirectPath =
-        normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard')
-          ? savedPath
-          : defaultRoute
+      const redirectPath = getPostLoginRoute(normalizedUser.role, {
+        savedPath,
+        restoreSavedAdminDashboard: Boolean(sessionMessage),
+      })
       localStorage.removeItem('last_secure_path')
       navigate(redirectPath, { replace: true })
     } catch (error) {
