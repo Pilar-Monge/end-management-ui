@@ -1284,6 +1284,7 @@ export default function AdminDashboardPage() {
           onBack={() => navigate("/admin-main-view-ui")}
           onLogout={handleLogout}
           profile={adminProfile}
+          serverTimeState={globalTimeState}
         />
       )}
 
@@ -1441,14 +1442,16 @@ function TopHud({
   onBack,
   onLogout,
   profile,
+  serverTimeState,
 }: {
   onBack: () => void;
   onLogout: () => void;
   profile: AdminProfileSummary;
+  serverTimeState: GlobalTimeState;
 }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProfilePreviewOpen, setIsProfilePreviewOpen] = useState(false);
-  const [currentDeviceTime, setCurrentDeviceTime] = useState<Date>(() => new Date());
+  const [currentServerTime, setCurrentServerTime] = useState<Date>(() => serverTimeState.baseServerTime);
   const profileWrapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -1485,14 +1488,17 @@ function TopHud({
   }, [isProfilePreviewOpen]);
 
   useEffect(() => {
-    const tickInterval = window.setInterval(() => {
-      setCurrentDeviceTime(new Date());
-    }, 1000);
+    const updateServerClock = () => {
+      const elapsedMs = Date.now() - serverTimeState.syncedAtClientMs;
+      setCurrentServerTime(new Date(serverTimeState.baseServerTime.getTime() + Math.max(0, elapsedMs)));
+    };
 
+    updateServerClock();
+    const tickInterval = window.setInterval(updateServerClock, 1000);
     return () => window.clearInterval(tickInterval);
-  }, []);
+  }, [serverTimeState.baseServerTime, serverTimeState.syncedAtClientMs]);
 
-  const hudDateTime = useMemo(() => formatHudDateTime(currentDeviceTime), [currentDeviceTime]);
+  const hudDateTime = useMemo(() => formatHudDateTime(currentServerTime), [currentServerTime]);
   const profileButtonLabel = `${profile.role} · @${profile.username}`;
   const profileInitials = useMemo(
     () => resolveInitials([profile.firstName, profile.lastName1, profile.lastName2, profile.displayName], 3),
@@ -1515,8 +1521,8 @@ function TopHud({
         <span className="admin-ui-v2-time-day">{hudDateTime.day}</span>
         <span className="admin-ui-v2-time-sep" aria-hidden="true">|</span>
         <span className="admin-ui-v2-time-clock">{hudDateTime.time}</span>
-        <span className="admin-ui-v2-time-status is-synced">
-          Dispositivo
+        <span className={`admin-ui-v2-time-status ${serverTimeState.status === "error" ? "is-error" : "is-synced"}`}>
+          Servidor
         </span>
       </div>
       <div className="admin-ui-v2-profile-hud-wrap pointer-events-auto" ref={profileWrapRef}>
