@@ -27,11 +27,45 @@ function unwrapList<T>(payload: unknown): T[] {
   return []
 }
 
+function numberFromUnknown(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
+
+function normalizeCamp(rawCamp: Camp): Camp {
+  const rawRecord = rawCamp as unknown as Record<string, unknown>
+  const rawLocation = rawRecord.location as Record<string, unknown> | undefined
+  const latitude = numberFromUnknown(rawLocation?.latitude ?? rawRecord.latitude)
+  const longitude = numberFromUnknown(rawLocation?.longitude ?? rawRecord.longitude)
+  const maxCapacity = numberFromUnknown(rawRecord.maxPersonCapacity)
+
+  return {
+    ...rawCamp,
+    description: rawCamp.description ?? '',
+    location: {
+      ...(rawCamp.location ?? {}),
+      latitude: latitude ?? Number.NaN,
+      longitude: longitude ?? Number.NaN,
+    },
+    capacity: rawCamp.capacity ?? maxCapacity ?? 0,
+    currentPopulation: rawCamp.currentPopulation ?? 0,
+    foundedAt: rawCamp.foundedAt ?? (typeof rawRecord.foundationDate === 'string' ? rawRecord.foundationDate : ''),
+    resources: rawCamp.resources ?? [],
+    defenseLevel: rawCamp.defenseLevel ?? 0,
+    commander: rawCamp.commander ?? 0,
+    watchers: rawCamp.watchers ?? 0,
+  }
+}
+
 export async function fetchCamps(): Promise<Camp[]> {
   const res = await fetch(ENDPOINTS.camps, { headers: getHeaders() })
   if (!res.ok) throw new Error('Failed to fetch camps')
   const payload = await res.json()
-  return unwrapList<Camp>(payload)
+  return unwrapList<Camp>(payload).map(normalizeCamp)
 }
 
 export function useCamps(
@@ -48,7 +82,7 @@ export async function fetchCampById(id: number): Promise<CampWithStats> {
   const res = await fetch(`${ENDPOINTS.camps}/${id}`, { headers: getHeaders() })
   if (!res.ok) throw new Error('Failed to fetch camp')
   const payload = await res.json()
-  return unwrapPayload<CampWithStats>(payload)
+  return normalizeCamp(unwrapPayload<CampWithStats>(payload)) as CampWithStats
 }
 
 export function useCampById(

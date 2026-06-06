@@ -76,6 +76,40 @@ export interface AdminExpeditionRecord {
   durationDays?: number
   participants?: string[]
   members?: string[]
+  originCampId?: number
+  destinationCampId?: number
+  startCampId?: number
+  endCampId?: number
+  campId?: number
+  targetCampId?: number
+  baseCampId?: number
+  destinationLatitude?: string | number | null
+  destinationLongitude?: string | number | null
+  destinationDescription?: string | null
+  route?: unknown
+  plannedRoute?: unknown
+  coordinates?: unknown
+  destination?: unknown
+  targetLocation?: unknown
+}
+
+export interface AdminTransferRecord {
+  id: number
+  requestId?: number
+  intercampRequestId?: number
+  status?: string
+  plannedDepartureDate?: string
+  departureDate?: string
+  actualDepartureDate?: string
+  plannedArrivalDate?: string
+  arrivalDate?: string
+  actualArrivalDate?: string
+  departureApprovedBy?: number | string
+  arrivalApprovedBy?: number | string
+  rationsForTrip?: number | string
+  rations?: number | string
+  receptionNotes?: string
+  notes?: string
 }
 
 export interface GeneralDashboardPayload {
@@ -105,6 +139,12 @@ export interface IntercampRecord {
   type?: string
   createdAt?: string
   updatedAt?: string
+  plannedDepartureDate?: string
+  departureDate?: string
+  plannedArrivalDate?: string
+  arrivalDate?: string
+  createdBy?: number | string
+  respondedBy?: number | string
 }
 
 export interface InventoryMovementRecord {

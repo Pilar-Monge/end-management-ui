@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
+import * as L from "leaflet";
 import {
   Area,
   AreaChart,
@@ -40,7 +41,6 @@ import {
 import {
   mapNotificationFromApi,
 } from "../mappers/adminMappers";
-import { ExpeditionsWorldMap, prefetchExpeditionsWorldMap } from "../expeditions/components/ExpeditionsWorldMap";
 import type { MappedCampPoint } from "../expeditions/types";
 import { AdminSyncOverlay } from "../components/AdminSyncOverlay";
 import { SESSION_TOKEN_CHANGED_EVENT } from "../../../shared/services/sessionService";
@@ -49,6 +49,7 @@ import { getErrorMessage } from "../../../shared/services/errorMessages";
 import { PopupMessage } from "../../../shared/components/PopupMessage";
 import "../../expeditions-ui/expeditionsUi.css";
 import "../expeditions/expeditions-panel.css";
+import "leaflet/dist/leaflet.css";
 import "./admin-dashboard.css";
 
 type AdminSectionId =
@@ -93,6 +94,9 @@ interface UiExpedition {
   status: "EN CURSO" | "PROGRAMADA" | "REGRESANDO" | "COMPLETADA";
   objective: string;
   sector: string;
+  originCampId?: number;
+  destinationCampId?: number;
+  routePoints: Array<{ latitude: number; longitude: number; label?: string }>;
 }
 
 interface UiIntercampRequest {
@@ -103,6 +107,26 @@ interface UiIntercampRequest {
   status: "PENDIENTE" | "APROBADO" | "RECHAZADO" | "CONFIRMADO";
   urgent: boolean;
   type: "solicitud" | "traslado" | "oferta";
+  originCampId?: number;
+  destinationCampId?: number;
+  plannedDepartureDate?: string;
+  plannedArrivalDate?: string;
+  createdBy?: string;
+  respondedBy?: string;
+}
+
+interface UiTransfer {
+  id: number;
+  requestId: number | null;
+  status: "PLANIFICADA" | "EN_TRANSITO" | "ENTREGADA" | "CANCELADA";
+  plannedDepartureDate?: string;
+  actualDepartureDate?: string;
+  plannedArrivalDate?: string;
+  actualArrivalDate?: string;
+  departureApprovedBy?: string;
+  arrivalApprovedBy?: string;
+  rationsForTrip: number;
+  receptionNotes: string;
 }
 
 interface UiNotification {
@@ -302,15 +326,13 @@ function expeditionRouteStatus(status: UiExpedition["status"]): string {
 }
 
 function buildExpeditionRoute(expedition: UiExpedition, points: MappedCampPoint[]) {
-  const base = points[0];
-  if (!base) return null;
-  const destinations = points.filter((point) => point.id !== base.id);
-  const destination = destinations[expedition.id % Math.max(1, destinations.length)];
-  if (!destination) return null;
+  const origin = points.find((point) => point.id === expedition.originCampId);
+  const destination = expedition.routePoints[0];
+  if (!origin || !destination) return null;
 
   return {
-    start: { lat: base.latitude, lng: base.longitude, label: "Base" },
-    end: { lat: destination.latitude, lng: destination.longitude, label: destination.name.slice(0, 14) },
+    start: { lat: origin.latitude, lng: origin.longitude, label: origin.name.slice(0, 14) },
+    end: { lat: destination.latitude, lng: destination.longitude, label: destination.label?.slice(0, 14) ?? expedition.sector.slice(0, 14) },
     status: expeditionRouteStatus(expedition.status),
   };
 }
@@ -811,6 +833,7 @@ export default function AdminDashboardPage() {
   const [admissions, setAdmissions] = useState<UiAdmission[]>(initialBootstrapData?.admissions ?? []);
   const [expeditions, setExpeditions] = useState<UiExpedition[]>(initialBootstrapData?.expeditions ?? []);
   const [intercampRequests, setIntercampRequests] = useState<UiIntercampRequest[]>(initialBootstrapData?.intercampRequests ?? []);
+  const [transfers, setTransfers] = useState<UiTransfer[]>(initialBootstrapData?.transfers ?? []);
   const [dashboardKpi, setDashboardKpi] = useState<DashboardKpi>(initialBootstrapData?.dashboardKpi ?? INITIAL_DASHBOARD_KPI);
   const [notifications, setNotifications] = useState<UiNotification[]>([]);
   const [resourceTrendData, setResourceTrendData] = useState<ResourceTrendPoint[]>([]);
@@ -876,6 +899,7 @@ export default function AdminDashboardPage() {
     setAdmissions(data.admissions);
     setExpeditions(data.expeditions);
     setIntercampRequests(data.intercampRequests);
+    setTransfers(data.transfers);
     setDashboardKpi(data.dashboardKpi);
   }, []);
 
@@ -1289,6 +1313,7 @@ export default function AdminDashboardPage() {
                       consumedResources={consumedResources}
                       gainedResources={gainedResources}
                       intercampRequests={intercampRequests}
+                      transfers={transfers}
                       campCatalog={camps}
                       campNameById={campNameById}
                       occupationNameById={occupationNameById}
@@ -1326,6 +1351,7 @@ export default function AdminDashboardPage() {
                         consumedResources={consumedResources}
                         gainedResources={gainedResources}
                         intercampRequests={intercampRequests}
+                        transfers={transfers}
                         campCatalog={camps}
                         campNameById={campNameById}
                         occupationNameById={occupationNameById}
@@ -1655,6 +1681,7 @@ function ContentArea({
   consumedResources,
   gainedResources,
   intercampRequests,
+  transfers,
   campCatalog,
   campNameById,
   occupationNameById,
@@ -1683,6 +1710,7 @@ function ContentArea({
   consumedResources: ResourceLedgerEntry[];
   gainedResources: ResourceLedgerEntry[];
   intercampRequests: UiIntercampRequest[];
+  transfers: UiTransfer[];
   campCatalog: Camp[];
   campNameById: Map<number, string>;
   occupationNameById: Map<number, string>;
@@ -1801,7 +1829,11 @@ function ContentArea({
         <p className="admin-ui-v2-meta-desc">{SECTION_DESCRIPTIONS[section]}</p>
       </div>
 
-      {void moduleWarnings}
+      {moduleWarnings.length > 0 && (
+        <div className="admin-ui-v2-warning-strip" role="status">
+          {moduleWarnings.map((warning) => <span key={warning}>{warning}</span>)}
+        </div>
+      )}
 
       {section === "centro" && (
         <DashboardModule
@@ -1853,38 +1885,40 @@ function ContentArea({
       )}
 
       {section === "intercamp" && (
-        <>
-          <div className="admin-ui-v2-module-card">
-            <p className="admin-ui-v2-muted">Módulo en modo solo lectura para el rol administrador del sistema.</p>
+        <div className="admin-ui-v2-intercamp-console">
+          <AdminIntercampLeafletMap camps={campCatalog} requests={intercampRequests} transfers={transfers} />
+          <div className="admin-ui-v2-module-card admin-ui-v2-module-banner">
+            <div>
+              <span className="admin-ui-v2-command-kicker">Cobertura intercampamento</span>
+              <h3>Solicitudes y transferencias en consulta</h3>
+              <p>Vista de solo lectura alineada con las reglas administrativas. No se exponen acciones de creación, edición o borrado.</p>
+            </div>
+            <span className="admin-ui-v2-pill is-info">Solo lectura</span>
           </div>
 
-          <table className="v-table admin-ui-v2-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Origen</th>
-                <th>Tipo</th>
-                <th>Estado</th>
-                <th>Tiempo</th>
-                <th>Acceso</th>
-              </tr>
-            </thead>
-            <tbody>
-              {intercampRequests
-                .filter((request) => (sub === "Pendientes" ? request.status === "PENDIENTE" : request.status !== "PENDIENTE"))
-                .map((request) => (
-                  <tr key={request.id}>
-                    <td>#{request.id}</td>
-                    <td>{request.from}</td>
-                    <td>{request.type}</td>
-                    <td><span className={`admin-ui-v2-pill ${intercampPillClass(request.status)}`}>{request.status}</span></td>
-                    <td>{request.time}</td>
-                    <td><span className="admin-ui-v2-muted">Solo lectura</span></td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </>
+          <div className="admin-ui-v2-intercamp-grid">
+            {intercampRequests
+              .filter((request) => (sub === "Pendientes" ? request.status === "PENDIENTE" : request.status !== "PENDIENTE"))
+              .map((request) => (
+                <article className={`admin-ui-v2-intercamp-card ${request.urgent ? "is-urgent" : ""}`} key={request.id}>
+                  <div className="admin-ui-v2-intercamp-head">
+                    <span>Solicitud #{request.id}</span>
+                    <span className={`admin-ui-v2-pill ${intercampPillClass(request.status)}`}>{request.status}</span>
+                  </div>
+                  <h3>{request.from}</h3>
+                  <p>{request.text}</p>
+                  <div className="admin-ui-v2-intercamp-foot">
+                    <span>{request.type}</span>
+                    <strong>{request.time}</strong>
+                  </div>
+                  <span className="admin-ui-v2-muted">Acceso de consulta</span>
+                </article>
+              ))}
+            {intercampRequests.filter((request) => (sub === "Pendientes" ? request.status === "PENDIENTE" : request.status !== "PENDIENTE")).length === 0 && (
+              <div className="admin-ui-v2-empty-cell">Sin solicitudes para esta vista.</div>
+            )}
+          </div>
+        </div>
       )}
 
       {section === "configuracion" && (
@@ -1992,29 +2026,50 @@ const DashboardModule = memo(function DashboardModule({
 
   return (
     <div className="admin-ui-v2-dashboard">
+      <div className="admin-ui-v2-command-hero">
+        <div className="admin-ui-v2-command-hero-copy">
+          <span className="admin-ui-v2-command-kicker">Consola operacional</span>
+          <h2>Centro de mando táctico</h2>
+          <p>
+            Lectura integral de población, alertas, expediciones y prioridades críticas sin modificar la estructura externa del panel.
+          </p>
+        </div>
+        <div className="admin-ui-v2-command-health">
+          <span>Salud operativa</span>
+          <strong>{healthScore}%</strong>
+          <em className={`admin-ui-v2-pill is-${healthTone}`}>{healthScore < 45 ? "Comprometido" : healthScore < 70 ? "Inestable" : "Estable"}</em>
+        </div>
+        <div className="admin-ui-v2-command-actions">
+          <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void onReload()}>Sincronizar</button>
+          <button className="admin-ui-v2-btn" type="button" onClick={() => onQuickNav("poblacion")}>Población</button>
+          <button className="admin-ui-v2-btn" type="button" onClick={() => onQuickNav("expediciones")}>Expediciones</button>
+        </div>
+      </div>
+
       <div className="admin-ui-v2-overview-band">
-        <div className="admin-ui-v2-grid admin-ui-v2-grid-4">
+        <div className="admin-ui-v2-grid admin-ui-v2-grid-4 admin-ui-v2-tactical-kpi-grid">
           <DashboardMetricCard label="Población total" value={populationTotal} detail={`${activePopulation} activos`} tone="info" />
           <DashboardMetricCard label="Recursos críticos" value={kpi.criticalResources} detail={kpi.criticalResources > 0 ? "Atención inmediata" : "Sin alertas"} tone={kpi.criticalResources > 0 ? "danger" : "ok"} />
           <DashboardMetricCard label="Expediciones activas" value={kpi.activeExpeditions || activeExpeditions} detail={`${outPopulation} fuera del campamento`} tone="info" />
           <DashboardMetricCard label="Solicitudes intercamp" value={kpi.pendingIntercamp || intercampCount} detail="Pendientes de coordinación" tone="warn" />
         </div>
 
-        <div className="admin-ui-v2-module-card admin-ui-v2-briefing-card">
-          <div>
-            <h3>Centro de mando operativo</h3>
-            <p>Estado general del campamento, prioridades activas y rutas de respuesta inmediata.</p>
+        <div className="admin-ui-v2-module-card admin-ui-v2-briefing-card admin-ui-v2-coverage-card">
+          <div className="admin-ui-v2-section-head">
+            <span>Estado de cobertura</span>
+            <span className={`admin-ui-v2-pill is-${threatTone}`}>Amenaza {threatLevel}%</span>
           </div>
-          <div className="admin-ui-v2-briefing-status">
-            <small>Salud operativa</small>
-            <strong>{healthScore}%</strong>
-            <span className={`admin-ui-v2-pill is-${healthTone}`}>{healthScore < 45 ? "Comprometido" : healthScore < 70 ? "Inestable" : "Estable"}</span>
+          <div className="admin-ui-v2-coverage-radar" aria-hidden="true">
+            <span />
+            <i />
           </div>
-          <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
-            <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void onReload()}>Actualizar</button>
-            <button className="admin-ui-v2-btn is-info" type="button" onClick={() => onQuickNav("admisiones")}>Admisiones</button>
-            <button className="admin-ui-v2-btn" type="button" onClick={() => onQuickNav("expediciones")}>Expediciones</button>
+          <div className="admin-ui-v2-threat-meter">
+            <div className="admin-ui-v2-threat-value">{threatLevel}%</div>
+            <div className="admin-ui-v2-threat-track">
+              <span className={`is-${threatTone}`} style={{ width: `${threatLevel}%` }} />
+            </div>
           </div>
+          <p>Prioriza admisiones, recursos críticos y operaciones de campo según la lectura de riesgo actual.</p>
         </div>
       </div>
 
@@ -2074,27 +2129,19 @@ const DashboardModule = memo(function DashboardModule({
           </div>
         </div>
 
-        <div className="admin-ui-v2-module-card admin-ui-v2-priority-card">
+        <div className="admin-ui-v2-module-card admin-ui-v2-priority-card admin-ui-v2-diagnostic-card">
           <div className="admin-ui-v2-section-head">
-            <span>Crisis del día</span>
-            <span className={`admin-ui-v2-pill is-${threatTone}`}>Amenaza {threatLevel}%</span>
+            <span>Diagnóstico prioritario</span>
+            <span>Respuesta sugerida</span>
           </div>
-          <div className="admin-ui-v2-priority-layout">
-            <div>
-              <h3>Riesgo de abastecimiento</h3>
-              <p>Si el agua cae por debajo del umbral crítico, habrá penalización de moral y productividad.</p>
-            </div>
-            <div className="admin-ui-v2-threat-meter">
-              <div className="admin-ui-v2-threat-value">{threatLevel}%</div>
-              <div className="admin-ui-v2-threat-track">
-                <span className={`is-${threatTone}`} style={{ width: `${threatLevel}%` }} />
-              </div>
-            </div>
+          <div>
+            <h3>Riesgo operativo cruzado</h3>
+            <p>La consola cruza notificaciones, solicitudes, recursos y expediciones para decidir dónde concentrar supervisión administrativa.</p>
           </div>
           <div className="admin-ui-v2-grid admin-ui-v2-grid-3">
-            <SignalTile label="-12% eficiencia de tareas" tone="danger" />
-            <SignalTile label="+18% riesgo médico" tone="warn" />
-            <SignalTile label="IA recomienda expedición de agua" tone="info" />
+            <SignalTile label={`${liveAlerts.length} alertas vivas`} tone={liveAlerts.length > 0 ? "warn" : "ok"} />
+            <SignalTile label={`${admissionsQueue} admisiones en cola`} tone={admissionsQueue > 0 ? "warn" : "ok"} />
+            <SignalTile label={`${activeExpeditions} operaciones externas`} tone="info" />
           </div>
         </div>
       </div>
@@ -4092,6 +4139,270 @@ function AdmissionReviewModal({
   );
 }
 
+function validCampPoint(camp: Camp | undefined): camp is Camp & { location: { latitude: number; longitude: number } } {
+  return Boolean(
+    camp?.location
+      && Number.isFinite(camp.location.latitude)
+      && Number.isFinite(camp.location.longitude),
+  );
+}
+
+function createAdminLeafletMap(container: HTMLDivElement): L.Map {
+  const map = L.map(container, {
+    zoomControl: true,
+    attributionControl: false,
+    scrollWheelZoom: false,
+  });
+
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    maxZoom: 18,
+  }).addTo(map);
+
+  return map;
+}
+
+function escapeMapHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function createMapMarker(label: string, tone: "base" | "ok" | "warn" | "danger" | "info") {
+  return L.divIcon({
+    className: "admin-ui-v2-leaflet-marker-wrap",
+    html: `<span class="admin-ui-v2-leaflet-marker is-${tone}"><i></i><strong>${escapeMapHtml(label)}</strong></span>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+  });
+}
+
+function expeditionRouteTone(status: UiExpedition["status"]): { status: string; color: string; className: string } {
+  if (status === "COMPLETADA") return { status: "COMPLETADA", color: "#48c58f", className: "admin-ui-v2-leaflet-route is-completed" };
+  if (status === "REGRESANDO") return { status: "REGRESANDO", color: "#efc16e", className: "admin-ui-v2-leaflet-route is-returning" };
+  if (status === "PROGRAMADA") return { status: "PROGRAMADA", color: "#69bfb7", className: "admin-ui-v2-leaflet-route is-planned" };
+  return { status: "EN CURSO", color: "#69bfb7", className: "admin-ui-v2-leaflet-route is-active" };
+}
+
+function routePointsFromExpedition(expedition: UiExpedition, camps: Camp[]): Array<{ latitude: number; longitude: number; label: string }> {
+  if (expedition.routePoints.length >= 2) {
+    return expedition.routePoints.map((point, index) => ({
+      latitude: point.latitude,
+      longitude: point.longitude,
+      label: point.label ?? (index === 0 ? "Origen" : index === expedition.routePoints.length - 1 ? "Destino" : `Punto ${index + 1}`),
+    }));
+  }
+
+  const origin = camps.find((camp) => camp.id === expedition.originCampId);
+  const backendDestination = expedition.routePoints[0];
+  if (validCampPoint(origin) && backendDestination) {
+    return [
+      { latitude: origin.location.latitude, longitude: origin.location.longitude, label: origin.name },
+      {
+        latitude: backendDestination.latitude,
+        longitude: backendDestination.longitude,
+        label: backendDestination.label ?? expedition.sector,
+      },
+    ];
+  }
+
+  const destination = validCampPoint(camps.find((camp) => camp.id === expedition.destinationCampId))
+    ? camps.find((camp) => camp.id === expedition.destinationCampId)
+    : undefined;
+
+  if (!validCampPoint(origin) || !validCampPoint(destination)) return [];
+  return [
+    { latitude: origin.location.latitude, longitude: origin.location.longitude, label: origin.name },
+    { latitude: destination.location.latitude, longitude: destination.location.longitude, label: destination.name },
+  ];
+}
+
+function AdminExpeditionsLeafletMap({
+  camps,
+  expeditions,
+  selectedExpeditionId,
+  onSelectExpedition,
+}: {
+  camps: Camp[];
+  expeditions: UiExpedition[];
+  selectedExpeditionId: number | null;
+  onSelectExpedition: (id: number) => void;
+}) {
+  const mapRef = useRef<L.Map | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const routes = useMemo(() => expeditions.map((expedition) => ({
+    expedition,
+    points: routePointsFromExpedition(expedition, camps),
+  })), [camps, expeditions]);
+  const validRoutes = routes.filter((route) => route.points.length >= 2);
+  const missingRoutes = routes.filter((route) => route.points.length < 2);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    if (!mapRef.current) mapRef.current = createAdminLeafletMap(containerRef.current);
+    const map = mapRef.current;
+    const layer = L.layerGroup().addTo(map);
+    const bounds = L.latLngBounds([]);
+
+    camps.filter(validCampPoint).forEach((camp) => {
+      const latLng: L.LatLngExpression = [camp.location.latitude, camp.location.longitude];
+      bounds.extend(latLng);
+      L.marker(latLng, { icon: createMapMarker(camp.name.slice(0, 10).toUpperCase(), "base") })
+        .bindTooltip(`<strong>${escapeMapHtml(camp.name)}</strong><br/>${camp.currentPopulation}/${camp.capacity} personas`, { sticky: true })
+        .addTo(layer);
+    });
+
+    validRoutes.forEach(({ expedition, points }) => {
+      const tone = expeditionRouteTone(expedition.status);
+      const latLngs: L.LatLngExpression[] = points.map((point) => [point.latitude, point.longitude]);
+      latLngs.forEach((latLng) => bounds.extend(latLng));
+      L.polyline(latLngs, {
+        color: tone.color,
+        weight: selectedExpeditionId === expedition.id ? 4 : 2.5,
+        opacity: selectedExpeditionId === expedition.id ? 0.95 : 0.62,
+        className: tone.className,
+      })
+        .on("click", () => onSelectExpedition(expedition.id))
+        .bindTooltip(`<strong>${escapeMapHtml(expedition.name)}</strong><br/>${tone.status}<br/>${escapeMapHtml(points[0].label)} -> ${escapeMapHtml(points[points.length - 1].label)}`, { sticky: true })
+        .addTo(layer);
+    });
+
+    if (bounds.isValid()) map.fitBounds(bounds.pad(0.22), { maxZoom: 7 });
+    window.setTimeout(() => map.invalidateSize(), 80);
+
+    return () => { layer.remove(); };
+  }, [camps, onSelectExpedition, selectedExpeditionId, validRoutes]);
+
+  useEffect(() => () => {
+    mapRef.current?.remove();
+    mapRef.current = null;
+  }, []);
+
+  return (
+    <div className="admin-ui-v2-leaflet-console">
+      <div className="admin-ui-v2-leaflet-map" ref={containerRef} />
+      <aside className="admin-ui-v2-leaflet-side">
+        <div className="admin-ui-v2-section-head"><span>Rutas backend</span><span>{validRoutes.length} visibles</span></div>
+        {validRoutes.map(({ expedition, points }) => (
+          <button
+            className={`admin-ui-v2-leaflet-route-row${selectedExpeditionId === expedition.id ? " is-selected" : ""}`}
+            key={expedition.id}
+            onClick={() => onSelectExpedition(expedition.id)}
+            type="button"
+          >
+            <strong>{expedition.name}</strong>
+            <span>{points[0].label} &gt; {points[points.length - 1].label}</span>
+            <em>{expedition.status}</em>
+          </button>
+        ))}
+        {missingRoutes.length > 0 && (
+          <div className="admin-ui-v2-leaflet-warning">
+            {missingRoutes.length} expedición(es) no incluyen ruta geográfica o destino con coordenadas en backend.
+          </div>
+        )}
+      </aside>
+    </div>
+  );
+}
+
+function transferStatusTone(status: UiTransfer["status"]): { label: string; color: string; className: string } {
+  if (status === "ENTREGADA") return { label: "ENTREGADA", color: "#48c58f", className: "is-completed" };
+  if (status === "CANCELADA") return { label: "CANCELADA", color: "#f37b7b", className: "is-cancelled" };
+  if (status === "EN_TRANSITO") return { label: "EN TRÁNSITO", color: "#efc16e", className: "is-transit" };
+  return { label: "PLANIFICADA", color: "#69bfb7", className: "is-planned" };
+}
+
+function AdminIntercampLeafletMap({ camps, requests, transfers }: { camps: Camp[]; requests: UiIntercampRequest[]; transfers: UiTransfer[] }) {
+  const mapRef = useRef<L.Map | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
+
+  const routes = useMemo(() => requests.flatMap((request) => {
+    const origin = camps.find((camp) => camp.id === request.originCampId);
+    const destination = camps.find((camp) => camp.id === request.destinationCampId);
+    if (!validCampPoint(origin) || !validCampPoint(destination)) return [];
+    const relatedTransfers = transfers.filter((transfer) => transfer.requestId === request.id);
+    return [{ request, origin, destination, transfers: relatedTransfers }];
+  }), [camps, requests, transfers]);
+
+  const missingRoutes = requests.length - routes.length;
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    if (!mapRef.current) mapRef.current = createAdminLeafletMap(containerRef.current);
+    const map = mapRef.current;
+    const layer = L.layerGroup().addTo(map);
+    const bounds = L.latLngBounds([]);
+
+    camps.filter(validCampPoint).forEach((camp) => {
+      const latLng: L.LatLngExpression = [camp.location.latitude, camp.location.longitude];
+      bounds.extend(latLng);
+      L.marker(latLng, { icon: createMapMarker(camp.name.slice(0, 10).toUpperCase(), camp.status === "COMPROMISED" ? "danger" : "base") })
+        .bindTooltip(`<strong>${escapeMapHtml(camp.name)}</strong><br/>${camp.status}`, { sticky: true })
+        .addTo(layer);
+    });
+
+    routes.forEach(({ request, origin, destination, transfers: relatedTransfers }) => {
+      const latestTransfer = relatedTransfers[0] ?? null;
+      const tone = latestTransfer ? transferStatusTone(latestTransfer.status) : { label: request.status, color: request.urgent ? "#f37b7b" : "#69bfb7", className: request.urgent ? "is-urgent" : "is-planned" };
+      const latLngs: L.LatLngExpression[] = [
+        [origin.location.latitude, origin.location.longitude],
+        [destination.location.latitude, destination.location.longitude],
+      ];
+      latLngs.forEach((latLng) => bounds.extend(latLng));
+      L.polyline(latLngs, {
+        color: tone.color,
+        weight: selectedRequestId === request.id ? 4 : 2.5,
+        opacity: selectedRequestId === request.id ? 0.95 : 0.62,
+        className: `admin-ui-v2-leaflet-route ${tone.className}`,
+      })
+        .on("click", () => setSelectedRequestId(request.id))
+        .bindTooltip(`<strong>Solicitud #${request.id}</strong><br/>${escapeMapHtml(origin.name)} -> ${escapeMapHtml(destination.name)}<br/>${tone.label}`, { sticky: true })
+        .addTo(layer);
+    });
+
+    if (bounds.isValid()) map.fitBounds(bounds.pad(0.22), { maxZoom: 7 });
+    window.setTimeout(() => map.invalidateSize(), 80);
+    return () => { layer.remove(); };
+  }, [camps, routes, selectedRequestId]);
+
+  useEffect(() => () => {
+    mapRef.current?.remove();
+    mapRef.current = null;
+  }, []);
+
+  const selectedRoute = routes.find((route) => route.request.id === selectedRequestId) ?? routes[0] ?? null;
+
+  return (
+    <div className="admin-ui-v2-leaflet-console admin-ui-v2-intercamp-map-console">
+      <div className="admin-ui-v2-leaflet-map" ref={containerRef} />
+      <aside className="admin-ui-v2-leaflet-side">
+        <div className="admin-ui-v2-section-head"><span>Conexiones backend</span><span>{routes.length} rutas</span></div>
+        {selectedRoute ? (
+          <div className="admin-ui-v2-leaflet-detail">
+            <strong>Solicitud #{selectedRoute.request.id}</strong>
+            <span>{selectedRoute.origin.name} &gt; {selectedRoute.destination.name}</span>
+            <p>{selectedRoute.request.text}</p>
+            <small>Creado por: {selectedRoute.request.createdBy ?? "No informado"}</small>
+            <small>Respondido por: {selectedRoute.request.respondedBy ?? "Pendiente"}</small>
+            {selectedRoute.transfers.map((transfer) => (
+              <div className="admin-ui-v2-leaflet-transfer" key={transfer.id}>
+                <span>Transferencia #{transfer.id}</span>
+                <strong>{transferStatusTone(transfer.status).label}</strong>
+                <small>Raciones: {transfer.rationsForTrip}</small>
+              </div>
+            ))}
+          </div>
+        ) : <div className="admin-ui-v2-empty-cell">Sin conexiones con coordenadas.</div>}
+        {missingRoutes > 0 && <div className="admin-ui-v2-leaflet-warning">{missingRoutes} solicitud(es) no tienen origen/destino con coordenadas backend.</div>}
+      </aside>
+    </div>
+  );
+}
+
 const ExpeditionsModule = memo(function ExpeditionsModule({
   sub,
   expeditions,
@@ -4105,7 +4416,6 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
   consumedResources: ResourceLedgerEntry[];
   gainedResources: ResourceLedgerEntry[];
 }) {
-  const [selectedCampId, setSelectedCampId] = useState<number | null>(null);
   const [selectedExpeditionId, setSelectedExpeditionId] = useState<number | null>(null);
   const effectiveExpeditions = expeditions;
 
@@ -4130,17 +4440,6 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
     return backendPoints;
   }, [campCatalog]);
 
-  useEffect(() => {
-    if (mappedCamps.length === 0) {
-      setSelectedCampId(null);
-      return;
-    }
-    setSelectedCampId((prev) => {
-      if (prev && mappedCamps.some((camp) => camp.id === prev)) return prev;
-      return mappedCamps[0].id;
-    });
-  }, [mappedCamps]);
-
   const activeExpeditions = effectiveExpeditions.filter((item) => item.status !== "COMPLETADA");
   const plannedExpeditions = effectiveExpeditions.filter((item) => item.status === "PROGRAMADA");
   const historyExpeditions = effectiveExpeditions.filter((item) => item.status === "COMPLETADA");
@@ -4154,27 +4453,6 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
 
   const selectedExpedition = visibleExpeditions.find((item) => item.id === selectedExpeditionId) ?? null;
   const selectedExpeditionRoute = selectedExpedition ? buildExpeditionRoute(selectedExpedition, mappedCamps) : null;
-
-  useEffect(() => {
-    if (sub !== "Mapa operativo") return;
-
-    const idleApi = window as Window & {
-      requestIdleCallback?: (callback: () => void) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-
-    if (typeof idleApi.requestIdleCallback === "function") {
-      const idleCallbackId = idleApi.requestIdleCallback(() => prefetchExpeditionsWorldMap());
-      return () => {
-        if (typeof idleApi.cancelIdleCallback === "function") {
-          idleApi.cancelIdleCallback(idleCallbackId);
-        }
-      };
-    }
-
-    const timer = window.setTimeout(() => prefetchExpeditionsWorldMap(), 120);
-    return () => window.clearTimeout(timer);
-  }, [sub]);
 
   useEffect(() => {
     setSelectedExpeditionId((prev) => {
@@ -4213,14 +4491,19 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
       </div>
 
       {sub === "Mapa operativo" && (
-        mappedCamps.length > 1 ? (
-          <div className="admin-ui-v2-map-shell">
-            <ExpeditionsWorldMap camps={mappedCamps} selectedCampId={selectedCampId} onSelectCamp={setSelectedCampId} />
+        campCatalog.filter(validCampPoint).length > 1 ? (
+          <div className="admin-ui-v2-map-shell admin-ui-v2-map-shell-leaflet">
+            <AdminExpeditionsLeafletMap
+              camps={campCatalog}
+              expeditions={effectiveExpeditions}
+              selectedExpeditionId={selectedExpeditionId}
+              onSelectExpedition={setSelectedExpeditionId}
+            />
           </div>
         ) : (
           <div className="admin-ui-v2-module-card">
             <h3>Mapa operativo</h3>
-            <p>Se requieren al menos dos campamentos con coordenadas para renderizar rutas intercampamento.</p>
+            <p>Se requieren al menos dos campamentos con coordenadas reales del backend para renderizar rutas de expedición.</p>
           </div>
         )
       )}

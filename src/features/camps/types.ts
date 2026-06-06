@@ -3,9 +3,11 @@ export interface Camp {
   name: string
   description: string
   location: LocationCoords
+  latitude?: string | number
+  longitude?: string | number
   capacity: number
   currentPopulation: number
-  status: 'ACTIVE' | 'ABANDONED' | 'COMPROMISED' | 'UNDER_CONSTRUCTION'
+  status: 'ACTIVE' | 'INACTIVE' | 'ABANDONED' | 'COMPROMISED' | 'UNDER_CONSTRUCTION'
   foundedAt: string
   resources: CampResource[]
   defenseLevel: number

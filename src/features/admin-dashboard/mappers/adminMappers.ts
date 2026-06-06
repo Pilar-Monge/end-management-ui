@@ -2,6 +2,7 @@ import type {
   AdminAdmissionRequest,
   AdminExpeditionRecord,
   AdminNotificationRecord,
+  AdminTransferRecord,
   AuditRecord,
   CampInventoryEntry,
   IntercampRecord,
@@ -40,6 +41,9 @@ type UiExpedition = {
   status: 'EN CURSO' | 'PROGRAMADA' | 'REGRESANDO' | 'COMPLETADA'
   objective: string
   sector: string
+  originCampId?: number
+  destinationCampId?: number
+  routePoints: Array<{ latitude: number; longitude: number; label?: string }>
 }
 
 type UiIntercampRequest = {
@@ -50,6 +54,26 @@ type UiIntercampRequest = {
   status: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | 'CONFIRMADO'
   urgent: boolean
   type: 'solicitud' | 'traslado' | 'oferta'
+  originCampId?: number
+  destinationCampId?: number
+  plannedDepartureDate?: string
+  plannedArrivalDate?: string
+  createdBy?: string
+  respondedBy?: string
+}
+
+type UiTransfer = {
+  id: number
+  requestId: number | null
+  status: 'PLANIFICADA' | 'EN_TRANSITO' | 'ENTREGADA' | 'CANCELADA'
+  plannedDepartureDate?: string
+  actualDepartureDate?: string
+  plannedArrivalDate?: string
+  actualArrivalDate?: string
+  departureApprovedBy?: string
+  arrivalApprovedBy?: string
+  rationsForTrip: number
+  receptionNotes: string
 }
 
 type UiInventoryMovement = {
@@ -253,6 +277,74 @@ function mapExpeditionStatus(statusCandidate?: string): UiExpedition['status'] {
   return 'EN CURSO'
 }
 
+function numberFromUnknown(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
+
+function readOptionalNumber(source: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = numberFromUnknown(source[key])
+    if (value !== null) return value
+  }
+  return undefined
+}
+
+function isCoordinatePair(value: unknown): value is { latitude?: unknown; longitude?: unknown; lat?: unknown; lng?: unknown; lon?: unknown; label?: unknown; name?: unknown } {
+  return Boolean(value && typeof value === 'object')
+}
+
+function extractRoutePoints(value: unknown): Array<{ latitude: number; longitude: number; label?: string }> {
+  if (!value) return []
+
+  if (typeof value === 'string') {
+    try {
+      return extractRoutePoints(JSON.parse(value))
+    } catch {
+      return []
+    }
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => {
+      if (!isCoordinatePair(entry)) return []
+      const latitude = numberFromUnknown(entry.latitude ?? entry.lat)
+      const longitude = numberFromUnknown(entry.longitude ?? entry.lng ?? entry.lon)
+      if (latitude === null || longitude === null) return []
+      const label = typeof entry.label === 'string'
+        ? entry.label
+        : typeof entry.name === 'string'
+          ? entry.name
+          : undefined
+      return [{ latitude, longitude, label }]
+    })
+  }
+
+  if (isCoordinatePair(value)) {
+    const objectValue = value as Record<string, unknown>
+    for (const key of ['points', 'route', 'plannedRoute', 'coordinates', 'path']) {
+      const points = extractRoutePoints(objectValue[key])
+      if (points.length > 0) return points
+    }
+
+    const start = extractRoutePoints(objectValue.start ?? objectValue.origin ?? objectValue.from)
+    const end = extractRoutePoints(objectValue.end ?? objectValue.destination ?? objectValue.to)
+    if (start.length > 0 || end.length > 0) return [...start, ...end]
+
+    const latitude = numberFromUnknown(objectValue.latitude ?? objectValue.lat)
+    const longitude = numberFromUnknown(objectValue.longitude ?? objectValue.lng ?? objectValue.lon)
+    if (latitude !== null && longitude !== null) {
+      return [{ latitude, longitude, label: typeof objectValue.label === 'string' ? objectValue.label : undefined }]
+    }
+  }
+
+  return []
+}
+
 export function mapExpeditionFromApi(item: AdminExpeditionRecord): UiExpedition {
   const participants = Array.isArray(item.participants)
     ? item.participants
@@ -262,6 +354,26 @@ export function mapExpeditionFromApi(item: AdminExpeditionRecord): UiExpedition 
 
   const day = Number(item.day ?? item.currentDay ?? 0)
   const total = Number(item.total ?? item.totalDays ?? item.durationDays ?? Math.max(day, 1))
+  const rawItem = item as unknown as Record<string, unknown>
+  const originCampId = readOptionalNumber(rawItem, ['originCampId', 'startCampId', 'baseCampId', 'campId'])
+  const destinationCampId = readOptionalNumber(rawItem, ['destinationCampId', 'endCampId', 'targetCampId'])
+  const destinationLatitude = numberFromUnknown(item.destinationLatitude)
+  const destinationLongitude = numberFromUnknown(item.destinationLongitude)
+  const backendDestinationPoint = destinationLatitude !== null && destinationLongitude !== null
+    ? [{
+        latitude: destinationLatitude,
+        longitude: destinationLongitude,
+        label: item.destinationDescription ?? item.location ?? item.name ?? `Destino #${item.id}`,
+      }]
+    : []
+  const routePoints = [
+    item.plannedRoute,
+    item.route,
+    item.coordinates,
+    item.destination,
+    item.targetLocation,
+  ]
+    .flatMap((candidate) => extractRoutePoints(candidate))
 
   return {
     id: item.id,
@@ -272,6 +384,9 @@ export function mapExpeditionFromApi(item: AdminExpeditionRecord): UiExpedition 
     status: mapExpeditionStatus(item.status ?? item.expeditionStatus),
     objective: item.objective ?? item.description ?? 'Objetivo no especificado',
     sector: item.sector ?? item.location ?? 'Sector no definido',
+    originCampId,
+    destinationCampId,
+    routePoints: routePoints.length > 0 ? routePoints : backendDestinationPoint,
   }
 }
 
@@ -305,6 +420,39 @@ export function mapIntercampFromApi(record: IntercampRecord): UiIntercampRequest
     status: mapIntercampStatus(record.status),
     urgent: Boolean(record.urgent) || String(record.urgency ?? '').toLowerCase().includes('high'),
     type: requestType,
+    originCampId: record.originCampId,
+    destinationCampId: record.destinationCampId,
+    plannedDepartureDate: record.plannedDepartureDate ?? record.departureDate,
+    plannedArrivalDate: record.plannedArrivalDate ?? record.arrivalDate,
+    createdBy: record.createdBy === undefined ? undefined : String(record.createdBy),
+    respondedBy: record.respondedBy === undefined ? undefined : String(record.respondedBy),
+  }
+}
+
+function mapTransferStatus(statusCandidate?: string, actualDepartureDate?: string): UiTransfer['status'] {
+  const normalized = String(statusCandidate ?? '').toLowerCase()
+  if (normalized.includes('cancel')) return 'CANCELADA'
+  if (normalized.includes('complete') || normalized.includes('deliver') || normalized.includes('arriv')) return 'ENTREGADA'
+  if (normalized.includes('transit') || normalized.includes('route') || actualDepartureDate) return 'EN_TRANSITO'
+  return 'PLANIFICADA'
+}
+
+export function mapTransferFromApi(record: AdminTransferRecord): UiTransfer {
+  const requestId = numberFromUnknown(record.requestId ?? record.intercampRequestId)
+  const rationsForTrip = numberFromUnknown(record.rationsForTrip ?? record.rations) ?? 0
+
+  return {
+    id: record.id,
+    requestId,
+    status: mapTransferStatus(record.status, record.actualDepartureDate),
+    plannedDepartureDate: record.plannedDepartureDate ?? record.departureDate,
+    actualDepartureDate: record.actualDepartureDate,
+    plannedArrivalDate: record.plannedArrivalDate ?? record.arrivalDate,
+    actualArrivalDate: record.actualArrivalDate,
+    departureApprovedBy: record.departureApprovedBy === undefined ? undefined : String(record.departureApprovedBy),
+    arrivalApprovedBy: record.arrivalApprovedBy === undefined ? undefined : String(record.arrivalApprovedBy),
+    rationsForTrip,
+    receptionNotes: record.receptionNotes ?? record.notes ?? 'Sin observaciones registradas',
   }
 }
 

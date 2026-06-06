@@ -19,10 +19,168 @@
   min-height: 100%;
 }
 
+.admin-ui-v2-content,
+.admin-ui-v2-dashboard,
+.admin-ui-v2-population,
+.admin-ui-v2-admissions,
+.admin-ui-v2-expeditions,
+.admin-ui-v2-achievements-wrap {
+  position: relative;
+}
+
+.admin-ui-v2-content::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: -8px 0 auto 0;
+  height: 160px;
+  background:
+    linear-gradient(90deg, transparent, rgba(103, 172, 169, 0.08), transparent),
+    repeating-linear-gradient(0deg, rgba(103, 172, 169, 0.03) 0 1px, transparent 1px 5px);
+  opacity: 0.8;
+  z-index: 0;
+}
+
+.admin-ui-v2-content > * {
+  position: relative;
+  z-index: 1;
+}
+
 .admin-ui-v2-dashboard {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.admin-ui-v2-command-hero {
+  align-items: stretch;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(103, 172, 169, 0.16), transparent 34%),
+    linear-gradient(135deg, rgba(3, 10, 10, 0.72), rgba(4, 14, 14, 0.42));
+  border: 1px solid rgba(103, 172, 169, 0.24);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.22fr) auto;
+  overflow: hidden;
+  padding: 16px;
+  position: relative;
+}
+
+.admin-ui-v2-command-hero::before,
+.admin-ui-v2-module-card::before,
+.admin-ui-v2-temp-sector-card::before,
+.admin-ui-v2-temp-panel::before,
+.admin-ui-v2-temp-assignment-card::before,
+.admin-ui-v2-adm-card::before,
+.admin-ui-v2-achievement-card::before,
+.admin-ui-v2-intercamp-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(105, 191, 183, 0.52), transparent);
+  opacity: 0.9;
+}
+
+.admin-ui-v2-command-hero::after {
+  background: rgba(103, 172, 169, 0.08);
+  content: "";
+  height: 120px;
+  position: absolute;
+  right: -44px;
+  top: -50px;
+  transform: rotate(45deg);
+  width: 120px;
+}
+
+.admin-ui-v2-command-hero-copy,
+.admin-ui-v2-command-health,
+.admin-ui-v2-command-actions {
+  position: relative;
+  z-index: 1;
+}
+
+.admin-ui-v2-command-kicker {
+  color: rgba(105, 191, 183, 0.82);
+  display: block;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.admin-ui-v2-command-hero h2,
+.admin-ui-v2-module-banner h3 {
+  color: #f0fafa;
+  font-size: 22px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  margin: 4px 0 6px;
+  text-transform: uppercase;
+}
+
+.admin-ui-v2-command-hero p,
+.admin-ui-v2-module-banner p {
+  color: rgba(164, 194, 197, 0.78);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 720px;
+}
+
+.admin-ui-v2-command-health {
+  border: 1px solid rgba(103, 172, 169, 0.22);
+  background: rgba(3, 10, 10, 0.46);
+  display: grid;
+  gap: 4px;
+  min-width: 150px;
+  padding: 10px 12px;
+}
+
+.admin-ui-v2-command-health span,
+.admin-ui-v2-command-health em {
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-ui-v2-command-health span {
+  color: rgba(164, 194, 197, 0.62);
+}
+
+.admin-ui-v2-command-health strong {
+  color: #f0fafa;
+  font-size: 32px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.admin-ui-v2-command-actions {
+  align-content: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  justify-content: flex-end;
+}
+
+.admin-ui-v2-warning-strip {
+  border: 1px solid rgba(239, 193, 110, 0.28);
+  background:
+    linear-gradient(90deg, rgba(239, 193, 110, 0.12), transparent),
+    rgba(3, 10, 10, 0.45);
+  color: rgba(251, 211, 141, 0.92);
+  display: grid;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  padding: 9px 11px;
+  text-transform: uppercase;
 }
 
 .admin-ui-v2-overview-band,
@@ -263,6 +421,19 @@
   min-height: 104px;
   justify-content: space-between;
   position: relative;
+  overflow: hidden;
+}
+
+.admin-ui-v2-dashboard-metric::before,
+.admin-ui-v2-metric::before {
+  content: "";
+  position: absolute;
+  right: -18px;
+  top: -22px;
+  width: 76px;
+  height: 76px;
+  border: 1px solid rgba(103, 172, 169, 0.12);
+  transform: rotate(45deg);
 }
 
 .admin-ui-v2-dashboard-metric::after {
@@ -776,8 +947,12 @@
   flex-direction: column;
   gap: 3px;
   border: 1px solid rgba(103, 172, 169, 0.2);
-  background: rgba(4, 14, 14, 0.4);
+  background:
+    linear-gradient(180deg, rgba(103, 172, 169, 0.07), transparent),
+    rgba(4, 14, 14, 0.4);
   padding: 12px 10px;
+  position: relative;
+  overflow: hidden;
 }
 
 .admin-ui-v2-metric-value {
@@ -845,6 +1020,28 @@
 .admin-ui-v2-table {
   border: 1px solid rgba(103, 172, 169, 0.2);
   background: rgba(4, 14, 14, 0.35);
+  overflow: hidden;
+}
+
+.admin-ui-v2-table thead tr {
+  background: rgba(3, 10, 10, 0.72);
+}
+
+.admin-ui-v2-table th {
+  color: rgba(164, 194, 197, 0.78);
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-ui-v2-table td {
+  border-color: rgba(103, 172, 169, 0.1);
+  color: rgba(223, 241, 241, 0.86);
+}
+
+.admin-ui-v2-table tbody tr:hover {
+  background: rgba(103, 172, 169, 0.07);
 }
 
 .admin-ui-v2-table td,
@@ -906,6 +1103,17 @@
   font-weight: 900;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.admin-ui-v2-btn:hover:not(:disabled) {
+  background: rgba(103, 172, 169, 0.13);
+  border-color: rgba(105, 191, 183, 0.72);
+  color: #f0fafa;
+}
+
+.admin-ui-v2-btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .admin-ui-v2-btn.is-ok {
@@ -959,8 +1167,26 @@
 
 .admin-ui-v2-module-card {
   border: 1px solid rgba(103, 172, 169, 0.22);
-  background: rgba(4, 14, 14, 0.38);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(103, 172, 169, 0.08), transparent 34%),
+    rgba(4, 14, 14, 0.38);
   padding: 14px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.admin-ui-v2-module-card:hover,
+.admin-ui-v2-adm-card:hover,
+.admin-ui-v2-achievement-card:hover,
+.admin-ui-v2-intercamp-card:hover,
+.admin-ui-v2-temp-sector-card:hover,
+.admin-ui-v2-temp-panel:hover,
+.admin-ui-v2-temp-assignment-card:hover {
+  border-color: rgba(105, 191, 183, 0.38);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(103, 172, 169, 0.12), transparent 36%),
+    rgba(4, 14, 14, 0.48);
 }
 
 .admin-ui-v2-module-card h3 {
@@ -2521,6 +2747,397 @@
   margin: 10px 0;
 }
 
+.admin-ui-v2-intercamp-map-console,
+.admin-ui-v2-map-shell-leaflet {
+  min-height: 520px;
+}
+
+.admin-ui-v2-leaflet-console {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(103, 172, 169, 0.1), transparent 34%),
+    rgba(3, 10, 10, 0.45);
+  border: 1px solid rgba(103, 172, 169, 0.22);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.32fr);
+  min-height: 520px;
+  overflow: hidden;
+  padding: 10px;
+}
+
+.admin-ui-v2-leaflet-map {
+  background: #010304;
+  border: 1px solid rgba(103, 172, 169, 0.2);
+  min-height: 500px;
+  overflow: hidden;
+  position: relative;
+}
+
+.admin-ui-v2-leaflet-map .leaflet-container,
+.admin-ui-v2-leaflet-map.leaflet-container {
+  background: #010304;
+  font-family: inherit;
+}
+
+.admin-ui-v2-leaflet-side {
+  background: rgba(4, 14, 14, 0.72);
+  border: 1px solid rgba(103, 172, 169, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.admin-ui-v2-leaflet-route-row {
+  background: rgba(3, 10, 10, 0.46);
+  border: 1px solid rgba(103, 172, 169, 0.18);
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+  text-align: left;
+}
+
+.admin-ui-v2-leaflet-route-row:hover,
+.admin-ui-v2-leaflet-route-row.is-selected {
+  background: rgba(103, 172, 169, 0.1);
+  border-color: rgba(105, 191, 183, 0.48);
+}
+
+.admin-ui-v2-leaflet-route-row strong,
+.admin-ui-v2-leaflet-detail strong,
+.admin-ui-v2-leaflet-transfer strong {
+  color: #f0fafa;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-ui-v2-leaflet-route-row span,
+.admin-ui-v2-leaflet-detail span,
+.admin-ui-v2-leaflet-detail p,
+.admin-ui-v2-leaflet-detail small,
+.admin-ui-v2-leaflet-transfer span,
+.admin-ui-v2-leaflet-transfer small {
+  color: rgba(164, 194, 197, 0.72);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.admin-ui-v2-leaflet-route-row em {
+  color: #69bfb7;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-ui-v2-leaflet-warning {
+  background: rgba(239, 193, 110, 0.09);
+  border: 1px solid rgba(239, 193, 110, 0.24);
+  color: rgba(251, 211, 141, 0.92);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.45;
+  padding: 9px;
+}
+
+.admin-ui-v2-leaflet-detail,
+.admin-ui-v2-leaflet-transfer {
+  background: rgba(3, 10, 10, 0.42);
+  border: 1px solid rgba(103, 172, 169, 0.18);
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+}
+
+.admin-ui-v2-leaflet-transfer {
+  margin-top: 6px;
+}
+
+.admin-ui-v2-leaflet-marker-wrap {
+  background: transparent;
+  border: 0;
+}
+
+.admin-ui-v2-leaflet-marker {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  position: relative;
+}
+
+.admin-ui-v2-leaflet-marker i {
+  background: #69bfb7;
+  border: 2px solid #010304;
+  box-shadow: 0 0 0 1px rgba(105, 191, 183, 0.72), 0 0 16px rgba(105, 191, 183, 0.45);
+  display: block;
+  height: 14px;
+  transform: rotate(45deg);
+  width: 14px;
+}
+
+.admin-ui-v2-leaflet-marker.is-danger i {
+  background: #f37b7b;
+  box-shadow: 0 0 0 1px rgba(243, 123, 123, 0.72), 0 0 16px rgba(243, 123, 123, 0.45);
+}
+
+.admin-ui-v2-leaflet-marker strong {
+  background: rgba(1, 3, 4, 0.88);
+  border: 1px solid rgba(103, 172, 169, 0.28);
+  color: #dff1f1;
+  font-size: 7px;
+  font-weight: 950;
+  left: 50%;
+  letter-spacing: 0.04em;
+  padding: 2px 4px;
+  position: absolute;
+  top: -23px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.admin-ui-v2-leaflet-map .leaflet-control-zoom a {
+  background: rgba(3, 10, 10, 0.92);
+  border-color: rgba(103, 172, 169, 0.22);
+  color: #69bfb7;
+}
+
+.admin-ui-v2-leaflet-map .leaflet-tooltip {
+  background: rgba(3, 10, 10, 0.94);
+  border: 1px solid rgba(103, 172, 169, 0.42);
+  color: #dff1f1;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.admin-ui-v2-leaflet-route.is-active,
+.admin-ui-v2-leaflet-route.is-transit,
+.admin-ui-v2-leaflet-route.is-returning {
+  animation: admin-ui-v2-route-dash 1.4s linear infinite;
+  stroke-dasharray: 9 9;
+}
+
+.admin-ui-v2-leaflet-route.is-planned {
+  stroke-dasharray: 4 8;
+}
+
+.admin-ui-v2-leaflet-route.is-cancelled {
+  stroke-dasharray: 2 8;
+}
+
+@keyframes admin-ui-v2-route-dash {
+  to { stroke-dashoffset: -36; }
+}
+
+.admin-ui-v2-coverage-card {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  min-height: 226px;
+}
+
+.admin-ui-v2-coverage-radar {
+  align-self: center;
+  aspect-ratio: 1;
+  background:
+    radial-gradient(circle, rgba(103, 172, 169, 0.12) 0 2px, transparent 3px),
+    radial-gradient(circle, transparent 0 39%, rgba(103, 172, 169, 0.18) 40% 41%, transparent 42% 60%, rgba(103, 172, 169, 0.12) 61% 62%, transparent 63%),
+    linear-gradient(90deg, transparent 49.5%, rgba(103, 172, 169, 0.18) 50%, transparent 50.5%),
+    linear-gradient(0deg, transparent 49.5%, rgba(103, 172, 169, 0.18) 50%, transparent 50.5%);
+  border: 1px solid rgba(103, 172, 169, 0.2);
+  display: grid;
+  margin: 2px auto 8px;
+  max-width: 150px;
+  place-items: center;
+  position: relative;
+  width: 70%;
+}
+
+.admin-ui-v2-coverage-radar span {
+  border-left: 2px solid rgba(105, 191, 183, 0.75);
+  height: 50%;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform-origin: top center;
+  animation: admin-ui-v2-radar-spin 8s linear infinite;
+}
+
+.admin-ui-v2-coverage-radar i {
+  background: #69bfb7;
+  box-shadow: 0 0 12px rgba(105, 191, 183, 0.75);
+  display: block;
+  height: 7px;
+  width: 7px;
+}
+
+@keyframes admin-ui-v2-radar-spin {
+  to { transform: rotate(360deg); }
+}
+
+.admin-ui-v2-diagnostic-card {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-ui-v2-module-banner {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.admin-ui-v2-intercamp-console {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-ui-v2-intercamp-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+}
+
+.admin-ui-v2-intercamp-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(103, 172, 169, 0.08), transparent 34%),
+    rgba(4, 14, 14, 0.38);
+  border: 1px solid rgba(103, 172, 169, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 178px;
+  overflow: hidden;
+  padding: 13px;
+  position: relative;
+}
+
+.admin-ui-v2-intercamp-card.is-urgent {
+  border-color: rgba(243, 123, 123, 0.38);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(243, 123, 123, 0.1), transparent 34%),
+    rgba(4, 14, 14, 0.4);
+}
+
+.admin-ui-v2-intercamp-head,
+.admin-ui-v2-intercamp-foot {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.admin-ui-v2-intercamp-head span:first-child,
+.admin-ui-v2-intercamp-foot span,
+.admin-ui-v2-intercamp-foot strong {
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-ui-v2-intercamp-head span:first-child,
+.admin-ui-v2-intercamp-foot span {
+  color: rgba(164, 194, 197, 0.62);
+}
+
+.admin-ui-v2-intercamp-card h3 {
+  color: #f0fafa;
+  font-size: 13px;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.admin-ui-v2-intercamp-card p {
+  color: rgba(164, 194, 197, 0.8);
+  flex: 1;
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.admin-ui-v2-intercamp-foot strong {
+  color: #69bfb7;
+}
+
+.admin-ui-v2-adm-card,
+.admin-ui-v2-achievement-card,
+.admin-ui-v2-assignment-card,
+.admin-ui-v2-temp-sector-card,
+.admin-ui-v2-temp-panel,
+.admin-ui-v2-temp-assignment-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-ui-v2-adm-card {
+  background:
+    linear-gradient(90deg, rgba(103, 172, 169, 0.08), transparent),
+    rgba(4, 14, 14, 0.42);
+}
+
+.admin-ui-v2-expedition-row,
+.admin-ui-v2-resource-row,
+.admin-ui-v2-status-row,
+.admin-ui-v2-alert-item,
+.admin-ui-v2-role-item,
+.admin-ui-v2-candidate,
+.admin-ui-v2-temp-worker-row,
+.admin-ui-v2-temp-choice,
+.admin-ui-v2-temp-vacancy {
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.admin-ui-v2-expedition-row:hover,
+.admin-ui-v2-resource-row:hover,
+.admin-ui-v2-status-row:hover,
+.admin-ui-v2-alert-item:hover,
+.admin-ui-v2-role-item:hover,
+.admin-ui-v2-candidate:hover,
+.admin-ui-v2-temp-worker-row:hover,
+.admin-ui-v2-temp-choice:hover,
+.admin-ui-v2-temp-vacancy:hover {
+  border-color: rgba(105, 191, 183, 0.42);
+  background: rgba(103, 172, 169, 0.08);
+}
+
+.admin-ui-v2-modal {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(103, 172, 169, 0.12), transparent 36%),
+    linear-gradient(145deg, rgba(6, 14, 14, 0.98), rgba(7, 20, 20, 0.94));
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.5);
+}
+
+.admin-ui-v2-meta {
+  background:
+    linear-gradient(90deg, rgba(103, 172, 169, 0.1), transparent),
+    rgba(4, 14, 14, 0.45);
+}
+
+.admin-ui-v2-population .admin-ui-v2-toolbar,
+.admin-ui-v2-admissions .admin-ui-v2-pagination,
+.admin-ui-v2-expeditions .admin-ui-v2-expedition-command {
+  background: rgba(3, 10, 10, 0.35);
+  border: 1px solid rgba(103, 172, 169, 0.14);
+  padding: 10px;
+}
+
+.admin-ui-v2-population .admin-ui-v2-grid-4,
+.admin-ui-v2-admissions > .admin-ui-v2-grid-3,
+.admin-ui-v2-expeditions > .admin-ui-v2-grid-4,
+.admin-ui-v2-achievement-kpi-grid {
+  background: rgba(3, 10, 10, 0.24);
+  border: 1px solid rgba(103, 172, 169, 0.12);
+  padding: 10px;
+}
+
 @media (max-width: 1200px) {
   .admin-ui-v2-grid-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2530,6 +3147,18 @@
   .admin-ui-v2-analytics-band,
   .admin-ui-v2-artifacts-band {
     grid-template-columns: 1fr;
+  }
+
+  .admin-ui-v2-command-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-ui-v2-leaflet-console {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-ui-v2-command-actions {
+    justify-content: flex-start;
   }
 }
 
@@ -2560,6 +3189,28 @@
   .admin-ui-v2-command-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .admin-ui-v2-command-hero {
+    padding: 12px;
+  }
+
+  .admin-ui-v2-command-hero h2,
+  .admin-ui-v2-module-banner h3 {
+    font-size: 17px;
+  }
+
+  .admin-ui-v2-module-banner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-ui-v2-leaflet-console {
+    min-height: auto;
+  }
+
+  .admin-ui-v2-leaflet-map {
+    min-height: 360px;
   }
 
   .admin-ui-v2-expedition-command {
