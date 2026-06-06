@@ -24,6 +24,8 @@ import {
   listNotifications,
   markCampAchievementSeen,
   updateAdmissionRequestStatus,
+  getSystemTimeOffset,
+  advanceSystemTime,
   ADMIN_DASHBOARD_BOOT_MAX_VISUAL_LEAD,
   ADMIN_DASHBOARD_BOOT_MIN_MS,
   INITIAL_DASHBOARD_KPI,
@@ -31,6 +33,9 @@ import {
   type CampAchievementProgress,
   type CampAchievementUnlock,
   type AdminDashboardBootstrapData,
+  type SystemTimeUnit,
+  type SystemTimeOffset,
+  type AdvanceSystemTimeResult,
 } from "../services";
 import {
   mapNotificationFromApi,
@@ -272,7 +277,7 @@ const NAVIGATION_DATA: NavItem[] = [
   { id: "logros", label: "Logros", icon: <TrophyIcon />, subOptions: ["Progreso", "Desbloqueados", "Historial"] },
   { id: "seguridad", label: "Seguridad", icon: <SecurityIcon />, subOptions: ["En vivo", "Errores", "Sistema"] },
   { id: "notificaciones", label: "Notificaciones", icon: <AlertIcon />, subOptions: ["Todas", "No leídas", "Críticas"] },
-  { id: "configuracion", label: "Configuración", icon: <GearIcon />, subOptions: ["Campamento"] },
+  { id: "configuracion", label: "Configuración", icon: <GearIcon />, subOptions: ["Campamento", "Tiempo lógico"] },
 ];
 
 const BOTTOM_DOCK_ORDER: AdminSectionId[] = ["poblacion", "admisiones", "expediciones", "intercamp", "logros"];
@@ -759,6 +764,30 @@ function formatHudDateTime(date: Date): { day: string; time: string } {
   const day = `${String(date.getUTCDate()).padStart(2, "0")}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`;
   const time = `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(date.getUTCSeconds()).padStart(2, "0")} UTC`;
   return { day, time };
+}
+
+function formatSystemDateTime(value?: string | null): string {
+  if (!value) return "Sin dato";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("es-CR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function formatOffsetMilliseconds(value?: number | null): string {
+  if (!Number.isFinite(value ?? NaN)) return "Sin dato";
+  const sign = Number(value) < 0 ? "-" : "+";
+  const totalMinutes = Math.floor(Math.abs(Number(value)) / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  return `${sign}${days}d ${hours}h ${minutes}m`;
 }
 
 export default function AdminDashboardPage() {
@@ -3446,6 +3475,7 @@ const SettingsModule = memo(function SettingsModule({
 }) {
   const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
   const ALLOWED_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+  const SYSTEM_TIME_LIMITS: Record<SystemTimeUnit, number> = { minutes: 1440, hours: 168 };
 
   const [settings, setSettings] = useState(() => {
     const base = {
@@ -3469,6 +3499,13 @@ const SettingsModule = memo(function SettingsModule({
   const [photoInputKey, setPhotoInputKey] = useState(0);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [photoMessage, setPhotoMessage] = useState<{ type: ModuleMessageType; text: string } | null>(null);
+  const [systemTime, setSystemTime] = useState<string | null>(null);
+  const [timeOffset, setTimeOffset] = useState<SystemTimeOffset | null>(null);
+  const [timeAmount, setTimeAmount] = useState(24);
+  const [timeUnit, setTimeUnit] = useState<SystemTimeUnit>("hours");
+  const [isLoadingTime, setIsLoadingTime] = useState(false);
+  const [isAdvancingTime, setIsAdvancingTime] = useState(false);
+  const [advanceResult, setAdvanceResult] = useState<AdvanceSystemTimeResult | null>(null);
   const resolvedProfilePerson = useMemo(() => resolveSessionPerson(profile, persons), [profile, persons]);
   const resolvedProfilePersonId = useMemo(() => resolveSessionPersonId(profile, persons), [profile, persons]);
 
@@ -3487,6 +3524,78 @@ const SettingsModule = memo(function SettingsModule({
     () => resolveInitials([profile.firstName, profile.lastName1, profile.lastName2, profile.displayName, profile.username], 3),
     [profile.firstName, profile.lastName1, profile.lastName2, profile.displayName, profile.username],
   );
+
+  const loadSystemTimeControls = useCallback(async () => {
+    setIsLoadingTime(true);
+    try {
+      const [serverTimeResult, offsetResult] = await Promise.all([
+        getServerTime(),
+        getSystemTimeOffset(),
+      ]);
+      setSystemTime(serverTimeResult.serverTime);
+      setTimeOffset(offsetResult);
+    } catch (error) {
+      onNotice("configuracion", "error", getErrorMessage(error, "load_dashboard"));
+    } finally {
+      setIsLoadingTime(false);
+    }
+  }, [onNotice]);
+
+  useEffect(() => {
+    if (sub !== "Tiempo lógico") return;
+    void loadSystemTimeControls();
+  }, [loadSystemTimeControls, sub]);
+
+  const validateTimeAdvance = (): number | null => {
+    const amount = Number(timeAmount);
+    const maxAmount = SYSTEM_TIME_LIMITS[timeUnit];
+    if (!Number.isInteger(amount) || amount <= 0) {
+      onNotice("configuracion", "warning", "Indica una cantidad entera mayor a cero.");
+      return null;
+    }
+    if (amount > maxAmount) {
+      onNotice("configuracion", "warning", `El maximo permitido es ${maxAmount} ${timeUnit === "hours" ? "horas" : "minutos"} por operacion.`);
+      return null;
+    }
+    return amount;
+  };
+
+  const handleAdvanceSystemTime = async (preset?: { unit: SystemTimeUnit; amount: number }) => {
+    if (isAdvancingTime) return;
+    const unit = preset?.unit ?? timeUnit;
+    const amount = preset?.amount ?? validateTimeAdvance();
+    if (amount === null) return;
+
+    const maxAmount = SYSTEM_TIME_LIMITS[unit];
+    if (amount > maxAmount) {
+      onNotice("configuracion", "warning", `El maximo permitido es ${maxAmount} ${unit === "hours" ? "horas" : "minutos"} por operacion.`);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Esta accion cambia el tiempo logico de la aplicacion y puede ejecutar ciclos diarios, consumo de recursos, expediciones, expiracion de sesiones y tokens. No cambia el reloj real del servidor. ¿Deseas continuar?",
+    );
+    if (!confirmed) return;
+
+    setIsAdvancingTime(true);
+    setAdvanceResult(null);
+    try {
+      const result = await advanceSystemTime({ unit, amount });
+      setAdvanceResult(result);
+      setSystemTime(result.currentSystemTime);
+      setTimeOffset({
+        offsetMilliseconds: result.offsetMilliseconds,
+        currentSystemTime: result.currentSystemTime,
+        lastModifiedAt: result.lastModifiedAt,
+      });
+      await loadSystemTimeControls();
+      onNotice("configuracion", "success", result.message || `Tiempo logico avanzado ${amount} ${unit}.`);
+    } catch (error) {
+      onNotice("configuracion", "error", getErrorMessage(error, "update_person"));
+    } finally {
+      setIsAdvancingTime(false);
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -3738,12 +3847,112 @@ const SettingsModule = memo(function SettingsModule({
             </div>
           </>
         )}
+
+        {sub === "Tiempo lógico" && (
+          <>
+            <div className="admin-ui-v2-module-card admin-ui-v2-time-control-card">
+              <div className="admin-ui-v2-section-head">
+                <span>Tiempo logico del sistema</span>
+                <span>{isLoadingTime ? "Sincronizando" : "Servidor"}</span>
+              </div>
+              <div className="admin-ui-v2-time-control-grid">
+                <div>
+                  <small>Hora logica actual</small>
+                  <strong>{formatSystemDateTime(systemTime ?? timeOffset?.currentSystemTime)}</strong>
+                </div>
+                <div>
+                  <small>Offset acumulado</small>
+                  <strong>{formatOffsetMilliseconds(timeOffset?.offsetMilliseconds)}</strong>
+                </div>
+                <div>
+                  <small>Ultima modificacion</small>
+                  <strong>{formatSystemDateTime(timeOffset?.lastModifiedAt)}</strong>
+                </div>
+              </div>
+              <p className="admin-ui-v2-time-warning">
+                Esta accion cambia el tiempo logico de la aplicacion y puede ejecutar ciclos diarios, consumo de recursos, expediciones, expiracion de sesiones y tokens. No cambia el reloj real del servidor.
+              </p>
+              <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
+                <button className="admin-ui-v2-btn" type="button" onClick={() => void loadSystemTimeControls()} disabled={isLoadingTime || isAdvancingTime}>
+                  {isLoadingTime ? "Sincronizando..." : "Actualizar estado"}
+                </button>
+              </div>
+            </div>
+
+            <div className="admin-ui-v2-module-card">
+              <div className="admin-ui-v2-section-head">
+                <span>Avanzar tiempo</span>
+                <span>Max {timeUnit === "hours" ? "168 horas" : "1440 minutos"}</span>
+              </div>
+              <div className="admin-ui-v2-form-grid">
+                <label className="admin-ui-v2-muted">Cantidad</label>
+                <input
+                  className="v-input"
+                  type="number"
+                  min={1}
+                  max={SYSTEM_TIME_LIMITS[timeUnit]}
+                  value={timeAmount}
+                  onChange={(event) => setTimeAmount(Number(event.target.value))}
+                />
+
+                <label className="admin-ui-v2-muted">Unidad</label>
+                <select
+                  className="v-select"
+                  value={timeUnit}
+                  onChange={(event) => {
+                    const nextUnit = event.target.value as SystemTimeUnit;
+                    setTimeUnit(nextUnit);
+                    setTimeAmount((prev) => Math.min(Math.max(1, Number(prev) || 1), SYSTEM_TIME_LIMITS[nextUnit]));
+                  }}
+                >
+                  <option value="hours">Horas</option>
+                  <option value="minutes">Minutos</option>
+                </select>
+              </div>
+              <small className="admin-ui-v2-muted">Limite permitido: hasta 1440 minutos o 168 horas por operacion.</small>
+              <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap admin-ui-v2-time-actions">
+                <button className="admin-ui-v2-btn" type="button" onClick={() => void handleAdvanceSystemTime({ unit: "hours", amount: 1 })} disabled={isAdvancingTime}>+1 hora</button>
+                <button className="admin-ui-v2-btn" type="button" onClick={() => void handleAdvanceSystemTime({ unit: "hours", amount: 24 })} disabled={isAdvancingTime}>+24 horas</button>
+                <button className="admin-ui-v2-btn" type="button" onClick={() => void handleAdvanceSystemTime({ unit: "minutes", amount: 60 })} disabled={isAdvancingTime}>+60 minutos</button>
+                <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void handleAdvanceSystemTime()} disabled={isAdvancingTime}>
+                  {isAdvancingTime ? "Avanzando..." : "Avanzar tiempo logico"}
+                </button>
+              </div>
+            </div>
+
+            {advanceResult && (
+              <div className="admin-ui-v2-module-card admin-ui-v2-time-result">
+                <div className="admin-ui-v2-section-head">
+                  <span>Resultado del avance</span>
+                  <span>{formatSystemDateTime(advanceResult.currentSystemTime)}</span>
+                </div>
+                <p>{advanceResult.message}</p>
+                <div className="admin-ui-v2-time-control-grid">
+                  <div>
+                    <small>Nuevo offset</small>
+                    <strong>{formatOffsetMilliseconds(advanceResult.offsetMilliseconds)}</strong>
+                  </div>
+                  <div>
+                    <small>Actualizado</small>
+                    <strong>{formatSystemDateTime(advanceResult.lastModifiedAt)}</strong>
+                  </div>
+                </div>
+                <div className="admin-ui-v2-time-result-list">
+                  {advanceResult.automations.map((item) => <span key={item}>{item}</span>)}
+                  {advanceResult.automations.length === 0 && <span>Sin automatizaciones ejecutadas.</span>}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
-      <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
-        <button className="admin-ui-v2-btn is-info" type="button" onClick={handleSave}>Guardar configuracion</button>
-        <button className="admin-ui-v2-btn" type="button" onClick={handleReset}>Restablecer</button>
-      </div>
+      {sub === "Campamento" && (
+        <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
+          <button className="admin-ui-v2-btn is-info" type="button" onClick={handleSave}>Guardar configuracion</button>
+          <button className="admin-ui-v2-btn" type="button" onClick={handleReset}>Restablecer</button>
+        </div>
+      )}
     </div>
   );
 });

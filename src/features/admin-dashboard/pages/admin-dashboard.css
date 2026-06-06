@@ -1807,6 +1807,83 @@
   text-transform: uppercase;
 }
 
+.admin-ui-v2-time-control-card {
+  border-color: rgba(103, 172, 169, 0.28);
+}
+
+.admin-ui-v2-time-control-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-ui-v2-time-control-grid div {
+  border: 1px solid rgba(103, 172, 169, 0.2);
+  background: rgba(3, 10, 10, 0.42);
+  padding: 9px;
+}
+
+.admin-ui-v2-time-control-grid small,
+.admin-ui-v2-time-control-grid strong {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-ui-v2-time-control-grid small {
+  color: rgba(164, 194, 197, 0.65);
+  font-weight: 800;
+}
+
+.admin-ui-v2-time-control-grid strong {
+  color: #dff1f1;
+  font-weight: 900;
+  margin-top: 4px;
+}
+
+.admin-ui-v2-time-warning {
+  border: 1px solid rgba(239, 193, 110, 0.28);
+  background: rgba(239, 193, 110, 0.08);
+  color: rgba(251, 211, 141, 0.9);
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 10px 0;
+  padding: 9px;
+}
+
+.admin-ui-v2-time-actions {
+  margin-top: 12px;
+}
+
+.admin-ui-v2-time-result {
+  grid-column: 1 / -1;
+}
+
+.admin-ui-v2-time-result p {
+  color: rgba(164, 194, 197, 0.84);
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 0 0 10px;
+}
+
+.admin-ui-v2-time-result-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.admin-ui-v2-time-result-list span {
+  border-left: 2px solid rgba(103, 172, 169, 0.5);
+  background: rgba(3, 10, 10, 0.35);
+  color: rgba(223, 241, 241, 0.86);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 7px 9px;
+  text-transform: uppercase;
+}
+
 /* --- TACTICAL ROLES UI --- */
 .admin-ui-v2-tactical-grid {
   display: grid;
@@ -2500,6 +2577,10 @@
   }
 
   .admin-ui-v2-expedition-ledger {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-ui-v2-time-control-grid {
     grid-template-columns: 1fr;
   }
 

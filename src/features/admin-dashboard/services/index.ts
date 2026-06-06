@@ -14,6 +14,15 @@ export {
   getInventoryDashboard,
   getExpeditionsDashboard,
   getServerTime,
+  getSystemTimeOffset,
+  advanceSystemTime,
+} from './dashboard.service'
+
+export type {
+  SystemTimeUnit,
+  SystemTimeOffset,
+  AdvanceSystemTimePayload,
+  AdvanceSystemTimeResult,
 } from './dashboard.service'
 
 export {
