@@ -761,8 +761,8 @@ function resolveAdminProfileImage(sessionUser: SessionAdminUser, matchedPerson: 
 }
 
 function formatHudDateTime(date: Date): { day: string; time: string } {
-  const day = `${String(date.getUTCDate()).padStart(2, "0")}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`;
-  const time = `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(date.getUTCSeconds()).padStart(2, "0")} UTC`;
+  const day = `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+  const time = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}`;
   return { day, time };
 }
 
@@ -1260,7 +1260,6 @@ export default function AdminDashboardPage() {
           onBack={() => navigate("/admin-main-view-ui")}
           onLogout={handleLogout}
           profile={adminProfile}
-          globalTimeState={globalTimeState}
         />
       )}
 
@@ -1416,19 +1415,14 @@ function TopHud({
   onBack,
   onLogout,
   profile,
-  globalTimeState,
 }: {
   onBack: () => void;
   onLogout: () => void;
   profile: AdminProfileSummary;
-  globalTimeState: GlobalTimeState;
 }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProfilePreviewOpen, setIsProfilePreviewOpen] = useState(false);
-  const [currentGlobalTime, setCurrentGlobalTime] = useState<Date>(() => {
-    const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
-    return new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs);
-  });
+  const [currentDeviceTime, setCurrentDeviceTime] = useState<Date>(() => new Date());
   const profileWrapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -1466,14 +1460,13 @@ function TopHud({
 
   useEffect(() => {
     const tickInterval = window.setInterval(() => {
-      const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
-      setCurrentGlobalTime(new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs));
+      setCurrentDeviceTime(new Date());
     }, 1000);
 
     return () => window.clearInterval(tickInterval);
-  }, [globalTimeState.baseServerTime, globalTimeState.syncedAtClientMs]);
+  }, []);
 
-  const hudDateTime = useMemo(() => formatHudDateTime(currentGlobalTime), [currentGlobalTime]);
+  const hudDateTime = useMemo(() => formatHudDateTime(currentDeviceTime), [currentDeviceTime]);
   const profileButtonLabel = `${profile.role} · @${profile.username}`;
   const profileInitials = useMemo(
     () => resolveInitials([profile.firstName, profile.lastName1, profile.lastName2, profile.displayName], 3),
@@ -1496,8 +1489,8 @@ function TopHud({
         <span className="admin-ui-v2-time-day">{hudDateTime.day}</span>
         <span className="admin-ui-v2-time-sep" aria-hidden="true">|</span>
         <span className="admin-ui-v2-time-clock">{hudDateTime.time}</span>
-        <span className={`admin-ui-v2-time-status is-${globalTimeState.status}`}>
-          {globalTimeState.status === "synced" ? "Sincronizado" : globalTimeState.status === "syncing" ? "Sincronizando" : "Hora local"}
+        <span className="admin-ui-v2-time-status is-synced">
+          Dispositivo
         </span>
       </div>
       <div className="admin-ui-v2-profile-hud-wrap pointer-events-auto" ref={profileWrapRef}>
