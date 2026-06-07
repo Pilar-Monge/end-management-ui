@@ -9,6 +9,7 @@ import type {
   InventoryMovement,
   InventoryAlert,
   IntercampRequest,
+  RequestPersonDetail,
   RequestResourceDetail,
   Transfer,
   TransferPerson,
@@ -17,12 +18,12 @@ import type {
   DeliveredTransferResource,
   Occupation,
   OccupationCoverage,
-  OperationalNotification
+  OperationalNotification,
+  CampPerson
 } from "../types/resourceManagementTypes";
 import {
   INITIAL_CAMPS,
   INITIAL_RESOURCE_TYPES,
-  INITIAL_CAMP_INVENTORIES,
   INITIAL_MOVEMENTS,
   INITIAL_ALERTS,
   INITIAL_INTERCAMP_REQUESTS,
@@ -36,28 +37,24 @@ import {
   INITIAL_NOTIFICATIONS
 } from "../data/resourceManagementData";
 import {
-  Btn,
   ViewDashboard,
-  ViewInventarioCampamento,
   ViewRecoleccionDiaria,
   ViewMovimientosInventario,
   ViewAlertasInventario,
   ViewSolicitudesIntercampamento,
   ViewTraslados,
-  ViewRecursosExpediciones,
-  ViewRecursosEntregados,
   ViewTiposDeRecurso,
   ViewCampamentos,
   ViewOficiosCobertura,
   ViewNotificaciones,
-  ViewDetalleRecursosSolicitados,
-  ViewPersonasEnTraslado,
-  ViewHistorialDeTraslado,
-  ViewPersonalDashboard
+  ViewPersonalDashboard,
+  ViewHistorialDeTraslado
 } from "../views/ResourceManagementViews";
 import { WorldMapDashboard } from "../views/WorldMapView";
 import { LoadingScreen } from "../components/ResourcePanelLoadingScreen";
 import { resourceApi } from "../services/resourceManagementApi";
+import { ApiHttpError } from "../../../shared/services/httpClient";
+import { PopupMessage } from "../../../shared/components/PopupMessage";
 
 
 const NAVIGATION_DATA = [
@@ -66,20 +63,10 @@ const NAVIGATION_DATA = [
     label: "Almacenes",
     icon: <PackageIcon />,
     subOptions: [
-      "Dashboard",
-      "Inventario del campamento",
-      "Tipos de recurso"
-    ]
-  },
-  {
-    id: "operaciones",
-    label: "Operaciones",
-    icon: <ExchangeIcon />,
-    subOptions: [
-      "Recoleccion diaria",
-      "Movimientos de inventario",
+      "Inventario actual",
+      "Historial de recursos",
+      "Recolección diaria",
       "Alertas de inventario",
-      "Recursos de expediciones"
     ]
   },
   {
@@ -88,11 +75,8 @@ const NAVIGATION_DATA = [
     icon: <TruckIcon />,
     subOptions: [
       "Solicitudes intercampamento",
-      "Detalle de recursos solicitados",
       "Traslados",
-      "Personas en traslado",
-      "Historial de traslado",
-      "Recursos entregados de traslado"
+      "Historial de traslados"
     ]
   },
   {
@@ -101,7 +85,7 @@ const NAVIGATION_DATA = [
     icon: <SquadIcon />,
     subOptions: [
       "Dashboard global",
-      "Oficios y cobertura",
+      "Glosario",
       "Notificaciones"
     ]
   }
@@ -117,7 +101,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   const [hasEntered, setHasEntered] = useState(false);
 
   const [activeNav, setActiveNav] = useState<string | null>("almacenes");
-  const [activeSub, setActiveSub] = useState<string>("Dashboard");
+  const [activeSub, setActiveSub] = useState<string>("Inventario actual");
   const [lastActiveNav, setLastActiveNav] = useState<string>("almacenes");
 
   
@@ -174,12 +158,13 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
 
 
   const [resourceTypes, setResourceTypesState] = useState<ResourceType[]>(INITIAL_RESOURCE_TYPES);
-  const [campInventories, setCampInventories] = useState<CampInventory[]>(INITIAL_CAMP_INVENTORIES);
+  const [campInventories, setCampInventories] = useState<CampInventory[]>([]);
   const [dailyCollectionRecords, setDailyCollectionRecords] = useState<DailyCollectionRecord[]>([]);
   const [inventoryMovements, setInventoryMovements] = useState<InventoryMovement[]>(INITIAL_MOVEMENTS);
   const [inventoryAlerts, setInventoryAlerts] = useState<InventoryAlert[]>(INITIAL_ALERTS);
   const [intercampRequests, setIntercampRequests] = useState<IntercampRequest[]>(INITIAL_INTERCAMP_REQUESTS);
   const [requestResourceDetails, setRequestResourceDetails] = useState<RequestResourceDetail[]>(INITIAL_REQUEST_RESOURCE_DETAILS);
+  const [requestPersonDetails, setRequestPersonDetails] = useState<RequestPersonDetail[]>([]);
   const [transfers, setTransfers] = useState<Transfer[]>(INITIAL_TRANSFERS);
   const [transferPersons, setTransferPersons] = useState<TransferPerson[]>(INITIAL_TRANSFER_PERSONS);
   const [expeditionsResources, setExpeditionsResources] = useState<ExpeditionResource[]>(INITIAL_EXPEDITIONS_RESOURCES);
@@ -187,9 +172,24 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   const [occupations, setOccupationsState] = useState<Occupation[]>(INITIAL_OCCUPATIONS);
   const [occupationCoverages, setOccupationCoverages] = useState<OccupationCoverage[]>(INITIAL_OCCUPATION_COVERAGES);
   const [notifications, setNotifications] = useState<OperationalNotification[]>(INITIAL_NOTIFICATIONS);
+  const [people, setPeople] = useState<CampPerson[]>([]);
+  const [requestPopupMessage, setRequestPopupMessage] = useState<string | null>(null);
+  const [requestPopupVariant, setRequestPopupVariant] = useState<"success" | "error">("success");
 
   const applyList = <T,>(list: T[], setter: (value: T[]) => void) => {
     if (list.length > 0) setter(list);
+  };
+
+  const showRequestSuccess = (message: string) => {
+    setRequestPopupVariant("success");
+    setRequestPopupMessage(message);
+  };
+
+  const showRequestError = (message: string, error?: unknown) => {
+    const details = error instanceof ApiHttpError ? error.details : undefined;
+    const detailText = Array.isArray(details) ? details.join(" ") : details;
+    setRequestPopupVariant("error");
+    setRequestPopupMessage(detailText || message);
   };
 
   const fetchAllSystemData = async () => {
@@ -203,6 +203,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       resourceApi.listInventoryAlerts(),
       resourceApi.listIntercampRequests(),
       resourceApi.listRequestResourceDetails(),
+      resourceApi.listRequestPersonDetails(),
       resourceApi.listTransfers(),
       resourceApi.listTransferPersons(),
       resourceApi.listTransferHistory(),
@@ -210,6 +211,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       resourceApi.listDeliveredTransferResources(),
       resourceApi.listOccupationCoverage(),
       resourceApi.listNotifications(),
+      resourceApi.listPeople(),
     ]);
 
     const [
@@ -222,6 +224,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       alertsResult,
       requestsResult,
       detailsResult,
+      personDetailsResult,
       transfersResult,
       transferPersonsResult,
       transferHistoryResult,
@@ -229,17 +232,19 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       deliveredResourcesResult,
       coverageResult,
       notificationsResult,
+      peopleResult,
     ] = results;
 
     if (campsResult.status === "fulfilled") applyList(campsResult.value, setCamps);
     if (resourceTypesResult.status === "fulfilled") applyList(resourceTypesResult.value, setResourceTypesState);
     if (occupationsResult.status === "fulfilled") applyList(occupationsResult.value, setOccupationsState);
-    if (inventoriesResult.status === "fulfilled") applyList(inventoriesResult.value, setCampInventories);
-    if (dailyCollectionsResult.status === "fulfilled") applyList(dailyCollectionsResult.value, setDailyCollectionRecords);
+    if (inventoriesResult.status === "fulfilled") setCampInventories(inventoriesResult.value);
+    if (dailyCollectionsResult.status === "fulfilled") setDailyCollectionRecords(dailyCollectionsResult.value);
     if (movementsResult.status === "fulfilled") applyList(movementsResult.value, setInventoryMovements);
     if (alertsResult.status === "fulfilled") applyList(alertsResult.value, setInventoryAlerts);
     if (requestsResult.status === "fulfilled") applyList(requestsResult.value, setIntercampRequests);
     if (detailsResult.status === "fulfilled") applyList(detailsResult.value, setRequestResourceDetails);
+    if (personDetailsResult.status === "fulfilled") setRequestPersonDetails(personDetailsResult.value);
     if (transfersResult.status === "fulfilled") applyList(transfersResult.value, setTransfers);
     if (transferPersonsResult.status === "fulfilled") applyList(transferPersonsResult.value, setTransferPersons);
     if (transferHistoryResult.status === "fulfilled") applyList(transferHistoryResult.value, setTransferHistories);
@@ -247,6 +252,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     if (deliveredResourcesResult.status === "fulfilled") applyList(deliveredResourcesResult.value, setDeliveredTransferResources);
     if (coverageResult.status === "fulfilled") applyList(coverageResult.value, setOccupationCoverages);
     if (notificationsResult.status === "fulfilled") applyList(notificationsResult.value, setNotifications);
+    if (peopleResult.status === "fulfilled") setPeople(peopleResult.value);
 
     results.forEach((result, index) => {
       if (result.status === "rejected") {
@@ -411,23 +417,38 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     );
   };
 
-  const handleAddRequest = async (data: Omit<IntercampRequest, "id">) => {
+  const handleAddRequest = async (data: Omit<IntercampRequest, "id">): Promise<string | null> => {
     try {
-      await resourceApi.createIntercampRequest(data);
+      const created = await resourceApi.createIntercampRequest(data);
       await fetchAllSystemData();
-      return;
+      showRequestSuccess("Borrador de solicitud intercampamento creado correctamente.");
+      return created?.id ?? null;
     } catch (error) {
       console.warn("Could not create intercamp request.", error);
-      alert("No se pudo crear la solicitud en la API. Se agregará solo en pantalla.");
+      showRequestError("No se pudo crear la solicitud en la API.", error);
     }
 
     const record: IntercampRequest = { ...data, id: `req-${Date.now().toString().slice(-4)}` };
     setIntercampRequests(prev => [...prev, record]);
+    showRequestSuccess("Borrador de solicitud intercampamento creado correctamente.");
+    return record.id;
   };
 
-  const handleUpdateRequestStatus = async (id: string, status: IntercampRequest["status"], responder: string) => {
+  const handleSubmitIntercampRequest = async (id: string) => {
     try {
-      await resourceApi.updateIntercampRequestStatus(id, status, responder);
+      await resourceApi.submitIntercampRequest(id);
+      await fetchAllSystemData();
+      showRequestSuccess("Solicitud intercampamento enviada correctamente.");
+      return;
+    } catch (error) {
+      console.warn("Could not submit intercamp request.", error);
+      showRequestError("No se pudo enviar la solicitud en la API.", error);
+    }
+  };
+
+  const handleUpdateRequestStatus = async (id: string, status: IntercampRequest["status"], responder: string, transportPersonIds?: string[]) => {
+    try {
+      await resourceApi.updateIntercampRequestStatus(id, status, responder, transportPersonIds);
       await fetchAllSystemData();
       return;
     } catch (error) {
@@ -447,7 +468,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       return;
     } catch (error) {
       console.warn("Could not create request resource detail.", error);
-      alert("No se pudo agregar el recurso solicitado en la API. Se agregará solo en pantalla.");
+      showRequestError("No se pudo agregar el recurso solicitado en la API.", error);
     }
 
     const record: RequestResourceDetail = {
@@ -458,6 +479,36 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       approvedAmount: requestedAmount
     };
     setRequestResourceDetails(prev => [...prev, record]);
+  };
+
+  const handleAddPersonToRequest = async (detail: Omit<RequestPersonDetail, "id">) => {
+    try {
+      await resourceApi.createRequestPersonDetail(detail);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not create request person detail.", error);
+      showRequestError("No se pudo agregar el detalle de persona en la API.", error);
+    }
+
+    const record: RequestPersonDetail = {
+      ...detail,
+      id: `pdet-${Date.now().toString().slice(-4)}`,
+    };
+    setRequestPersonDetails(prev => [...prev, record]);
+  };
+
+  const handleDeleteRequestPerson = async (id: string) => {
+    try {
+      await resourceApi.deleteRequestPersonDetail(id);
+      await fetchAllSystemData();
+      return;
+    } catch (error) {
+      console.warn("Could not delete request person detail.", error);
+      alert("No se pudo eliminar el detalle de persona en la API. Se quitará solo en pantalla.");
+    }
+
+    setRequestPersonDetails(prev => prev.filter(d => d.id !== id));
   };
 
   const handleDeleteRequestResource = async (id: string) => {
@@ -530,6 +581,18 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
         return t;
       });
     });
+  };
+
+  const handleUpdateTransferTransportStaff = async (id: string, transportPersonIds: string[]) => {
+    try {
+      await resourceApi.updateTransferTransportStaff(id, transportPersonIds);
+      await fetchAllSystemData();
+      showRequestSuccess("Manifiesto operativo actualizado correctamente.");
+      return;
+    } catch (error) {
+      console.warn("Could not update transfer transport staff.", error);
+      showRequestError("No se pudo actualizar el manifiesto operativo.", error);
+    }
   };
 
   const handleAddPersonToTransfer = async (transferId: string, personId: string) => {
@@ -646,6 +709,30 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     }
   };
 
+  const handleSaveCollection = (data: Omit<DailyCollectionRecord, "id">) => {
+    setDailyCollectionRecords(prev => [
+      {
+        ...data,
+        id: `col-${Date.now().toString().slice(-5)}`
+      },
+      ...prev
+    ]);
+  };
+
+  const handleAdjustRecord = (id: string, actualAmount: number, reason: string) => {
+    setDailyCollectionRecords(prev =>
+      prev.map(record =>
+        String(record.id) === id
+          ? { ...record, actualAmount, differenceReason: reason }
+          : record
+      )
+    );
+  };
+
+  const handleDeleteMovement = (id: string) => {
+    setInventoryMovements(prev => prev.filter(item => item.id !== id));
+  };
+
   const activeNavData = NAVIGATION_DATA.find((item) => item.id === activeNav);
 
 
@@ -663,6 +750,12 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             intercampRequests={intercampRequests}
             transfers={transfers}
             notifications={notifications}
+            transferPersons={transferPersons}
+            occupations={occupations}
+            occupationCoverages={occupationCoverages}
+            requestResourceDetails={requestResourceDetails}
+            deliveredTransferResources={deliveredTransferResources}
+            onSaveCollection={handleSaveCollection}
             onAddManualMovement={handleAddManualMovement}
             onAddRequest={handleAddRequest}
             onAddNotification={handleAddNotification}
@@ -670,69 +763,44 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             onResolveAlert={handleResolveAlert}
             onUpdateInventory={handleUpdateInventory}
             onNavigateToSub={handleInnerNavigation}
-            syncStatus={globalTimeState.status}
           />
         );
-      case "Inventario del campamento":
-        return (
-          <ViewInventarioCampamento
-            camps={camps}
-            resourceTypes={resourceTypes}
-            campInventories={campInventories}
-            onUpdateInventory={handleUpdateInventory}
-            onAddInventory={async (data) => {
-              try {
-                await resourceApi.upsertCampInventory(data);
-                await fetchAllSystemData();
-                return;
-              } catch (error) {
-                console.warn("Could not persist new inventory entry.", error);
-                alert("No se pudo guardar el nuevo inventario en la API. Se agregará solo en pantalla.");
-              }
-
-              setCampInventories(prev => {
-                const exists = prev.some(item => item.campId === data.campId && item.resourceTypeId === data.resourceTypeId);
-                if (exists) {
-                  return prev.map(item => item.campId === data.campId && item.resourceTypeId === data.resourceTypeId ? data : item);
-                }
-                return [...prev, data];
-              });
-            }}
-          />
-        );
+      case "Inventario actual":
       case "Tipos de recurso":
         return (
           <ViewTiposDeRecurso
             resourceTypes={resourceTypes}
-            onAddResourceType={(data) => {
-              setResourceTypesState(prev => [...prev, data]);
-            }}
-            onUpdateResourceType={(id, updated) => {
-              setResourceTypesState(prev => prev.map(rt => rt.id === id ? { ...rt, ...updated } : rt));
-            }}
-            onDeleteResourceType={(id) => {
-              setResourceTypesState(prev => prev.filter(rt => rt.id !== id));
-            }}
+            campInventories={campInventories}
+            onUpdateInventory={handleUpdateInventory}
             onNavigateToSub={handleInnerNavigation}
           />
         );
       case "Campamentos":
         return <ViewCampamentos camps={camps} />;
-      case "Recoleccion diaria":
+      case "Recolección diaria":
         return (
           <ViewRecoleccionDiaria
             camps={camps}
             resourceTypes={resourceTypes}
-            onRefreshSystemData={fetchAllSystemData}
+            dailyCollectionRecords={dailyCollectionRecords}
+            campPersonnel={people}
+            setCampPersonnel={setPeople}
+            onSaveRecord={handleSaveCollection}
+            onAdjustRecord={handleAdjustRecord}
+            onDeleteRecord={(id) => {
+              setDailyCollectionRecords(prev => prev.filter(r => String(r.id) !== id));
+            }}
           />
         );
-      case "Movimientos de inventario":
+      case "Historial de recursos":
+      case "Historial de movimientos":
         return (
           <ViewMovimientosInventario
             camps={camps}
             resourceTypes={resourceTypes}
             inventoryMovements={inventoryMovements}
             onAddManualMovement={handleAddManualMovement}
+            onDeleteMovement={handleDeleteMovement}
           />
         );
       case "Alertas de inventario":
@@ -741,15 +809,10 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             camps={camps}
             resourceTypes={resourceTypes}
             inventoryAlerts={inventoryAlerts}
+            campInventories={campInventories}
+            inventoryMovements={inventoryMovements}
             onResolveAlert={handleResolveAlert}
-          />
-        );
-      case "Recursos de expediciones":
-        return (
-          <ViewRecursosExpediciones
-            resourceTypes={resourceTypes}
-            expeditionsResources={expeditionsResources}
-            onSaveExpeditionResource={handleSaveExpeditionResource}
+            onNavigateToSub={handleInnerNavigation}
           />
         );
       case "Solicitudes intercampamento":
@@ -763,58 +826,69 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             onUpdateRequestStatus={handleUpdateRequestStatus}
             onAddResourceToRequest={handleAddResourceToRequest}
             onDeleteRequestResource={handleDeleteRequestResource}
-          />
-        );
-      case "Detalle de recursos solicitados":
-        return (
-          <ViewDetalleRecursosSolicitados
-            intercampRequests={intercampRequests}
-            resourceTypes={resourceTypes}
-            requestResourceDetails={requestResourceDetails}
-            onAddResourceDetail={handleAddResourceToRequest}
-            onUpdateResourceDetail={async (id, updated) => {
-              try {
-                await resourceApi.updateRequestResourceDetail(id, updated);
-                await fetchAllSystemData();
-                return;
-              } catch (error) {
-                console.warn("Could not update request resource detail.", error);
-                alert("No se pudo actualizar el detalle en la API. Se actualizará solo en pantalla.");
-              }
-              setRequestResourceDetails(prev => prev.map(d => d.id === id ? { ...d, ...updated } : d));
+            onAddPersonToRequest={handleAddPersonToRequest}
+            onSubmitRequest={handleSubmitIntercampRequest}
+            onUpdateTransportStaff={handleUpdateTransferTransportStaff}
+            onUpdateRequest={(id, patch) => {
+              setIntercampRequests(prev => prev.map(req => req.id === id ? { ...req, ...patch } : req));
             }}
-            onDeleteResourceDetail={handleDeleteRequestResource}
+            campInventories={campInventories}
+            setCampInventories={setCampInventories}
+            transfers={transfers}
+            setTransfers={setTransfers}
+            transferPersons={transferPersons}
+            setTransferPersons={setTransferPersons}
+            transferHistories={transferHistories}
           />
         );
       case "Traslados":
         return (
           <ViewTraslados
             camps={camps}
+            resourceTypes={resourceTypes}
             intercampRequests={intercampRequests}
+            requestResourceDetails={requestResourceDetails}
             transfers={transfers}
+            setTransfers={setTransfers}
             transferPersons={transferPersons}
+            setTransferPersons={setTransferPersons}
+            transferHistories={transferHistories}
+            setTransferHistories={setTransferHistories}
+            campInventories={campInventories}
+            setCampInventories={setCampInventories}
+            deliveredTransferResources={deliveredTransferResources}
             onAddTransfer={handleAddTransfer}
             onUpdateTransferStatus={handleUpdateTransferStatus}
             onAddPersonToTransfer={handleAddPersonToTransfer}
             onUpdatePersonStatus={handleUpdatePersonStatus}
-          />
-        );
-      case "Personas en traslado":
-        return (
-          <ViewPersonasEnTraslado
-            transfers={transfers}
-            transferPersons={transferPersons}
-            onAddPersonToTransfer={handleAddPersonToTransfer}
-            onUpdatePersonStatus={(id, updated) => {
-              setTransferPersons(prev => prev.map(tp => tp.id === id ? { ...tp, ...updated } : tp));
+            onUpdateTransportStaff={handleUpdateTransferTransportStaff}
+            onAddHistoryEntry={async (data) => {
+              try {
+                await resourceApi.createTransferHistory(data);
+                await fetchAllSystemData();
+                return;
+              } catch (error) {
+                console.warn("Could not create transfer history entry.", error);
+                alert("No se pudo guardar el historial en la API. Se agregará solo en pantalla.");
+              }
+              setTransferHistories(prev => [...prev, {
+                ...data,
+                id: `th-${Date.now().toString().slice(-4)}`
+              }]);
             }}
+            onSaveDelivery={handleSaveDelivery}
           />
         );
-      case "Historial de traslado":
+      case "Historial de traslados":
         return (
           <ViewHistorialDeTraslado
             transfers={transfers}
             transferHistories={transferHistories}
+            intercampRequests={intercampRequests}
+            requestResourceDetails={requestResourceDetails}
+            camps={camps}
+            resourceTypes={resourceTypes}
+            occupations={occupations}
             onAddHistoryEntry={async (data) => {
               try {
                 await resourceApi.createTransferHistory(data);
@@ -831,15 +905,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             }}
           />
         );
-      case "Recursos entregados de traslado":
-        return (
-          <ViewRecursosEntregados
-            transfers={transfers}
-            resourceTypes={resourceTypes}
-            deliveredTransferResources={deliveredTransferResources}
-            onSaveDelivery={handleSaveDelivery}
-          />
-        );
       case "Dashboard global":
         return (
           <ViewPersonalDashboard
@@ -853,13 +918,11 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             onNavigateToSub={handleInnerNavigation}
           />
         );
-      case "Oficios y cobertura":
+      case "Glosario":
         return (
           <ViewOficiosCobertura
-            camps={camps}
             occupations={occupations}
-            occupationCoverages={occupationCoverages}
-            onAutoAssign={handleAutoAssign}
+            resourceTypes={resourceTypes}
           />
         );
       case "Notificaciones":
@@ -896,6 +959,12 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   return (
     <div className="game-screen-layout text-[#A4C2C5]">
       <div className="holo-grid" />
+
+      <PopupMessage
+        message={requestPopupMessage}
+        onClose={() => setRequestPopupMessage(null)}
+        variant={requestPopupVariant}
+      />
 
       
       <LoadingScreen
@@ -1178,7 +1247,6 @@ function BottomDock({ activeDock, onSelect }: { activeDock: string; onSelect: (i
   const items = [
     { id: "mapa", label: "Mapa Operativo de Suministros", subtext: "MAPA", icon: <CompassIcon /> },
     { id: "almacenes", label: "Almacenes", subtext: "ALMACENES", icon: <PackageIcon /> },
-    { id: "operaciones", label: "Operaciones", subtext: "OPERACIONES", icon: <ExchangeIcon /> },
     { id: "logistica", label: "Logística y Traslados", subtext: "LOGÍSTICA", icon: <TruckIcon /> },
     { id: "cobertura", label: "Personal", subtext: "PERSONAL", icon: <SquadIcon /> }
   ];
@@ -1251,15 +1319,6 @@ function PackageIcon() {
       <path d="M6 10v12l10 5v-12" />
       <path d="M26 10v12l-10 5v-12" />
       <path d="M11 7.5l10 5" />
-    </IconSvg>
-  );
-}
-
-function ExchangeIcon() {
-  return (
-    <IconSvg>
-      <path d="M5 10h22M27 10l-6-6M27 10l-6 6" />
-      <path d="M27 22H5M5 22l6-6M5 22l6 6" />
     </IconSvg>
   );
 }

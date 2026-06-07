@@ -7,27 +7,52 @@ import { AlertCircle } from "lucide-react";
 function getCurrentResourceUser() {
   if (typeof window === "undefined") return null;
 
-  const raw = localStorage.getItem("session_user") ?? localStorage.getItem("user");
-  if (!raw) return null;
+  const campIdFromStorage = Number(localStorage.getItem("last_selected_camp_id"));
+  const rawSources = [
+    localStorage.getItem("session_user"),
+    localStorage.getItem("user"),
+  ];
 
-  try {
-    const parsed = JSON.parse(raw) as { userId?: unknown; id?: unknown; campId?: unknown; camp_id?: unknown; rol?: unknown; role?: unknown; camp?: { id?: unknown } };
-    const userId = Number(parsed.userId ?? parsed.id);
-    const campId = Number(parsed.campId ?? parsed.camp_id ?? parsed.camp?.id);
-    const role = String(parsed.rol ?? parsed.role ?? "").toUpperCase();
+  let userId = 0;
+  let campId = Number.isFinite(campIdFromStorage) && campIdFromStorage > 0 ? campIdFromStorage : 0;
 
-    if (!Number.isFinite(userId) || !Number.isFinite(campId) || role !== "RESOURCE_MANAGEMENT") {
-      return null;
+  for (const raw of rawSources) {
+    if (!raw) continue;
+
+    try {
+      const parsed = JSON.parse(raw) as { userId?: unknown; id?: unknown; campId?: unknown; selectedCampId?: unknown; camp_id?: unknown; rol?: unknown; role?: unknown; camp?: { id?: unknown } };
+      const parsedUserId = Number(parsed.userId ?? parsed.id);
+      const parsedCampId = Number(parsed.selectedCampId ?? parsed.campId ?? parsed.camp_id ?? parsed.camp?.id);
+      const role = String(parsed.rol ?? parsed.role ?? "").toUpperCase();
+
+      if (Number.isFinite(parsedUserId) && parsedUserId > 0) {
+        userId = parsedUserId;
+      }
+      if (Number.isFinite(parsedCampId) && parsedCampId > 0) {
+        campId = parsedCampId;
+      }
+
+      if (role === "RESOURCE_MANAGEMENT" && userId > 0 && campId > 0) {
+        return {
+          userId,
+          campId,
+          rol: "RESOURCE_MANAGEMENT" as const,
+        };
+      }
+    } catch {
+      // Ignore malformed session data and continue to the next source.
     }
+  }
 
+  if (userId > 0 && campId > 0) {
     return {
       userId,
       campId,
       rol: "RESOURCE_MANAGEMENT" as const,
     };
-  } catch {
-    return null;
   }
+
+  return null;
 }
 
 
