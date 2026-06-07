@@ -1464,6 +1464,8 @@ export default function AdminDashboardPage() {
                       onSetDataError={setDataError}
                       onSetModuleFeedback={notifyModule}
                       sessionAdminUser={sessionAdminUser}
+                      currentAdminUserId={positiveNumber(sessionAdminUser.id)}
+                      currentAdminPersonId={positiveNumber(authenticatedPerson?.id) ?? resolveSessionPersonId(sessionAdminUser, persons)}
                       onRefreshAdminProfile={() => { void refreshCurrentUserFromBackend(); }}
                       onProfilePersonUpdated={handleProfilePersonUpdated}
                     />
@@ -1503,6 +1505,8 @@ export default function AdminDashboardPage() {
                         onSetDataError={setDataError}
                         onSetModuleFeedback={notifyModule}
                         sessionAdminUser={sessionAdminUser}
+                        currentAdminUserId={positiveNumber(sessionAdminUser.id)}
+                        currentAdminPersonId={positiveNumber(authenticatedPerson?.id) ?? resolveSessionPersonId(sessionAdminUser, persons)}
                         onRefreshAdminProfile={() => { void refreshCurrentUserFromBackend(); }}
                         onProfilePersonUpdated={handleProfilePersonUpdated}
                       />
@@ -1838,6 +1842,8 @@ function ContentArea({
   onSetDataError,
   onSetModuleFeedback,
   sessionAdminUser,
+  currentAdminUserId,
+  currentAdminPersonId,
   onRefreshAdminProfile,
   onProfilePersonUpdated,
 }: {
@@ -1872,6 +1878,8 @@ function ContentArea({
   onSetDataError: (message: string | null) => void;
   onSetModuleFeedback: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
   sessionAdminUser: SessionAdminUser;
+  currentAdminUserId: number | null;
+  currentAdminPersonId: number | null;
   onRefreshAdminProfile: () => void;
   onProfilePersonUpdated: (person: Person) => void;
 }) {
@@ -2004,7 +2012,8 @@ function ContentArea({
           persons={persons}
           camps={campNameById}
           occupations={occupationNameById}
-          currentAdminId={sessionAdminUser.id ?? null}
+          currentAdminUserId={currentAdminUserId}
+          currentAdminPersonId={currentAdminPersonId}
           onReload={onPopulationReload}
           onError={onSetDataError}
           onNotice={onSetModuleFeedback}
@@ -2074,6 +2083,7 @@ function ContentArea({
           sub={sub}
           profile={sessionAdminUser}
           persons={persons}
+          currentAdminPersonId={currentAdminPersonId}
           onNotice={onSetModuleFeedback}
           onProfileRefresh={onRefreshAdminProfile}
           onReloadPersons={onPopulationReload}
@@ -2402,7 +2412,8 @@ const PopulationModule = memo(function PopulationModule({
   persons,
   camps,
   occupations,
-  currentAdminId,
+  currentAdminUserId,
+  currentAdminPersonId,
   onReload,
   onError,
   onNotice,
@@ -2411,7 +2422,8 @@ const PopulationModule = memo(function PopulationModule({
   persons: Person[];
   camps: Map<number, string>;
   occupations: Map<number, string>;
-  currentAdminId: number | null;
+  currentAdminUserId: number | null;
+  currentAdminPersonId: number | null;
   onReload: () => Promise<void>;
   onError: (message: string | null) => void;
   onNotice: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
@@ -2565,6 +2577,7 @@ const PopulationModule = memo(function PopulationModule({
   const activeAssignments = assignments.filter((item) => item.status === "ACTIVA");
   const historicalAssignments = assignments.filter((item) => item.status === "FINALIZADA");
   const activeAssignedPersonIds = new Set(activeAssignments.map((assignment) => assignment.personId));
+  const isCurrentAdminPerson = (personId: number) => currentAdminPersonId !== null && personId === currentAdminPersonId;
   const availableTempCandidates = assignCandidates.filter((person) => !activeAssignedPersonIds.has(person.id));
   const occupationOptions = Array.from(occupations.entries());
   const quickSelectedPerson = quickPersonId === null ? null : availableTempCandidates.find((person) => person.id === quickPersonId) ?? null;
@@ -2617,6 +2630,11 @@ const PopulationModule = memo(function PopulationModule({
   }, [userPage, userTotalPages]);
 
   const openPersonModal = (person: Person, editMode: boolean) => {
+    if (editMode && isCurrentAdminPerson(person.id)) {
+      onNotice("poblacion", "warning", "Tu propio perfil se edita desde Configuracion.");
+      editMode = false;
+    }
+
     const normalizedLastName = String(person.lastName ?? "").trim();
     const lastNameParts = normalizedLastName.split(/\s+/).filter(Boolean);
     const lastName1 = lastNameParts[0] ?? "";
@@ -2643,6 +2661,11 @@ const PopulationModule = memo(function PopulationModule({
   };
 
   const handleDeletePerson = async (personId: number) => {
+    if (isCurrentAdminPerson(personId)) {
+      onNotice("poblacion", "error", "No puedes eliminar tu propio registro desde Poblacion.");
+      return;
+    }
+
     if (!window.confirm("¿Eliminar este registro de persona?")) return;
     setIsSaving(true);
     onError(null);
@@ -2661,12 +2684,10 @@ const PopulationModule = memo(function PopulationModule({
   const handleSavePerson = async () => {
     if (!selectedPerson) return;
 
-    const isSelfAccountEdit = currentAdminId !== null && selectedPerson.id === currentAdminId;
-    const originalAccountStatus = normalizeAccountStatus(selectedPerson.accountStatus);
-    const requestedAccountStatus = normalizeAccountStatus(editForm.accountStatus);
+    const isSelfAccountEdit = isCurrentAdminPerson(selectedPerson.id);
 
-    if (isSelfAccountEdit && requestedAccountStatus !== originalAccountStatus) {
-      onNotice("poblacion", "error", "No puedes cambiar el estado de tu propia cuenta. Debe hacerlo otro administrador.");
+    if (isSelfAccountEdit) {
+      onNotice("poblacion", "error", "Tu propio perfil se edita desde Configuracion, no desde Poblacion.");
       return;
     }
 
@@ -2757,7 +2778,7 @@ const PopulationModule = memo(function PopulationModule({
           personId: person.id,
           temporaryOccupationId: tempOccupationId,
           reason: reason.trim() || "Asignación temporal",
-          assignedBy: currentAdminId ?? 1,
+          assignedBy: currentAdminUserId ?? 1,
           startDate: normalizedStartDate,
           endDate: normalizedEndDate,
         }),
@@ -2954,6 +2975,7 @@ const PopulationModule = memo(function PopulationModule({
             <tbody>
               {pagedPersons.map((person) => {
                 const profileImage = resolvePersonProfileImage(person);
+                const isOwnRecord = isCurrentAdminPerson(person.id);
                 return (
                   <tr key={person.id}>
                     <td>
@@ -2992,8 +3014,8 @@ const PopulationModule = memo(function PopulationModule({
                     <td>
                       <div className="admin-ui-v2-actions">
                         <button className="admin-ui-v2-btn" onClick={() => openPersonModal(person, false)} type="button">Ver</button>
-                        <button className="admin-ui-v2-btn is-info" onClick={() => openPersonModal(person, true)} type="button">Editar</button>
-                        <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(person.id)} type="button">Eliminar</button>
+                        <button className="admin-ui-v2-btn is-info" onClick={() => openPersonModal(person, true)} type="button" disabled={isOwnRecord} title={isOwnRecord ? "Edita tu perfil desde Configuracion" : undefined}>Editar</button>
+                        <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(person.id)} type="button" disabled={isOwnRecord} title={isOwnRecord ? "No puedes eliminar tu propio registro" : undefined}>Eliminar</button>
                       </div>
                     </td>
                   </tr>
@@ -3340,15 +3362,11 @@ const PopulationModule = memo(function PopulationModule({
                   className="v-select"
                   value={editForm.accountStatus}
                   onChange={(event) => setEditForm((prev) => ({ ...prev, accountStatus: event.target.value as "ACTIVE" | "BLOCKED" | "INACTIVE" }))}
-                  disabled={currentAdminId !== null && selectedPerson.id === currentAdminId}
                 >
                   <option value="ACTIVE">Cuenta activa</option>
                   <option value="BLOCKED">Cuenta bloqueada</option>
                   <option value="INACTIVE">Cuenta inactiva</option>
                 </select>
-                {currentAdminId !== null && selectedPerson.id === currentAdminId && (
-                  <div className="admin-ui-v2-muted">No puedes cambiar el estado de tu propia cuenta.</div>
-                )}
                 <div className="v-input" aria-readonly="true">
                   {camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}
                 </div>
@@ -3369,13 +3387,16 @@ const PopulationModule = memo(function PopulationModule({
                 <div><strong>Edad:</strong> {selectedPerson.age}</div>
                 <div><strong>Estado:</strong> {normalizeStatusLabel(selectedPerson.status)}</div>
                 <div><strong>Estado de cuenta:</strong> {selectedPerson.accountStatus ?? "ACTIVE"}</div>
-                <div><strong>Rol:</strong> {occupations.get(selectedPerson.occupationId) ?? `Ocupación #${selectedPerson.occupationId}`}</div>
+                <div><strong>Rol:</strong> {resolvePersonOccupationLabel(selectedPerson, occupations)}</div>
                 <div><strong>Sector:</strong> {camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}</div>
                 <div><strong>Ingreso:</strong> {new Date(selectedPerson.admissionDate).toLocaleDateString("es-CR")}</div>
                 <div><strong>Notas:</strong> {selectedPerson.notes || "Sin notas"}</div>
                 <div className="admin-ui-v2-actions">
-                  <button className="admin-ui-v2-btn is-info" onClick={() => setIsEditMode(true)} type="button">Editar</button>
-                  <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(selectedPerson.id)} type="button" disabled={isSaving}>Eliminar</button>
+                  {isCurrentAdminPerson(selectedPerson.id) && (
+                    <div className="admin-ui-v2-muted">Tu propio perfil se edita desde Configuracion.</div>
+                  )}
+                  <button className="admin-ui-v2-btn is-info" onClick={() => setIsEditMode(true)} type="button" disabled={isCurrentAdminPerson(selectedPerson.id)}>Editar</button>
+                  <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(selectedPerson.id)} type="button" disabled={isSaving || isCurrentAdminPerson(selectedPerson.id)}>Eliminar</button>
                 </div>
               </div>
             )}
@@ -3651,6 +3672,7 @@ const SettingsModule = memo(function SettingsModule({
   sub,
   profile,
   persons,
+  currentAdminPersonId,
   onNotice,
   onProfileRefresh,
   onReloadPersons,
@@ -3659,6 +3681,7 @@ const SettingsModule = memo(function SettingsModule({
   sub: string;
   profile: SessionAdminUser;
   persons: Person[];
+  currentAdminPersonId: number | null;
   onNotice: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
   onProfileRefresh: () => void;
   onReloadPersons: () => Promise<void>;
@@ -3671,6 +3694,9 @@ const SettingsModule = memo(function SettingsModule({
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [photoInputKey, setPhotoInputKey] = useState(0);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{ type: ModuleMessageType; text: string } | null>(null);
+  const [profileForm, setProfileForm] = useState({ firstName: "", lastName1: "", lastName2: "" });
   const [photoMessage, setPhotoMessage] = useState<{ type: ModuleMessageType; text: string } | null>(null);
   const [systemTime, setSystemTime] = useState<string | null>(null);
   const [timeOffset, setTimeOffset] = useState<SystemTimeOffset | null>(null);
@@ -3681,6 +3707,7 @@ const SettingsModule = memo(function SettingsModule({
   const [advanceResult, setAdvanceResult] = useState<AdvanceSystemTimeResult | null>(null);
   const resolvedProfilePerson = useMemo(() => resolveSessionPerson(profile, persons), [profile, persons]);
   const resolvedProfilePersonId = useMemo(() => resolveSessionPersonId(profile, persons), [profile, persons]);
+  const editableProfilePersonId = currentAdminPersonId ?? resolvedProfilePersonId ?? profile.personId ?? profile.person_id ?? null;
 
   const currentProfilePhoto = useMemo(
     () =>
@@ -3691,6 +3718,16 @@ const SettingsModule = memo(function SettingsModule({
     () => resolveInitials([profile.firstName, profile.lastName1, profile.lastName2, profile.displayName, profile.username], 3),
     [profile.firstName, profile.lastName1, profile.lastName2, profile.displayName, profile.username],
   );
+
+  useEffect(() => {
+    const sourcePerson = resolvedProfilePerson;
+    const fallbackLastName = String(sourcePerson?.lastName ?? "").trim().split(/\s+/).filter(Boolean);
+    setProfileForm({
+      firstName: sourcePerson?.firstName ?? profile.firstName ?? "",
+      lastName1: sourcePerson?.lastName1 ?? fallbackLastName[0] ?? profile.lastName1 ?? "",
+      lastName2: sourcePerson?.lastName2 ?? fallbackLastName.slice(1).join(" ") ?? profile.lastName2 ?? "",
+    });
+  }, [profile.firstName, profile.lastName1, profile.lastName2, resolvedProfilePerson]);
 
   const loadSystemTimeControls = useCallback(async () => {
     setIsLoadingTime(true);
@@ -3771,6 +3808,50 @@ const SettingsModule = memo(function SettingsModule({
       }
     };
   }, [photoPreviewUrl]);
+
+  const handleProfileDataSave = async () => {
+    if (isSavingProfile) return;
+    const profilePersonId = positiveNumber(editableProfilePersonId);
+    if (profilePersonId === null) {
+      setProfileMessage({ type: "error", text: "No se encontro una persona vinculada a tu usuario." });
+      onNotice("configuracion", "error", "No se encontro una persona vinculada a tu usuario.");
+      return;
+    }
+
+    const normalizedFirstName = profileForm.firstName.trim();
+    const normalizedLastName1 = profileForm.lastName1.trim();
+    const normalizedLastName2 = profileForm.lastName2.trim();
+
+    if (!normalizedFirstName || !normalizedLastName1) {
+      setProfileMessage({ type: "warning", text: "Nombre y primer apellido son requeridos." });
+      onNotice("configuracion", "warning", "Nombre y primer apellido son requeridos.");
+      return;
+    }
+
+    setIsSavingProfile(true);
+    setProfileMessage({ type: "info", text: "Guardando datos de perfil..." });
+    try {
+      const payload = {
+        name: normalizedFirstName,
+        firstName: normalizedFirstName,
+        lastName: [normalizedLastName1, normalizedLastName2].filter(Boolean).join(" "),
+        lastName1: normalizedLastName1,
+        lastName2: normalizedLastName2 || null,
+      };
+      await updatePerson(profilePersonId, payload);
+      const refreshedPerson = await fetchPersonById(profilePersonId);
+      onProfilePersonUpdated(refreshedPerson);
+      onProfileRefresh();
+      setProfileMessage({ type: "success", text: "Datos de perfil actualizados correctamente." });
+      onNotice("configuracion", "success", "Datos de perfil actualizados correctamente.");
+    } catch (error) {
+      const message = getErrorMessage(error, "update_person");
+      setProfileMessage({ type: "error", text: message });
+      onNotice("configuracion", "error", message);
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   const handlePhotoSelection = (event: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0] ?? null;
@@ -3908,20 +3989,40 @@ const SettingsModule = memo(function SettingsModule({
                 </div>
 
                 <label className="admin-ui-v2-muted">Primer nombre</label>
-                <div className="v-input" aria-readonly="true">
-                  {profile.firstName || "-"}
-                </div>
+                <input
+                  className="v-input"
+                  value={profileForm.firstName}
+                  onChange={(event) => setProfileForm((prev) => ({ ...prev, firstName: event.target.value }))}
+                  disabled={isSavingProfile}
+                />
 
                 <label className="admin-ui-v2-muted">Primer apellido</label>
-                <div className="v-input" aria-readonly="true">
-                  {profile.lastName1 || "-"}
-                </div>
+                <input
+                  className="v-input"
+                  value={profileForm.lastName1}
+                  onChange={(event) => setProfileForm((prev) => ({ ...prev, lastName1: event.target.value }))}
+                  disabled={isSavingProfile}
+                />
 
                 <label className="admin-ui-v2-muted">Segundo apellido</label>
-                <div className="v-input" aria-readonly="true">
-                  {profile.lastName2 || "-"}
-                </div>
+                <input
+                  className="v-input"
+                  value={profileForm.lastName2}
+                  onChange={(event) => setProfileForm((prev) => ({ ...prev, lastName2: event.target.value }))}
+                  disabled={isSavingProfile}
+                />
 
+              </div>
+
+              <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
+                <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void handleProfileDataSave()} disabled={isSavingProfile}>
+                  {isSavingProfile ? "Guardando perfil..." : "Guardar datos de perfil"}
+                </button>
+                <button className="admin-ui-v2-btn" type="button" onClick={onProfileRefresh} disabled={isSavingProfile}>Actualizar datos de autenticacion</button>
+              </div>
+
+              <div className={`admin-ui-v2-settings-photo-message is-${profileMessage?.type ?? "info"}`}>
+                {profileMessage?.text ?? "Estos datos corresponden a tu persona vinculada y solo se editan desde Configuracion."}
               </div>
             </div>
 
@@ -4079,12 +4180,6 @@ const SettingsModule = memo(function SettingsModule({
           </>
         )}
       </div>
-
-      {sub === "Campamento" && (
-        <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
-          <button className="admin-ui-v2-btn is-info" type="button" onClick={onProfileRefresh}>Actualizar datos de autenticacion</button>
-        </div>
-      )}
     </div>
   );
 });
