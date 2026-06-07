@@ -4,6 +4,7 @@ export interface Camp {
   name: string;
   location: string;
   personnelCount: number;
+  maxPersonCapacity?: number;
 }
 
 export interface ResourceType {
@@ -22,16 +23,16 @@ export interface CampInventory {
 }
 
 export interface DailyCollectionRecord {
-  id: number;
-  campId: number;
-  personId: number;
-  resourceTypeId: number;
+  id: string | number;
+  campId: string | number;
+  personId: string | number;
+  resourceTypeId: string | number;
   date: string;
-  expectedAmount: string;
-  actualAmount: string;
+  expectedAmount: string | number;
+  actualAmount: string | number;
   differenceReason: string | null;
-  recordedBy: number;
-  movementId: number | null;
+  recordedBy: string | number;
+  movementId: string | number | null;
 }
 
 export interface InventoryMovement {
@@ -63,7 +64,7 @@ export interface IntercampRequest {
   id: string;
   originCampId: string;
   destinationCampId: string;
-  status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELED";
+  status: "DRAFT" | "PENDING" | "APPROVED" | "REJECTED" | "CANCELED";
   description: string;
   plannedDepartureDate: string;
   plannedArrivalDate: string;
@@ -72,6 +73,16 @@ export interface IntercampRequest {
   responseDate?: string;
   createdBy: string;
   respondedBy?: string;
+}
+
+export interface RequestPersonDetail {
+  id: string;
+  requestId: string;
+  detailType: "BY_OCCUPATION" | "SPECIFIC";
+  personId: string | null;
+  occupationId: string | null;
+  amount: number;
+  status: "PROPOSED" | "CONFIRMED" | "REJECTED";
 }
 
 export interface RequestResourceDetail {
@@ -89,7 +100,7 @@ export interface Transfer {
   actualDepartureDate?: string;
   plannedArrivalDate: string;
   actualArrivalDate?: string;
-  status: "PLANNING" | "EN_ROUTE" | "DELIVERED" | "PENDING_DEPARTURE" | "COMPLETED" | "CANCELED";
+  status: "PLANNING" | "EN_ROUTE" | "DELIVERED" | "PENDING_DEPARTURE" | "IN_TRANSIT" | "COMPLETED" | "CANCELED";
   departureApprovedBy?: string;
   arrivalApprovedBy?: string;
   rationsForTrip: number;
@@ -103,6 +114,14 @@ export interface TransferPerson {
   status: "CONFIRMED" | "IN_TRANSIT" | "DELIVERED" | "CANCELED";
   departureDate?: string;
   arrivalDate?: string;
+}
+
+export interface CampPerson {
+  id: string;
+  name: string;
+  campId: string;
+  status: "ACTIVE" | "SICK" | "INJURED" | "OUTSIDE_CAMP" | "ON_EXPEDITION" | string;
+  occupationId: string;
 }
 
 export interface TransferHistory {
@@ -141,6 +160,8 @@ export interface Occupation {
   id: string;
   name: string;
   description: string;
+  collects_resources?: boolean;
+  resource_type_id?: string;
 }
 
 export interface OccupationCoverage {
