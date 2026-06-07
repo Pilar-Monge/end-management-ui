@@ -303,6 +303,7 @@ export function MainHomePage() {
       localStorage.setItem('accessToken', token)
       window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
       localStorage.setItem('user', JSON.stringify(normalizedUser))
+      localStorage.removeItem('admin_settings_v2')
       localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(response.user.campId))
 
       const redirectPath = getPostLoginRoute(normalizedUser.role, {

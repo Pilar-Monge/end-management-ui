@@ -31,6 +31,7 @@ export class SessionService {
     localStorage.removeItem('token')
     localStorage.removeItem('accessToken')
     localStorage.removeItem('user')
+    localStorage.removeItem('admin_settings_v2')
     window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
   }
 

@@ -775,27 +775,15 @@ function achievementDateLabel(value?: string | null): string {
 function readSessionAdminUser(): SessionAdminUser {
   try {
     const rawUser = localStorage.getItem("user");
-    const rawSettings = localStorage.getItem("admin_settings_v2");
-
     const parsedUser = rawUser ? (JSON.parse(rawUser) as SessionAdminUser) : {};
-    const parsedSettings = rawSettings ? (JSON.parse(rawSettings) as Record<string, unknown>) : {};
+    if (!parsedUser || typeof parsedUser !== "object") return {};
 
-    const resolvedUser: SessionAdminUser =
-      parsedUser && typeof parsedUser === "object" ? parsedUser : {};
-
-    if (parsedSettings && typeof parsedSettings === "object") {
-      if (typeof parsedSettings.firstName === "string") {
-        resolvedUser.firstName = parsedSettings.firstName;
-      }
-      if (typeof parsedSettings.lastName1 === "string") {
-        resolvedUser.lastName1 = parsedSettings.lastName1;
-      }
-      if (typeof parsedSettings.lastName2 === "string") {
-        resolvedUser.lastName2 = parsedSettings.lastName2;
-      }
-    }
-
-    return resolvedUser;
+    const sessionUser = { ...parsedUser };
+    delete sessionUser.firstName;
+    delete sessionUser.lastName1;
+    delete sessionUser.lastName2;
+    delete sessionUser.displayName;
+    return sessionUser;
   } catch {
     return {};
   }
@@ -948,6 +936,10 @@ export default function AdminDashboardPage() {
 
     setSessionAdminUser((prev) => ({
       ...prev,
+      firstName: undefined,
+      lastName1: undefined,
+      lastName2: undefined,
+      displayName: undefined,
       id: positiveNumber(user.id) ?? prev.id,
       userId: positiveNumber(user.id) ?? prev.userId,
       username: user.username ?? prev.username,
@@ -982,6 +974,10 @@ export default function AdminDashboardPage() {
         delete nextUser.profileImage;
         delete nextUser.avatar;
         delete nextUser.photo;
+        delete nextUser.firstName;
+        delete nextUser.lastName1;
+        delete nextUser.lastName2;
+        delete nextUser.displayName;
         localStorage.setItem("user", JSON.stringify(nextUser));
       } catch {
         // Ignore malformed cached user; runtime state already came from backend.
@@ -1135,6 +1131,8 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (!hasEntered) return;
+
+    localStorage.removeItem("admin_settings_v2");
 
     refreshCurrentUserFromBackend().catch((error) => {
       console.warn("Failed to refresh current user profile", error);
@@ -1291,6 +1289,7 @@ export default function AdminDashboardPage() {
     localStorage.removeItem("token");
     localStorage.removeItem("accessToken");
     localStorage.removeItem("user");
+    localStorage.removeItem("admin_settings_v2");
     window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT));
     navigate("/");
   };
@@ -1310,8 +1309,8 @@ export default function AdminDashboardPage() {
   const adminProfile = useMemo<AdminProfileSummary>(() => {
     const sessionUser = sessionAdminUser;
     const matchedPerson = resolveSessionPerson(sessionUser, persons);
-    const firstName = sessionUser.firstName?.trim() || matchedPerson?.firstName || "Administrador";
-    const lastName1 = sessionUser.lastName1?.trim() || matchedPerson?.lastName || "";
+    const firstName = matchedPerson?.firstName || sessionUser.firstName?.trim() || "Administrador";
+    const lastName1 = matchedPerson?.lastName || sessionUser.lastName1?.trim() || "";
     const lastName2 = sessionUser.lastName2?.trim() || "";
     const fullName = [firstName, lastName1, lastName2].filter(Boolean).join(" ").trim();
     const displayName = fullName || sessionUser.username?.trim() || (matchedPerson ? personFullName(matchedPerson) : "Administrador");
@@ -3649,24 +3648,6 @@ const SettingsModule = memo(function SettingsModule({
   const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
   const ALLOWED_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
   const SYSTEM_TIME_LIMITS: Record<SystemTimeUnit, number> = { minutes: 1440, hours: 168 };
-
-  const [settings, setSettings] = useState(() => {
-    const base = {
-      firstName: profile.firstName ?? "",
-      lastName1: profile.lastName1 ?? "",
-      lastName2: profile.lastName2 ?? "",
-    };
-
-    const stored = localStorage.getItem("admin_settings_v2");
-    if (!stored) return base;
-
-    try {
-      const parsed = JSON.parse(stored) as Partial<typeof base>;
-      return { ...base, ...parsed };
-    } catch {
-      return base;
-    }
-  });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [photoInputKey, setPhotoInputKey] = useState(0);
@@ -3771,45 +3752,6 @@ const SettingsModule = memo(function SettingsModule({
       }
     };
   }, [photoPreviewUrl]);
-
-  const persistSettings = (nextSettings: typeof settings) => {
-    localStorage.setItem("admin_settings_v2", JSON.stringify(nextSettings));
-
-    const rawUser = localStorage.getItem("user");
-    if (rawUser) {
-      try {
-        const parsed = JSON.parse(rawUser) as Record<string, unknown>;
-        const updated: Record<string, unknown> = {
-          ...parsed,
-          firstName: nextSettings.firstName,
-          lastName1: nextSettings.lastName1,
-          lastName2: nextSettings.lastName2,
-        };
-        const profileName = [nextSettings.firstName, nextSettings.lastName1, nextSettings.lastName2]
-          .map((part) => String(part ?? "").trim())
-          .filter(Boolean)
-          .join(" ");
-        if (profileName) {
-          updated.displayName = profileName;
-        }
-        localStorage.setItem("user", JSON.stringify(updated));
-      } catch {
-        // Ignore malformed cached user
-      }
-    }
-
-    onProfileRefresh();
-    onNotice("configuracion", "success", "Configuracion guardada correctamente.");
-  };
-
-  const handleSave = () => {
-    persistSettings(settings);
-  };
-
-  const handleReset = () => {
-    localStorage.removeItem("admin_settings_v2");
-    onNotice("configuracion", "info", "Se restablecio la configuracion local del panel.");
-  };
 
   const handlePhotoSelection = (event: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0] ?? null;
@@ -3947,25 +3889,19 @@ const SettingsModule = memo(function SettingsModule({
                 </div>
 
                 <label className="admin-ui-v2-muted">Primer nombre</label>
-                <input
-                  className="v-input"
-                  value={settings.firstName}
-                  onChange={(event) => setSettings((prev) => ({ ...prev, firstName: event.target.value }))}
-                />
+                <div className="v-input" aria-readonly="true">
+                  {profile.firstName || "-"}
+                </div>
 
                 <label className="admin-ui-v2-muted">Primer apellido</label>
-                <input
-                  className="v-input"
-                  value={settings.lastName1}
-                  onChange={(event) => setSettings((prev) => ({ ...prev, lastName1: event.target.value }))}
-                />
+                <div className="v-input" aria-readonly="true">
+                  {profile.lastName1 || "-"}
+                </div>
 
                 <label className="admin-ui-v2-muted">Segundo apellido</label>
-                <input
-                  className="v-input"
-                  value={settings.lastName2}
-                  onChange={(event) => setSettings((prev) => ({ ...prev, lastName2: event.target.value }))}
-                />
+                <div className="v-input" aria-readonly="true">
+                  {profile.lastName2 || "-"}
+                </div>
 
               </div>
             </div>
@@ -4127,8 +4063,7 @@ const SettingsModule = memo(function SettingsModule({
 
       {sub === "Campamento" && (
         <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
-          <button className="admin-ui-v2-btn is-info" type="button" onClick={handleSave}>Guardar configuracion</button>
-          <button className="admin-ui-v2-btn" type="button" onClick={handleReset}>Restablecer</button>
+          <button className="admin-ui-v2-btn is-info" type="button" onClick={onProfileRefresh}>Actualizar datos de autenticacion</button>
         </div>
       )}
     </div>

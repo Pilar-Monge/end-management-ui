@@ -100,6 +100,7 @@ export default function LoginPage() {
       localStorage.setItem('token', token)
       localStorage.setItem('accessToken', token)
       localStorage.setItem('user', JSON.stringify(normalizedUser))
+      localStorage.removeItem('admin_settings_v2')
       localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(response.user.campId))
       window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
 
