@@ -36,3 +36,28 @@ export type LoginErrors = Partial<{
   campId: string
   general: string
 }>
+
+export interface PasswordResetRequestPayload {
+  username: string
+  email: string
+  campId: number
+}
+
+export interface PasswordResetConfirmPayload extends PasswordResetRequestPayload {
+  code: string
+  newPassword: string
+}
+
+export interface PasswordResetApiResponse {
+  success?: boolean
+  message?: string
+}
+
+export type PasswordResetErrors = Partial<{
+  username: string
+  email: string
+  code: string
+  newPassword: string
+  confirmPassword: string
+  general: string
+}>
