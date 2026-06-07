@@ -170,7 +170,10 @@ export async function updatePerson(id: number, data: UpdatePersonRequest): Promi
     body: JSON.stringify(data),
   })
 
-  if (!res.ok) throw new Error('Failed to update person')
+  if (!res.ok) {
+    const errorMsg = await readServiceError(res, 'No se pudo actualizar la persona')
+    throw new Error(errorMsg)
+  }
   const payload = await res.json()
   return unwrapPayload<Person>(payload)
 }

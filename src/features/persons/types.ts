@@ -7,6 +7,9 @@ export type PersonStatus =
   | 'INACTIVE'
 
 export type AccountStatus = 'ACTIVE' | 'BLOCKED' | 'INACTIVE'
+export type Gender = 'MALE' | 'FEMALE' | 'OTHER'
+export type SystemRole = 'WORKER' | 'RESOURCE_MANAGEMENT' | 'TRAVEL_MANAGER' | 'SYSTEM_ADMIN'
+export type SystemUserStatus = 'ACTIVE' | 'BLOCKED' | 'INACTIVE'
 
 export interface Person {
   id: number
@@ -17,6 +20,9 @@ export interface Person {
   name?: string
   lastName1?: string | null
   lastName2?: string | null
+  identificationNumber?: string
+  birthDate?: string
+  gender?: Gender
   firstName: string
   lastName: string
   photoUrl?: string | null
@@ -36,17 +42,32 @@ export interface Person {
     name: string
     description?: string | null
   } | null
+  character?: number
   achievementIds: number[]
   admissionDate: string
   notes?: string
   createdAt: string
   updatedAt: string
   accountStatus?: AccountStatus
+  accountRole?: SystemRole
 }
 
 export interface PersonWithStats extends Person {
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH'
   performanceScore: number
+}
+
+export interface SystemUser {
+  id: number
+  personId: number | null
+  requestId?: number | null
+  username: string
+  email?: string
+  status: SystemUserStatus
+  role: SystemRole
+  campId: number
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface PersonsStats {
@@ -68,11 +89,21 @@ export interface CreatePersonRequest {
   notes?: string
 }
 
-export interface UpdatePersonRequest extends Partial<Omit<CreatePersonRequest, 'occupationId'>> {
+export interface UpdatePersonRequest {
+  name?: string
+  lastName1?: string
+  lastName2?: string | null
+  identificationNumber?: string
+  birthDate?: string
+  gender?: Gender
   occupationId?: number | null
-  status?: PersonStatus
   currentStatus?: PersonStatus
-  accountStatus?: AccountStatus
+  character?: number
+}
+
+export interface UpdateSystemUserRequest {
+  role?: SystemRole
+  status?: SystemUserStatus
 }
 
 export interface PersonStatusUpdateRequest {

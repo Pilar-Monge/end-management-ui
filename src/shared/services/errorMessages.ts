@@ -27,6 +27,7 @@ const CONTEXT_DEFAULT_MESSAGES: Record<string, string> = {
 
 export function getErrorMessage(error: unknown, context: string, fallback?: string): string {
   if (error instanceof ApiHttpError) {
+    if (error.details?.trim()) return error.details.trim()
     return HTTP_STATUS_MESSAGES[error.statusCode] ?? (fallback ?? CONTEXT_DEFAULT_MESSAGES[context] ?? 'Ocurrio un error inesperado.')
   }
 

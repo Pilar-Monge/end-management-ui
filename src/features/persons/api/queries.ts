@@ -1,5 +1,5 @@
 import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
-import type { ApiError, Person, PersonStatus, PersonWithStats, PersonsStats } from '../types'
+import type { AccountStatus, ApiError, Gender, Person, PersonStatus, PersonWithStats, PersonsStats, SystemRole } from '../types'
 import { ENDPOINTS, personsKeys } from './keys'
 
 const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('accessToken')
@@ -49,6 +49,31 @@ function normalizePersonStatus(value: unknown): PersonStatus {
   return 'INACTIVE'
 }
 
+function normalizeAccountStatus(value: unknown): AccountStatus | undefined {
+  const normalized = String(value ?? '').toUpperCase()
+  if (normalized === 'ACTIVE') return 'ACTIVE'
+  if (normalized === 'BLOCKED') return 'BLOCKED'
+  if (normalized === 'INACTIVE') return 'INACTIVE'
+  return undefined
+}
+
+function normalizeSystemRole(value: unknown): SystemRole | undefined {
+  const normalized = String(value ?? '').toUpperCase()
+  if (normalized === 'WORKER') return 'WORKER'
+  if (normalized === 'RESOURCE_MANAGEMENT') return 'RESOURCE_MANAGEMENT'
+  if (normalized === 'TRAVEL_MANAGER') return 'TRAVEL_MANAGER'
+  if (normalized === 'SYSTEM_ADMIN') return 'SYSTEM_ADMIN'
+  return undefined
+}
+
+function normalizeGender(value: unknown): Gender | undefined {
+  const normalized = String(value ?? '').toUpperCase()
+  if (normalized === 'MALE') return 'MALE'
+  if (normalized === 'FEMALE') return 'FEMALE'
+  if (normalized === 'OTHER') return 'OTHER'
+  return undefined
+}
+
 function numberFromValue(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   if (typeof value === 'string') {
@@ -64,6 +89,21 @@ function stringFromValue(value: unknown): string | undefined {
 
 function recordFromValue(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null
+}
+
+function ageFromBirthDate(value: unknown): number | undefined {
+  const rawDate = stringFromValue(value)
+  if (!rawDate) return undefined
+  const birthDate = new Date(rawDate)
+  if (Number.isNaN(birthDate.getTime())) return undefined
+
+  const today = new Date()
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const monthDelta = today.getMonth() - birthDate.getMonth()
+  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < birthDate.getDate())) {
+    age -= 1
+  }
+  return age >= 0 ? age : undefined
 }
 
 function normalizeMediaUrl(value: unknown): string | null {
@@ -104,6 +144,7 @@ export function mapPersonRecord(record: unknown): Person {
   const source = record as Record<string, unknown>
   const occupationRecord = recordFromValue(source.occupation)
   const campRecord = recordFromValue(source.camp)
+  const userRecord = recordFromValue(source.systemUser ?? source.user ?? source.account)
 
   const firstName = String(
     source.firstName
@@ -159,14 +200,19 @@ export function mapPersonRecord(record: unknown): Person {
   const photo = normalizeMediaUrl(source.photo)
   const imageUrl = normalizeMediaUrl(source.imageUrl ?? source.image_url)
   const resolvedProfileImage = imageSignedUrl ?? imageUrl ?? photoUrl ?? profileImage ?? avatar ?? photo
+  const birthDateValue = stringFromValue(source.birthDate ?? source.birth_date)
+  const resolvedAge = numberFromValue(source.age ?? source.edad) ?? ageFromBirthDate(birthDateValue) ?? 0
 
   return {
     ...(record as Person),
     id: numberFromValue(source.id) ?? 0,
-    userId: numberFromValue(source.userId ?? source.user_id),
+    userId: numberFromValue(source.userId ?? source.user_id ?? userRecord?.id),
     systemUserId:
       numberFromValue(source.systemUserId ?? source.system_user_id),
     accountId: numberFromValue(source.accountId ?? source.account_id),
+    identificationNumber: stringFromValue(source.identificationNumber ?? source.identification_number) ?? '',
+    birthDate: birthDateValue,
+    gender: normalizeGender(source.gender),
     username: typeof source.username === 'string' ? source.username : typeof source.userName === 'string' ? source.userName : undefined,
     name: firstName,
     lastName1: lastNamePrimary || null,
@@ -175,6 +221,7 @@ export function mapPersonRecord(record: unknown): Person {
     currentStatus: normalizedStatus,
     firstName,
     lastName,
+    age: resolvedAge,
     campId,
     occupationId,
     occupation: occupationName
@@ -184,6 +231,7 @@ export function mapPersonRecord(record: unknown): Person {
           description: occupationDescription,
         }
       : null,
+    character: numberFromValue(source.character),
     photoUrl: resolvedProfileImage,
     profileImage: resolvedProfileImage,
     avatar: resolvedProfileImage,
@@ -192,6 +240,8 @@ export function mapPersonRecord(record: unknown): Person {
     imageSignedUrl: resolvedProfileImage,
     admissionDate: String(admissionDateValue),
     notes: typeof source.notes === 'string' ? source.notes : undefined,
+    accountStatus: normalizeAccountStatus(source.accountStatus ?? source.account_status ?? userRecord?.status),
+    accountRole: normalizeSystemRole(source.accountRole ?? source.account_role ?? source.role ?? source.rol ?? userRecord?.role ?? userRecord?.rol),
   }
 }
 
