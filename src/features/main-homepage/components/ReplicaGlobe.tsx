@@ -482,17 +482,26 @@ const ReplicaGlobe = ({
         }
       `}</style>
 
-      <div
-        className={`absolute inset-0 pointer-events-none transition-all duration-1000 ${isReady ? 'z-[15] opacity-50' : 'z-[80]'}`}
-      >
-        <Canvas
-          camera={{ position: [0, 0, 250], fov: 45 }}
-          style={{ width: '100%', height: '100%' }}
-        >
-          {React.createElement('ambientLight' as any, { intensity: 0.5 })}
-          <ParticleSystem progress={formationProgress} isReady={isReady} />
-        </Canvas>
-      </div>
+      <AnimatePresence>
+        {isLoading && (
+          <motion.div
+            key="particle-canvas"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: isReady ? 0.5 : 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8 }}
+            className={`absolute inset-0 pointer-events-none ${isReady ? 'z-[15]' : 'z-[80]'}`}
+          >
+            <Canvas
+              camera={{ position: [0, 0, 250], fov: 45 }}
+              style={{ width: '100%', height: '100%' }}
+            >
+              {React.createElement('ambientLight' as any, { intensity: 0.5 })}
+              <ParticleSystem progress={formationProgress} isReady={isReady} />
+            </Canvas>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {!isReady && (
