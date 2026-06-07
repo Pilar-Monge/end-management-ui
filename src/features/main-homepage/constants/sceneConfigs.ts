@@ -175,7 +175,7 @@ export const LIGHT_CONFIG = {
 }
 
 export const GLTF_URLS = {
-  sign: 'https://tuieldonbxswmopvyryx.supabase.co/storage/v1/object/public/1.principal/quarantine_sign.glb',
-  lightPole: 'https://tuieldonbxswmopvyryx.supabase.co/storage/v1/object/public/1.principal/ligthpole.glb',
-  areaSign: 'https://tuieldonbxswmopvyryx.supabase.co/storage/v1/object/public/1.principal/areasing.glb',
+  sign: 'https://pub-9d9e76b894c2469985b070f298268aad.r2.dev/3d-models-intro/quarantine_sign%20(1).glb',
+  lightPole: 'https://pub-9d9e76b894c2469985b070f298268aad.r2.dev/3d-models-intro/ligthpole%20(1).glb',
+  areaSign: 'https://pub-9d9e76b894c2469985b070f298268aad.r2.dev/3d-models-intro/areasing%20(1).glb',
 }
