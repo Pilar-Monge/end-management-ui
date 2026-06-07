@@ -25,8 +25,12 @@ export interface LoginApiResponse {
   accessToken?: string
   user: {
     id: number
+    personId?: number
+    person_id?: number
+    userId?: number
     username: string
     rol: string
+    role?: string
     campId: number
   }
 }

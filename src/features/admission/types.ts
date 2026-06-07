@@ -33,6 +33,7 @@ export interface AdmissionRequest {
   birthDate: string
   gender: 'MALE' | 'FEMALE' | 'OTHER'
   photoUrl: string | null
+  photoSignedUrl?: string | null
   declaredHealthLevel: string | null
   previousExperience: string | null
   physicalCondition: string | null

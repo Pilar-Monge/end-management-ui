@@ -21,6 +21,7 @@ export interface Person {
   avatar?: string | null
   photo?: string | null
   imageUrl?: string | null
+  imageSignedUrl?: string | null
   alias?: string
   age: number
   status: PersonStatus

@@ -53,13 +53,33 @@ function normalizeMediaUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
   if (!trimmed) return null
-  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  if (!/^https?:\/\//i.test(trimmed)) return null
 
   try {
-    return new URL(trimmed, API_ORIGIN).toString()
+    const url = new URL(trimmed)
+    if (url.origin === API_ORIGIN && /^\/(person-photos|admission-photos)\//i.test(url.pathname)) {
+      return null
+    }
+    return url.toString()
   } catch {
     return null
   }
+}
+
+export interface AuthMeProfileUser {
+  id: number
+  username?: string
+  role?: string
+  rol?: string
+  campId?: number
+  personId?: number
+  person_id?: number
+  person?: Person | null
+}
+
+export interface AuthMeProfile {
+  user: AuthMeProfileUser
+  person: Person | null
 }
 
 function mapPersonRecord(record: unknown): Person {
@@ -102,12 +122,13 @@ function mapPersonRecord(record: unknown): Person {
     ?? source.createdAt
     ?? new Date().toISOString()
 
+  const imageSignedUrl = normalizeMediaUrl(source.imageSignedUrl ?? source.image_signed_url)
   const photoUrl = normalizeMediaUrl(source.photoUrl ?? source.photo_url)
   const profileImage = normalizeMediaUrl(source.profileImage ?? source.profile_image ?? source.profilePhoto ?? source.profile_photo)
   const avatar = normalizeMediaUrl(source.avatar)
   const photo = normalizeMediaUrl(source.photo)
   const imageUrl = normalizeMediaUrl(source.imageUrl ?? source.image_url)
-  const resolvedProfileImage = photoUrl ?? profileImage ?? avatar ?? photo ?? imageUrl
+  const resolvedProfileImage = imageSignedUrl ?? imageUrl ?? photoUrl ?? profileImage ?? avatar ?? photo
 
   return {
     ...(record as Person),
@@ -129,8 +150,47 @@ function mapPersonRecord(record: unknown): Person {
     avatar: resolvedProfileImage,
     photo: resolvedProfileImage,
     imageUrl: resolvedProfileImage,
+    imageSignedUrl: resolvedProfileImage,
     admissionDate: String(admissionDateValue),
     notes: typeof source.notes === 'string' ? source.notes : undefined,
+  }
+}
+
+function numberFromValue(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return undefined
+}
+
+function stringFromValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+export async function fetchAuthMeProfile(): Promise<AuthMeProfile> {
+  const res = await fetch(`${API_BASE}/auth/me`, { headers: buildHeaders() })
+  if (!res.ok) throw new Error('Failed to fetch current profile')
+
+  const payload = await res.json()
+  const data = unwrapPayload<Record<string, unknown>>(payload)
+  const rawPerson = data.person && typeof data.person === 'object' ? data.person : null
+  const person = rawPerson ? mapPersonRecord(rawPerson) : null
+  const personId = numberFromValue(data.personId ?? data.person_id) ?? (person ? numberFromValue(person.id) : undefined)
+
+  return {
+    user: {
+      id: numberFromValue(data.id) ?? 0,
+      username: stringFromValue(data.username),
+      role: stringFromValue(data.role),
+      rol: stringFromValue(data.rol),
+      campId: numberFromValue(data.campId ?? data.camp_id),
+      personId,
+      person_id: personId,
+      person,
+    },
+    person,
   }
 }
 

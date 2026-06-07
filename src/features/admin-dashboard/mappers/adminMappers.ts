@@ -21,6 +21,8 @@ type UiAdmission = {
   suggestedOccupationId?: number
   finalOccupationId?: number
   rejectionReason?: string
+  photoUrl?: string | null
+  photoSignedUrl?: string | null
 }
 
 type UiNotification = {
@@ -192,6 +194,8 @@ export function mapAdmissionFromApi(item: AdminAdmissionRequest): UiAdmission {
     suggestedOccupationId: item.suggestedOccupationId ?? item.oficioSugeridoId,
     finalOccupationId: item.finalOccupationId ?? item.oficioFinalId,
     rejectionReason: item.rejectionReason ?? undefined,
+    photoUrl: item.photoUrl ?? item.photo_url ?? null,
+    photoSignedUrl: item.photoSignedUrl ?? item.photo_signed_url ?? item.photoUrl ?? item.photo_url ?? null,
   }
 }
 

@@ -10,6 +10,15 @@ import { ENDPOINTS, personsKeys } from './keys'
 
 const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('accessToken')
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+const API_ORIGIN = (() => {
+  try {
+    return new URL(API_BASE).origin
+  } catch {
+    return 'http://localhost:3000'
+  }
+})()
+
 function buildHeaders(): HeadersInit {
   const token = getToken()
   return {
@@ -30,6 +39,85 @@ function unwrapPayload<T>(payload: unknown): T {
     return (payload as { data: T }).data
   }
   return payload as T
+}
+
+function normalizeMediaUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (!/^https?:\/\//i.test(trimmed)) return null
+
+  try {
+    const url = new URL(trimmed)
+    if (url.origin === API_ORIGIN && /^\/(person-photos|admission-photos)\//i.test(url.pathname)) {
+      return null
+    }
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+function resolveProfilePhotoFromRecord(record: unknown, depth = 0): string | null {
+  if (!record || typeof record !== 'object') return null
+  if (depth > 3) return null
+  const source = record as Record<string, unknown>
+  const directPhoto =
+    normalizeMediaUrl(source.imageSignedUrl ?? source.image_signed_url) ??
+    normalizeMediaUrl(source.signedImageUrl ?? source.signed_image_url) ??
+    normalizeMediaUrl(source.signedUrl ?? source.signed_url) ??
+    normalizeMediaUrl(source.photoSignedUrl ?? source.photo_signed_url) ??
+    normalizeMediaUrl(source.url) ??
+    normalizeMediaUrl(source.secureUrl ?? source.secure_url) ??
+    normalizeMediaUrl(source.publicUrl ?? source.public_url) ??
+    normalizeMediaUrl(source.downloadUrl ?? source.download_url) ??
+    normalizeMediaUrl(source.imageUrl ?? source.image_url) ??
+    normalizeMediaUrl(source.photoUrl ?? source.photo_url) ??
+    normalizeMediaUrl(source.profileImage ?? source.profile_image ?? source.profilePhoto ?? source.profile_photo) ??
+    normalizeMediaUrl(source.avatar) ??
+    normalizeMediaUrl(source.photo)
+
+  if (directPhoto) return directPhoto
+
+  for (const value of Object.values(source)) {
+    const nestedPhoto = resolveProfilePhotoFromRecord(value, depth + 1)
+    if (nestedPhoto) return nestedPhoto
+  }
+
+  return null
+}
+
+function numberFromValue(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed) && parsed > 0) return parsed
+  }
+  return null
+}
+
+function resolveProfilePersonIdFromRecord(record: unknown, depth = 0): number | null {
+  if (!record || typeof record !== 'object') return null
+  if (depth > 3) return null
+
+  const source = record as Record<string, unknown>
+  const explicitPersonId = numberFromValue(source.personId ?? source.person_id ?? source.profilePersonId ?? source.profile_person_id)
+  if (explicitPersonId !== null) return explicitPersonId
+
+  for (const key of ['person', 'profile', 'data', 'user'] as const) {
+    const nestedId = resolveProfilePersonIdFromRecord(source[key], depth + 1)
+    if (nestedId !== null) return nestedId
+  }
+
+  const directId = numberFromValue(source.id)
+  if (directId !== null) return directId
+
+  for (const value of Object.values(source)) {
+    const nestedId = resolveProfilePersonIdFromRecord(value, depth + 1)
+    if (nestedId !== null) return nestedId
+  }
+
+  return null
 }
 
 async function readServiceError(response: Response, fallback: string): Promise<string> {
@@ -105,7 +193,27 @@ export async function updatePersonPhoto(id: number, photo: File): Promise<Person
   }
 
   const payload = await res.json()
-  return unwrapPayload<Person>(payload)
+  const data = unwrapPayload<Person>(payload)
+  const resolvedPhotoUrl = resolveProfilePhotoFromRecord(data) ?? resolveProfilePhotoFromRecord(payload)
+  const resolvedPersonId = resolveProfilePersonIdFromRecord(data) ?? resolveProfilePersonIdFromRecord(payload) ?? numberFromValue(id)
+
+  if (!resolvedPhotoUrl) {
+    return {
+      ...data,
+      ...(resolvedPersonId !== null ? { id: resolvedPersonId } : {}),
+    }
+  }
+
+  return {
+    ...data,
+    id: resolvedPersonId ?? data.id ?? id,
+    imageSignedUrl: resolvedPhotoUrl,
+    imageUrl: resolvedPhotoUrl,
+    photoUrl: resolvedPhotoUrl,
+    profileImage: resolvedPhotoUrl,
+    avatar: resolvedPhotoUrl,
+    photo: resolvedPhotoUrl,
+  }
 }
 
 export function useUpdatePersonPhoto(

@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { WorldMap } from "../../expeditions-ui/components/WorldMap";
 import type { Person } from "../../persons/types";
+import { fetchAuthMeProfile, fetchPersonById, type AuthMeProfile } from "../../persons/api/queries";
 import { deletePerson, updatePerson, updatePersonPhoto } from "../../persons/api/mutations";
 import type { Camp } from "../../camps/types";
 import type { Occupation } from "../../catalogs/types";
@@ -83,6 +84,8 @@ interface UiAdmission {
   suggestedOccupationId?: number;
   finalOccupationId?: number;
   rejectionReason?: string;
+  photoUrl?: string | null;
+  photoSignedUrl?: string | null;
 }
 
 interface UiExpedition {
@@ -187,6 +190,7 @@ interface SessionAdminUser {
   campId?: number;
   photoUrl?: string;
   imageUrl?: string;
+  imageSignedUrl?: string;
   profileImage?: string;
   avatar?: string;
   photo?: string;
@@ -640,16 +644,33 @@ function personInitials(person: Person): string {
   return resolveInitials([person.firstName, lastNameTokens[0], lastNameTokens[1]], 3);
 }
 
+function normalizeDisplayImageUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || !/^https?:\/\//i.test(trimmed)) return null;
+
+  try {
+    const apiOrigin = new URL(import.meta.env.VITE_API_URL ?? "http://localhost:3000/api").origin;
+    const url = new URL(trimmed);
+    if (url.origin === apiOrigin && /^\/(person-photos|admission-photos)\//i.test(url.pathname)) {
+      return null;
+    }
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 function resolvePersonProfileImage(person: Person | null): string | null {
   if (!person) return null;
-  const candidate =
-    (typeof person.photoUrl === "string" && person.photoUrl.trim()) ||
-    (typeof person.profileImage === "string" && person.profileImage.trim()) ||
-    (typeof person.avatar === "string" && person.avatar.trim()) ||
-    (typeof person.photo === "string" && person.photo.trim()) ||
-    (typeof person.imageUrl === "string" && person.imageUrl.trim()) ||
-    "";
-  return candidate || null;
+  return (
+    normalizeDisplayImageUrl(person.imageSignedUrl) ||
+    normalizeDisplayImageUrl(person.imageUrl) ||
+    normalizeDisplayImageUrl(person.photoUrl) ||
+    normalizeDisplayImageUrl(person.profileImage) ||
+    normalizeDisplayImageUrl(person.avatar) ||
+    normalizeDisplayImageUrl(person.photo)
+  );
 }
 
 function resolveSessionPerson(profile: SessionAdminUser, persons: Person[]): Person | null {
@@ -687,6 +708,29 @@ function resolveSessionPersonId(profile: SessionAdminUser, persons: Person[]): n
   if (typeof profile.personId === "number") return profile.personId;
   if (typeof profile.person_id === "number") return profile.person_id;
   return resolveSessionPerson(profile, persons)?.id ?? null;
+}
+
+function upsertPersonById(persons: Person[], updatedPerson: Person): Person[] {
+  const updatedPersonId = positiveNumber(updatedPerson.id);
+  if (updatedPersonId === null) return persons;
+
+  let found = false;
+  const nextPersons = persons.map((person) => {
+    if (person.id !== updatedPersonId) return person;
+    found = true;
+    return { ...person, ...updatedPerson };
+  });
+
+  return found ? nextPersons : [...nextPersons, updatedPerson];
+}
+
+function positiveNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return null;
 }
 
 function achievementUnlockKey(item: Pick<CampAchievementUnlock, "achievementId" | "unlockedAt">): string {
@@ -767,18 +811,6 @@ function normalizeRoleLabel(role?: string): string {
 }
 
 function resolveAdminProfileImage(sessionUser: SessionAdminUser, matchedPerson: Person | null): string | null {
-  const storedProfileImage =
-    (typeof sessionUser.photoUrl === "string" && sessionUser.photoUrl.trim()) ||
-    (typeof sessionUser.imageUrl === "string" && sessionUser.imageUrl.trim()) ||
-    (typeof sessionUser.profileImage === "string" && sessionUser.profileImage.trim()) ||
-    (typeof sessionUser.avatar === "string" && sessionUser.avatar.trim()) ||
-    (typeof sessionUser.photo === "string" && sessionUser.photo.trim()) ||
-    "";
-
-  if (storedProfileImage) {
-    return storedProfileImage;
-  }
-
   return resolvePersonProfileImage(matchedPerson);
 }
 
@@ -856,6 +888,7 @@ export default function AdminDashboardPage() {
   const bootStartedAtRef = useRef<number>(Date.now());
   const initialCoreLoadStartedRef = useRef(false);
   const preloadedDeferredLoadStartedRef = useRef(false);
+  const currentProfileRefreshKeyRef = useRef<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(!initialBootstrapData);
   const [bootDataProgress, setBootDataProgress] = useState(0);
   const [bootVisualProgress, setBootVisualProgress] = useState(0);
@@ -902,6 +935,69 @@ export default function AdminDashboardPage() {
     setTransfers(data.transfers);
     setDashboardKpi(data.dashboardKpi);
   }, []);
+
+  const handleProfilePersonUpdated = useCallback((updatedPerson: Person) => {
+    setPersons((prev) => upsertPersonById(prev, updatedPerson));
+  }, []);
+
+  const refreshCurrentUserFromBackend = useCallback(async () => {
+    const authProfile: AuthMeProfile = await fetchAuthMeProfile();
+    const { user, person } = authProfile;
+    const resolvedPersonId = positiveNumber(user.personId ?? user.person_id) ?? positiveNumber(person?.id);
+    const resolvedRole = user.role ?? user.rol;
+
+    setSessionAdminUser((prev) => ({
+      ...prev,
+      id: positiveNumber(user.id) ?? prev.id,
+      userId: positiveNumber(user.id) ?? prev.userId,
+      username: user.username ?? prev.username,
+      role: resolvedRole ?? prev.role,
+      campId: positiveNumber(user.campId) ?? person?.campId ?? prev.campId,
+      ...(resolvedPersonId !== null ? { personId: resolvedPersonId, person_id: resolvedPersonId } : {}),
+    }));
+
+    if (person) {
+      handleProfilePersonUpdated(person);
+    }
+
+    const rawUser = localStorage.getItem("user");
+    if (rawUser) {
+      try {
+        const parsed = JSON.parse(rawUser) as Record<string, unknown>;
+        const nextUser: Record<string, unknown> = {
+          ...parsed,
+          id: positiveNumber(user.id) ?? parsed.id,
+          username: user.username ?? parsed.username,
+          role: resolvedRole ?? parsed.role,
+          rol: user.rol ?? user.role ?? parsed.rol,
+          campId: positiveNumber(user.campId) ?? person?.campId ?? parsed.campId,
+        };
+        if (resolvedPersonId !== null) {
+          nextUser.personId = resolvedPersonId;
+          nextUser.person_id = resolvedPersonId;
+        }
+        delete nextUser.imageSignedUrl;
+        delete nextUser.imageUrl;
+        delete nextUser.photoUrl;
+        delete nextUser.profileImage;
+        delete nextUser.avatar;
+        delete nextUser.photo;
+        localStorage.setItem("user", JSON.stringify(nextUser));
+      } catch {
+        // Ignore malformed cached user; runtime state already came from backend.
+      }
+    }
+
+    return authProfile;
+  }, [handleProfilePersonUpdated]);
+
+  const refreshCurrentProfilePerson = useCallback(async () => {
+    const currentPersonId = resolveSessionPersonId(sessionAdminUser, persons);
+    if (currentPersonId === null) return;
+
+    const refreshedPerson = await fetchPersonById(currentPersonId);
+    handleProfilePersonUpdated(refreshedPerson);
+  }, [handleProfilePersonUpdated, persons, sessionAdminUser]);
 
   const loadDeferredDashboardData = useCallback(async () => {
     let deferredFailedCount = 0;
@@ -1036,6 +1132,30 @@ export default function AdminDashboardPage() {
     initialCoreLoadStartedRef.current = true;
     void loadCoreData();
   }, [hasEntered, loadCoreData]);
+
+  useEffect(() => {
+    if (!hasEntered) return;
+
+    refreshCurrentUserFromBackend().catch((error) => {
+      console.warn("Failed to refresh current user profile", error);
+    });
+  }, [hasEntered, refreshCurrentUserFromBackend]);
+
+  useEffect(() => {
+    if (!hasEntered || persons.length === 0) return;
+
+    const currentPersonId = resolveSessionPersonId(sessionAdminUser, persons);
+    if (currentPersonId === null) return;
+
+    const refreshKey = String(currentPersonId);
+    if (currentProfileRefreshKeyRef.current === refreshKey) return;
+    currentProfileRefreshKeyRef.current = refreshKey;
+
+    refreshCurrentProfilePerson().catch((error) => {
+      currentProfileRefreshKeyRef.current = null;
+      console.warn("Failed to refresh current profile person", error);
+    });
+  }, [hasEntered, persons, refreshCurrentProfilePerson, sessionAdminUser]);
 
   useEffect(() => {
     const data = initialBootstrapDataRef.current;
@@ -1326,7 +1446,8 @@ export default function AdminDashboardPage() {
                       onSetDataError={setDataError}
                       onSetModuleFeedback={notifyModule}
                       sessionAdminUser={sessionAdminUser}
-                      onRefreshAdminProfile={() => setSessionAdminUser(readSessionAdminUser())}
+                      onRefreshAdminProfile={() => { void refreshCurrentUserFromBackend(); }}
+                      onProfilePersonUpdated={handleProfilePersonUpdated}
                     />
                   </div>
                 ) : (
@@ -1364,7 +1485,8 @@ export default function AdminDashboardPage() {
                         onSetDataError={setDataError}
                         onSetModuleFeedback={notifyModule}
                         sessionAdminUser={sessionAdminUser}
-                        onRefreshAdminProfile={() => setSessionAdminUser(readSessionAdminUser())}
+                        onRefreshAdminProfile={() => { void refreshCurrentUserFromBackend(); }}
+                        onProfilePersonUpdated={handleProfilePersonUpdated}
                       />
                     </div>
                   </div>
@@ -1699,6 +1821,7 @@ function ContentArea({
   onSetModuleFeedback,
   sessionAdminUser,
   onRefreshAdminProfile,
+  onProfilePersonUpdated,
 }: {
   section: AdminSectionId;
   sub: string;
@@ -1732,6 +1855,7 @@ function ContentArea({
   onSetModuleFeedback: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
   sessionAdminUser: SessionAdminUser;
   onRefreshAdminProfile: () => void;
+  onProfilePersonUpdated: (person: Person) => void;
 }) {
   const unreadNotificationsCount = useMemo(
     () => notifications.filter((item) => !item.read).length,
@@ -1935,6 +2059,7 @@ function ContentArea({
           onNotice={onSetModuleFeedback}
           onProfileRefresh={onRefreshAdminProfile}
           onReloadPersons={onPopulationReload}
+          onProfilePersonUpdated={onProfilePersonUpdated}
         />
       )}
 
@@ -3511,6 +3636,7 @@ const SettingsModule = memo(function SettingsModule({
   onNotice,
   onProfileRefresh,
   onReloadPersons,
+  onProfilePersonUpdated,
 }: {
   sub: string;
   profile: SessionAdminUser;
@@ -3518,6 +3644,7 @@ const SettingsModule = memo(function SettingsModule({
   onNotice: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
   onProfileRefresh: () => void;
   onReloadPersons: () => Promise<void>;
+  onProfilePersonUpdated: (person: Person) => void;
 }) {
   const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
   const ALLOWED_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
@@ -3557,14 +3684,8 @@ const SettingsModule = memo(function SettingsModule({
 
   const currentProfilePhoto = useMemo(
     () =>
-      resolvePersonProfileImage(resolvedProfilePerson) ||
-      (typeof profile.photoUrl === "string" && profile.photoUrl.trim()) ||
-      (typeof profile.imageUrl === "string" && profile.imageUrl.trim()) ||
-      (typeof profile.profileImage === "string" && profile.profileImage.trim()) ||
-      (typeof profile.avatar === "string" && profile.avatar.trim()) ||
-      (typeof profile.photo === "string" && profile.photo.trim()) ||
-      null,
-    [resolvedProfilePerson, profile.photoUrl, profile.imageUrl, profile.profileImage, profile.avatar, profile.photo],
+      resolvePersonProfileImage(resolvedProfilePerson),
+    [resolvedProfilePerson],
   );
   const currentProfileInitials = useMemo(
     () => resolveInitials([profile.firstName, profile.lastName1, profile.lastName2, profile.displayName, profile.username], 3),
@@ -3733,18 +3854,28 @@ const SettingsModule = memo(function SettingsModule({
       onNotice("configuracion", "warning", "Primero selecciona una imagen.");
       return;
     }
-    if (resolvedProfilePersonId === null) {
-      const message = "No se pudo identificar la persona enlazada a este usuario. Revisa que la cuenta tenga personId o username asociado.";
-      setPhotoMessage({ type: "error", text: message });
-      onNotice("configuracion", "error", message);
-      return;
-    }
-
     setIsUploadingPhoto(true);
     setPhotoMessage({ type: "info", text: "Subiendo imagen de perfil..." });
     try {
-      const updatedPerson = await updatePersonPhoto(resolvedProfilePersonId, photoFile);
-      const resolvedPhotoUrl = resolvePersonProfileImage(updatedPerson);
+      const profileFallbackId = resolvedProfilePersonId ?? profile.personId ?? profile.person_id ?? profile.id ?? 0;
+      const updatedPerson = await updatePersonPhoto(profileFallbackId, photoFile);
+      const uploadedPersonId = positiveNumber(updatedPerson.id) ?? resolvedProfilePersonId ?? positiveNumber(profile.personId) ?? positiveNumber(profile.person_id);
+      let resolvedPhotoUrl = resolvePersonProfileImage(updatedPerson);
+      let refreshedProfilePerson: Person | null = positiveNumber(updatedPerson.id) !== null ? updatedPerson : null;
+
+      if (uploadedPersonId !== null) {
+        try {
+          const refreshedPerson = await fetchPersonById(uploadedPersonId);
+          refreshedProfilePerson = refreshedPerson;
+          resolvedPhotoUrl = resolvePersonProfileImage(refreshedPerson);
+        } catch (refreshError) {
+          console.warn("Profile photo uploaded, but signed URL refresh failed", refreshError);
+        }
+      }
+
+      if (refreshedProfilePerson) {
+        onProfilePersonUpdated(refreshedProfilePerson);
+      }
 
       const rawUser = localStorage.getItem("user");
       if (rawUser) {
@@ -3752,14 +3883,9 @@ const SettingsModule = memo(function SettingsModule({
           const parsed = JSON.parse(rawUser) as Record<string, unknown>;
           const updated: Record<string, unknown> = {
             ...parsed,
-            personId: resolvedProfilePersonId,
           };
-          if (resolvedPhotoUrl) {
-            updated.photoUrl = resolvedPhotoUrl;
-            updated.imageUrl = resolvedPhotoUrl;
-            updated.profileImage = resolvedPhotoUrl;
-            updated.avatar = resolvedPhotoUrl;
-            updated.photo = resolvedPhotoUrl;
+          if (uploadedPersonId !== null) {
+            updated.personId = uploadedPersonId;
           }
           localStorage.setItem("user", JSON.stringify(updated));
         } catch {
@@ -3775,8 +3901,16 @@ const SettingsModule = memo(function SettingsModule({
       setPhotoInputKey((prev) => prev + 1);
 
       await onReloadPersons();
+      if (refreshedProfilePerson) {
+        onProfilePersonUpdated(refreshedProfilePerson);
+      }
       onProfileRefresh();
-      setPhotoMessage({ type: "success", text: "Foto de perfil actualizada correctamente." });
+      setPhotoMessage({
+        type: resolvedPhotoUrl ? "success" : "warning",
+        text: resolvedPhotoUrl
+          ? "Foto de perfil actualizada correctamente."
+          : "Foto actualizada, pero el backend no devolvio una URL firmada para mostrarla.",
+      });
       onNotice("configuracion", "success", "Foto de perfil actualizada correctamente.");
     } catch (error) {
       const message = error instanceof Error && error.message.trim()
@@ -3885,9 +4019,7 @@ const SettingsModule = memo(function SettingsModule({
 
                 <div className={`admin-ui-v2-settings-photo-message is-${photoMessage?.type ?? "info"}`}>
                   {photoMessage?.text ??
-                    (resolvedProfilePersonId === null
-                      ? "No se encontro una persona enlazada para este usuario."
-                      : "Selecciona una imagen JPG, PNG o WEBP para actualizarla.")}
+                    "Selecciona una imagen JPG, PNG o WEBP para actualizarla. El servidor enlazara la foto con tu usuario actual."}
                 </div>
               </div>
             </div>
@@ -4022,6 +4154,7 @@ function AdmissionReviewModal({
     options?: { finalOccupationId?: number; finalRole?: string; rejectionReason?: string },
   ) => Promise<void>;
 }) {
+  const admissionPhoto = normalizeDisplayImageUrl(admission.photoSignedUrl) || normalizeDisplayImageUrl(admission.photoUrl);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewForm, setReviewForm] = useState({
     finalOccupationId: admission.finalOccupationId ?? admission.suggestedOccupationId ?? 0,
@@ -4059,6 +4192,16 @@ function AdmissionReviewModal({
         </div>
 
         <div className="admin-ui-v2-adm-detail">
+          {admissionPhoto && (
+            <img
+              src={admissionPhoto}
+              alt={`Foto de ingreso de ${admission.name}`}
+              className="admin-ui-v2-settings-photo-preview"
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+            />
+          )}
           <div><strong>Nombre:</strong> {admission.name}</div>
           <div><strong>Profesión:</strong> {admission.profession}</div>
           <div><strong>Score IA:</strong> {admission.score}/100</div>

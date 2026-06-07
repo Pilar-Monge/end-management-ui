@@ -81,8 +81,14 @@ export default function LoginPage() {
     try {
       const response = await loginRequest(form)
       const normalizedUser = {
-        ...response.user,
+        id: response.user.id,
+        ...(typeof response.user.personId === 'number' ? { personId: response.user.personId } : {}),
+        ...(typeof response.user.person_id === 'number' ? { person_id: response.user.person_id } : {}),
+        ...(typeof response.user.userId === 'number' ? { userId: response.user.userId } : {}),
+        username: response.user.username,
+        rol: response.user.rol,
         role: normalizeUserRole(response.user.rol),
+        campId: response.user.campId,
       }
       const token = response.token ?? response.accessToken
       const savedPath = localStorage.getItem('last_secure_path')

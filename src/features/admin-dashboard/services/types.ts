@@ -29,6 +29,10 @@ export interface AdminAdmissionRequest {
   rolFinal?: string
   sospechoso?: boolean
   suspicious?: boolean
+  photoUrl?: string
+  photo_url?: string
+  photoSignedUrl?: string
+  photo_signed_url?: string
 }
 
 export interface CampInventoryEntry {
