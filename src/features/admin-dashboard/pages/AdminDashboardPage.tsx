@@ -14,7 +14,7 @@ import {
   YAxis,
 } from "recharts";
 import { WorldMap } from "../../expeditions-ui/components/WorldMap";
-import type { Person, Gender, SystemRole, SystemUserStatus } from "../../persons/types";
+import type { Gender, Person, SystemRole, SystemUserStatus } from "../../persons/types";
 import { fetchAuthMeProfile, fetchPersonById, type AuthMeProfile } from "../../persons/api/queries";
 import { deletePerson, updatePerson, updatePersonPhoto } from "../../persons/api/mutations";
 import { fetchSystemUserById, updateSystemUser } from "../../persons/api/systemUsers";
@@ -443,21 +443,16 @@ function dateInputValue(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function dateInputFromUnknown(value: unknown): string {
-  if (!value) return "";
-  const d = new Date(String(value));
-  if (Number.isNaN(d.getTime())) return "";
-  return dateInputValue(d);
-}
-
-function resolvePersonSystemUserId(person: Person): number | null {
-  return person.systemUserId ?? person.userId ?? person.accountId ?? null;
-}
-
 function dateInputFromToday(daysToAdd = 0): string {
   const date = new Date();
   date.setDate(date.getDate() + daysToAdd);
   return dateInputValue(date);
+}
+
+function dateInputFromUnknown(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) return "";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? "" : dateInputValue(parsed);
 }
 
 function startOfLocalDay(value: Date): number {
@@ -645,6 +640,10 @@ function intercampPillClass(status: UiIntercampRequest["status"]): string {
 
 function personFullName(person: Person): string {
   return `${person.firstName} ${person.lastName}`.trim();
+}
+
+function resolvePersonSystemUserId(person: Person): number | null {
+  return positiveNumber(person.userId ?? person.systemUserId ?? person.accountId);
 }
 
 function resolveInitials(parts: Array<string | null | undefined>, maxLetters = 3): string {
@@ -2468,9 +2467,6 @@ const PopulationModule = memo(function PopulationModule({
     accountStatus: "ACTIVE" as SystemUserStatus,
   });
 
-  const selectedSystemUserId = selectedPerson ? resolvePersonSystemUserId(selectedPerson) : null;
-  const isAccountEditReady = selectedSystemUserId === null || editableSystemUserId === selectedSystemUserId;
-
   const [assignments, setAssignments] = useState<TempRoleAssignment[]>(INITIAL_TEMP_ASSIGNMENTS);
   const [assignSearch, setAssignSearch] = useState("");
   const [temporaryView, setTemporaryView] = useState<TemporaryView>("sectors");
@@ -2710,6 +2706,8 @@ const PopulationModule = memo(function PopulationModule({
     if (isSaving) return;
     setSelectedPerson(null);
     setIsEditMode(false);
+    setEditableSystemUserId(null);
+    setEditableSystemUserSnapshot(null);
   };
 
   const handleDeletePerson = async (personId: number) => {
@@ -2749,48 +2747,53 @@ const PopulationModule = memo(function PopulationModule({
       const normalizedFirstName = String(editForm.firstName ?? "").trim();
       const normalizedLastName1 = String(editForm.lastName1 ?? "").trim();
       const normalizedLastName2 = String(editForm.lastName2 ?? "").trim();
-      const normalizedLastName = [normalizedLastName1, normalizedLastName2].filter(Boolean).join(" ");
-      const normalizedNotes = String(editForm.notes ?? "").trim();
+      const normalizedIdentification = String(editForm.identificationNumber ?? "").trim();
+      const normalizedBirthDate = String(editForm.birthDate ?? "").trim();
 
-      const personPayload = {
-        firstName: normalizedFirstName,
-        nombre: normalizedFirstName,
-        first_name: normalizedFirstName,
-        primer_nombre: normalizedFirstName,
-        lastName: normalizedLastName,
-        lastName1: normalizedLastName1,
-        lastName2: normalizedLastName2 || null,
-        primer_apellido: normalizedLastName1,
-        segundo_apellido: normalizedLastName2 || null,
-        identificationNumber: editForm.identificationNumber,
-        birthDate: editForm.birthDate || null,
-        gender: editForm.gender,
-        status: editForm.status,
-        currentStatus: editForm.status,
-        campId: selectedPerson.campId,
-        occupationId: Number(editForm.occupationId) > 0 ? Number(editForm.occupationId) : null,
-        character: Number(editForm.character) > 0 ? Number(editForm.character) : 1,
-        notes: normalizedNotes || undefined,
-      };
+      if (!normalizedFirstName || !normalizedLastName1 || !normalizedIdentification || !normalizedBirthDate) {
+        onNotice("poblacion", "warning", "Nombre, primer apellido, identificacion y fecha de nacimiento son requeridos.");
+        return;
+      }
 
-      await updatePerson(selectedPerson.id, personPayload);
+      const nextOccupationId = Number(editForm.occupationId) > 0 ? Number(editForm.occupationId) : null;
+      const nextCharacter = Math.min(5, Math.max(1, Number(editForm.character) || 1));
+      const nextLastName2 = normalizedLastName2 || null;
+      const personPayload: Parameters<typeof updatePerson>[1] = {};
+      if (normalizedFirstName !== String(selectedPerson.name ?? selectedPerson.firstName ?? "").trim()) personPayload.name = normalizedFirstName;
+      if (normalizedLastName1 !== String(selectedPerson.lastName1 ?? "").trim()) personPayload.lastName1 = normalizedLastName1;
+      if (nextLastName2 !== (selectedPerson.lastName2 ?? null)) personPayload.lastName2 = nextLastName2;
+      if (normalizedIdentification !== String(selectedPerson.identificationNumber ?? "").trim()) personPayload.identificationNumber = normalizedIdentification;
+      if (normalizedBirthDate !== dateInputFromUnknown(selectedPerson.birthDate)) personPayload.birthDate = normalizedBirthDate;
+      if (editForm.gender !== selectedPerson.gender) personPayload.gender = editForm.gender;
+      if (editForm.status !== (selectedPerson.currentStatus ?? selectedPerson.status)) personPayload.currentStatus = editForm.status;
+      if (nextOccupationId !== (selectedPerson.occupationId ?? null)) personPayload.occupationId = nextOccupationId;
+      if (nextCharacter !== (selectedPerson.character ?? 1)) personPayload.character = nextCharacter;
+      const systemUserId = resolvePersonSystemUserId(selectedPerson);
 
-      if (selectedSystemUserId !== null && editableSystemUserId !== null) {
-        const hasUserChanges = !editableSystemUserSnapshot ||
-          editableSystemUserSnapshot.role !== editForm.accountRole ||
-          editableSystemUserSnapshot.status !== editForm.accountStatus;
-
-        if (hasUserChanges) {
-          await updateSystemUser(selectedSystemUserId, {
-            role: editForm.accountRole,
-            status: editForm.accountStatus,
-          });
+      const updates: Array<Promise<unknown>> = [];
+      if (Object.keys(personPayload).length > 0) {
+        updates.push(updatePerson(selectedPerson.id, personPayload));
+      }
+      if (systemUserId !== null && editableSystemUserId === systemUserId && editableSystemUserSnapshot?.id === systemUserId) {
+        const userPayload: Parameters<typeof updateSystemUser>[1] = {};
+        if (editForm.accountRole !== editableSystemUserSnapshot.role) userPayload.role = editForm.accountRole;
+        if (editForm.accountStatus !== editableSystemUserSnapshot.status) userPayload.status = editForm.accountStatus;
+        if (Object.keys(userPayload).length > 0) {
+          updates.push(updateSystemUser(systemUserId, userPayload));
         }
       }
 
+      if (updates.length === 0) {
+        onNotice("poblacion", "info", "No hay cambios para guardar.");
+        return;
+      }
+
+      await Promise.all(updates);
       await onReload();
       setIsEditMode(false);
       setSelectedPerson(null);
+      setEditableSystemUserId(null);
+      setEditableSystemUserSnapshot(null);
       onNotice("poblacion", "success", "Datos de persona actualizados correctamente.");
     } catch (error) {
       onError(getErrorMessage(error, "update_person"));
@@ -2952,6 +2955,9 @@ const PopulationModule = memo(function PopulationModule({
     if (normalized === "BLOCKED") return "is-warn";
     return "is-danger";
   };
+
+  const selectedSystemUserId = selectedPerson ? resolvePersonSystemUserId(selectedPerson) : null;
+  const isAccountEditReady = selectedSystemUserId === null || editableSystemUserId === selectedSystemUserId;
 
   return (
     <div className="admin-ui-v2-population">
@@ -3404,75 +3410,67 @@ const PopulationModule = memo(function PopulationModule({
               <button className="admin-ui-v2-btn" type="button" onClick={closePersonModal}>Cerrar</button>
             </div>
 
-            <div className="admin-ui-v2-modal-body">
-              {isEditMode ? (
-                <div className="admin-ui-v2-form-grid admin-ui-v2-person-form-grid">
-                  <input className="v-input" value={editForm.firstName} onChange={(event) => setEditForm((prev) => ({ ...prev, firstName: event.target.value }))} placeholder="Nombre" />
-                  <input className="v-input" value={editForm.lastName1} onChange={(event) => setEditForm((prev) => ({ ...prev, lastName1: event.target.value }))} placeholder="Primer apellido" />
-                  <input className="v-input" value={editForm.lastName2} onChange={(event) => setEditForm((prev) => ({ ...prev, lastName2: event.target.value }))} placeholder="Segundo apellido" />
-                  <input className="v-input" value={editForm.identificationNumber} onChange={(event) => setEditForm((prev) => ({ ...prev, identificationNumber: event.target.value }))} placeholder="Identificacion" />
-                  <input className="v-input" type="date" value={editForm.birthDate} onChange={(event) => setEditForm((prev) => ({ ...prev, birthDate: event.target.value }))} />
-                  <select className="v-select" value={editForm.gender} onChange={(event) => setEditForm((prev) => ({ ...prev, gender: event.target.value as Gender }))}>
-                    <option value="MALE">Masculino</option>
-                    <option value="FEMALE">Femenino</option>
-                    <option value="OTHER">Otro</option>
-                  </select>
-                  <select className="v-select" value={editForm.status} onChange={(event) => setEditForm((prev) => ({ ...prev, status: event.target.value as Person["status"] }))}>
-                    <option value="ACTIVE">Activo</option>
-                    <option value="SICK">Enfermo</option>
-                    <option value="INJURED">Herido</option>
-                    <option value="OUTSIDE_CAMP">Fuera del campamento</option>
-                    <option value="ON_EXPEDITION">En expedicion</option>
-                    <option value="INACTIVE">Inactivo</option>
-                  </select>
-                  <select className="v-select" value={editForm.accountRole} onChange={(event) => setEditForm((prev) => ({ ...prev, accountRole: event.target.value as SystemRole }))} disabled={!isAccountEditReady}>
-                    <option value="WORKER">Trabajador</option>
-                    <option value="RESOURCE_MANAGEMENT">Gestion de recursos</option>
-                    <option value="TRAVEL_MANAGER">Gestor de viajes</option>
-                    <option value="SYSTEM_ADMIN">Administrador</option>
-                  </select>
-                  <select
-                    className="v-select"
-                    value={editForm.accountStatus}
-                    disabled={!isAccountEditReady}
-                    onChange={(event) => setEditForm((prev) => ({ ...prev, accountStatus: event.target.value as SystemUserStatus }))}
-                  >
-                    <option value="ACTIVE">Cuenta activa</option>
-                    <option value="BLOCKED">Cuenta bloqueada</option>
-                    <option value="INACTIVE">Cuenta inactiva</option>
-                  </select>
-                  {!isAccountEditReady && <div className="admin-ui-v2-muted">Cargando cuenta vinculada...</div>}
-                  <div className="v-input" aria-readonly="true">
-                    {camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}
-                  </div>
-                  <select className="v-select" value={editForm.occupationId} onChange={(event) => setEditForm((prev) => ({ ...prev, occupationId: Number(event.target.value) }))}>
-                    {Array.from(occupations.entries()).map(([id, name]) => (
-                      <option key={id} value={id}>{name}</option>
-                    ))}
-                  </select>
-                  <input className="v-input" type="number" min={1} max={5} value={editForm.character} onChange={(event) => setEditForm((prev) => ({ ...prev, character: Number(event.target.value) }))} placeholder="Personaje (1-5)" />
+            {isEditMode ? (
+              <div className="admin-ui-v2-form-grid">
+                <input className="v-input" value={editForm.firstName} onChange={(event) => setEditForm((prev) => ({ ...prev, firstName: event.target.value }))} placeholder="Nombre" />
+                <input className="v-input" value={editForm.lastName1} onChange={(event) => setEditForm((prev) => ({ ...prev, lastName1: event.target.value }))} placeholder="Primer apellido" />
+                <input className="v-input" value={editForm.lastName2} onChange={(event) => setEditForm((prev) => ({ ...prev, lastName2: event.target.value }))} placeholder="Segundo apellido" />
+                <input className="v-input" value={editForm.identificationNumber} onChange={(event) => setEditForm((prev) => ({ ...prev, identificationNumber: event.target.value }))} placeholder="Identificacion" />
+                <input className="v-input" type="date" value={editForm.birthDate} onChange={(event) => setEditForm((prev) => ({ ...prev, birthDate: event.target.value }))} />
+                <select className="v-select" value={editForm.gender} onChange={(event) => setEditForm((prev) => ({ ...prev, gender: event.target.value as Gender }))}>
+                  <option value="MALE">Masculino</option>
+                  <option value="FEMALE">Femenino</option>
+                  <option value="OTHER">Otro</option>
+                </select>
+                <select className="v-select" value={editForm.status} onChange={(event) => setEditForm((prev) => ({ ...prev, status: event.target.value as Person["status"] }))}>
+                  <option value="ACTIVE">Activo</option>
+                  <option value="SICK">Enfermo</option>
+                  <option value="INJURED">Herido</option>
+                  <option value="OUTSIDE_CAMP">Fuera del campamento</option>
+                  <option value="ON_EXPEDITION">En expedicion</option>
+                  <option value="INACTIVE">Inactivo</option>
+                </select>
+                <select className="v-select" value={editForm.accountRole} onChange={(event) => setEditForm((prev) => ({ ...prev, accountRole: event.target.value as SystemRole }))} disabled={!isAccountEditReady}>
+                  <option value="WORKER">Trabajador</option>
+                  <option value="RESOURCE_MANAGEMENT">Gestion de recursos</option>
+                  <option value="TRAVEL_MANAGER">Gestor de viajes</option>
+                  <option value="SYSTEM_ADMIN">Administrador</option>
+                </select>
+                <select
+                  className="v-select"
+                  value={editForm.accountStatus}
+                  disabled={!isAccountEditReady}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, accountStatus: event.target.value as SystemUserStatus }))}
+                >
+                  <option value="ACTIVE">Cuenta activa</option>
+                  <option value="BLOCKED">Cuenta bloqueada</option>
+                  <option value="INACTIVE">Cuenta inactiva</option>
+                </select>
+                {!isAccountEditReady && <div className="admin-ui-v2-muted">Cargando cuenta vinculada...</div>}
+                <div className="v-input" aria-readonly="true">
+                  {camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}
                 </div>
-              ) : (
-                <div className="admin-ui-v2-person-detail">
-                  <div><strong>Nombre:</strong> {personFullName(selectedPerson)}</div>
-                  <div><strong>Edad:</strong> {selectedPerson.age}</div>
-                  <div><strong>Estado:</strong> {normalizeStatusLabel(selectedPerson.status)}</div>
-                  <div><strong>Estado de cuenta:</strong> {selectedPerson.accountStatus ?? "ACTIVE"}</div>
-                  <div><strong>Rol:</strong> {resolvePersonOccupationLabel(selectedPerson, occupations)}</div>
-                  <div><strong>Sector:</strong> {camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}</div>
-                  <div><strong>Ingreso:</strong> {new Date(selectedPerson.admissionDate).toLocaleDateString("es-CR")}</div>
-                  <div><strong>Notas:</strong> {selectedPerson.notes || "Sin notas"}</div>
-                </div>
-              )}
-            </div>
-
-            <div className="admin-ui-v2-modal-footer">
-              {isEditMode ? (
+                <select className="v-select" value={editForm.occupationId} onChange={(event) => setEditForm((prev) => ({ ...prev, occupationId: Number(event.target.value) }))}>
+                  {Array.from(occupations.entries()).map(([id, name]) => (
+                    <option key={id} value={id}>{name}</option>
+                  ))}
+                </select>
+                <input className="v-input" type="number" min={1} max={5} value={editForm.character} onChange={(event) => setEditForm((prev) => ({ ...prev, character: Number(event.target.value) }))} placeholder="Personaje (1-5)" />
                 <div className="admin-ui-v2-actions">
                   <button className="admin-ui-v2-btn is-info" onClick={() => void handleSavePerson()} type="button" disabled={isSaving}>Guardar</button>
                   <button className="admin-ui-v2-btn" onClick={() => setIsEditMode(false)} type="button" disabled={isSaving}>Cancelar</button>
                 </div>
-              ) : (
+              </div>
+            ) : (
+              <div className="admin-ui-v2-person-detail">
+                <div><strong>Nombre:</strong> {personFullName(selectedPerson)}</div>
+                <div><strong>Edad:</strong> {selectedPerson.age}</div>
+                <div><strong>Estado:</strong> {normalizeStatusLabel(selectedPerson.status)}</div>
+                <div><strong>Estado de cuenta:</strong> {selectedPerson.accountStatus ?? "ACTIVE"}</div>
+                <div><strong>Rol:</strong> {resolvePersonOccupationLabel(selectedPerson, occupations)}</div>
+                <div><strong>Sector:</strong> {camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}</div>
+                <div><strong>Ingreso:</strong> {new Date(selectedPerson.admissionDate).toLocaleDateString("es-CR")}</div>
+                <div><strong>Notas:</strong> {selectedPerson.notes || "Sin notas"}</div>
                 <div className="admin-ui-v2-actions">
                   {isCurrentAdminPerson(selectedPerson.id) && (
                     <div className="admin-ui-v2-muted">Tu propio perfil se edita desde Configuracion.</div>
@@ -3480,8 +3478,8 @@ const PopulationModule = memo(function PopulationModule({
                   <button className="admin-ui-v2-btn is-info" onClick={() => setIsEditMode(true)} type="button" disabled={isCurrentAdminPerson(selectedPerson.id)}>Editar</button>
                   <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(selectedPerson.id)} type="button" disabled={isSaving || isCurrentAdminPerson(selectedPerson.id)}>Eliminar</button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -3915,8 +3913,6 @@ const SettingsModule = memo(function SettingsModule({
     try {
       const payload = {
         name: normalizedFirstName,
-        firstName: normalizedFirstName,
-        lastName: [normalizedLastName1, normalizedLastName2].filter(Boolean).join(" "),
         lastName1: normalizedLastName1,
         lastName2: normalizedLastName2 || null,
       };
@@ -4322,35 +4318,35 @@ function AdmissionReviewModal({
           <button className="admin-ui-v2-btn" type="button" onClick={onClose}>Cerrar</button>
         </div>
 
-        <div className="admin-ui-v2-modal-body">
-          <div className="admin-ui-v2-adm-detail">
-            {admissionPhoto && (
-              <img
-                src={admissionPhoto}
-                alt={`Foto de ingreso de ${admission.name}`}
-                className="admin-ui-v2-settings-photo-preview"
-                loading="lazy"
-                decoding="async"
-                referrerPolicy="no-referrer"
-              />
-            )}
-            <div><strong>Nombre:</strong> {admission.name}</div>
-            <div><strong>Profesión:</strong> {admission.profession}</div>
-            <div><strong>Score IA:</strong> {admission.score}/100</div>
-            <div><strong>Estado:</strong> {statusLabel(admission.status)}</div>
-            <div><strong>Flujo:</strong> {workflowStatusLabel(admission.workflowStatus)}</div>
-            <div><strong>Oficio sugerido IA:</strong> {typeof admission.suggestedOccupationId === "number" ? occupations.find(([id]) => id === admission.suggestedOccupationId)?.[1] ?? `Ocupación #${admission.suggestedOccupationId}` : "No definido"}</div>
-            <div><strong>Oficio final:</strong> {typeof admission.finalOccupationId === "number" ? occupations.find(([id]) => id === admission.finalOccupationId)?.[1] ?? `Ocupación #${admission.finalOccupationId}` : "Sin asignar"}</div>
-            <div><strong>Razón:</strong> {admission.reason}</div>
-            {admission.skills.length > 0 && (
-              <div className="admin-ui-v2-adm-skills">
-                {admission.skills.map((skill) => (
-                  <span key={skill} className="admin-ui-v2-pill is-info">{skill}</span>
-                ))}
-              </div>
-            )}
+        <div className="admin-ui-v2-adm-detail">
+          {admissionPhoto && (
+            <img
+              src={admissionPhoto}
+              alt={`Foto de ingreso de ${admission.name}`}
+              className="admin-ui-v2-settings-photo-preview"
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+            />
+          )}
+          <div><strong>Nombre:</strong> {admission.name}</div>
+          <div><strong>Profesión:</strong> {admission.profession}</div>
+          <div><strong>Score IA:</strong> {admission.score}/100</div>
+          <div><strong>Estado:</strong> {statusLabel(admission.status)}</div>
+          <div><strong>Flujo:</strong> {workflowStatusLabel(admission.workflowStatus)}</div>
+          <div><strong>Oficio sugerido IA:</strong> {typeof admission.suggestedOccupationId === "number" ? occupations.find(([id]) => id === admission.suggestedOccupationId)?.[1] ?? `Ocupación #${admission.suggestedOccupationId}` : "No definido"}</div>
+          <div><strong>Oficio final:</strong> {typeof admission.finalOccupationId === "number" ? occupations.find(([id]) => id === admission.finalOccupationId)?.[1] ?? `Ocupación #${admission.finalOccupationId}` : "Sin asignar"}</div>
+          <div><strong>Razón:</strong> {admission.reason}</div>
+          {admission.skills.length > 0 && (
+            <div className="admin-ui-v2-adm-skills">
+              {admission.skills.map((skill) => (
+                <span key={skill} className="admin-ui-v2-pill is-info">{skill}</span>
+              ))}
+            </div>
+          )}
 
-            {canReviewSelected ? (
+          {canReviewSelected ? (
+            <>
               <div className="admin-ui-v2-form-grid">
                 <label className="admin-ui-v2-muted">Oficio final (requerido para aprobar)</label>
                 <select
@@ -4384,18 +4380,8 @@ function AdmissionReviewModal({
                   placeholder="Motivo documentado para auditoria"
                 />
               </div>
-            ) : (
-              <p className="admin-ui-v2-muted">
-                Esta solicitud no esta lista para revision administrativa. Solo se puede revisar en estado PENDING_ADMIN.
-              </p>
-            )}
-          </div>
-        </div>
 
-        <div className="admin-ui-v2-modal-footer">
-          {canReviewSelected ? (
-            <div className="admin-ui-v2-actions-container" style={{ width: "100%" }}>
-              <div className="admin-ui-v2-actions" style={{ justifyContent: "flex-end" }}>
+              <div className="admin-ui-v2-actions">
                 <button
                   className="admin-ui-v2-btn is-ok"
                   type="button"
@@ -4413,12 +4399,15 @@ function AdmissionReviewModal({
                   {reviewSubmitting ? "Procesando..." : "Rechazar"}
                 </button>
               </div>
-              <p className="admin-ui-v2-muted" style={{ marginTop: "6px", fontSize: "10px", textAlign: "right", marginLeft: 0, marginRight: 0 }}>
+
+              <p className="admin-ui-v2-muted">
                 Al aprobar, se crea automaticamente la persona y su cuenta de acceso.
               </p>
-            </div>
+            </>
           ) : (
-            <div className="admin-ui-v2-muted">Solo consulta</div>
+            <p className="admin-ui-v2-muted">
+              Esta solicitud no esta lista para revision administrativa. Solo se puede revisar en estado PENDING_ADMIN.
+            </p>
           )}
         </div>
       </div>
