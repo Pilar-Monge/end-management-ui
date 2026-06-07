@@ -1,4 +1,5 @@
 import type {
+  CurrentUserProfile,
   PaginationInfo,
   WorkerAutoAssignmentResult,
   WorkerDailyCollectionRecord,
@@ -12,13 +13,23 @@ import type {
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
 
 function getToken(): string | null {
-  return localStorage.getItem('token')
+  return localStorage.getItem('token') ?? localStorage.getItem('accessToken')
 }
 
 function getHeaders(): HeadersInit {
   return {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${getToken() || ''}`,
+  }
+}
+
+export class WorkerApiError extends Error {
+  statusCode: number
+
+  constructor(statusCode: number, message: string) {
+    super(message)
+    this.name = 'WorkerApiError'
+    this.statusCode = statusCode
   }
 }
 
@@ -44,10 +55,21 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const payload = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new Error(payload?.message || 'No se pudieron cargar los datos')
+    const message = Array.isArray(payload?.message)
+      ? payload.message.join(', ')
+      : payload?.message || payload?.error || response.statusText || 'No se pudieron cargar los datos'
+    throw new WorkerApiError(response.status, message)
   }
 
   return payload as T
+}
+
+export async function fetchCurrentUserProfile(): Promise<CurrentUserProfile> {
+  const payload = await requestJson<{ success: boolean; data: CurrentUserProfile }>(`/users/me`, {
+    method: 'GET',
+  })
+
+  return payload.data
 }
 
 export async function fetchWorkerNotifications(params: {
