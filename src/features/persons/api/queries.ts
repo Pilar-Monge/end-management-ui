@@ -49,6 +49,23 @@ function normalizePersonStatus(value: unknown): PersonStatus {
   return 'INACTIVE'
 }
 
+function numberFromValue(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return undefined
+}
+
+function stringFromValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+function recordFromValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null
+}
+
 function normalizeMediaUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
@@ -71,6 +88,7 @@ export interface AuthMeProfileUser {
   username?: string
   role?: string
   rol?: string
+  status?: string
   campId?: number
   personId?: number
   person_id?: number
@@ -82,8 +100,10 @@ export interface AuthMeProfile {
   person: Person | null
 }
 
-function mapPersonRecord(record: unknown): Person {
+export function mapPersonRecord(record: unknown): Person {
   const source = record as Record<string, unknown>
+  const occupationRecord = recordFromValue(source.occupation)
+  const campRecord = recordFromValue(source.camp)
 
   const firstName = String(
     source.firstName
@@ -96,12 +116,12 @@ function mapPersonRecord(record: unknown): Person {
   ).trim()
 
   const lastNamePrimary = String(
-    source.lastName
+    source.lastName1
+    ?? source.lastName
     ?? source.primer_apellido
     ?? source.last_name
     ?? source.apellido
     ?? source.apellido1
-    ?? source.lastName1
     ?? '',
   ).trim()
 
@@ -114,9 +134,19 @@ function mapPersonRecord(record: unknown): Person {
 
   const lastName = [lastNamePrimary, lastNameSecondary].filter(Boolean).join(' ').trim()
 
-  const statusValue = source.status ?? source.currentStatus
+  const statusValue = source.currentStatus ?? source.current_status ?? source.status ?? source.personStatus ?? source.person_status ?? source.estado
+  const normalizedStatus = normalizePersonStatus(statusValue)
+  const occupationId =
+    numberFromValue(source.occupationId ?? source.occupation_id)
+    ?? numberFromValue(occupationRecord?.id)
+    ?? null
+  const occupationName = stringFromValue(occupationRecord?.name ?? occupationRecord?.nombre)
+  const occupationDescription = stringFromValue(occupationRecord?.description ?? occupationRecord?.descripcion) ?? null
+  const campId = numberFromValue(source.campId ?? source.camp_id) ?? numberFromValue(campRecord?.id) ?? 0
   const admissionDateValue =
     source.admissionDate
+    ?? source.entryDate
+    ?? source.entry_date
     ?? source.joinedAt
     ?? source.joinDate
     ?? source.createdAt
@@ -132,19 +162,28 @@ function mapPersonRecord(record: unknown): Person {
 
   return {
     ...(record as Person),
-    userId: typeof source.userId === 'number' ? source.userId : typeof source.user_id === 'number' ? source.user_id : undefined,
+    id: numberFromValue(source.id) ?? 0,
+    userId: numberFromValue(source.userId ?? source.user_id),
     systemUserId:
-      typeof source.systemUserId === 'number'
-        ? source.systemUserId
-        : typeof source.system_user_id === 'number'
-          ? source.system_user_id
-          : undefined,
-    accountId: typeof source.accountId === 'number' ? source.accountId : typeof source.account_id === 'number' ? source.account_id : undefined,
+      numberFromValue(source.systemUserId ?? source.system_user_id),
+    accountId: numberFromValue(source.accountId ?? source.account_id),
     username: typeof source.username === 'string' ? source.username : typeof source.userName === 'string' ? source.userName : undefined,
-    status: normalizePersonStatus(statusValue),
-    currentStatus: normalizePersonStatus(statusValue),
+    name: firstName,
+    lastName1: lastNamePrimary || null,
+    lastName2: lastNameSecondary || null,
+    status: normalizedStatus,
+    currentStatus: normalizedStatus,
     firstName,
     lastName,
+    campId,
+    occupationId,
+    occupation: occupationName
+      ? {
+          id: occupationId ?? numberFromValue(occupationRecord?.id) ?? 0,
+          name: occupationName,
+          description: occupationDescription,
+        }
+      : null,
     photoUrl: resolvedProfileImage,
     profileImage: resolvedProfileImage,
     avatar: resolvedProfileImage,
@@ -154,19 +193,6 @@ function mapPersonRecord(record: unknown): Person {
     admissionDate: String(admissionDateValue),
     notes: typeof source.notes === 'string' ? source.notes : undefined,
   }
-}
-
-function numberFromValue(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string') {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return undefined
-}
-
-function stringFromValue(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
 export async function fetchAuthMeProfile(): Promise<AuthMeProfile> {
@@ -185,6 +211,7 @@ export async function fetchAuthMeProfile(): Promise<AuthMeProfile> {
       username: stringFromValue(data.username),
       role: stringFromValue(data.role),
       rol: stringFromValue(data.rol),
+      status: stringFromValue(data.status),
       campId: numberFromValue(data.campId ?? data.camp_id),
       personId,
       person_id: personId,

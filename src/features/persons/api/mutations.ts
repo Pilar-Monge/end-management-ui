@@ -7,6 +7,7 @@ import type {
   UpdatePersonRequest,
 } from '../types'
 import { ENDPOINTS, personsKeys } from './keys'
+import { mapPersonRecord } from './queries'
 
 const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('accessToken')
 
@@ -198,13 +199,13 @@ export async function updatePersonPhoto(id: number, photo: File): Promise<Person
   const resolvedPersonId = resolveProfilePersonIdFromRecord(data) ?? resolveProfilePersonIdFromRecord(payload) ?? numberFromValue(id)
 
   if (!resolvedPhotoUrl) {
-    return {
+    return mapPersonRecord({
       ...data,
       ...(resolvedPersonId !== null ? { id: resolvedPersonId } : {}),
-    }
+    })
   }
 
-  return {
+  return mapPersonRecord({
     ...data,
     id: resolvedPersonId ?? data.id ?? id,
     imageSignedUrl: resolvedPhotoUrl,
@@ -213,7 +214,7 @@ export async function updatePersonPhoto(id: number, photo: File): Promise<Person
     profileImage: resolvedPhotoUrl,
     avatar: resolvedPhotoUrl,
     photo: resolvedPhotoUrl,
-  }
+  })
 }
 
 export function useUpdatePersonPhoto(

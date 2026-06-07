@@ -14,6 +14,9 @@ export interface Person {
   systemUserId?: number | null
   accountId?: number | null
   username?: string | null
+  name?: string
+  lastName1?: string | null
+  lastName2?: string | null
   firstName: string
   lastName: string
   photoUrl?: string | null
@@ -27,7 +30,12 @@ export interface Person {
   status: PersonStatus
   currentStatus?: PersonStatus
   campId: number
-  occupationId: number
+  occupationId: number | null
+  occupation?: {
+    id: number
+    name: string
+    description?: string | null
+  } | null
   achievementIds: number[]
   admissionDate: string
   notes?: string
@@ -60,7 +68,8 @@ export interface CreatePersonRequest {
   notes?: string
 }
 
-export interface UpdatePersonRequest extends Partial<CreatePersonRequest> {
+export interface UpdatePersonRequest extends Partial<Omit<CreatePersonRequest, 'occupationId'>> {
+  occupationId?: number | null
   status?: PersonStatus
   currentStatus?: PersonStatus
   accountStatus?: AccountStatus

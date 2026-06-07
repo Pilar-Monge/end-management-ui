@@ -32,6 +32,7 @@ export interface LoginApiResponse {
     rol: string
     role?: string
     campId: number
+    status?: string
   }
 }
 export type LoginErrors = Partial<{

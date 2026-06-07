@@ -187,6 +187,7 @@ interface SessionAdminUser {
   lastName1?: string;
   lastName2?: string;
   role?: string;
+  status?: string;
   campId?: number;
   photoUrl?: string;
   imageUrl?: string;
@@ -601,6 +602,15 @@ function normalizeStatusLabel(status: Person["status"]): string {
   return "Inactivo";
 }
 
+function resolvePersonOccupationLabel(person: Person | null | undefined, occupations: Map<number, string>, fallback = "No asignado"): string {
+  if (!person) return fallback;
+  const directName = person.occupation?.name?.trim();
+  if (directName) return directName;
+  const occupationId = typeof person.occupationId === "number" && Number.isFinite(person.occupationId) ? person.occupationId : null;
+  if (occupationId === null) return fallback;
+  return occupations.get(occupationId) ?? `Ocupación #${occupationId}`;
+}
+
 function legacyPopulationStatus(status: Person["status"]): "Activo" | "Herido" | "Enfermo" | "Fuera" {
   if (status === "ACTIVE") return "Activo";
   if (status === "INJURED") return "Herido";
@@ -865,6 +875,7 @@ export default function AdminDashboardPage() {
   const [sessionState, setSessionState] = useState<"ACTIVA" | "INACTIVA">("INACTIVA");
   const [moduleFeedback, setModuleFeedback] = useState<ModuleFeedback | null>(null);
   const [sessionAdminUser, setSessionAdminUser] = useState<SessionAdminUser>(() => readSessionAdminUser());
+  const [authenticatedPerson, setAuthenticatedPerson] = useState<Person | null>(null);
   const [dashboardPopup, setDashboardPopup] = useState<{ id: number; message: string; type: ModuleMessageType } | null>(null);
   const [globalTimeState, setGlobalTimeState] = useState<GlobalTimeState>({
     baseServerTime: new Date(),
@@ -926,6 +937,10 @@ export default function AdminDashboardPage() {
 
   const handleProfilePersonUpdated = useCallback((updatedPerson: Person) => {
     setPersons((prev) => upsertPersonById(prev, updatedPerson));
+    setAuthenticatedPerson((prev) => {
+      if (!prev || prev.id !== updatedPerson.id) return prev;
+      return { ...prev, ...updatedPerson };
+    });
   }, []);
 
   const refreshCurrentUserFromBackend = useCallback(async () => {
@@ -944,11 +959,13 @@ export default function AdminDashboardPage() {
       userId: positiveNumber(user.id) ?? prev.userId,
       username: user.username ?? prev.username,
       role: resolvedRole ?? prev.role,
+      status: user.status ?? prev.status,
       campId: positiveNumber(user.campId) ?? person?.campId ?? prev.campId,
       ...(resolvedPersonId !== null ? { personId: resolvedPersonId, person_id: resolvedPersonId } : {}),
     }));
 
     if (person) {
+      setAuthenticatedPerson(person);
       handleProfilePersonUpdated(person);
     }
 
@@ -962,6 +979,7 @@ export default function AdminDashboardPage() {
           username: user.username ?? parsed.username,
           role: resolvedRole ?? parsed.role,
           rol: user.rol ?? user.role ?? parsed.rol,
+          status: user.status ?? parsed.status,
           campId: positiveNumber(user.campId) ?? person?.campId ?? parsed.campId,
         };
         if (resolvedPersonId !== null) {
@@ -988,12 +1006,13 @@ export default function AdminDashboardPage() {
   }, [handleProfilePersonUpdated]);
 
   const refreshCurrentProfilePerson = useCallback(async () => {
-    const currentPersonId = resolveSessionPersonId(sessionAdminUser, persons);
+    const currentPersonId = positiveNumber(authenticatedPerson?.id) ?? resolveSessionPersonId(sessionAdminUser, persons);
     if (currentPersonId === null) return;
 
     const refreshedPerson = await fetchPersonById(currentPersonId);
+    setAuthenticatedPerson(refreshedPerson);
     handleProfilePersonUpdated(refreshedPerson);
-  }, [handleProfilePersonUpdated, persons, sessionAdminUser]);
+  }, [authenticatedPerson, handleProfilePersonUpdated, persons, sessionAdminUser]);
 
   const loadDeferredDashboardData = useCallback(async () => {
     let deferredFailedCount = 0;
@@ -1142,7 +1161,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (!hasEntered || persons.length === 0) return;
 
-    const currentPersonId = resolveSessionPersonId(sessionAdminUser, persons);
+    const currentPersonId = positiveNumber(authenticatedPerson?.id) ?? resolveSessionPersonId(sessionAdminUser, persons);
     if (currentPersonId === null) return;
 
     const refreshKey = String(currentPersonId);
@@ -1153,7 +1172,7 @@ export default function AdminDashboardPage() {
       currentProfileRefreshKeyRef.current = null;
       console.warn("Failed to refresh current profile person", error);
     });
-  }, [hasEntered, persons, refreshCurrentProfilePerson, sessionAdminUser]);
+  }, [authenticatedPerson, hasEntered, persons, refreshCurrentProfilePerson, sessionAdminUser]);
 
   useEffect(() => {
     const data = initialBootstrapDataRef.current;
@@ -1308,16 +1327,16 @@ export default function AdminDashboardPage() {
 
   const adminProfile = useMemo<AdminProfileSummary>(() => {
     const sessionUser = sessionAdminUser;
-    const matchedPerson = resolveSessionPerson(sessionUser, persons);
+    const matchedPerson = authenticatedPerson ?? resolveSessionPerson(sessionUser, persons);
     const firstName = matchedPerson?.firstName || sessionUser.firstName?.trim() || "Administrador";
     const lastName1 = matchedPerson?.lastName || sessionUser.lastName1?.trim() || "";
     const lastName2 = sessionUser.lastName2?.trim() || "";
     const fullName = [firstName, lastName1, lastName2].filter(Boolean).join(" ").trim();
     const displayName = fullName || sessionUser.username?.trim() || (matchedPerson ? personFullName(matchedPerson) : "Administrador");
-    const occupation = matchedPerson ? occupationNameById.get(matchedPerson.occupationId) ?? `Ocupación #${matchedPerson.occupationId}` : "No disponible";
+    const occupation = resolvePersonOccupationLabel(matchedPerson, occupationNameById, "No disponible");
     const campId = matchedPerson?.campId ?? sessionUser.campId;
     const camp = typeof campId === "number" ? campNameById.get(campId) ?? `Campamento #${campId}` : "Sin asignar";
-    const status = matchedPerson ? normalizeStatusLabel(matchedPerson.status) : "Sin registro";
+    const status = matchedPerson ? normalizeStatusLabel(matchedPerson.currentStatus ?? matchedPerson.status) : "Sin registro";
 
     return {
       id: typeof sessionUser.id === "number" ? sessionUser.id : matchedPerson?.id ?? null,
@@ -1333,7 +1352,7 @@ export default function AdminDashboardPage() {
       avatarUrl: resolveAdminProfileImage(sessionUser, matchedPerson),
       sessionState,
     };
-  }, [persons, occupationNameById, campNameById, sessionState, sessionAdminUser]);
+  }, [authenticatedPerson, persons, occupationNameById, campNameById, sessionState, sessionAdminUser]);
 
   const populationStats = useMemo(() => {
     const total = persons.length;
@@ -2451,7 +2470,7 @@ const PopulationModule = memo(function PopulationModule({
       const person = persons.find((candidate) => candidate.id === personId);
       const personName = person ? personFullName(person) : nestedName(rawItem, ["person", "resident", "survivor"]) ?? `Usuario #${personId}`;
       const fromRole = person
-        ? occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`
+        ? resolvePersonOccupationLabel(person, occupations, "Desconocido")
         : originalOccupationId !== null
           ? occupations.get(originalOccupationId) ?? `Ocupación #${originalOccupationId}`
           : nestedName(rawItem, ["originalOccupation", "baseOccupation", "previousOccupation"]) ?? "Desconocido";
@@ -2499,7 +2518,7 @@ const PopulationModule = memo(function PopulationModule({
   const roleDistribution = useMemo(() => {
     const map = new Map<string, number>();
     persons.forEach((person) => {
-      const role = occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`;
+      const role = resolvePersonOccupationLabel(person, occupations);
       map.set(role, (map.get(role) ?? 0) + 1);
     });
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8);
@@ -2523,7 +2542,7 @@ const PopulationModule = memo(function PopulationModule({
       if (!query) return true;
 
       const name = personFullName(person).toLowerCase();
-      const role = (occupations.get(person.occupationId) ?? "").toLowerCase();
+      const role = resolvePersonOccupationLabel(person, occupations, "").toLowerCase();
       const sector = (camps.get(person.campId) ?? "").toLowerCase();
       return name.includes(query) || role.includes(query) || sector.includes(query);
     });
@@ -2536,7 +2555,7 @@ const PopulationModule = memo(function PopulationModule({
       .filter((person) => {
         if (!query) return true;
         const name = personFullName(person).toLowerCase();
-        const role = (occupations.get(person.occupationId) ?? "").toLowerCase();
+        const role = resolvePersonOccupationLabel(person, occupations, "").toLowerCase();
         return name.includes(query) || role.includes(query);
       })
       .slice(0, 60);
@@ -2611,7 +2630,7 @@ const PopulationModule = memo(function PopulationModule({
       lastName2,
       age: person.age,
       status: person.status,
-      occupationId: person.occupationId,
+      occupationId: person.occupationId ?? 0,
       notes: person.notes ?? "",
       accountStatus: person.accountStatus ?? "ACTIVE",
     });
@@ -2674,7 +2693,7 @@ const PopulationModule = memo(function PopulationModule({
         status: editForm.status,
         currentStatus: editForm.status,
         campId: selectedPerson.campId,
-        occupationId: Number(editForm.occupationId),
+        occupationId: Number(editForm.occupationId) > 0 ? Number(editForm.occupationId) : null,
         notes: normalizedNotes || undefined,
       };
 
@@ -2956,7 +2975,7 @@ const PopulationModule = memo(function PopulationModule({
                         <span>{personFullName(person)}</span>
                       </div>
                     </td>
-                    <td>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`}</td>
+                    <td>{resolvePersonOccupationLabel(person, occupations)}</td>
                     <td>
                       <span className={`admin-ui-v2-pill ${statusPillFromLegacy(legacyPopulationStatus(person.status))}`}>
                         {legacyPopulationStatus(person.status)}
@@ -3202,7 +3221,7 @@ const PopulationModule = memo(function PopulationModule({
                         }}
                       >
                         <span className="admin-ui-v2-temp-avatar">{personInitials(person)}</span>
-                        <div><strong>{personFullName(person)}</strong><small>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`} · {person.age} años</small></div>
+                        <div><strong>{personFullName(person)}</strong><small>{resolvePersonOccupationLabel(person, occupations)} · {person.age} años</small></div>
                       </button>
                     ))}
                     {availableTempCandidates.length === 0 && <div className="admin-ui-v2-empty-cell">No hay operarios disponibles con esos filtros.</div>}

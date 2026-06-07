@@ -89,6 +89,7 @@ export default function LoginPage() {
         rol: response.user.rol,
         role: normalizeUserRole(response.user.rol),
         campId: response.user.campId,
+        status: response.user.status,
       }
       const token = response.token ?? response.accessToken
       const savedPath = localStorage.getItem('last_secure_path')
