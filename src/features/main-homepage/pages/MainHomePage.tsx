@@ -141,6 +141,7 @@ export function MainHomePage() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [showCredits, setShowCredits] = useState(false)
   const [isGlobeLoaded, setIsGlobeLoaded] = useState(false)
+  const [hasGlobeIntroPlayed, setHasGlobeIntroPlayed] = useState(false)
   const [popupMessage, setPopupMessage] = useState<string | null>(null)
   const [popupVariant, setPopupVariant] = useState<PopupVariant>('error')
   void selectedCamp
@@ -158,6 +159,12 @@ export function MainHomePage() {
     appState === 'login' ||
     appState === 'register' ||
     appState === 'global-map'
+  const shouldMountScene = appState !== 'landing'
+  const shouldShowSceneNav =
+    shouldMountScene &&
+    appState !== 'login' &&
+    appState !== 'register' &&
+    appState !== 'global-map'
 
   useEffect(() => {
     if (appState === 'global-map') {
@@ -231,6 +238,17 @@ export function MainHomePage() {
       setAuthErrors({})
       setIsAuthenticating(false)
       resetPasswordResetState()
+    }
+  }, [appState])
+
+  useEffect(() => {
+    document.body.classList.toggle(
+      'main-homepage-auth-active',
+      appState === 'login' || appState === 'register',
+    )
+
+    return () => {
+      document.body.classList.remove('main-homepage-auth-active')
     }
   }, [appState])
 
@@ -544,6 +562,12 @@ export function MainHomePage() {
     setAppState('global-map')
   }, [])
 
+  const returnToLoadedGlobalMap = useCallback(() => {
+    setHasGlobeIntroPlayed(true)
+    setIsGlobeLoaded(true)
+    setAppState('global-map')
+  }, [])
+
   useEffect(() => {
     if (bridgeVideoRef.current) {
       if (isPaused || appState !== 'bridge') bridgeVideoRef.current.pause()
@@ -673,7 +697,7 @@ export function MainHomePage() {
   }, [currentMode, isSceneReady])
 
   useEffect(() => {
-    if (!containerRef.current) return
+    if (!shouldMountScene || !containerRef.current) return
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(MODES[currentModeRef.current].skyColor)
@@ -699,7 +723,8 @@ export function MainHomePage() {
       alpha: false,
     })
     renderer.setSize(window.innerWidth, window.innerHeight)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    const renderPixelRatioLimit = window.innerWidth < 900 || window.innerHeight < 600 ? 1.25 : 1.5
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, renderPixelRatioLimit))
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFShadowMap
     renderer.setClearColor(0x000000, 1)
@@ -1294,8 +1319,11 @@ export function MainHomePage() {
     setIsSceneReady(true)
 
     let frame = 0
+    let animationFrameId = 0
+    let isDisposed = false
     const animate = () => {
-      requestAnimationFrame(animate)
+      if (isDisposed) return
+      animationFrameId = requestAnimationFrame(animate)
 
       const paused = isPausedRef.current
       const appSt = appStateRef.current
@@ -1458,37 +1486,6 @@ export function MainHomePage() {
           }
         }
 
-        if (mistRef.current) {
-          const pos = mistRef.current.geometry.attributes.position.array as Float32Array
-          const count = pos.length / 3
-          for (let i = 0; i < count; i++) {
-            const idx = i * 3
-
-            pos[idx] += 0.15
-
-            pos[idx + 1] += Math.sin(frame * 0.3 + i) * 0.03
-
-            if (pos[idx] > 600) pos[idx] = -600
-            if (pos[idx + 1] > 80) pos[idx + 1] = 0
-          }
-          mistRef.current.geometry.attributes.position.needsUpdate = true
-        }
-
-        if (cloudGroupRef.current) {
-          cloudGroupRef.current.children.forEach((cloud, i) => {
-            cloud.position.x += 0.05
-            cloud.position.y += Math.sin(frame * 0.2 + i) * 0.02
-            if (cloud.position.x > 800) cloud.position.x = -800
-          })
-        }
-
-        if (treeGroupRef.current) {
-          treeGroupRef.current.children.forEach((tree, i) => {
-            tree.rotation.x = Math.sin(frame + i) * 0.02
-            tree.rotation.z = Math.cos(frame * 0.8 + i) * 0.02
-          })
-        }
-
         if (appSt === 'explore') {
           coordsRef.current = {
             lat: 9.9281 + camera.position.z / 5000,
@@ -1502,7 +1499,9 @@ export function MainHomePage() {
         }
       }
 
-      renderer.render(scene, camera)
+      if (!isDisposed) {
+        renderer.render(scene, camera)
+      }
     }
     animate()
 
@@ -1514,7 +1513,7 @@ export function MainHomePage() {
       camera.aspect = width / height
       camera.updateProjectionMatrix()
       renderer.setSize(width, height)
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, renderPixelRatioLimit))
     }
 
     const resizeObserver = new ResizeObserver(() => {
@@ -1529,6 +1528,8 @@ export function MainHomePage() {
     onResize()
 
     return () => {
+      isDisposed = true
+      cancelAnimationFrame(animationFrameId)
       resizeObserver.disconnect()
       window.removeEventListener('resize', onResize)
       window.removeEventListener('mousemove', onMouseMove)
@@ -1541,10 +1542,40 @@ export function MainHomePage() {
       window.removeEventListener('keyup', onKeyUp)
       controls.dispose()
       fpControls.dispose()
+      scene.traverse((object) => {
+        if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.LineSegments) {
+          object.geometry?.dispose()
+          const materials = Array.isArray(object.material) ? object.material : [object.material]
+          materials.forEach((material) => {
+            if (!material) return
+            Object.values(material).forEach((value) => {
+              if (value instanceof THREE.Texture) value.dispose()
+            })
+            material.dispose()
+          })
+        }
+      })
       renderer.dispose()
-      containerRef.current?.removeChild(renderer.domElement)
+      renderer.domElement.parentElement?.removeChild(renderer.domElement)
+      sceneRef.current = null
+      cameraRef.current = null
+      rendererRef.current = null
+      controlsRef.current = null
+      fpControlsRef.current = null
+      treeGroupRef.current = null
+      birdsRef.current = null
+      threatsRef.current = null
+      starsRef.current = null
+      rainRef.current = null
+      sunRef.current = null
+      sunGlowRef.current = null
+      moonRef.current = null
+      moonGlowRef.current = null
+      cloudGroupRef.current = null
+      godRaysRef.current = null
+      mistRef.current = null
     }
-  }, [])
+  }, [shouldMountScene])
 
   const handleFPClick = useCallback(() => {
     fpControlsRef.current?.lock()
@@ -1557,7 +1588,9 @@ export function MainHomePage() {
       <div className="scanline" />
       <div className="vignette" />
 
-      <div ref={containerRef} className="absolute inset-0 z-0" data-menu-open={isAnyMenuOpen} />
+      {shouldMountScene && (
+        <div ref={containerRef} className="absolute inset-0 z-0" data-menu-open={isAnyMenuOpen} />
+      )}
 
       <audio ref={audioRef} />
 
@@ -1569,7 +1602,7 @@ export function MainHomePage() {
 
       {}
       <AnimatePresence>
-        {!(appState === 'landing' || appState === 'login' || appState === 'register') && (
+        {shouldShowSceneNav && (
           <motion.nav
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -2046,24 +2079,24 @@ export function MainHomePage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[500] flex items-center justify-center bg-transparent"
+            className="login-flow-overlay absolute inset-0 z-[500] flex items-center justify-center bg-transparent"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 50 }}
-              animate={{ scale: 1, opacity: 1, y: -40 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1] }}
-              className="w-[1000px] max-w-[92vw] h-[580px] max-h-[82vh] flex flex-col-reverse md:flex-row relative panel-brush panel-contrast-accent overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.8)]"
+              className="login-flow-dialog w-[1000px] max-w-[92vw] h-[580px] max-h-[82vh] flex flex-col-reverse md:flex-row relative panel-brush panel-contrast-accent overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.8)]"
             >
               {}
-              <div className="w-full md:w-[340px] h-full bg-black/60 backdrop-blur-2xl border-t md:border-t-0 md:border-r border-white/5 p-8 md:p-10 flex flex-col justify-center relative z-10 overflow-y-auto">
+              <div className="login-flow-form-panel w-full md:w-[340px] h-full bg-black/60 backdrop-blur-2xl border-t md:border-t-0 md:border-r border-white/5 p-8 md:p-10 flex flex-col justify-center relative z-10 overflow-y-auto">
                 {}
                 <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
 
                 <div className="relative z-10 w-full max-w-sm mx-auto">
-                  <div className="flex items-center gap-6 mb-12">
+                  <div className="login-flow-header flex items-center gap-6 mb-12">
                     <button
                       onClick={() => setAppState('explore')}
-                      className="group/close p-3 transition-all duration-300 text-white hover:text-blue-400 hover:rotate-90 hover:scale-110 active:scale-95 z-20 flex items-center justify-center border border-white/10 hover:border-blue-400/50 rounded-full"
+                      className="login-flow-close group/close p-3 transition-all duration-300 text-white hover:text-blue-400 hover:rotate-90 hover:scale-110 active:scale-95 z-20 flex items-center justify-center border border-white/10 hover:border-blue-400/50 rounded-full"
                       style={{ fontFamily: "'Oswald', sans-serif" }}
                     >
                       <X size={24} className="transition-transform" />
@@ -2076,7 +2109,7 @@ export function MainHomePage() {
                     </div>
                   </div>
 
-                  <form className="space-y-6" onSubmit={handleAuthSubmit}>
+                  <form className="login-flow-form space-y-6" onSubmit={handleAuthSubmit}>
                     <div className="space-y-3 w-full max-w-[260px]">
                       <label className="text-[11px] uppercase font-bold tracking-[0.2em] text-white block">
                         Nombre de Usuario
@@ -2149,15 +2182,25 @@ export function MainHomePage() {
                       <span className="relative z-10 transition-colors">
                         {appState === 'login'
                           ? isAuthenticating
-                            ? 'Autenticando...'
-                            : 'Autenticar'
+                            ? 'Ingresando...'
+                            : 'Ingresar'
                           : 'REGISTRAR'}
                       </span>
                     </button>
 
+                    {appState === 'login' && (
+                      <button
+                        type="button"
+                        onClick={returnToLoadedGlobalMap}
+                        className="group relative w-full max-w-[260px] py-3 font-black uppercase tracking-[0.3em] text-[11px] transition-all menu-brush text-white/90 mt-2 text-left px-8"
+                        style={{ fontFamily: "'Oswald', sans-serif" }}
+                      >
+                        <span className="relative z-10 transition-colors">Volver</span>
+                      </button>
+                    )}
                   </form>
 
-                  <div className="mt-12 pt-10 border-t border-white/5">
+                  <div className="login-flow-footer mt-12 pt-10 border-t border-white/5">
                     {appState === 'login' ? (
                       <div className="flex items-center gap-4 text-[11px] uppercase font-bold tracking-widest text-white leading-relaxed">
                         <Compass
@@ -2183,7 +2226,7 @@ export function MainHomePage() {
               </div>
 
               {}
-              <div className="w-full md:flex-1 h-[40vh] md:h-full relative overflow-hidden bg-zinc-950">
+              <div className="login-flow-media w-full md:flex-1 h-[40vh] md:h-full relative overflow-hidden bg-zinc-950">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={loginVideos[loginVideoIndex]}
@@ -2207,7 +2250,7 @@ export function MainHomePage() {
                 <div className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-black/90 pointer-events-none" />
 
                 {}
-                <div className="absolute top-6 left-6 z-20">
+                <div className="login-flow-kicker absolute top-6 left-6 z-20">
                   {appState === 'register' ? (
                     <span className="text-xl font-black uppercase tracking-widest text-amber-400">
                       ESCOGE TU PERSONAJE
@@ -2224,7 +2267,7 @@ export function MainHomePage() {
                   key={`info-${loginVideoIndex}`}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="absolute bottom-6 right-6 z-30 text-right flex flex-col items-end"
+                  className="login-flow-character-info absolute bottom-6 right-6 z-30 text-right flex flex-col items-end"
                 >
                   {appState === 'register' && (
                     <div className="mb-4 flex flex-col items-end">
@@ -2521,19 +2564,23 @@ export function MainHomePage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[600] flex items-center justify-center pointer-events-none"
+            className="global-map-shell fixed inset-0 z-[1600] flex items-center justify-center pointer-events-none"
           >
-            <div className="w-full max-w-3xl h-[75vh] bg-black/20 border border-[#00d4ff]/40 rounded-2xl relative shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden pointer-events-auto">
+            <div className="global-map-panel w-full max-w-3xl h-[75vh] bg-black/20 border border-[#00d4ff]/40 rounded-2xl relative shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden pointer-events-auto">
               <button
                 onClick={() => setAppState('explore')}
-                className="absolute top-6 right-6 z-[700] w-10 h-10 flex items-center justify-center bg-black/40 text-white hover:text-blue-400 transition-all duration-300 hover:rotate-90 hover:scale-110 active:scale-95 rounded-full border border-white/10"
+                className="global-map-close absolute top-6 right-6 z-[700] w-10 h-10 flex items-center justify-center bg-black/40 text-white hover:text-blue-400 transition-all duration-300 hover:rotate-90 hover:scale-110 active:scale-95 rounded-full border border-white/10"
               >
                 <X size={20} />
               </button>
 
               <div className="w-full h-full">
                 <ReplicaGlobe
-                  onLoadingComplete={() => setIsGlobeLoaded(true)}
+                  skipIntro={hasGlobeIntroPlayed}
+                  onLoadingComplete={() => {
+                    setIsGlobeLoaded(true)
+                    setHasGlobeIntroPlayed(true)
+                  }}
                   onLoginClick={() => {
                     setAppState('login')
                     setCurrentMode('Storm')
@@ -2646,26 +2693,26 @@ export function MainHomePage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+            className="main-user-guide-overlay fixed inset-0 z-[1200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 30 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 30 }}
-              className="w-full max-w-lg p-10 relative shadow-2xl panel-brush"
+              className="main-user-guide-dialog w-full max-w-lg p-10 relative shadow-2xl panel-brush"
             >
               <button
                 onClick={() => {
                   setIsUserGuideOpen(false)
                   setIsPaused(false)
                 }}
-                className="absolute top-6 right-6 text-white/60 hover:text-blue-400 transition-all duration-300 hover:rotate-90 hover:scale-110 active:scale-95 z-20 flex items-center justify-center"
+                className="main-user-guide-close absolute top-6 right-6 text-white/60 hover:text-blue-400 transition-all duration-300 hover:rotate-90 hover:scale-110 active:scale-95 z-20 flex items-center justify-center"
               >
                 <X size={24} />
               </button>
 
-              <div className="space-y-8">
-                <div className="text-center">
+              <div className="main-user-guide-scroll space-y-8">
+                <div className="main-user-guide-header text-center">
                   <h2
                     className="panel-title-white text-3xl font-black italic uppercase tracking-tighter text-white mb-2"
                     style={{ fontFamily: "'Oswald', sans-serif", color: '#ffffff' }}
@@ -2675,8 +2722,8 @@ export function MainHomePage() {
                   <div className="h-1 w-20 bg-blue-400 mx-auto" />
                 </div>
 
-                <div className="space-y-6">
-                  <div className="bg-white/5 border border-white/10 p-5 rounded-lg">
+                <div className="main-user-guide-sections space-y-6">
+                  <div className="main-user-guide-card bg-white/5 border border-white/10 p-5 rounded-lg">
                     <h3 className="text-[10px] font-black uppercase text-blue-400 tracking-widest mb-2 font-mono">
                       Controles de Vuelo
                     </h3>
@@ -2689,7 +2736,7 @@ export function MainHomePage() {
                     </p>
                   </div>
 
-                  <div className="bg-white/5 border border-white/10 p-5 rounded-lg">
+                  <div className="main-user-guide-card bg-white/5 border border-white/10 p-5 rounded-lg">
                     <h3 className="text-[10px] font-black uppercase text-blue-400 tracking-widest mb-2 font-mono">
                       Redes del Campamento
                     </h3>
