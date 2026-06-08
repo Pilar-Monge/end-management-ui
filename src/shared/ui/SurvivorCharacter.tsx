@@ -90,7 +90,7 @@ const SurvivorCharacter = memo(
 
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
       renderer.shadowMap.enabled = true
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap
+      renderer.shadowMap.type = THREE.PCFShadowMap
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8))
       renderer.setSize(width, height)
       renderer.setClearColor(0x000000, 0)

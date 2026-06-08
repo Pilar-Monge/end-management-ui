@@ -80,6 +80,10 @@ const monthNames = [
 ]
 const weekDays = ['LU', 'MA', 'MI', 'JU', 'VI', 'SA', 'DO']
 
+// Generar lista de años (desde el actual hasta 1920)
+const currentYear = new Date().getFullYear()
+const yearOptions = Array.from({ length: currentYear - 1919 }, (_, i) => currentYear - i)
+
 const toDateValue = (date: Date) => {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -141,6 +145,9 @@ export default function AdmissionPage() {
     message: string
     type: 'success' | 'warning'
   } | null>(null)
+  
+  // Nuevo estado para el selector de años
+  const [isYearPickerOpen, setIsYearPickerOpen] = useState(false)
 
   const calendarDays = useMemo(
     () => buildCalendar(calendarDate, form.nacimiento),
@@ -350,6 +357,20 @@ export default function AdmissionPage() {
           .filter(Boolean)
     : []
 
+  
+  const currentCampName = useMemo(() => {
+    if (!form.campId) return 'SELECCIONE UN CAMPAMENTO'
+    
+    
+    if (prefilledCampId && prefilledCampId === form.campId && prefilledCampName) {
+      return prefilledCampName
+    }
+
+    
+    const selectedCamp = camps.find((c) => c.id === form.campId)
+    return selectedCamp ? selectedCamp.name : 'CAMPAMENTO DESCONOCIDO'
+  }, [form.campId, camps, prefilledCampId, prefilledCampName])
+
   return (
     <main className="admission-page">
       <div className="admission-backdrop" />
@@ -384,49 +405,13 @@ export default function AdmissionPage() {
         <header className="admission-header">
           <div className="header-card">
             <p className="header-eyebrow">Survival System - Project X</p>
-            <h1 className="stencil">Camp Zero</h1>
+            <h1 className="stencil">{currentCampName}</h1>
             <p className="header-subtitle">Formulario de ingreso a zona segura</p>
           </div>
         </header>
 
         <form className="admission-form-shell" onSubmit={handleSubmit}>
           <div className="admission-main">
-            <fieldset className="file-section animate-rise">
-              <legend className="section-title">Selección de campamento</legend>
-              <div className="admission-personal-grid">
-                <label className="field-label">
-                  Campamento
-                  {prefilledCampId ? (
-                    <select
-                      className="classified-input"
-                      name="campId"
-                      disabled
-                      value={form.campId ?? ''}
-                    >
-                      <option value={prefilledCampId}>
-                        {prefilledCampName ?? `Campamento ${prefilledCampId}`}
-                      </option>
-                    </select>
-                  ) : (
-                    <select
-                      className="classified-input"
-                      name="campId"
-                      onChange={handleCampSelect}
-                      required
-                      value={form.campId ?? ''}
-                    >
-                      <option value="">Seleccionar campamento</option>
-                      {camps.map((camp) => (
-                        <option key={camp.id} value={camp.id}>
-                          {camp.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </label>
-              </div>
-            </fieldset>
-
             <fieldset className="file-section animate-rise">
               <legend className="section-title">Datos personales</legend>
               <div className="admission-personal-grid">
@@ -654,9 +639,38 @@ export default function AdmissionPage() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="calendar-header">
-              <strong>
-                {monthNames[calendarDate.getMonth()]} de {calendarDate.getFullYear()}
-              </strong>
+              <div className="calendar-month-selector" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                 
+                <strong 
+                  onClick={() => setIsYearPickerOpen(false)}
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                >
+                  {monthNames[calendarDate.getMonth()]}
+                </strong>
+                
+                
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsYearPickerOpen(prev => !prev);
+                  }}
+                  className="cal-year-btn"
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    color: '#fff',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.9em',
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  {calendarDate.getFullYear()} ▾
+                </button>
+              </div>
+
               <div className="calendar-header-actions">
                 <button
                   aria-label="Mes anterior"
@@ -676,6 +690,56 @@ export default function AdmissionPage() {
                 </button>
               </div>
             </div>
+
+            
+            {isYearPickerOpen && (
+              <div 
+                className="year-picker-dropdown"
+                style={{
+                  position: 'absolute',
+                  top: '45px',
+                  left: '10px',
+                  right: '10px',
+                  maxHeight: '200px',
+                  overflowY: 'auto',
+                  background: 'rgba(10, 15, 20, 0.95)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '4px',
+                  zIndex: 20,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                  backdropFilter: 'blur(4px)'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {yearOptions.map((year) => (
+                  <button
+                    key={year}
+                    type="button"
+                    onClick={() => {
+                      setCalendarDate(new Date(year, calendarDate.getMonth(), 1));
+                      setIsYearPickerOpen(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '6px 10px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: year === calendarDate.getFullYear() ? '#4ade80' : '#ccc',
+                      fontWeight: year === calendarDate.getFullYear() ? 'bold' : 'normal',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      fontFamily: 'inherit'
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div className="calendar-grid">
               {weekDays.map((day) => (
                 <span className="calendar-weekday" key={day}>

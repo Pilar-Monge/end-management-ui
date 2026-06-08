@@ -532,6 +532,17 @@ export function MainHomePage() {
   const mistRef = useRef<THREE.Points | null>(null)
   const bridgeVideoRef = useRef<HTMLVideoElement>(null)
   const mainVideoRef = useRef<HTMLVideoElement>(null)
+  const isTransitionImage = /\.(webp|png|jpe?g|gif|avif)(?:[?#]|$)/i.test(
+    MEDIA_URLS.videos.transition,
+  )
+
+  const goToGlobalMap = useCallback(() => {
+    if (cameraRef.current) {
+      cameraRef.current.position.set(0, 10, 450)
+      cameraRef.current.lookAt(0, 0, 0)
+    }
+    setAppState('global-map')
+  }, [])
 
   useEffect(() => {
     if (bridgeVideoRef.current) {
@@ -546,6 +557,12 @@ export function MainHomePage() {
       else if (appState === 'video') mainVideoRef.current.play().catch(() => {})
     }
   }, [isPaused, appState])
+
+  useEffect(() => {
+    if (appState !== 'video' || !isTransitionImage || isPaused) return
+    const timer = setTimeout(goToGlobalMap, 6000)
+    return () => clearTimeout(timer)
+  }, [appState, goToGlobalMap, isPaused, isTransitionImage])
 
   useEffect(() => {
     if (audioRef.current) {
@@ -577,8 +594,6 @@ export function MainHomePage() {
     if (!sceneRef.current) return
     const config = MODES[currentMode]
     const scene = sceneRef.current
-
-    console.log(`Changing mode to: ${currentMode}`, config)
 
     scene.background = new THREE.Color(config.skyColor)
     if (scene.fog instanceof THREE.FogExp2) {
@@ -686,7 +701,7 @@ export function MainHomePage() {
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.shadowMap.enabled = true
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    renderer.shadowMap.type = THREE.PCFShadowMap
     renderer.setClearColor(0x000000, 1)
 
     if (containerRef.current) {
@@ -877,11 +892,11 @@ export function MainHomePage() {
 
     const gltfLoader = new GLTFLoader()
     const signUrl =
-      'https://tuieldonbxswmopvyryx.supabase.co/storage/v1/object/public/1.principal/quarantine_sign.glb'
+      'https://pub-9d9e76b894c2469985b070f298268aad.r2.dev/3d-models-intro/quarantine_sign%20(1).glb'
     const lightPoleUrl =
-      'https://tuieldonbxswmopvyryx.supabase.co/storage/v1/object/public/1.principal/ligthpole.glb'
+      'https://pub-9d9e76b894c2469985b070f298268aad.r2.dev/3d-models-intro/ligthpole%20(1).glb'
     const areaSignUrl =
-      'https://tuieldonbxswmopvyryx.supabase.co/storage/v1/object/public/1.principal/areasing.glb'
+      'https://pub-9d9e76b894c2469985b070f298268aad.r2.dev/3d-models-intro/areasing%20(1).glb'
 
     const signPositions = [
       { x: 120, z: -150 },
@@ -1698,33 +1713,32 @@ export function MainHomePage() {
                   }}
                   className="absolute inset-0 flex items-center justify-center overflow-hidden"
                 >
-                  <video
-                    ref={mainVideoRef}
-                    autoPlay
-                    playsInline
-                    preload="metadata"
-                    poster={MEDIA_URLS.branding.background}
-                    onCanPlay={(e) => (e.currentTarget.volume = 0.3)}
-                    onTimeUpdate={(e) => {
-                      if (e.currentTarget.currentTime >= 6.0) {
-                        if (cameraRef.current) {
-                          cameraRef.current.position.set(0, 10, 450)
-                          cameraRef.current.lookAt(0, 0, 0)
+                  {isTransitionImage ? (
+                    <img
+                      src={MEDIA_URLS.videos.transition}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      onError={() => setTimeout(goToGlobalMap, 3000)}
+                    />
+                  ) : (
+                    <video
+                      ref={mainVideoRef}
+                      autoPlay
+                      playsInline
+                      preload="metadata"
+                      poster={MEDIA_URLS.branding.background}
+                      onCanPlay={(e) => (e.currentTarget.volume = 0.3)}
+                      onTimeUpdate={(e) => {
+                        if (e.currentTarget.currentTime >= 6.0) {
+                          goToGlobalMap()
                         }
-                        setAppState('global-map')
-                      }
-                    }}
-                    onEnded={() => {
-                      if (cameraRef.current) {
-                        cameraRef.current.position.set(0, 10, 450)
-                        cameraRef.current.lookAt(0, 0, 0)
-                      }
-                      setAppState('global-map')
-                    }}
-                    onError={() => setTimeout(() => setAppState('global-map'), 3000)}
-                    className="w-full h-full object-cover"
-                    src={MEDIA_URLS.videos.transition}
-                  />
+                      }}
+                      onEnded={goToGlobalMap}
+                      onError={() => setTimeout(goToGlobalMap, 3000)}
+                      className="w-full h-full object-cover"
+                      src={MEDIA_URLS.videos.transition}
+                    />
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1757,8 +1771,8 @@ export function MainHomePage() {
                 <div className="space-y-4">
                   <div className="mb-6">
                     <h2
-                      className="text-xl font-black italic uppercase tracking-tighter text-white mb-2"
-                      style={{ fontFamily: "'Oswald', sans-serif" }}
+                      className="relative z-10 text-xl font-black italic uppercase tracking-tighter text-white mb-2"
+                      style={{ fontFamily: "'Oswald', sans-serif", color: '#ffffff' }}
                     >
                       ATMÓSFERA
                     </h2>
@@ -2526,9 +2540,11 @@ export function MainHomePage() {
                   }}
                   onSelectCamp={(campId) => {
                     if (campId > 0) {
-                      authDispatch({ type: 'SELECT_CAMP', payload: campId })
-                      setAuthForm((prev) => ({ ...prev, campId }))
-                      localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(campId))
+                      window.setTimeout(() => {
+                        authDispatch({ type: 'SELECT_CAMP', payload: campId })
+                        setAuthForm((prev) => ({ ...prev, campId }))
+                        localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(campId))
+                      }, 0)
                     }
                   }}
                 />
@@ -2651,8 +2667,8 @@ export function MainHomePage() {
               <div className="space-y-8">
                 <div className="text-center">
                   <h2
-                    className="text-3xl font-black italic uppercase tracking-tighter text-white mb-2"
-                    style={{ fontFamily: "'Oswald', sans-serif" }}
+                    className="panel-title-white text-3xl font-black italic uppercase tracking-tighter text-white mb-2"
+                    style={{ fontFamily: "'Oswald', sans-serif", color: '#ffffff' }}
                   >
                     GUÍA DEL SOBREVIVIENTE
                   </h2>
@@ -2720,8 +2736,8 @@ export function MainHomePage() {
                 {}
                 <div className="text-center mb-8">
                   <h2
-                    className="text-3xl font-black italic uppercase tracking-tighter text-white mb-2"
-                    style={{ fontFamily: "'Oswald', sans-serif" }}
+                    className="panel-title-white text-3xl font-black italic uppercase tracking-tighter text-white mb-2"
+                    style={{ fontFamily: "'Oswald', sans-serif", color: '#ffffff' }}
                   >
                     SISTEMA CENTRAL
                   </h2>
