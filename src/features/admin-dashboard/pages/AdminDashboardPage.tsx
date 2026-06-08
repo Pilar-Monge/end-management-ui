@@ -1,10 +1,14 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
+import * as L from "leaflet";
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   Cell,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -13,8 +17,10 @@ import {
   YAxis,
 } from "recharts";
 import { WorldMap } from "../../expeditions-ui/components/WorldMap";
-import type { Person } from "../../persons/types";
+import type { Gender, Person, SystemRole, SystemUserStatus } from "../../persons/types";
+import { fetchAuthMeProfile, fetchPersonById, type AuthMeProfile } from "../../persons/api/queries";
 import { deletePerson, updatePerson, updatePersonPhoto } from "../../persons/api/mutations";
+import { fetchSystemUserById, updateSystemUser } from "../../persons/api/systemUsers";
 import type { Camp } from "../../camps/types";
 import type { Occupation } from "../../catalogs/types";
 import {
@@ -40,7 +46,6 @@ import {
 import {
   mapNotificationFromApi,
 } from "../mappers/adminMappers";
-import { ExpeditionsWorldMap, prefetchExpeditionsWorldMap } from "../expeditions/components/ExpeditionsWorldMap";
 import type { MappedCampPoint } from "../expeditions/types";
 import { AdminSyncOverlay } from "../components/AdminSyncOverlay";
 import { SESSION_TOKEN_CHANGED_EVENT } from "../../../shared/services/sessionService";
@@ -49,6 +54,7 @@ import { getErrorMessage } from "../../../shared/services/errorMessages";
 import { PopupMessage } from "../../../shared/components/PopupMessage";
 import "../../expeditions-ui/expeditionsUi.css";
 import "../expeditions/expeditions-panel.css";
+import "leaflet/dist/leaflet.css";
 import "./admin-dashboard.css";
 
 type AdminSectionId =
@@ -82,6 +88,8 @@ interface UiAdmission {
   suggestedOccupationId?: number;
   finalOccupationId?: number;
   rejectionReason?: string;
+  photoUrl?: string | null;
+  photoSignedUrl?: string | null;
 }
 
 interface UiExpedition {
@@ -93,6 +101,9 @@ interface UiExpedition {
   status: "EN CURSO" | "PROGRAMADA" | "REGRESANDO" | "COMPLETADA";
   objective: string;
   sector: string;
+  originCampId?: number;
+  destinationCampId?: number;
+  routePoints: Array<{ latitude: number; longitude: number; label?: string }>;
 }
 
 interface UiIntercampRequest {
@@ -103,6 +114,26 @@ interface UiIntercampRequest {
   status: "PENDIENTE" | "APROBADO" | "RECHAZADO" | "CONFIRMADO";
   urgent: boolean;
   type: "solicitud" | "traslado" | "oferta";
+  originCampId?: number;
+  destinationCampId?: number;
+  plannedDepartureDate?: string;
+  plannedArrivalDate?: string;
+  createdBy?: string;
+  respondedBy?: string;
+}
+
+interface UiTransfer {
+  id: number;
+  requestId: number | null;
+  status: "PLANIFICADA" | "EN_TRANSITO" | "ENTREGADA" | "CANCELADA";
+  plannedDepartureDate?: string;
+  actualDepartureDate?: string;
+  plannedArrivalDate?: string;
+  actualArrivalDate?: string;
+  departureApprovedBy?: string;
+  arrivalApprovedBy?: string;
+  rationsForTrip: number;
+  receptionNotes: string;
 }
 
 interface UiNotification {
@@ -160,9 +191,11 @@ interface SessionAdminUser {
   lastName1?: string;
   lastName2?: string;
   role?: string;
+  status?: string;
   campId?: number;
   photoUrl?: string;
   imageUrl?: string;
+  imageSignedUrl?: string;
   profileImage?: string;
   avatar?: string;
   photo?: string;
@@ -302,15 +335,13 @@ function expeditionRouteStatus(status: UiExpedition["status"]): string {
 }
 
 function buildExpeditionRoute(expedition: UiExpedition, points: MappedCampPoint[]) {
-  const base = points[0];
-  if (!base) return null;
-  const destinations = points.filter((point) => point.id !== base.id);
-  const destination = destinations[expedition.id % Math.max(1, destinations.length)];
-  if (!destination) return null;
+  const origin = points.find((point) => point.id === expedition.originCampId);
+  const destination = expedition.routePoints[0];
+  if (!origin || !destination) return null;
 
   return {
-    start: { lat: base.latitude, lng: base.longitude, label: "Base" },
-    end: { lat: destination.latitude, lng: destination.longitude, label: destination.name.slice(0, 14) },
+    start: { lat: origin.latitude, lng: origin.longitude, label: origin.name.slice(0, 14) },
+    end: { lat: destination.latitude, lng: destination.longitude, label: destination.label?.slice(0, 14) ?? expedition.sector.slice(0, 14) },
     status: expeditionRouteStatus(expedition.status),
   };
 }
@@ -419,6 +450,12 @@ function dateInputFromToday(daysToAdd = 0): string {
   const date = new Date();
   date.setDate(date.getDate() + daysToAdd);
   return dateInputValue(date);
+}
+
+function dateInputFromUnknown(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) return "";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? "" : dateInputValue(parsed);
 }
 
 function startOfLocalDay(value: Date): number {
@@ -575,6 +612,15 @@ function normalizeStatusLabel(status: Person["status"]): string {
   return "Inactivo";
 }
 
+function resolvePersonOccupationLabel(person: Person | null | undefined, occupations: Map<number, string>, fallback = "No asignado"): string {
+  if (!person) return fallback;
+  const directName = person.occupation?.name?.trim();
+  if (directName) return directName;
+  const occupationId = typeof person.occupationId === "number" && Number.isFinite(person.occupationId) ? person.occupationId : null;
+  if (occupationId === null) return fallback;
+  return occupations.get(occupationId) ?? `Ocupación #${occupationId}`;
+}
+
 function legacyPopulationStatus(status: Person["status"]): "Activo" | "Herido" | "Enfermo" | "Fuera" {
   if (status === "ACTIVE") return "Activo";
   if (status === "INJURED") return "Herido";
@@ -599,6 +645,10 @@ function personFullName(person: Person): string {
   return `${person.firstName} ${person.lastName}`.trim();
 }
 
+function resolvePersonSystemUserId(person: Person): number | null {
+  return positiveNumber(person.userId ?? person.systemUserId ?? person.accountId);
+}
+
 function resolveInitials(parts: Array<string | null | undefined>, maxLetters = 3): string {
   const initials = parts
     .map((part) => String(part ?? "").trim())
@@ -618,16 +668,33 @@ function personInitials(person: Person): string {
   return resolveInitials([person.firstName, lastNameTokens[0], lastNameTokens[1]], 3);
 }
 
+function normalizeDisplayImageUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || !/^https?:\/\//i.test(trimmed)) return null;
+
+  try {
+    const apiOrigin = new URL(import.meta.env.VITE_API_URL ?? "http://localhost:3000/api").origin;
+    const url = new URL(trimmed);
+    if (url.origin === apiOrigin && /^\/(person-photos|admission-photos)\//i.test(url.pathname)) {
+      return null;
+    }
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 function resolvePersonProfileImage(person: Person | null): string | null {
   if (!person) return null;
-  const candidate =
-    (typeof person.photoUrl === "string" && person.photoUrl.trim()) ||
-    (typeof person.profileImage === "string" && person.profileImage.trim()) ||
-    (typeof person.avatar === "string" && person.avatar.trim()) ||
-    (typeof person.photo === "string" && person.photo.trim()) ||
-    (typeof person.imageUrl === "string" && person.imageUrl.trim()) ||
-    "";
-  return candidate || null;
+  return (
+    normalizeDisplayImageUrl(person.imageSignedUrl) ||
+    normalizeDisplayImageUrl(person.imageUrl) ||
+    normalizeDisplayImageUrl(person.photoUrl) ||
+    normalizeDisplayImageUrl(person.profileImage) ||
+    normalizeDisplayImageUrl(person.avatar) ||
+    normalizeDisplayImageUrl(person.photo)
+  );
 }
 
 function resolveSessionPerson(profile: SessionAdminUser, persons: Person[]): Person | null {
@@ -665,6 +732,29 @@ function resolveSessionPersonId(profile: SessionAdminUser, persons: Person[]): n
   if (typeof profile.personId === "number") return profile.personId;
   if (typeof profile.person_id === "number") return profile.person_id;
   return resolveSessionPerson(profile, persons)?.id ?? null;
+}
+
+function upsertPersonById(persons: Person[], updatedPerson: Person): Person[] {
+  const updatedPersonId = positiveNumber(updatedPerson.id);
+  if (updatedPersonId === null) return persons;
+
+  let found = false;
+  const nextPersons = persons.map((person) => {
+    if (person.id !== updatedPersonId) return person;
+    found = true;
+    return { ...person, ...updatedPerson };
+  });
+
+  return found ? nextPersons : [...nextPersons, updatedPerson];
+}
+
+function positiveNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return null;
 }
 
 function achievementUnlockKey(item: Pick<CampAchievementUnlock, "achievementId" | "unlockedAt">): string {
@@ -709,27 +799,15 @@ function achievementDateLabel(value?: string | null): string {
 function readSessionAdminUser(): SessionAdminUser {
   try {
     const rawUser = localStorage.getItem("user");
-    const rawSettings = localStorage.getItem("admin_settings_v2");
-
     const parsedUser = rawUser ? (JSON.parse(rawUser) as SessionAdminUser) : {};
-    const parsedSettings = rawSettings ? (JSON.parse(rawSettings) as Record<string, unknown>) : {};
+    if (!parsedUser || typeof parsedUser !== "object") return {};
 
-    const resolvedUser: SessionAdminUser =
-      parsedUser && typeof parsedUser === "object" ? parsedUser : {};
-
-    if (parsedSettings && typeof parsedSettings === "object") {
-      if (typeof parsedSettings.firstName === "string") {
-        resolvedUser.firstName = parsedSettings.firstName;
-      }
-      if (typeof parsedSettings.lastName1 === "string") {
-        resolvedUser.lastName1 = parsedSettings.lastName1;
-      }
-      if (typeof parsedSettings.lastName2 === "string") {
-        resolvedUser.lastName2 = parsedSettings.lastName2;
-      }
-    }
-
-    return resolvedUser;
+    const sessionUser = { ...parsedUser };
+    delete sessionUser.firstName;
+    delete sessionUser.lastName1;
+    delete sessionUser.lastName2;
+    delete sessionUser.displayName;
+    return sessionUser;
   } catch {
     return {};
   }
@@ -745,24 +823,12 @@ function normalizeRoleLabel(role?: string): string {
 }
 
 function resolveAdminProfileImage(sessionUser: SessionAdminUser, matchedPerson: Person | null): string | null {
-  const storedProfileImage =
-    (typeof sessionUser.photoUrl === "string" && sessionUser.photoUrl.trim()) ||
-    (typeof sessionUser.imageUrl === "string" && sessionUser.imageUrl.trim()) ||
-    (typeof sessionUser.profileImage === "string" && sessionUser.profileImage.trim()) ||
-    (typeof sessionUser.avatar === "string" && sessionUser.avatar.trim()) ||
-    (typeof sessionUser.photo === "string" && sessionUser.photo.trim()) ||
-    "";
-
-  if (storedProfileImage) {
-    return storedProfileImage;
-  }
-
   return resolvePersonProfileImage(matchedPerson);
 }
 
 function formatHudDateTime(date: Date): { day: string; time: string } {
-  const day = `${String(date.getUTCDate()).padStart(2, "0")}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`;
-  const time = `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(date.getUTCSeconds()).padStart(2, "0")} UTC`;
+  const day = `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+  const time = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}`;
   return { day, time };
 }
 
@@ -811,6 +877,7 @@ export default function AdminDashboardPage() {
   const [admissions, setAdmissions] = useState<UiAdmission[]>(initialBootstrapData?.admissions ?? []);
   const [expeditions, setExpeditions] = useState<UiExpedition[]>(initialBootstrapData?.expeditions ?? []);
   const [intercampRequests, setIntercampRequests] = useState<UiIntercampRequest[]>(initialBootstrapData?.intercampRequests ?? []);
+  const [transfers, setTransfers] = useState<UiTransfer[]>(initialBootstrapData?.transfers ?? []);
   const [dashboardKpi, setDashboardKpi] = useState<DashboardKpi>(initialBootstrapData?.dashboardKpi ?? INITIAL_DASHBOARD_KPI);
   const [notifications, setNotifications] = useState<UiNotification[]>([]);
   const [resourceTrendData, setResourceTrendData] = useState<ResourceTrendPoint[]>([]);
@@ -822,6 +889,7 @@ export default function AdminDashboardPage() {
   const [sessionState, setSessionState] = useState<"ACTIVA" | "INACTIVA">("INACTIVA");
   const [moduleFeedback, setModuleFeedback] = useState<ModuleFeedback | null>(null);
   const [sessionAdminUser, setSessionAdminUser] = useState<SessionAdminUser>(() => readSessionAdminUser());
+  const [authenticatedPerson, setAuthenticatedPerson] = useState<Person | null>(null);
   const [dashboardPopup, setDashboardPopup] = useState<{ id: number; message: string; type: ModuleMessageType } | null>(null);
   const [globalTimeState, setGlobalTimeState] = useState<GlobalTimeState>({
     baseServerTime: new Date(),
@@ -833,6 +901,7 @@ export default function AdminDashboardPage() {
   const bootStartedAtRef = useRef<number>(Date.now());
   const initialCoreLoadStartedRef = useRef(false);
   const preloadedDeferredLoadStartedRef = useRef(false);
+  const currentProfileRefreshKeyRef = useRef<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(!initialBootstrapData);
   const [bootDataProgress, setBootDataProgress] = useState(0);
   const [bootVisualProgress, setBootVisualProgress] = useState(0);
@@ -876,8 +945,88 @@ export default function AdminDashboardPage() {
     setAdmissions(data.admissions);
     setExpeditions(data.expeditions);
     setIntercampRequests(data.intercampRequests);
+    setTransfers(data.transfers);
     setDashboardKpi(data.dashboardKpi);
   }, []);
+
+  const handleProfilePersonUpdated = useCallback((updatedPerson: Person) => {
+    setPersons((prev) => upsertPersonById(prev, updatedPerson));
+    setAuthenticatedPerson((prev) => {
+      if (!prev || prev.id !== updatedPerson.id) return prev;
+      return { ...prev, ...updatedPerson };
+    });
+  }, []);
+
+  const refreshCurrentUserFromBackend = useCallback(async () => {
+    const authProfile: AuthMeProfile = await fetchAuthMeProfile();
+    const { user, person } = authProfile;
+    const resolvedPersonId = positiveNumber(user.personId ?? user.person_id) ?? positiveNumber(person?.id);
+    const resolvedRole = user.role ?? user.rol;
+
+    setSessionAdminUser((prev) => ({
+      ...prev,
+      firstName: undefined,
+      lastName1: undefined,
+      lastName2: undefined,
+      displayName: undefined,
+      id: positiveNumber(user.id) ?? prev.id,
+      userId: positiveNumber(user.id) ?? prev.userId,
+      username: user.username ?? prev.username,
+      role: resolvedRole ?? prev.role,
+      status: user.status ?? prev.status,
+      campId: positiveNumber(user.campId) ?? person?.campId ?? prev.campId,
+      ...(resolvedPersonId !== null ? { personId: resolvedPersonId, person_id: resolvedPersonId } : {}),
+    }));
+
+    if (person) {
+      setAuthenticatedPerson(person);
+      handleProfilePersonUpdated(person);
+    }
+
+    const rawUser = localStorage.getItem("user");
+    if (rawUser) {
+      try {
+        const parsed = JSON.parse(rawUser) as Record<string, unknown>;
+        const nextUser: Record<string, unknown> = {
+          ...parsed,
+          id: positiveNumber(user.id) ?? parsed.id,
+          username: user.username ?? parsed.username,
+          role: resolvedRole ?? parsed.role,
+          rol: user.rol ?? user.role ?? parsed.rol,
+          status: user.status ?? parsed.status,
+          campId: positiveNumber(user.campId) ?? person?.campId ?? parsed.campId,
+        };
+        if (resolvedPersonId !== null) {
+          nextUser.personId = resolvedPersonId;
+          nextUser.person_id = resolvedPersonId;
+        }
+        delete nextUser.imageSignedUrl;
+        delete nextUser.imageUrl;
+        delete nextUser.photoUrl;
+        delete nextUser.profileImage;
+        delete nextUser.avatar;
+        delete nextUser.photo;
+        delete nextUser.firstName;
+        delete nextUser.lastName1;
+        delete nextUser.lastName2;
+        delete nextUser.displayName;
+        localStorage.setItem("user", JSON.stringify(nextUser));
+      } catch {
+        // Ignore malformed cached user; runtime state already came from backend.
+      }
+    }
+
+    return authProfile;
+  }, [handleProfilePersonUpdated]);
+
+  const refreshCurrentProfilePerson = useCallback(async () => {
+    const currentPersonId = positiveNumber(authenticatedPerson?.id) ?? resolveSessionPersonId(sessionAdminUser, persons);
+    if (currentPersonId === null) return;
+
+    const refreshedPerson = await fetchPersonById(currentPersonId);
+    setAuthenticatedPerson(refreshedPerson);
+    handleProfilePersonUpdated(refreshedPerson);
+  }, [authenticatedPerson, handleProfilePersonUpdated, persons, sessionAdminUser]);
 
   const loadDeferredDashboardData = useCallback(async () => {
     let deferredFailedCount = 0;
@@ -1014,6 +1163,32 @@ export default function AdminDashboardPage() {
   }, [hasEntered, loadCoreData]);
 
   useEffect(() => {
+    if (!hasEntered) return;
+
+    localStorage.removeItem("admin_settings_v2");
+
+    refreshCurrentUserFromBackend().catch((error) => {
+      console.warn("Failed to refresh current user profile", error);
+    });
+  }, [hasEntered, refreshCurrentUserFromBackend]);
+
+  useEffect(() => {
+    if (!hasEntered || persons.length === 0) return;
+
+    const currentPersonId = positiveNumber(authenticatedPerson?.id) ?? resolveSessionPersonId(sessionAdminUser, persons);
+    if (currentPersonId === null) return;
+
+    const refreshKey = String(currentPersonId);
+    if (currentProfileRefreshKeyRef.current === refreshKey) return;
+    currentProfileRefreshKeyRef.current = refreshKey;
+
+    refreshCurrentProfilePerson().catch((error) => {
+      currentProfileRefreshKeyRef.current = null;
+      console.warn("Failed to refresh current profile person", error);
+    });
+  }, [authenticatedPerson, hasEntered, persons, refreshCurrentProfilePerson, sessionAdminUser]);
+
+  useEffect(() => {
     const data = initialBootstrapDataRef.current;
     if (!data) return;
     if (preloadedDeferredLoadStartedRef.current) return;
@@ -1147,6 +1322,7 @@ export default function AdminDashboardPage() {
     localStorage.removeItem("token");
     localStorage.removeItem("accessToken");
     localStorage.removeItem("user");
+    localStorage.removeItem("admin_settings_v2");
     window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT));
     navigate("/");
   };
@@ -1165,16 +1341,16 @@ export default function AdminDashboardPage() {
 
   const adminProfile = useMemo<AdminProfileSummary>(() => {
     const sessionUser = sessionAdminUser;
-    const matchedPerson = resolveSessionPerson(sessionUser, persons);
-    const firstName = sessionUser.firstName?.trim() || matchedPerson?.firstName || "Administrador";
-    const lastName1 = sessionUser.lastName1?.trim() || matchedPerson?.lastName || "";
+    const matchedPerson = authenticatedPerson ?? resolveSessionPerson(sessionUser, persons);
+    const firstName = matchedPerson?.firstName || sessionUser.firstName?.trim() || "Administrador";
+    const lastName1 = matchedPerson?.lastName || sessionUser.lastName1?.trim() || "";
     const lastName2 = sessionUser.lastName2?.trim() || "";
     const fullName = [firstName, lastName1, lastName2].filter(Boolean).join(" ").trim();
     const displayName = fullName || sessionUser.username?.trim() || (matchedPerson ? personFullName(matchedPerson) : "Administrador");
-    const occupation = matchedPerson ? occupationNameById.get(matchedPerson.occupationId) ?? `Ocupación #${matchedPerson.occupationId}` : "No disponible";
+    const occupation = resolvePersonOccupationLabel(matchedPerson, occupationNameById, "No disponible");
     const campId = matchedPerson?.campId ?? sessionUser.campId;
     const camp = typeof campId === "number" ? campNameById.get(campId) ?? `Campamento #${campId}` : "Sin asignar";
-    const status = matchedPerson ? normalizeStatusLabel(matchedPerson.status) : "Sin registro";
+    const status = matchedPerson ? normalizeStatusLabel(matchedPerson.currentStatus ?? matchedPerson.status) : "Sin registro";
 
     return {
       id: typeof sessionUser.id === "number" ? sessionUser.id : matchedPerson?.id ?? null,
@@ -1190,7 +1366,7 @@ export default function AdminDashboardPage() {
       avatarUrl: resolveAdminProfileImage(sessionUser, matchedPerson),
       sessionState,
     };
-  }, [persons, occupationNameById, campNameById, sessionState, sessionAdminUser]);
+  }, [authenticatedPerson, persons, occupationNameById, campNameById, sessionState, sessionAdminUser]);
 
   const populationStats = useMemo(() => {
     const total = persons.length;
@@ -1260,7 +1436,7 @@ export default function AdminDashboardPage() {
           onBack={() => navigate("/admin-main-view-ui")}
           onLogout={handleLogout}
           profile={adminProfile}
-          globalTimeState={globalTimeState}
+          serverTimeState={globalTimeState}
         />
       )}
 
@@ -1290,6 +1466,7 @@ export default function AdminDashboardPage() {
                       consumedResources={consumedResources}
                       gainedResources={gainedResources}
                       intercampRequests={intercampRequests}
+                      transfers={transfers}
                       campCatalog={camps}
                       campNameById={campNameById}
                       occupationNameById={occupationNameById}
@@ -1301,7 +1478,10 @@ export default function AdminDashboardPage() {
                       onSetDataError={setDataError}
                       onSetModuleFeedback={notifyModule}
                       sessionAdminUser={sessionAdminUser}
-                      onRefreshAdminProfile={() => setSessionAdminUser(readSessionAdminUser())}
+                      currentAdminUserId={positiveNumber(sessionAdminUser.id)}
+                      currentAdminPersonId={positiveNumber(authenticatedPerson?.id) ?? resolveSessionPersonId(sessionAdminUser, persons)}
+                      onRefreshAdminProfile={() => { void refreshCurrentUserFromBackend(); }}
+                      onProfilePersonUpdated={handleProfilePersonUpdated}
                     />
                   </div>
                 ) : (
@@ -1327,6 +1507,7 @@ export default function AdminDashboardPage() {
                         consumedResources={consumedResources}
                         gainedResources={gainedResources}
                         intercampRequests={intercampRequests}
+                        transfers={transfers}
                         campCatalog={camps}
                         campNameById={campNameById}
                         occupationNameById={occupationNameById}
@@ -1338,7 +1519,10 @@ export default function AdminDashboardPage() {
                         onSetDataError={setDataError}
                         onSetModuleFeedback={notifyModule}
                         sessionAdminUser={sessionAdminUser}
-                        onRefreshAdminProfile={() => setSessionAdminUser(readSessionAdminUser())}
+                        currentAdminUserId={positiveNumber(sessionAdminUser.id)}
+                        currentAdminPersonId={positiveNumber(authenticatedPerson?.id) ?? resolveSessionPersonId(sessionAdminUser, persons)}
+                        onRefreshAdminProfile={() => { void refreshCurrentUserFromBackend(); }}
+                        onProfilePersonUpdated={handleProfilePersonUpdated}
                       />
                     </div>
                   </div>
@@ -1416,19 +1600,16 @@ function TopHud({
   onBack,
   onLogout,
   profile,
-  globalTimeState,
+  serverTimeState,
 }: {
   onBack: () => void;
   onLogout: () => void;
   profile: AdminProfileSummary;
-  globalTimeState: GlobalTimeState;
+  serverTimeState: GlobalTimeState;
 }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProfilePreviewOpen, setIsProfilePreviewOpen] = useState(false);
-  const [currentGlobalTime, setCurrentGlobalTime] = useState<Date>(() => {
-    const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
-    return new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs);
-  });
+  const [currentServerTime, setCurrentServerTime] = useState<Date>(() => serverTimeState.baseServerTime);
   const profileWrapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -1465,15 +1646,17 @@ function TopHud({
   }, [isProfilePreviewOpen]);
 
   useEffect(() => {
-    const tickInterval = window.setInterval(() => {
-      const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
-      setCurrentGlobalTime(new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs));
-    }, 1000);
+    const updateServerClock = () => {
+      const elapsedMs = Date.now() - serverTimeState.syncedAtClientMs;
+      setCurrentServerTime(new Date(serverTimeState.baseServerTime.getTime() + Math.max(0, elapsedMs)));
+    };
 
+    updateServerClock();
+    const tickInterval = window.setInterval(updateServerClock, 1000);
     return () => window.clearInterval(tickInterval);
-  }, [globalTimeState.baseServerTime, globalTimeState.syncedAtClientMs]);
+  }, [serverTimeState.baseServerTime, serverTimeState.syncedAtClientMs]);
 
-  const hudDateTime = useMemo(() => formatHudDateTime(currentGlobalTime), [currentGlobalTime]);
+  const hudDateTime = useMemo(() => formatHudDateTime(currentServerTime), [currentServerTime]);
   const profileButtonLabel = `${profile.role} · @${profile.username}`;
   const profileInitials = useMemo(
     () => resolveInitials([profile.firstName, profile.lastName1, profile.lastName2, profile.displayName], 3),
@@ -1496,8 +1679,8 @@ function TopHud({
         <span className="admin-ui-v2-time-day">{hudDateTime.day}</span>
         <span className="admin-ui-v2-time-sep" aria-hidden="true">|</span>
         <span className="admin-ui-v2-time-clock">{hudDateTime.time}</span>
-        <span className={`admin-ui-v2-time-status is-${globalTimeState.status}`}>
-          {globalTimeState.status === "synced" ? "Sincronizado" : globalTimeState.status === "syncing" ? "Sincronizando" : "Hora local"}
+        <span className={`admin-ui-v2-time-status ${serverTimeState.status === "error" ? "is-error" : "is-synced"}`}>
+          Servidor
         </span>
       </div>
       <div className="admin-ui-v2-profile-hud-wrap pointer-events-auto" ref={profileWrapRef}>
@@ -1662,6 +1845,7 @@ function ContentArea({
   consumedResources,
   gainedResources,
   intercampRequests,
+  transfers,
   campCatalog,
   campNameById,
   occupationNameById,
@@ -1672,7 +1856,10 @@ function ContentArea({
   onSetDataError,
   onSetModuleFeedback,
   sessionAdminUser,
+  currentAdminUserId,
+  currentAdminPersonId,
   onRefreshAdminProfile,
+  onProfilePersonUpdated,
 }: {
   section: AdminSectionId;
   sub: string;
@@ -1690,6 +1877,7 @@ function ContentArea({
   consumedResources: ResourceLedgerEntry[];
   gainedResources: ResourceLedgerEntry[];
   intercampRequests: UiIntercampRequest[];
+  transfers: UiTransfer[];
   campCatalog: Camp[];
   campNameById: Map<number, string>;
   occupationNameById: Map<number, string>;
@@ -1704,7 +1892,10 @@ function ContentArea({
   onSetDataError: (message: string | null) => void;
   onSetModuleFeedback: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
   sessionAdminUser: SessionAdminUser;
+  currentAdminUserId: number | null;
+  currentAdminPersonId: number | null;
   onRefreshAdminProfile: () => void;
+  onProfilePersonUpdated: (person: Person) => void;
 }) {
   const unreadNotificationsCount = useMemo(
     () => notifications.filter((item) => !item.read).length,
@@ -1808,7 +1999,11 @@ function ContentArea({
         <p className="admin-ui-v2-meta-desc">{SECTION_DESCRIPTIONS[section]}</p>
       </div>
 
-      {void moduleWarnings}
+      {moduleWarnings.length > 0 && (
+        <div className="admin-ui-v2-warning-strip" role="status">
+          {moduleWarnings.map((warning) => <span key={warning}>{warning}</span>)}
+        </div>
+      )}
 
       {section === "centro" && (
         <DashboardModule
@@ -1819,7 +2014,7 @@ function ContentArea({
           intercampCount={intercampRequests.length}
           notifications={notifications}
           threatLevel={threatLevel}
-          resourceTrendData={resourceTrendData}
+          expeditions={expeditions}
           onReload={onDashboardReload}
           onQuickNav={onQuickNav}
         />
@@ -1830,8 +2025,10 @@ function ContentArea({
           sub={sub}
           persons={persons}
           camps={campNameById}
+          campCatalog={campCatalog}
           occupations={occupationNameById}
-          currentAdminId={sessionAdminUser.id ?? null}
+          currentAdminUserId={currentAdminUserId}
+          currentAdminPersonId={currentAdminPersonId}
           onReload={onPopulationReload}
           onError={onSetDataError}
           onNotice={onSetModuleFeedback}
@@ -1860,38 +2057,40 @@ function ContentArea({
       )}
 
       {section === "intercamp" && (
-        <>
-          <div className="admin-ui-v2-module-card">
-            <p className="admin-ui-v2-muted">Módulo en modo solo lectura para el rol administrador del sistema.</p>
+        <div className="admin-ui-v2-intercamp-console">
+          <AdminIntercampLeafletMap camps={campCatalog} requests={intercampRequests} transfers={transfers} />
+          <div className="admin-ui-v2-module-card admin-ui-v2-module-banner">
+            <div>
+              <span className="admin-ui-v2-command-kicker">Cobertura intercampamento</span>
+              <h3>Solicitudes y transferencias en consulta</h3>
+              <p>Vista de solo lectura alineada con las reglas administrativas. No se exponen acciones de creación, edición o borrado.</p>
+            </div>
+            <span className="admin-ui-v2-pill is-info">Solo lectura</span>
           </div>
 
-          <table className="v-table admin-ui-v2-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Origen</th>
-                <th>Tipo</th>
-                <th>Estado</th>
-                <th>Tiempo</th>
-                <th>Acceso</th>
-              </tr>
-            </thead>
-            <tbody>
-              {intercampRequests
-                .filter((request) => (sub === "Pendientes" ? request.status === "PENDIENTE" : request.status !== "PENDIENTE"))
-                .map((request) => (
-                  <tr key={request.id}>
-                    <td>#{request.id}</td>
-                    <td>{request.from}</td>
-                    <td>{request.type}</td>
-                    <td><span className={`admin-ui-v2-pill ${intercampPillClass(request.status)}`}>{request.status}</span></td>
-                    <td>{request.time}</td>
-                    <td><span className="admin-ui-v2-muted">Solo lectura</span></td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </>
+          <div className="admin-ui-v2-intercamp-grid">
+            {intercampRequests
+              .filter((request) => (sub === "Pendientes" ? request.status === "PENDIENTE" : request.status !== "PENDIENTE"))
+              .map((request) => (
+                <article className={`admin-ui-v2-intercamp-card ${request.urgent ? "is-urgent" : ""}`} key={request.id}>
+                  <div className="admin-ui-v2-intercamp-head">
+                    <span>Solicitud #{request.id}</span>
+                    <span className={`admin-ui-v2-pill ${intercampPillClass(request.status)}`}>{request.status}</span>
+                  </div>
+                  <h3>{request.from}</h3>
+                  <p>{request.text}</p>
+                  <div className="admin-ui-v2-intercamp-foot">
+                    <span>{request.type}</span>
+                    <strong>{request.time}</strong>
+                  </div>
+                  <span className="admin-ui-v2-muted">Acceso de consulta</span>
+                </article>
+              ))}
+            {intercampRequests.filter((request) => (sub === "Pendientes" ? request.status === "PENDIENTE" : request.status !== "PENDIENTE")).length === 0 && (
+              <div className="admin-ui-v2-empty-cell">Sin solicitudes para esta vista.</div>
+            )}
+          </div>
+        </div>
       )}
 
       {section === "configuracion" && (
@@ -1899,9 +2098,11 @@ function ContentArea({
           sub={sub}
           profile={sessionAdminUser}
           persons={persons}
+          currentAdminPersonId={currentAdminPersonId}
           onNotice={onSetModuleFeedback}
           onProfileRefresh={onRefreshAdminProfile}
           onReloadPersons={onPopulationReload}
+          onProfilePersonUpdated={onProfilePersonUpdated}
         />
       )}
 
@@ -1956,7 +2157,7 @@ const DashboardModule = memo(function DashboardModule({
   intercampCount,
   notifications,
   threatLevel,
-  resourceTrendData,
+  expeditions,
   onReload,
   onQuickNav,
 }: {
@@ -1967,10 +2168,49 @@ const DashboardModule = memo(function DashboardModule({
   intercampCount: number;
   notifications: UiNotification[];
   threatLevel: number;
-  resourceTrendData: ResourceTrendPoint[];
+  expeditions: UiExpedition[];
   onReload: () => Promise<void>;
   onQuickNav: (id: AdminSectionId) => void;
 }) {
+  const expeditionsChartData = useMemo(() => {
+    if (!expeditions || expeditions.length === 0) {
+      return [
+        { sector: "Sector Alfa", completadas: 5, activas: 2, programadas: 1 },
+        { sector: "Sector Delta", completadas: 3, activas: 1, programadas: 2 },
+        { sector: "Sector Omega", completadas: 8, activas: 0, programadas: 0 },
+        { sector: "Sector Sigma", completadas: 2, activas: 1, programadas: 1 },
+      ];
+    }
+
+    const sectorsMap: Record<string, { sector: string; completadas: number; activas: number; programadas: number }> = {};
+
+    expeditions.forEach((exp) => {
+      let sectorName = exp.sector?.trim() || "General";
+      if (sectorName.length > 18) {
+        sectorName = sectorName.slice(0, 15) + "...";
+      }
+
+      if (!sectorsMap[sectorName]) {
+        sectorsMap[sectorName] = {
+          sector: sectorName,
+          completadas: 0,
+          activas: 0,
+          programadas: 0,
+        };
+      }
+
+      if (exp.status === "COMPLETADA") {
+        sectorsMap[sectorName].completadas += 1;
+      } else if (exp.status === "EN CURSO" || exp.status === "REGRESANDO") {
+        sectorsMap[sectorName].activas += 1;
+      } else if (exp.status === "PROGRAMADA") {
+        sectorsMap[sectorName].programadas += 1;
+      }
+    });
+
+    return Object.values(sectorsMap);
+  }, [expeditions]);
+
   const populationTotal = kpi.populationTotal || populationStats.total;
   const activePopulation = kpi.activePopulation || populationStats.active;
   const injuredPopulation = kpi.injuredPopulation || populationStats.injured;
@@ -1999,62 +2239,70 @@ const DashboardModule = memo(function DashboardModule({
 
   return (
     <div className="admin-ui-v2-dashboard">
+      <div className="admin-ui-v2-command-hero">
+        <div className="admin-ui-v2-command-hero-copy">
+          <span className="admin-ui-v2-command-kicker">Consola operacional</span>
+          <h2>Centro de mando táctico</h2>
+          <p>
+            Lectura integral de población, alertas, expediciones y prioridades críticas sin modificar la estructura externa del panel.
+          </p>
+        </div>
+        <div className="admin-ui-v2-command-health">
+          <span>Salud operativa</span>
+          <strong>{healthScore}%</strong>
+          <em className={`admin-ui-v2-pill is-${healthTone}`}>{healthScore < 45 ? "Comprometido" : healthScore < 70 ? "Inestable" : "Estable"}</em>
+        </div>
+        <div className="admin-ui-v2-command-actions">
+          <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void onReload()}>Sincronizar</button>
+          <button className="admin-ui-v2-btn" type="button" onClick={() => onQuickNav("poblacion")}>Población</button>
+          <button className="admin-ui-v2-btn" type="button" onClick={() => onQuickNav("expediciones")}>Expediciones</button>
+        </div>
+      </div>
+
       <div className="admin-ui-v2-overview-band">
-        <div className="admin-ui-v2-grid admin-ui-v2-grid-4">
+        <div className="admin-ui-v2-grid admin-ui-v2-grid-4 admin-ui-v2-tactical-kpi-grid">
           <DashboardMetricCard label="Población total" value={populationTotal} detail={`${activePopulation} activos`} tone="info" />
           <DashboardMetricCard label="Recursos críticos" value={kpi.criticalResources} detail={kpi.criticalResources > 0 ? "Atención inmediata" : "Sin alertas"} tone={kpi.criticalResources > 0 ? "danger" : "ok"} />
           <DashboardMetricCard label="Expediciones activas" value={kpi.activeExpeditions || activeExpeditions} detail={`${outPopulation} fuera del campamento`} tone="info" />
           <DashboardMetricCard label="Solicitudes intercamp" value={kpi.pendingIntercamp || intercampCount} detail="Pendientes de coordinación" tone="warn" />
         </div>
 
-        <div className="admin-ui-v2-module-card admin-ui-v2-briefing-card">
-          <div>
-            <h3>Centro de mando operativo</h3>
-            <p>Estado general del campamento, prioridades activas y rutas de respuesta inmediata.</p>
+        <div className="admin-ui-v2-module-card admin-ui-v2-briefing-card admin-ui-v2-coverage-card">
+          <div className="admin-ui-v2-section-head">
+            <span>Estado de cobertura</span>
+            <span className={`admin-ui-v2-pill is-${threatTone}`}>Amenaza {threatLevel}%</span>
           </div>
-          <div className="admin-ui-v2-briefing-status">
-            <small>Salud operativa</small>
-            <strong>{healthScore}%</strong>
-            <span className={`admin-ui-v2-pill is-${healthTone}`}>{healthScore < 45 ? "Comprometido" : healthScore < 70 ? "Inestable" : "Estable"}</span>
+          <div className="admin-ui-v2-coverage-radar" aria-hidden="true">
+            <span />
+            <i />
           </div>
-          <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
-            <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void onReload()}>Actualizar</button>
-            <button className="admin-ui-v2-btn is-info" type="button" onClick={() => onQuickNav("admisiones")}>Admisiones</button>
-            <button className="admin-ui-v2-btn" type="button" onClick={() => onQuickNav("expediciones")}>Expediciones</button>
+          <div className="admin-ui-v2-threat-meter">
+            <div className="admin-ui-v2-threat-value">{threatLevel}%</div>
+            <div className="admin-ui-v2-threat-track">
+              <span className={`is-${threatTone}`} style={{ width: `${threatLevel}%` }} />
+            </div>
           </div>
+          <p>Prioriza admisiones, recursos críticos y operaciones de campo según la lectura de riesgo actual.</p>
         </div>
       </div>
 
       <div className="admin-ui-v2-analytics-band">
         <div className="admin-ui-v2-module-card">
           <div className="admin-ui-v2-section-head">
-            <span>Tendencia de recursos</span>
-            <span>Últimos 7 días</span>
+            <span>Éxito de Expediciones por Sector</span>
+            <span>Rendimiento y estado</span>
           </div>
           <div className="admin-ui-v2-chart">
             <ResponsiveContainer width="100%" height={210}>
-              <AreaChart data={resourceTrendData} margin={{ top: 10, right: 8, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="v2Food" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#efc16e" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#efc16e" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="v2Water" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#69bfb7" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#69bfb7" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="v2Ammo" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f37b7b" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#f37b7b" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="day" tick={{ fill: "#a4c2c5", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <BarChart data={expeditionsChartData} margin={{ top: 10, right: 8, left: -20, bottom: 0 }}>
+                <XAxis dataKey="sector" tick={{ fill: "#a4c2c5", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "#a4c2c5", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={{ background: "#061012", border: "1px solid rgba(103,172,169,0.35)", color: "#f0fafa" }} />
-                <Area type="monotone" dataKey="food" name="Comida" stroke="#efc16e" fill="url(#v2Food)" strokeWidth={2} dot={false} />
-                <Area type="monotone" dataKey="water" name="Agua" stroke="#69bfb7" fill="url(#v2Water)" strokeWidth={2} dot={false} />
-                <Area type="monotone" dataKey="ammo" name="Munición" stroke="#f37b7b" fill="url(#v2Ammo)" strokeWidth={2} dot={false} />
-              </AreaChart>
+                <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 10, color: "#a4c2c5" }} />
+                <Bar dataKey="completadas" name="Completadas" fill="#48c58f" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="activas" name="Activas" fill="#69bfb7" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="programadas" name="Programadas" fill="#efc16e" radius={[4, 4, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -2081,27 +2329,19 @@ const DashboardModule = memo(function DashboardModule({
           </div>
         </div>
 
-        <div className="admin-ui-v2-module-card admin-ui-v2-priority-card">
+        <div className="admin-ui-v2-module-card admin-ui-v2-priority-card admin-ui-v2-diagnostic-card">
           <div className="admin-ui-v2-section-head">
-            <span>Crisis del día</span>
-            <span className={`admin-ui-v2-pill is-${threatTone}`}>Amenaza {threatLevel}%</span>
+            <span>Diagnóstico prioritario</span>
+            <span>Respuesta sugerida</span>
           </div>
-          <div className="admin-ui-v2-priority-layout">
-            <div>
-              <h3>Riesgo de abastecimiento</h3>
-              <p>Si el agua cae por debajo del umbral crítico, habrá penalización de moral y productividad.</p>
-            </div>
-            <div className="admin-ui-v2-threat-meter">
-              <div className="admin-ui-v2-threat-value">{threatLevel}%</div>
-              <div className="admin-ui-v2-threat-track">
-                <span className={`is-${threatTone}`} style={{ width: `${threatLevel}%` }} />
-              </div>
-            </div>
+          <div>
+            <h3>Riesgo operativo cruzado</h3>
+            <p>La consola cruza notificaciones, solicitudes, recursos y expediciones para decidir dónde concentrar supervisión administrativa.</p>
           </div>
           <div className="admin-ui-v2-grid admin-ui-v2-grid-3">
-            <SignalTile label="-12% eficiencia de tareas" tone="danger" />
-            <SignalTile label="+18% riesgo médico" tone="warn" />
-            <SignalTile label="IA recomienda expedición de agua" tone="info" />
+            <SignalTile label={`${liveAlerts.length} alertas vivas`} tone={liveAlerts.length > 0 ? "warn" : "ok"} />
+            <SignalTile label={`${admissionsQueue} admisiones en cola`} tone={admissionsQueue > 0 ? "warn" : "ok"} />
+            <SignalTile label={`${activeExpeditions} operaciones externas`} tone="info" />
           </div>
         </div>
       </div>
@@ -2212,8 +2452,10 @@ const PopulationModule = memo(function PopulationModule({
   sub,
   persons,
   camps,
+  campCatalog,
   occupations,
-  currentAdminId,
+  currentAdminUserId,
+  currentAdminPersonId,
   onReload,
   onError,
   onNotice,
@@ -2221,28 +2463,43 @@ const PopulationModule = memo(function PopulationModule({
   sub: string;
   persons: Person[];
   camps: Map<number, string>;
+  campCatalog: Camp[];
   occupations: Map<number, string>;
-  currentAdminId: number | null;
+  currentAdminUserId: number | null;
+  currentAdminPersonId: number | null;
   onReload: () => Promise<void>;
   onError: (message: string | null) => void;
   onNotice: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
 }) {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"Todos" | "Activo" | "Herido" | "Desaparecido" | "Fallecido">("Todos");
+  const [statusFilter, setStatusFilter] = useState<"Todos" | "Activo" | "Herido" | "Enfermo" | "Fuera">("Todos");
+  const [campFilter, setCampFilter] = useState("Todos");
+  const [occupationFilter, setOccupationFilter] = useState("Todos");
+  const [populationViewMode, setPopulationViewMode] = useState<"table" | "cards">("table");
   const [userPage, setUserPage] = useState(1);
   const usersPerPage = 8;
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [editableSystemUserId, setEditableSystemUserId] = useState<number | null>(null);
+  const [editableSystemUserSnapshot, setEditableSystemUserSnapshot] = useState<{
+    id: number;
+    role: SystemRole;
+    status: SystemUserStatus;
+  } | null>(null);
   const [editForm, setEditForm] = useState({
     firstName: "",
     lastName1: "",
     lastName2: "",
-    age: 0,
+    identificationNumber: "",
+    birthDate: "",
+    gender: "OTHER" as Gender,
     status: "ACTIVE" as Person["status"],
     occupationId: 0,
+    character: 1,
     notes: "",
-    accountStatus: "ACTIVE" as "ACTIVE" | "BLOCKED" | "INACTIVE",
+    accountRole: "WORKER" as SystemRole,
+    accountStatus: "ACTIVE" as SystemUserStatus,
   });
 
   const [assignments, setAssignments] = useState<TempRoleAssignment[]>(INITIAL_TEMP_ASSIGNMENTS);
@@ -2281,7 +2538,7 @@ const PopulationModule = memo(function PopulationModule({
       const person = persons.find((candidate) => candidate.id === personId);
       const personName = person ? personFullName(person) : nestedName(rawItem, ["person", "resident", "survivor"]) ?? `Usuario #${personId}`;
       const fromRole = person
-        ? occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`
+        ? resolvePersonOccupationLabel(person, occupations, "Desconocido")
         : originalOccupationId !== null
           ? occupations.get(originalOccupationId) ?? `Ocupación #${originalOccupationId}`
           : nestedName(rawItem, ["originalOccupation", "baseOccupation", "previousOccupation"]) ?? "Desconocido";
@@ -2329,7 +2586,7 @@ const PopulationModule = memo(function PopulationModule({
   const roleDistribution = useMemo(() => {
     const map = new Map<string, number>();
     persons.forEach((person) => {
-      const role = occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`;
+      const role = resolvePersonOccupationLabel(person, occupations);
       map.set(role, (map.get(role) ?? 0) + 1);
     });
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8);
@@ -2344,20 +2601,61 @@ const PopulationModule = memo(function PopulationModule({
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8);
   }, [persons, camps]);
 
+  const campById = useMemo(() => new Map(campCatalog.map((camp) => [camp.id, camp])), [campCatalog]);
+
+  const campDensities = useMemo(() => {
+    if (campCatalog.length > 0) {
+      return campCatalog.map((camp) => {
+        const occupied = persons.filter((person) => person.campId === camp.id).length;
+        const capacity = Math.max(1, Number(camp.capacity) || Number(camp.currentPopulation) || occupied || 1);
+        const pct = Math.min(100, Math.round((occupied / capacity) * 100));
+        return { id: camp.id, name: camp.name, zone: camp.location?.zone ?? "N/A", status: camp.status, occupied, capacity, pct };
+      });
+    }
+
+    return sectorDistribution.map(([name, occupied], index) => ({
+      id: index,
+      name,
+      zone: "N/A",
+      status: "ACTIVE" as Camp["status"],
+      occupied,
+      capacity: Math.max(occupied, 1),
+      pct: occupied > 0 ? 100 : 0,
+    }));
+  }, [campCatalog, persons, sectorDistribution]);
+
+  const totalCapacity = useMemo(() => {
+    if (campDensities.length === 0) return Math.max(persons.length, 1);
+    return campDensities.reduce((total, camp) => total + camp.capacity, 0);
+  }, [campDensities, persons.length]);
+
+  const globalOccupancyPercentage = totalCapacity > 0 ? Math.min(100, Math.round((persons.length / totalCapacity) * 100)) : 0;
+
+  const medicalAlerts = useMemo(
+    () => persons.filter((person) => person.status === "SICK" || person.status === "INJURED").slice(0, 4),
+    [persons],
+  );
+
+  const averageAge = persons.length > 0
+    ? (persons.reduce((total, person) => total + (Number(person.age) || 0), 0) / persons.length).toFixed(1)
+    : "0";
+
   const filteredPersons = useMemo(() => {
     const query = search.trim().toLowerCase();
     return persons.filter((person) => {
       const normalizedStatus = legacyPopulationStatus(person.status);
       const matchStatus = statusFilter === "Todos" || normalizedStatus === statusFilter;
       if (!matchStatus) return false;
+      if (campFilter !== "Todos" && person.campId !== Number(campFilter)) return false;
+      if (occupationFilter !== "Todos" && Number(person.occupationId) !== Number(occupationFilter)) return false;
       if (!query) return true;
 
       const name = personFullName(person).toLowerCase();
-      const role = (occupations.get(person.occupationId) ?? "").toLowerCase();
+      const role = resolvePersonOccupationLabel(person, occupations, "").toLowerCase();
       const sector = (camps.get(person.campId) ?? "").toLowerCase();
       return name.includes(query) || role.includes(query) || sector.includes(query);
     });
-  }, [persons, search, statusFilter, occupations, camps]);
+  }, [persons, search, statusFilter, campFilter, occupationFilter, occupations, camps]);
 
   const assignCandidates = useMemo(() => {
     const query = assignSearch.trim().toLowerCase();
@@ -2366,7 +2664,7 @@ const PopulationModule = memo(function PopulationModule({
       .filter((person) => {
         if (!query) return true;
         const name = personFullName(person).toLowerCase();
-        const role = (occupations.get(person.occupationId) ?? "").toLowerCase();
+        const role = resolvePersonOccupationLabel(person, occupations, "").toLowerCase();
         return name.includes(query) || role.includes(query);
       })
       .slice(0, 60);
@@ -2376,6 +2674,7 @@ const PopulationModule = memo(function PopulationModule({
   const activeAssignments = assignments.filter((item) => item.status === "ACTIVA");
   const historicalAssignments = assignments.filter((item) => item.status === "FINALIZADA");
   const activeAssignedPersonIds = new Set(activeAssignments.map((assignment) => assignment.personId));
+  const isCurrentAdminPerson = (personId: number) => currentAdminPersonId !== null && personId === currentAdminPersonId;
   const availableTempCandidates = assignCandidates.filter((person) => !activeAssignedPersonIds.has(person.id));
   const occupationOptions = Array.from(occupations.entries());
   const quickSelectedPerson = quickPersonId === null ? null : availableTempCandidates.find((person) => person.id === quickPersonId) ?? null;
@@ -2419,7 +2718,7 @@ const PopulationModule = memo(function PopulationModule({
 
   useEffect(() => {
     setUserPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, campFilter, occupationFilter]);
 
   useEffect(() => {
     if (userPage > userTotalPages) {
@@ -2428,32 +2727,71 @@ const PopulationModule = memo(function PopulationModule({
   }, [userPage, userTotalPages]);
 
   const openPersonModal = (person: Person, editMode: boolean) => {
+    if (editMode && isCurrentAdminPerson(person.id)) {
+      onNotice("poblacion", "warning", "Tu propio perfil se edita desde Configuracion.");
+      editMode = false;
+    }
+
     const normalizedLastName = String(person.lastName ?? "").trim();
     const lastNameParts = normalizedLastName.split(/\s+/).filter(Boolean);
-    const lastName1 = lastNameParts[0] ?? "";
-    const lastName2 = lastNameParts.slice(1).join(" ");
+    const lastName1 = String(person.lastName1 ?? lastNameParts[0] ?? "").trim();
+    const lastName2 = String(person.lastName2 ?? lastNameParts.slice(1).join(" ")).trim();
+    const systemUserId = resolvePersonSystemUserId(person);
 
     setSelectedPerson(person);
     setIsEditMode(editMode);
+    setEditableSystemUserId(null);
+    setEditableSystemUserSnapshot(null);
     setEditForm({
-      firstName: person.firstName,
+      firstName: person.firstName ?? "",
       lastName1,
       lastName2,
-      age: person.age,
-      status: person.status,
-      occupationId: person.occupationId,
+      identificationNumber: person.identificationNumber ?? "",
+      birthDate: dateInputFromUnknown(person.birthDate),
+      gender: person.gender ?? "OTHER",
+      status: person.currentStatus ?? person.status ?? "ACTIVE",
+      occupationId: person.occupationId ?? 0,
+      character: person.character ?? 1,
       notes: person.notes ?? "",
+      accountRole: person.accountRole ?? "WORKER",
       accountStatus: person.accountStatus ?? "ACTIVE",
     });
+
+    if (editMode && systemUserId !== null) {
+      fetchSystemUserById(systemUserId)
+        .then((systemUser) => {
+          setEditableSystemUserId(systemUser.id);
+          setEditableSystemUserSnapshot({
+            id: systemUser.id,
+            role: systemUser.role,
+            status: systemUser.status,
+          });
+          setEditForm((prev) => ({
+            ...prev,
+            accountRole: systemUser.role,
+            accountStatus: systemUser.status,
+          }));
+        })
+        .catch((error) => {
+          onError(getErrorMessage(error, "fetch_user"));
+        });
+    }
   };
 
   const closePersonModal = () => {
     if (isSaving) return;
     setSelectedPerson(null);
     setIsEditMode(false);
+    setEditableSystemUserId(null);
+    setEditableSystemUserSnapshot(null);
   };
 
   const handleDeletePerson = async (personId: number) => {
+    if (isCurrentAdminPerson(personId)) {
+      onNotice("poblacion", "error", "No puedes eliminar tu propio registro desde Poblacion.");
+      return;
+    }
+
     if (!window.confirm("¿Eliminar este registro de persona?")) return;
     setIsSaving(true);
     onError(null);
@@ -2472,12 +2810,10 @@ const PopulationModule = memo(function PopulationModule({
   const handleSavePerson = async () => {
     if (!selectedPerson) return;
 
-    const isSelfAccountEdit = currentAdminId !== null && selectedPerson.id === currentAdminId;
-    const originalAccountStatus = normalizeAccountStatus(selectedPerson.accountStatus);
-    const requestedAccountStatus = normalizeAccountStatus(editForm.accountStatus);
+    const isSelfAccountEdit = isCurrentAdminPerson(selectedPerson.id);
 
-    if (isSelfAccountEdit && requestedAccountStatus !== originalAccountStatus) {
-      onNotice("poblacion", "error", "No puedes cambiar el estado de tu propia cuenta. Debe hacerlo otro administrador.");
+    if (isSelfAccountEdit) {
+      onNotice("poblacion", "error", "Tu propio perfil se edita desde Configuracion, no desde Poblacion.");
       return;
     }
 
@@ -2487,42 +2823,53 @@ const PopulationModule = memo(function PopulationModule({
       const normalizedFirstName = String(editForm.firstName ?? "").trim();
       const normalizedLastName1 = String(editForm.lastName1 ?? "").trim();
       const normalizedLastName2 = String(editForm.lastName2 ?? "").trim();
-      const normalizedLastName = [normalizedLastName1, normalizedLastName2].filter(Boolean).join(" ");
-      const normalizedNotes = String(editForm.notes ?? "").trim();
+      const normalizedIdentification = String(editForm.identificationNumber ?? "").trim();
+      const normalizedBirthDate = String(editForm.birthDate ?? "").trim();
 
-      const payload = {
-        firstName: normalizedFirstName,
-        nombre: normalizedFirstName,
-        first_name: normalizedFirstName,
-        primer_nombre: normalizedFirstName,
-        lastName: normalizedLastName,
-        lastName1: normalizedLastName1,
-        lastName2: normalizedLastName2 || null,
-        primer_apellido: normalizedLastName1,
-        segundo_apellido: normalizedLastName2 || null,
-        age: Number(editForm.age),
-        status: editForm.status,
-        currentStatus: editForm.status,
-        campId: selectedPerson.campId,
-        occupationId: Number(editForm.occupationId),
-        notes: normalizedNotes || undefined,
-      };
-
-      try {
-        await updatePerson(selectedPerson.id, {
-          ...payload,
-          accountStatus: editForm.accountStatus,
-        });
-      } catch (error) {
-        if (!(error instanceof ApiHttpError) || error.statusCode !== 400) {
-          throw error;
-        }
-
-        await updatePerson(selectedPerson.id, payload);
+      if (!normalizedFirstName || !normalizedLastName1 || !normalizedIdentification || !normalizedBirthDate) {
+        onNotice("poblacion", "warning", "Nombre, primer apellido, identificacion y fecha de nacimiento son requeridos.");
+        return;
       }
+
+      const nextOccupationId = Number(editForm.occupationId) > 0 ? Number(editForm.occupationId) : null;
+      const nextCharacter = Math.min(5, Math.max(1, Number(editForm.character) || 1));
+      const nextLastName2 = normalizedLastName2 || null;
+      const personPayload: Parameters<typeof updatePerson>[1] = {};
+      if (normalizedFirstName !== String(selectedPerson.name ?? selectedPerson.firstName ?? "").trim()) personPayload.name = normalizedFirstName;
+      if (normalizedLastName1 !== String(selectedPerson.lastName1 ?? "").trim()) personPayload.lastName1 = normalizedLastName1;
+      if (nextLastName2 !== (selectedPerson.lastName2 ?? null)) personPayload.lastName2 = nextLastName2;
+      if (normalizedIdentification !== String(selectedPerson.identificationNumber ?? "").trim()) personPayload.identificationNumber = normalizedIdentification;
+      if (normalizedBirthDate !== dateInputFromUnknown(selectedPerson.birthDate)) personPayload.birthDate = normalizedBirthDate;
+      if (editForm.gender !== selectedPerson.gender) personPayload.gender = editForm.gender;
+      if (editForm.status !== (selectedPerson.currentStatus ?? selectedPerson.status)) personPayload.currentStatus = editForm.status;
+      if (nextOccupationId !== (selectedPerson.occupationId ?? null)) personPayload.occupationId = nextOccupationId;
+      if (nextCharacter !== (selectedPerson.character ?? 1)) personPayload.character = nextCharacter;
+      const systemUserId = resolvePersonSystemUserId(selectedPerson);
+
+      const updates: Array<Promise<unknown>> = [];
+      if (Object.keys(personPayload).length > 0) {
+        updates.push(updatePerson(selectedPerson.id, personPayload));
+      }
+      if (systemUserId !== null && editableSystemUserId === systemUserId && editableSystemUserSnapshot?.id === systemUserId) {
+        const userPayload: Parameters<typeof updateSystemUser>[1] = {};
+        if (editForm.accountRole !== editableSystemUserSnapshot.role) userPayload.role = editForm.accountRole;
+        if (editForm.accountStatus !== editableSystemUserSnapshot.status) userPayload.status = editForm.accountStatus;
+        if (Object.keys(userPayload).length > 0) {
+          updates.push(updateSystemUser(systemUserId, userPayload));
+        }
+      }
+
+      if (updates.length === 0) {
+        onNotice("poblacion", "info", "No hay cambios para guardar.");
+        return;
+      }
+
+      await Promise.all(updates);
       await onReload();
       setIsEditMode(false);
       setSelectedPerson(null);
+      setEditableSystemUserId(null);
+      setEditableSystemUserSnapshot(null);
       onNotice("poblacion", "success", "Datos de persona actualizados correctamente.");
     } catch (error) {
       onError(getErrorMessage(error, "update_person"));
@@ -2568,7 +2915,7 @@ const PopulationModule = memo(function PopulationModule({
           personId: person.id,
           temporaryOccupationId: tempOccupationId,
           reason: reason.trim() || "Asignación temporal",
-          assignedBy: currentAdminId ?? 1,
+          assignedBy: currentAdminUserId ?? 1,
           startDate: normalizedStartDate,
           endDate: normalizedEndDate,
         }),
@@ -2651,20 +2998,6 @@ const PopulationModule = memo(function PopulationModule({
     }
   };
 
-  const legacyFilterFromStatus = (value: typeof statusFilter): "Todos" | "Activo" | "Herido" | "Enfermo" | "Fuera" => {
-    if (value === "Todos") return "Todos";
-    if (value === "Activo") return "Activo";
-    if (value === "Herido") return "Herido";
-    return "Fuera";
-  };
-
-  const legacyToStatusFilter = (value: "Todos" | "Activo" | "Herido" | "Enfermo" | "Fuera"): typeof statusFilter => {
-    if (value === "Todos") return "Todos";
-    if (value === "Activo") return "Activo";
-    if (value === "Herido") return "Herido";
-    return "Desaparecido";
-  };
-
   const statusPillFromLegacy = (value: "Activo" | "Herido" | "Enfermo" | "Fuera") => {
     if (value === "Activo") return "is-ok";
     if (value === "Herido") return "is-warn";
@@ -2685,41 +3018,131 @@ const PopulationModule = memo(function PopulationModule({
     return "is-danger";
   };
 
+  const selectedSystemUserId = selectedPerson ? resolvePersonSystemUserId(selectedPerson) : null;
+  const isAccountEditReady = selectedSystemUserId === null || editableSystemUserId === selectedSystemUserId;
+
   return (
     <div className="admin-ui-v2-population">
       {sub === "Estadísticas" && (
         <>
-          <div className="admin-ui-v2-grid admin-ui-v2-grid-4">
-            <MetricCard label="Activo" value={legacyCounts.Activo} tone="ok" />
-            <MetricCard label="Herido" value={legacyCounts.Herido} tone="warn" />
-            <MetricCard label="Enfermo" value={legacyCounts.Enfermo} tone="warn" />
-            <MetricCard label="Fuera" value={legacyCounts.Fuera} tone="danger" />
-          </div>
-
-          <div className="admin-ui-v2-grid admin-ui-v2-grid-2">
-            <div className="admin-ui-v2-module-card">
-              <h3>Distribución por Rol</h3>
-              <div className="admin-ui-v2-stat-list">
-                {roleDistribution.map(([role, total]) => (
-                  <div key={role} className="admin-ui-v2-stat-row">
-                    <span>{role}</span>
-                    <strong>{total}</strong>
-                  </div>
-                ))}
-                {roleDistribution.length === 0 && <div className="admin-ui-v2-muted">No hay roles disponibles.</div>}
+          <div className="admin-ui-v2-pop-overview-band">
+            <div className="admin-ui-v2-grid admin-ui-v2-grid-4 admin-ui-v2-pop-kpi-grid">
+              <div className="admin-ui-v2-metric info admin-ui-v2-dashboard-metric">
+                <span className="admin-ui-v2-metric-label">Censo total</span>
+                <span className="admin-ui-v2-metric-value">{persons.length}</span>
+                <span className="admin-ui-v2-metric-detail">Personas registradas</span>
+              </div>
+              <div className="admin-ui-v2-metric ok admin-ui-v2-dashboard-metric">
+                <span className="admin-ui-v2-metric-label">Operativos</span>
+                <span className="admin-ui-v2-metric-value">{legacyCounts.Activo}</span>
+                <span className="admin-ui-v2-metric-detail">Estado disponible</span>
+              </div>
+              <div className="admin-ui-v2-metric warn admin-ui-v2-dashboard-metric">
+                <span className="admin-ui-v2-metric-label">Atención médica</span>
+                <span className="admin-ui-v2-metric-value">{legacyCounts.Herido + legacyCounts.Enfermo}</span>
+                <span className="admin-ui-v2-metric-detail">Heridos y enfermos</span>
+              </div>
+              <div className="admin-ui-v2-metric danger admin-ui-v2-dashboard-metric">
+                <span className="admin-ui-v2-metric-label">Fuera de base</span>
+                <span className="admin-ui-v2-metric-value">{legacyCounts.Fuera}</span>
+                <span className="admin-ui-v2-metric-detail">Expedición o inactivo</span>
               </div>
             </div>
 
-            <div className="admin-ui-v2-module-card">
-              <h3>Ocupación por Sector</h3>
-              <div className="admin-ui-v2-stat-list">
-                {sectorDistribution.map(([sector, total]) => (
-                  <div key={sector} className="admin-ui-v2-stat-row">
-                    <span>{sector}</span>
-                    <strong>{total}</strong>
+            <div className="admin-ui-v2-module-card admin-ui-v2-pop-density-card">
+              <div className="admin-ui-v2-section-head">
+                <span>Densidad poblacional</span>
+                <span className={`admin-ui-v2-pill ${globalOccupancyPercentage >= 80 ? "is-danger" : globalOccupancyPercentage >= 50 ? "is-warn" : "is-ok"}`}>{globalOccupancyPercentage}% red</span>
+              </div>
+              <div className="admin-ui-v2-threat-meter">
+                <div className="admin-ui-v2-threat-value">{globalOccupancyPercentage}%</div>
+                <div className="admin-ui-v2-threat-track">
+                  <span className={globalOccupancyPercentage >= 80 ? "is-danger" : globalOccupancyPercentage >= 50 ? "is-warn" : "is-ok"} style={{ width: `${globalOccupancyPercentage}%` }} />
+                </div>
+              </div>
+              <p>{persons.length} / {totalCapacity} camas ocupadas. Evita saturación crítica en los nodos activos.</p>
+            </div>
+          </div>
+
+          <div className="admin-ui-v2-pop-stats-grid">
+            <div className="admin-ui-v2-module-card admin-ui-v2-pop-stat-panel">
+              <div className="admin-ui-v2-section-head">
+                <span>Densidad y saturación por nodo</span>
+                <span>Alojamiento</span>
+              </div>
+              <div className="admin-ui-v2-pop-density-list">
+                {campDensities.map((camp) => (
+                  <div key={`${camp.id}-${camp.name}`} className="admin-ui-v2-pop-density-row">
+                    <div className="admin-ui-v2-pop-density-row-head">
+                      <div>
+                        <strong>{camp.name}</strong>
+                        <span>Zona: {camp.zone}</span>
+                      </div>
+                      <em>{camp.occupied} / {camp.capacity} camas ({camp.pct}%)</em>
+                    </div>
+                    <div className="admin-ui-v2-pop-meter"><span className={camp.pct >= 85 ? "is-danger" : camp.pct >= 50 ? "is-warn" : "is-ok"} style={{ width: `${camp.pct}%` }} /></div>
+                    <div className="admin-ui-v2-pop-density-row-foot">
+                      <span>{Math.max(camp.capacity - camp.occupied, 0)} camas libres</span>
+                      <span>{camp.status === "COMPROMISED" ? "Nodo comprometido" : camp.pct >= 80 ? "Capacidad al límite" : "Nodo operativo"}</span>
+                    </div>
                   </div>
                 ))}
-                {sectorDistribution.length === 0 && <div className="admin-ui-v2-muted">No hay sectores disponibles.</div>}
+                {campDensities.length === 0 && <div className="admin-ui-v2-muted">No hay nodos disponibles.</div>}
+              </div>
+            </div>
+
+            <div className="admin-ui-v2-module-card admin-ui-v2-pop-stat-panel">
+              <div className="admin-ui-v2-section-head">
+                <span>Demografía y alertas clínicas</span>
+                <span>Reporte</span>
+              </div>
+              <div className="admin-ui-v2-pop-demography-grid">
+                <div>
+                  <span>Edad promedio</span>
+                  <strong>{averageAge}<small> años</small></strong>
+                </div>
+                <div>
+                  <span>Disponibilidad sanitaria</span>
+                  <strong>{persons.length > 0 ? Math.round((legacyCounts.Activo / persons.length) * 100) : 100}<small>%</small></strong>
+                </div>
+              </div>
+              <div className="admin-ui-v2-pop-alert-stack">
+                {medicalAlerts.map((person) => (
+                  <button key={person.id} className="admin-ui-v2-pop-alert-row" type="button" onClick={() => openPersonModal(person, false)}>
+                    <div>
+                      <strong>{personFullName(person)}</strong>
+                      <span>{person.notes || "Reporte sin descripción clínica."}</span>
+                    </div>
+                    <span className={`admin-ui-v2-pill ${person.status === "SICK" ? "is-danger" : "is-warn"}`}>{legacyPopulationStatus(person.status)}</span>
+                  </button>
+                ))}
+                {medicalAlerts.length === 0 && <div className="admin-ui-v2-empty-cell">Sin alertas sanitarias activas.</div>}
+              </div>
+            </div>
+
+            <div className="admin-ui-v2-module-card admin-ui-v2-pop-workload-card">
+              <div>
+                <div className="admin-ui-v2-section-head">
+                  <span>Proporción de fuerza técnica</span>
+                  <span>Mano de obra</span>
+                </div>
+                <p>Análisis dinámico de oficios registrados para detectar concentración operativa y brechas de asignación.</p>
+                <div className="admin-ui-v2-pop-workload-summary">
+                  <div><span>Personal operativo</span><strong>{legacyCounts.Activo} pers.</strong></div>
+                  <div><span>Personal con atención</span><strong>{legacyCounts.Herido + legacyCounts.Enfermo} pers.</strong></div>
+                </div>
+              </div>
+              <div className="admin-ui-v2-pop-role-bars">
+                {roleDistribution.map(([role, total]) => {
+                  const pct = persons.length > 0 ? Math.round((total / persons.length) * 100) : 0;
+                  return (
+                    <div key={role}>
+                      <div><span>{role}</span><strong>{total} ({pct}%)</strong></div>
+                      <div className="admin-ui-v2-pop-meter"><span className="is-info" style={{ width: `${pct}%` }} /></div>
+                    </div>
+                  );
+                })}
+                {roleDistribution.length === 0 && <div className="admin-ui-v2-muted">No hay roles disponibles.</div>}
               </div>
             </div>
           </div>
@@ -2728,117 +3151,182 @@ const PopulationModule = memo(function PopulationModule({
 
       {sub === "Usuarios" && (
         <>
-          <div className="admin-ui-v2-toolbar admin-ui-v2-toolbar-population">
-            <input
-              className="v-input admin-ui-v2-search"
-              placeholder="Buscar por nombre, rol o sector"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <div className="admin-ui-v2-filter-group">
-              {(["Todos", "Activo", "Herido", "Enfermo", "Fuera"] as const).map((legacyFilter) => (
-                <button
-                  key={legacyFilter}
-                  className={`admin-ui-v2-btn ${legacyFilterFromStatus(statusFilter) === legacyFilter ? "is-info" : ""}`}
-                  onClick={() => setStatusFilter(legacyToStatusFilter(legacyFilter))}
-                  type="button"
-                >
-                  {legacyFilter}
-                </button>
-              ))}
-            </div>
-          </div>
+          <div className="admin-ui-v2-pop-users-layout">
+            <div className="admin-ui-v2-pop-users-main">
+              <div className="admin-ui-v2-pop-status-bar">
+                <span>Estado:</span>
+                {(["Todos", "Activo", "Herido", "Enfermo", "Fuera"] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    className={`admin-ui-v2-pop-status-btn ${statusFilter === filter ? "is-active" : ""} is-${filter === "Activo" ? "ok" : filter === "Herido" || filter === "Enfermo" ? "warn" : filter === "Fuera" ? "danger" : "neutral"}`}
+                    onClick={() => setStatusFilter(filter)}
+                    type="button"
+                  >
+                    <span>{filter}</span>
+                    <strong>{filter === "Todos" ? persons.length : legacyCounts[filter]}</strong>
+                  </button>
+                ))}
+              </div>
 
-          <table className="v-table admin-ui-v2-table">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Rol</th>
-                <th>Estado</th>
-                <th>Cuenta</th>
-                <th>Edad</th>
-                <th>Sector</th>
-                <th>Ingreso</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagedPersons.map((person) => {
-                const profileImage = resolvePersonProfileImage(person);
-                return (
-                  <tr key={person.id}>
-                    <td>
-                      <div className="admin-ui-v2-person-cell">
-                        {profileImage ? (
-                          <img
-                            src={profileImage}
-                            alt={`Perfil de ${personFullName(person)}`}
-                            className="admin-ui-v2-person-avatar"
-                            loading="lazy"
-                            decoding="async"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <span className="admin-ui-v2-person-avatar admin-ui-v2-avatar-fallback" aria-hidden="true">
-                            {personInitials(person)}
-                          </span>
-                        )}
-                        <span>{personFullName(person)}</span>
-                      </div>
-                    </td>
-                    <td>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`}</td>
-                    <td>
-                      <span className={`admin-ui-v2-pill ${statusPillFromLegacy(legacyPopulationStatus(person.status))}`}>
-                        {legacyPopulationStatus(person.status)}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`admin-ui-v2-pill ${accountStatusPill(person.accountStatus)}`}>
-                        {normalizeAccountStatus(person.accountStatus)}
-                      </span>
-                    </td>
-                    <td>{person.age}</td>
-                    <td>{camps.get(person.campId) ?? `Camp #${person.campId}`}</td>
-                    <td>{new Date(person.admissionDate).toLocaleDateString("es-CR")}</td>
-                    <td>
-                      <div className="admin-ui-v2-actions">
-                        <button className="admin-ui-v2-btn" onClick={() => openPersonModal(person, false)} type="button">Ver</button>
-                        <button className="admin-ui-v2-btn is-info" onClick={() => openPersonModal(person, true)} type="button">Editar</button>
-                        <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(person.id)} type="button">Eliminar</button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {filteredPersons.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="admin-ui-v2-empty-cell">No hay personas para mostrar con esos filtros.</td>
-                </tr>
+              <div className="admin-ui-v2-toolbar admin-ui-v2-toolbar-population admin-ui-v2-pop-toolbar">
+                <input className="v-input admin-ui-v2-search" placeholder="Buscar por nombre, rol o sector" value={search} onChange={(event) => setSearch(event.target.value)} />
+                <select className="v-select" value={campFilter} onChange={(event) => setCampFilter(event.target.value)}>
+                  <option value="Todos">Campamento (Todos)</option>
+                  {Array.from(camps.entries()).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                </select>
+                <select className="v-select" value={occupationFilter} onChange={(event) => setOccupationFilter(event.target.value)}>
+                  <option value="Todos">Oficio (Todos)</option>
+                  {Array.from(occupations.entries()).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                </select>
+                <div className="admin-ui-v2-pop-view-toggle" aria-label="Modo de vista">
+                  <button className={populationViewMode === "table" ? "is-active" : ""} type="button" onClick={() => setPopulationViewMode("table")}>Tabla</button>
+                  <button className={populationViewMode === "cards" ? "is-active" : ""} type="button" onClick={() => setPopulationViewMode("cards")}>Tarjetas</button>
+                </div>
+              </div>
+
+              {populationViewMode === "table" ? (
+                <div className="admin-ui-v2-pop-table-shell">
+                  <table className="v-table admin-ui-v2-table admin-ui-v2-pop-table">
+                    <thead>
+                      <tr>
+                        <th>Usuario / Alias</th>
+                        <th>ID</th>
+                        <th>Edad</th>
+                        <th>Oficio asignado</th>
+                        <th>Campamento</th>
+                        <th>Ingreso</th>
+                        <th>Estado</th>
+                        <th>Cuenta</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedPersons.map((person) => {
+                        const profileImage = resolvePersonProfileImage(person);
+                        const isOwnRecord = isCurrentAdminPerson(person.id);
+                        const camp = campById.get(person.campId);
+                        return (
+                          <tr key={person.id} className="admin-ui-v2-pop-table-row" onClick={() => openPersonModal(person, false)}>
+                            <td>
+                              <div className="admin-ui-v2-person-cell admin-ui-v2-pop-person-cell">
+                                {profileImage ? (
+                                  <img src={profileImage} alt={`Perfil de ${personFullName(person)}`} className="admin-ui-v2-person-avatar" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <span className="admin-ui-v2-person-avatar admin-ui-v2-avatar-fallback" aria-hidden="true">{personInitials(person)}</span>
+                                )}
+                                <span><strong>{personFullName(person)}</strong><small>{person.alias ? `Alias: ${person.alias}` : "Ficha demográfica"}</small></span>
+                              </div>
+                            </td>
+                            <td>#{person.id}</td>
+                            <td>{person.age} años</td>
+                            <td>{resolvePersonOccupationLabel(person, occupations)}</td>
+                            <td><span className={camp?.status === "COMPROMISED" ? "admin-ui-v2-pop-danger-text" : undefined}>{camps.get(person.campId) ?? `Camp #${person.campId}`}</span></td>
+                            <td>{new Date(person.admissionDate).toLocaleDateString("es-CR")}</td>
+                            <td><span className={`admin-ui-v2-pill ${statusPillFromLegacy(legacyPopulationStatus(person.status))}`}>{legacyPopulationStatus(person.status)}</span></td>
+                            <td><span className={`admin-ui-v2-pill ${accountStatusPill(person.accountStatus)}`}>{normalizeAccountStatus(person.accountStatus)}</span></td>
+                            <td onClick={(event) => event.stopPropagation()}>
+                              <div className="admin-ui-v2-actions">
+                                <button className="admin-ui-v2-btn" onClick={() => openPersonModal(person, false)} type="button">Ver</button>
+                                <button className="admin-ui-v2-btn is-info" onClick={() => openPersonModal(person, true)} type="button" disabled={isOwnRecord} title={isOwnRecord ? "Edita tu perfil desde Configuracion" : undefined}>Editar</button>
+                                <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(person.id)} type="button" disabled={isOwnRecord} title={isOwnRecord ? "No puedes eliminar tu propio registro" : undefined}>Eliminar</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="admin-ui-v2-pop-card-grid">
+                  {pagedPersons.map((person) => {
+                    const profileImage = resolvePersonProfileImage(person);
+                    const isOwnRecord = isCurrentAdminPerson(person.id);
+                    const camp = campById.get(person.campId);
+                    return (
+                      <article className="admin-ui-v2-pop-card-v2" key={person.id} onClick={() => openPersonModal(person, false)}>
+                        <div className="admin-ui-v2-pop-card-v2-identity">
+                          {profileImage ? (
+                            <img src={profileImage} alt={`Perfil de ${personFullName(person)}`} className="admin-ui-v2-pop-card-v2-img" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+                          ) : (
+                            <span className="admin-ui-v2-pop-card-v2-avatar-fallback">{personInitials(person)}</span>
+                          )}
+                          <div className="admin-ui-v2-pop-card-v2-info">
+                            <h3>{personFullName(person)}</h3>
+                            <span>{resolvePersonOccupationLabel(person, occupations)}</span>
+                          </div>
+                        </div>
+                        <div className="admin-ui-v2-pop-card-v2-meta-grid">
+                          <div><span>Campamento</span><strong className={camp?.status === "COMPROMISED" ? "admin-ui-v2-pop-danger-text" : undefined}>{camps.get(person.campId) ?? `Camp #${person.campId}`}</strong></div>
+                          <div><span>Edad</span><strong>{person.age} años</strong></div>
+                          <div><span>Ingreso</span><strong>{new Date(person.admissionDate).toLocaleDateString("es-CR")}</strong></div>
+                          <div><span>Registro</span><strong>#{person.id}</strong></div>
+                        </div>
+                        <div className="admin-ui-v2-pop-card-v2-badges">
+                          <span className={`admin-ui-v2-pill ${statusPillFromLegacy(legacyPopulationStatus(person.status))}`}>{legacyPopulationStatus(person.status)}</span>
+                          <span className={`admin-ui-v2-pill ${accountStatusPill(person.accountStatus)}`}>{normalizeAccountStatus(person.accountStatus)}</span>
+                        </div>
+                        <p>{person.notes || "Ficha sin anotaciones clínicas o reportes operativos registrados."}</p>
+                        <div className="admin-ui-v2-pop-card-v2-actions" onClick={(event) => event.stopPropagation()}>
+                          <button className="admin-ui-v2-btn is-info" onClick={() => openPersonModal(person, true)} type="button" disabled={isOwnRecord}>Editar ficha</button>
+                          <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(person.id)} type="button" disabled={isOwnRecord}>Eliminar</button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
               )}
-            </tbody>
-          </table>
 
-          <div className="admin-ui-v2-pagination">
-            <span className="admin-ui-v2-muted">Registros: {filteredPersons.length}</span>
-            <div className="admin-ui-v2-actions">
-              <button
-                className="admin-ui-v2-btn"
-                type="button"
-                onClick={() => setUserPage((prev) => Math.max(1, prev - 1))}
-                disabled={userPage <= 1}
-              >
-                Ant
-              </button>
-              <span className="admin-ui-v2-muted">Pág {userPage} / {userTotalPages}</span>
-              <button
-                className="admin-ui-v2-btn"
-                type="button"
-                onClick={() => setUserPage((prev) => Math.min(userTotalPages, prev + 1))}
-                disabled={userPage >= userTotalPages}
-              >
-                Sig
-              </button>
+              {filteredPersons.length === 0 && (
+                <div className="admin-ui-v2-pop-empty">
+                  <p>No hay personas para mostrar con esos filtros.</p>
+                  <button className="admin-ui-v2-btn is-info" type="button" onClick={() => { setSearch(""); setStatusFilter("Todos"); setCampFilter("Todos"); setOccupationFilter("Todos"); }}>Restaurar filtros</button>
+                </div>
+              )}
+
+              <div className="admin-ui-v2-pagination admin-ui-v2-pop-pagination">
+                <span className="admin-ui-v2-muted">Mostrando {filteredPersons.length === 0 ? 0 : (userPage - 1) * usersPerPage + 1} - {Math.min(userPage * usersPerPage, filteredPersons.length)} de {filteredPersons.length}</span>
+                <div className="admin-ui-v2-actions">
+                  <button className="admin-ui-v2-btn" type="button" onClick={() => setUserPage((prev) => Math.max(1, prev - 1))} disabled={userPage <= 1}>Ant</button>
+                  <span className="admin-ui-v2-muted">Pág {userPage} / {userTotalPages}</span>
+                  <button className="admin-ui-v2-btn" type="button" onClick={() => setUserPage((prev) => Math.min(userTotalPages, prev + 1))} disabled={userPage >= userTotalPages}>Sig</button>
+                </div>
+              </div>
             </div>
+
+            <aside className="admin-ui-v2-pop-side-panel">
+              <div className="admin-ui-v2-module-card">
+                <div className="admin-ui-v2-section-head">
+                  <span>Densidad por nodo</span>
+                  <span>Filas</span>
+                </div>
+                <div className="admin-ui-v2-pop-density-list is-compact">
+                  {campDensities.map((camp) => (
+                    <div key={`side-${camp.id}-${camp.name}`} className="admin-ui-v2-pop-density-row">
+                      <div className="admin-ui-v2-pop-density-row-head"><strong>{camp.name}</strong><em>{camp.occupied}/{camp.capacity}</em></div>
+                      <div className="admin-ui-v2-pop-meter"><span className={camp.pct >= 85 ? "is-danger" : camp.pct >= 50 ? "is-warn" : "is-ok"} style={{ width: `${camp.pct}%` }} /></div>
+                      <div className="admin-ui-v2-pop-density-row-foot"><span>{camp.pct}% uso</span><span>{camp.zone}</span></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="admin-ui-v2-module-card admin-ui-v2-priority-card">
+                <div className="admin-ui-v2-section-head">
+                  <span>Alertas sanitarias</span>
+                  <span className="admin-ui-v2-pill is-danger">{medicalAlerts.length} críticas</span>
+                </div>
+                <div className="admin-ui-v2-pop-alert-stack">
+                  {medicalAlerts.map((person) => (
+                    <button key={`side-alert-${person.id}`} className="admin-ui-v2-pop-alert-row" type="button" onClick={() => openPersonModal(person, false)}>
+                      <div><strong>{personFullName(person)}</strong><span>{camps.get(person.campId) ?? `Camp #${person.campId}`} - {person.age} años</span></div>
+                      <span className={`admin-ui-v2-pill ${person.status === "SICK" ? "is-danger" : "is-warn"}`}>{legacyPopulationStatus(person.status)}</span>
+                    </button>
+                  ))}
+                  {medicalAlerts.length === 0 && <div className="admin-ui-v2-empty-cell">Población médica estable.</div>}
+                </div>
+              </div>
+            </aside>
           </div>
         </>
       )}
@@ -3032,7 +3520,7 @@ const PopulationModule = memo(function PopulationModule({
                         }}
                       >
                         <span className="admin-ui-v2-temp-avatar">{personInitials(person)}</span>
-                        <div><strong>{personFullName(person)}</strong><small>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`} · {person.age} años</small></div>
+                        <div><strong>{personFullName(person)}</strong><small>{resolvePersonOccupationLabel(person, occupations)} · {person.age} años</small></div>
                       </button>
                     ))}
                     {availableTempCandidates.length === 0 && <div className="admin-ui-v2-empty-cell">No hay operarios disponibles con esos filtros.</div>}
@@ -3129,7 +3617,7 @@ const PopulationModule = memo(function PopulationModule({
 
       {selectedPerson && (
         <div className="admin-ui-v2-modal-backdrop" onClick={closePersonModal}>
-          <div className="admin-ui-v2-modal" onClick={(event) => event.stopPropagation()}>
+          <div className={`admin-ui-v2-modal ${isEditMode ? "" : "admin-ui-v2-person-modal-shell"}`} onClick={(event) => event.stopPropagation()}>
             <div className="admin-ui-v2-modal-header">
               <h3>{isEditMode ? "Editar Persona" : "Ficha de Persona"}</h3>
               <button className="admin-ui-v2-btn" type="button" onClick={closePersonModal}>Cerrar</button>
@@ -3140,26 +3628,38 @@ const PopulationModule = memo(function PopulationModule({
                 <input className="v-input" value={editForm.firstName} onChange={(event) => setEditForm((prev) => ({ ...prev, firstName: event.target.value }))} placeholder="Nombre" />
                 <input className="v-input" value={editForm.lastName1} onChange={(event) => setEditForm((prev) => ({ ...prev, lastName1: event.target.value }))} placeholder="Primer apellido" />
                 <input className="v-input" value={editForm.lastName2} onChange={(event) => setEditForm((prev) => ({ ...prev, lastName2: event.target.value }))} placeholder="Segundo apellido" />
-                <input className="v-input" type="number" value={editForm.age} onChange={(event) => setEditForm((prev) => ({ ...prev, age: Number(event.target.value) }))} placeholder="Edad" />
+                <input className="v-input" value={editForm.identificationNumber} onChange={(event) => setEditForm((prev) => ({ ...prev, identificationNumber: event.target.value }))} placeholder="Identificacion" />
+                <input className="v-input" type="date" value={editForm.birthDate} onChange={(event) => setEditForm((prev) => ({ ...prev, birthDate: event.target.value }))} />
+                <select className="v-select" value={editForm.gender} onChange={(event) => setEditForm((prev) => ({ ...prev, gender: event.target.value as Gender }))}>
+                  <option value="MALE">Masculino</option>
+                  <option value="FEMALE">Femenino</option>
+                  <option value="OTHER">Otro</option>
+                </select>
                 <select className="v-select" value={editForm.status} onChange={(event) => setEditForm((prev) => ({ ...prev, status: event.target.value as Person["status"] }))}>
                   <option value="ACTIVE">Activo</option>
+                  <option value="SICK">Enfermo</option>
                   <option value="INJURED">Herido</option>
-                  <option value="MISSING">Desaparecido</option>
-                  <option value="DECEASED">Fallecido</option>
+                  <option value="OUTSIDE_CAMP">Fuera del campamento</option>
+                  <option value="ON_EXPEDITION">En expedicion</option>
+                  <option value="INACTIVE">Inactivo</option>
+                </select>
+                <select className="v-select" value={editForm.accountRole} onChange={(event) => setEditForm((prev) => ({ ...prev, accountRole: event.target.value as SystemRole }))} disabled={!isAccountEditReady}>
+                  <option value="WORKER">Trabajador</option>
+                  <option value="RESOURCE_MANAGEMENT">Gestion de recursos</option>
+                  <option value="TRAVEL_MANAGER">Gestor de viajes</option>
+                  <option value="SYSTEM_ADMIN">Administrador</option>
                 </select>
                 <select
                   className="v-select"
                   value={editForm.accountStatus}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, accountStatus: event.target.value as "ACTIVE" | "BLOCKED" | "INACTIVE" }))}
-                  disabled={currentAdminId !== null && selectedPerson.id === currentAdminId}
+                  disabled={!isAccountEditReady}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, accountStatus: event.target.value as SystemUserStatus }))}
                 >
                   <option value="ACTIVE">Cuenta activa</option>
                   <option value="BLOCKED">Cuenta bloqueada</option>
                   <option value="INACTIVE">Cuenta inactiva</option>
                 </select>
-                {currentAdminId !== null && selectedPerson.id === currentAdminId && (
-                  <div className="admin-ui-v2-muted">No puedes cambiar el estado de tu propia cuenta.</div>
-                )}
+                {!isAccountEditReady && <div className="admin-ui-v2-muted">Cargando cuenta vinculada...</div>}
                 <div className="v-input" aria-readonly="true">
                   {camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}
                 </div>
@@ -3168,28 +3668,96 @@ const PopulationModule = memo(function PopulationModule({
                     <option key={id} value={id}>{name}</option>
                   ))}
                 </select>
-                <textarea className="v-textarea" value={editForm.notes} onChange={(event) => setEditForm((prev) => ({ ...prev, notes: event.target.value }))} placeholder="Notas" />
+                <input className="v-input" type="number" min={1} max={5} value={editForm.character} onChange={(event) => setEditForm((prev) => ({ ...prev, character: Number(event.target.value) }))} placeholder="Personaje (1-5)" />
                 <div className="admin-ui-v2-actions">
                   <button className="admin-ui-v2-btn is-info" onClick={() => void handleSavePerson()} type="button" disabled={isSaving}>Guardar</button>
                   <button className="admin-ui-v2-btn" onClick={() => setIsEditMode(false)} type="button" disabled={isSaving}>Cancelar</button>
                 </div>
               </div>
-            ) : (
-              <div className="admin-ui-v2-person-detail">
-                <div><strong>Nombre:</strong> {personFullName(selectedPerson)}</div>
-                <div><strong>Edad:</strong> {selectedPerson.age}</div>
-                <div><strong>Estado:</strong> {normalizeStatusLabel(selectedPerson.status)}</div>
-                <div><strong>Estado de cuenta:</strong> {selectedPerson.accountStatus ?? "ACTIVE"}</div>
-                <div><strong>Rol:</strong> {occupations.get(selectedPerson.occupationId) ?? `Ocupación #${selectedPerson.occupationId}`}</div>
-                <div><strong>Sector:</strong> {camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}</div>
-                <div><strong>Ingreso:</strong> {new Date(selectedPerson.admissionDate).toLocaleDateString("es-CR")}</div>
-                <div><strong>Notas:</strong> {selectedPerson.notes || "Sin notas"}</div>
-                <div className="admin-ui-v2-actions">
-                  <button className="admin-ui-v2-btn is-info" onClick={() => setIsEditMode(true)} type="button">Editar</button>
-                  <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(selectedPerson.id)} type="button" disabled={isSaving}>Eliminar</button>
+            ) : (() => {
+              const selectedCamp = campById.get(selectedPerson.campId);
+              const selectedImage = resolvePersonProfileImage(selectedPerson);
+              const selectedStatus = legacyPopulationStatus(selectedPerson.status);
+              const isOwnRecord = isCurrentAdminPerson(selectedPerson.id);
+              const achievementIds = selectedPerson.achievementIds ?? [];
+              const formattedAdmissionDate = selectedPerson.admissionDate
+                ? new Date(selectedPerson.admissionDate).toLocaleDateString("es-CR", { day: "numeric", month: "long", year: "numeric" })
+                : "No especificado";
+
+              return (
+                <div className="admin-ui-v2-person-modal">
+                  <div className="admin-ui-v2-person-modal-head">
+                    <span>Ficha demográfica detallada</span>
+                    <strong>Registro #{selectedPerson.id}</strong>
+                  </div>
+
+                  <div className="admin-ui-v2-person-modal-body">
+                    <aside className="admin-ui-v2-person-modal-photo-panel">
+                      <span>Foto de identificación</span>
+                      {selectedImage ? (
+                        <img src={selectedImage} alt={`Perfil de ${personFullName(selectedPerson)}`} className="admin-ui-v2-person-modal-avatar" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="admin-ui-v2-person-modal-avatar admin-ui-v2-avatar-fallback">{personInitials(selectedPerson)}</div>
+                      )}
+                      <div className="admin-ui-v2-person-modal-registry">
+                        <small>Registro único</small>
+                        <strong>#{selectedPerson.id}</strong>
+                      </div>
+                      <div className="admin-ui-v2-person-modal-status">
+                        <small>Sinopsis clínica</small>
+                        <span className={`admin-ui-v2-pill ${statusPillFromLegacy(selectedStatus)}`}>{selectedStatus}</span>
+                      </div>
+                    </aside>
+
+                    <section className="admin-ui-v2-person-modal-info">
+                      <div className="admin-ui-v2-person-modal-title">
+                        {selectedPerson.alias && <span>Alias: {selectedPerson.alias}</span>}
+                        <h2>{personFullName(selectedPerson)}</h2>
+                        <p>Ingresó formalmente el {formattedAdmissionDate}</p>
+                      </div>
+
+                      <div className="admin-ui-v2-person-modal-grid">
+                        <div><span>Edad</span><strong>{selectedPerson.age} años</strong></div>
+                        <div>
+                          <span>Nodo campamento</span>
+                          <strong className={selectedCamp?.status === "COMPROMISED" ? "admin-ui-v2-pop-danger-text" : undefined}>{camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}</strong>
+                          <small>Zona: {selectedCamp?.location?.zone ?? "N/A"} | Capacidad: {selectedCamp?.capacity ?? "N/A"}</small>
+                        </div>
+                        <div>
+                          <span>Oficio asignado</span>
+                          <strong>{resolvePersonOccupationLabel(selectedPerson, occupations)}</strong>
+                          <small>{selectedPerson.occupation?.description ?? "Sin descripción de operaciones registrada."}</small>
+                        </div>
+                        <div><span>Identificación</span><strong>{selectedPerson.identificationNumber || "No registrada"}</strong></div>
+                        <div><span>Cuenta</span><strong>{normalizeAccountStatus(selectedPerson.accountStatus)}</strong></div>
+                        <div><span>Rol de sistema</span><strong>{selectedPerson.accountRole ?? "WORKER"}</strong></div>
+                      </div>
+
+                      {achievementIds.length > 0 && (
+                        <div className="admin-ui-v2-person-modal-achievements">
+                          <span>Condecoraciones / logros</span>
+                          <div>
+                            {achievementIds.map((achievementId) => <em key={achievementId}>Logro táctico #{achievementId}</em>)}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="admin-ui-v2-person-modal-notes">
+                        <span>Observaciones clínicas y de campo</span>
+                        <p>{selectedPerson.notes && selectedPerson.notes.trim() ? selectedPerson.notes : "Ficha sin anotaciones clínicas o reportes operativos registrados."}</p>
+                      </div>
+                    </section>
+                  </div>
+
+                  <div className="admin-ui-v2-person-modal-footer">
+                    {isOwnRecord && <span className="admin-ui-v2-muted">Tu propio perfil se edita desde Configuracion.</span>}
+                    <button className="admin-ui-v2-btn" onClick={closePersonModal} type="button">Cerrar</button>
+                    <button className="admin-ui-v2-btn is-info" onClick={() => setIsEditMode(true)} type="button" disabled={isOwnRecord}>Editar ficha</button>
+                    <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(selectedPerson.id)} type="button" disabled={isSaving || isOwnRecord}>Eliminar</button>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       )}
@@ -3462,42 +4030,31 @@ const SettingsModule = memo(function SettingsModule({
   sub,
   profile,
   persons,
+  currentAdminPersonId,
   onNotice,
   onProfileRefresh,
   onReloadPersons,
+  onProfilePersonUpdated,
 }: {
   sub: string;
   profile: SessionAdminUser;
   persons: Person[];
+  currentAdminPersonId: number | null;
   onNotice: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
   onProfileRefresh: () => void;
   onReloadPersons: () => Promise<void>;
+  onProfilePersonUpdated: (person: Person) => void;
 }) {
   const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
   const ALLOWED_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
   const SYSTEM_TIME_LIMITS: Record<SystemTimeUnit, number> = { minutes: 1440, hours: 168 };
-
-  const [settings, setSettings] = useState(() => {
-    const base = {
-      firstName: profile.firstName ?? "",
-      lastName1: profile.lastName1 ?? "",
-      lastName2: profile.lastName2 ?? "",
-    };
-
-    const stored = localStorage.getItem("admin_settings_v2");
-    if (!stored) return base;
-
-    try {
-      const parsed = JSON.parse(stored) as Partial<typeof base>;
-      return { ...base, ...parsed };
-    } catch {
-      return base;
-    }
-  });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [photoInputKey, setPhotoInputKey] = useState(0);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{ type: ModuleMessageType; text: string } | null>(null);
+  const [profileForm, setProfileForm] = useState({ firstName: "", lastName1: "", lastName2: "" });
   const [photoMessage, setPhotoMessage] = useState<{ type: ModuleMessageType; text: string } | null>(null);
   const [systemTime, setSystemTime] = useState<string | null>(null);
   const [timeOffset, setTimeOffset] = useState<SystemTimeOffset | null>(null);
@@ -3508,22 +4065,27 @@ const SettingsModule = memo(function SettingsModule({
   const [advanceResult, setAdvanceResult] = useState<AdvanceSystemTimeResult | null>(null);
   const resolvedProfilePerson = useMemo(() => resolveSessionPerson(profile, persons), [profile, persons]);
   const resolvedProfilePersonId = useMemo(() => resolveSessionPersonId(profile, persons), [profile, persons]);
+  const editableProfilePersonId = currentAdminPersonId ?? resolvedProfilePersonId ?? profile.personId ?? profile.person_id ?? null;
 
   const currentProfilePhoto = useMemo(
     () =>
-      resolvePersonProfileImage(resolvedProfilePerson) ||
-      (typeof profile.photoUrl === "string" && profile.photoUrl.trim()) ||
-      (typeof profile.imageUrl === "string" && profile.imageUrl.trim()) ||
-      (typeof profile.profileImage === "string" && profile.profileImage.trim()) ||
-      (typeof profile.avatar === "string" && profile.avatar.trim()) ||
-      (typeof profile.photo === "string" && profile.photo.trim()) ||
-      null,
-    [resolvedProfilePerson, profile.photoUrl, profile.imageUrl, profile.profileImage, profile.avatar, profile.photo],
+      resolvePersonProfileImage(resolvedProfilePerson),
+    [resolvedProfilePerson],
   );
   const currentProfileInitials = useMemo(
     () => resolveInitials([profile.firstName, profile.lastName1, profile.lastName2, profile.displayName, profile.username], 3),
     [profile.firstName, profile.lastName1, profile.lastName2, profile.displayName, profile.username],
   );
+
+  useEffect(() => {
+    const sourcePerson = resolvedProfilePerson;
+    const fallbackLastName = String(sourcePerson?.lastName ?? "").trim().split(/\s+/).filter(Boolean);
+    setProfileForm({
+      firstName: sourcePerson?.firstName ?? profile.firstName ?? "",
+      lastName1: sourcePerson?.lastName1 ?? fallbackLastName[0] ?? profile.lastName1 ?? "",
+      lastName2: sourcePerson?.lastName2 ?? fallbackLastName.slice(1).join(" ") ?? profile.lastName2 ?? "",
+    });
+  }, [profile.firstName, profile.lastName1, profile.lastName2, resolvedProfilePerson]);
 
   const loadSystemTimeControls = useCallback(async () => {
     setIsLoadingTime(true);
@@ -3605,43 +4167,46 @@ const SettingsModule = memo(function SettingsModule({
     };
   }, [photoPreviewUrl]);
 
-  const persistSettings = (nextSettings: typeof settings) => {
-    localStorage.setItem("admin_settings_v2", JSON.stringify(nextSettings));
-
-    const rawUser = localStorage.getItem("user");
-    if (rawUser) {
-      try {
-        const parsed = JSON.parse(rawUser) as Record<string, unknown>;
-        const updated: Record<string, unknown> = {
-          ...parsed,
-          firstName: nextSettings.firstName,
-          lastName1: nextSettings.lastName1,
-          lastName2: nextSettings.lastName2,
-        };
-        const profileName = [nextSettings.firstName, nextSettings.lastName1, nextSettings.lastName2]
-          .map((part) => String(part ?? "").trim())
-          .filter(Boolean)
-          .join(" ");
-        if (profileName) {
-          updated.displayName = profileName;
-        }
-        localStorage.setItem("user", JSON.stringify(updated));
-      } catch {
-        // Ignore malformed cached user
-      }
+  const handleProfileDataSave = async () => {
+    if (isSavingProfile) return;
+    const profilePersonId = positiveNumber(editableProfilePersonId);
+    if (profilePersonId === null) {
+      setProfileMessage({ type: "error", text: "No se encontro una persona vinculada a tu usuario." });
+      onNotice("configuracion", "error", "No se encontro una persona vinculada a tu usuario.");
+      return;
     }
 
-    onProfileRefresh();
-    onNotice("configuracion", "success", "Configuracion guardada correctamente.");
-  };
+    const normalizedFirstName = profileForm.firstName.trim();
+    const normalizedLastName1 = profileForm.lastName1.trim();
+    const normalizedLastName2 = profileForm.lastName2.trim();
 
-  const handleSave = () => {
-    persistSettings(settings);
-  };
+    if (!normalizedFirstName || !normalizedLastName1) {
+      setProfileMessage({ type: "warning", text: "Nombre y primer apellido son requeridos." });
+      onNotice("configuracion", "warning", "Nombre y primer apellido son requeridos.");
+      return;
+    }
 
-  const handleReset = () => {
-    localStorage.removeItem("admin_settings_v2");
-    onNotice("configuracion", "info", "Se restablecio la configuracion local del panel.");
+    setIsSavingProfile(true);
+    setProfileMessage({ type: "info", text: "Guardando datos de perfil..." });
+    try {
+      const payload = {
+        name: normalizedFirstName,
+        lastName1: normalizedLastName1,
+        lastName2: normalizedLastName2 || null,
+      };
+      await updatePerson(profilePersonId, payload);
+      const refreshedPerson = await fetchPersonById(profilePersonId);
+      onProfilePersonUpdated(refreshedPerson);
+      onProfileRefresh();
+      setProfileMessage({ type: "success", text: "Datos de perfil actualizados correctamente." });
+      onNotice("configuracion", "success", "Datos de perfil actualizados correctamente.");
+    } catch (error) {
+      const message = getErrorMessage(error, "update_person");
+      setProfileMessage({ type: "error", text: message });
+      onNotice("configuracion", "error", message);
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   const handlePhotoSelection = (event: ChangeEvent<HTMLInputElement>) => {
@@ -3687,18 +4252,28 @@ const SettingsModule = memo(function SettingsModule({
       onNotice("configuracion", "warning", "Primero selecciona una imagen.");
       return;
     }
-    if (resolvedProfilePersonId === null) {
-      const message = "No se pudo identificar la persona enlazada a este usuario. Revisa que la cuenta tenga personId o username asociado.";
-      setPhotoMessage({ type: "error", text: message });
-      onNotice("configuracion", "error", message);
-      return;
-    }
-
     setIsUploadingPhoto(true);
     setPhotoMessage({ type: "info", text: "Subiendo imagen de perfil..." });
     try {
-      const updatedPerson = await updatePersonPhoto(resolvedProfilePersonId, photoFile);
-      const resolvedPhotoUrl = resolvePersonProfileImage(updatedPerson);
+      const profileFallbackId = resolvedProfilePersonId ?? profile.personId ?? profile.person_id ?? profile.id ?? 0;
+      const updatedPerson = await updatePersonPhoto(profileFallbackId, photoFile);
+      const uploadedPersonId = positiveNumber(updatedPerson.id) ?? resolvedProfilePersonId ?? positiveNumber(profile.personId) ?? positiveNumber(profile.person_id);
+      let resolvedPhotoUrl = resolvePersonProfileImage(updatedPerson);
+      let refreshedProfilePerson: Person | null = positiveNumber(updatedPerson.id) !== null ? updatedPerson : null;
+
+      if (uploadedPersonId !== null) {
+        try {
+          const refreshedPerson = await fetchPersonById(uploadedPersonId);
+          refreshedProfilePerson = refreshedPerson;
+          resolvedPhotoUrl = resolvePersonProfileImage(refreshedPerson);
+        } catch (refreshError) {
+          console.warn("Profile photo uploaded, but signed URL refresh failed", refreshError);
+        }
+      }
+
+      if (refreshedProfilePerson) {
+        onProfilePersonUpdated(refreshedProfilePerson);
+      }
 
       const rawUser = localStorage.getItem("user");
       if (rawUser) {
@@ -3706,14 +4281,9 @@ const SettingsModule = memo(function SettingsModule({
           const parsed = JSON.parse(rawUser) as Record<string, unknown>;
           const updated: Record<string, unknown> = {
             ...parsed,
-            personId: resolvedProfilePersonId,
           };
-          if (resolvedPhotoUrl) {
-            updated.photoUrl = resolvedPhotoUrl;
-            updated.imageUrl = resolvedPhotoUrl;
-            updated.profileImage = resolvedPhotoUrl;
-            updated.avatar = resolvedPhotoUrl;
-            updated.photo = resolvedPhotoUrl;
+          if (uploadedPersonId !== null) {
+            updated.personId = uploadedPersonId;
           }
           localStorage.setItem("user", JSON.stringify(updated));
         } catch {
@@ -3729,8 +4299,16 @@ const SettingsModule = memo(function SettingsModule({
       setPhotoInputKey((prev) => prev + 1);
 
       await onReloadPersons();
+      if (refreshedProfilePerson) {
+        onProfilePersonUpdated(refreshedProfilePerson);
+      }
       onProfileRefresh();
-      setPhotoMessage({ type: "success", text: "Foto de perfil actualizada correctamente." });
+      setPhotoMessage({
+        type: resolvedPhotoUrl ? "success" : "warning",
+        text: resolvedPhotoUrl
+          ? "Foto de perfil actualizada correctamente."
+          : "Foto actualizada, pero el backend no devolvio una URL firmada para mostrarla.",
+      });
       onNotice("configuracion", "success", "Foto de perfil actualizada correctamente.");
     } catch (error) {
       const message = error instanceof Error && error.message.trim()
@@ -3769,24 +4347,38 @@ const SettingsModule = memo(function SettingsModule({
                 <label className="admin-ui-v2-muted">Primer nombre</label>
                 <input
                   className="v-input"
-                  value={settings.firstName}
-                  onChange={(event) => setSettings((prev) => ({ ...prev, firstName: event.target.value }))}
+                  value={profileForm.firstName}
+                  onChange={(event) => setProfileForm((prev) => ({ ...prev, firstName: event.target.value }))}
+                  disabled={isSavingProfile}
                 />
 
                 <label className="admin-ui-v2-muted">Primer apellido</label>
                 <input
                   className="v-input"
-                  value={settings.lastName1}
-                  onChange={(event) => setSettings((prev) => ({ ...prev, lastName1: event.target.value }))}
+                  value={profileForm.lastName1}
+                  onChange={(event) => setProfileForm((prev) => ({ ...prev, lastName1: event.target.value }))}
+                  disabled={isSavingProfile}
                 />
 
                 <label className="admin-ui-v2-muted">Segundo apellido</label>
                 <input
                   className="v-input"
-                  value={settings.lastName2}
-                  onChange={(event) => setSettings((prev) => ({ ...prev, lastName2: event.target.value }))}
+                  value={profileForm.lastName2}
+                  onChange={(event) => setProfileForm((prev) => ({ ...prev, lastName2: event.target.value }))}
+                  disabled={isSavingProfile}
                 />
 
+              </div>
+
+              <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
+                <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void handleProfileDataSave()} disabled={isSavingProfile}>
+                  {isSavingProfile ? "Guardando perfil..." : "Guardar datos de perfil"}
+                </button>
+                <button className="admin-ui-v2-btn" type="button" onClick={onProfileRefresh} disabled={isSavingProfile}>Actualizar datos de autenticacion</button>
+              </div>
+
+              <div className={`admin-ui-v2-settings-photo-message is-${profileMessage?.type ?? "info"}`}>
+                {profileMessage?.text ?? "Estos datos corresponden a tu persona vinculada y solo se editan desde Configuracion."}
               </div>
             </div>
 
@@ -3839,9 +4431,7 @@ const SettingsModule = memo(function SettingsModule({
 
                 <div className={`admin-ui-v2-settings-photo-message is-${photoMessage?.type ?? "info"}`}>
                   {photoMessage?.text ??
-                    (resolvedProfilePersonId === null
-                      ? "No se encontro una persona enlazada para este usuario."
-                      : "Selecciona una imagen JPG, PNG o WEBP para actualizarla.")}
+                    "Selecciona una imagen JPG, PNG o WEBP para actualizarla. El servidor enlazara la foto con tu usuario actual."}
                 </div>
               </div>
             </div>
@@ -3946,13 +4536,6 @@ const SettingsModule = memo(function SettingsModule({
           </>
         )}
       </div>
-
-      {sub === "Campamento" && (
-        <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
-          <button className="admin-ui-v2-btn is-info" type="button" onClick={handleSave}>Guardar configuracion</button>
-          <button className="admin-ui-v2-btn" type="button" onClick={handleReset}>Restablecer</button>
-        </div>
-      )}
     </div>
   );
 });
@@ -3976,6 +4559,7 @@ function AdmissionReviewModal({
     options?: { finalOccupationId?: number; finalRole?: string; rejectionReason?: string },
   ) => Promise<void>;
 }) {
+  const admissionPhoto = normalizeDisplayImageUrl(admission.photoSignedUrl) || normalizeDisplayImageUrl(admission.photoUrl);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewForm, setReviewForm] = useState({
     finalOccupationId: admission.finalOccupationId ?? admission.suggestedOccupationId ?? 0,
@@ -4013,6 +4597,16 @@ function AdmissionReviewModal({
         </div>
 
         <div className="admin-ui-v2-adm-detail">
+          {admissionPhoto && (
+            <img
+              src={admissionPhoto}
+              alt={`Foto de ingreso de ${admission.name}`}
+              className="admin-ui-v2-settings-photo-preview"
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+            />
+          )}
           <div><strong>Nombre:</strong> {admission.name}</div>
           <div><strong>Profesión:</strong> {admission.profession}</div>
           <div><strong>Score IA:</strong> {admission.score}/100</div>
@@ -4099,6 +4693,270 @@ function AdmissionReviewModal({
   );
 }
 
+function validCampPoint(camp: Camp | undefined): camp is Camp & { location: { latitude: number; longitude: number } } {
+  return Boolean(
+    camp?.location
+      && Number.isFinite(camp.location.latitude)
+      && Number.isFinite(camp.location.longitude),
+  );
+}
+
+function createAdminLeafletMap(container: HTMLDivElement): L.Map {
+  const map = L.map(container, {
+    zoomControl: true,
+    attributionControl: false,
+    scrollWheelZoom: false,
+  });
+
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    maxZoom: 18,
+  }).addTo(map);
+
+  return map;
+}
+
+function escapeMapHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function createMapMarker(label: string, tone: "base" | "ok" | "warn" | "danger" | "info") {
+  return L.divIcon({
+    className: "admin-ui-v2-leaflet-marker-wrap",
+    html: `<span class="admin-ui-v2-leaflet-marker is-${tone}"><i></i><strong>${escapeMapHtml(label)}</strong></span>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+  });
+}
+
+function expeditionRouteTone(status: UiExpedition["status"]): { status: string; color: string; className: string } {
+  if (status === "COMPLETADA") return { status: "COMPLETADA", color: "#48c58f", className: "admin-ui-v2-leaflet-route is-completed" };
+  if (status === "REGRESANDO") return { status: "REGRESANDO", color: "#efc16e", className: "admin-ui-v2-leaflet-route is-returning" };
+  if (status === "PROGRAMADA") return { status: "PROGRAMADA", color: "#69bfb7", className: "admin-ui-v2-leaflet-route is-planned" };
+  return { status: "EN CURSO", color: "#69bfb7", className: "admin-ui-v2-leaflet-route is-active" };
+}
+
+function routePointsFromExpedition(expedition: UiExpedition, camps: Camp[]): Array<{ latitude: number; longitude: number; label: string }> {
+  if (expedition.routePoints.length >= 2) {
+    return expedition.routePoints.map((point, index) => ({
+      latitude: point.latitude,
+      longitude: point.longitude,
+      label: point.label ?? (index === 0 ? "Origen" : index === expedition.routePoints.length - 1 ? "Destino" : `Punto ${index + 1}`),
+    }));
+  }
+
+  const origin = camps.find((camp) => camp.id === expedition.originCampId);
+  const backendDestination = expedition.routePoints[0];
+  if (validCampPoint(origin) && backendDestination) {
+    return [
+      { latitude: origin.location.latitude, longitude: origin.location.longitude, label: origin.name },
+      {
+        latitude: backendDestination.latitude,
+        longitude: backendDestination.longitude,
+        label: backendDestination.label ?? expedition.sector,
+      },
+    ];
+  }
+
+  const destination = validCampPoint(camps.find((camp) => camp.id === expedition.destinationCampId))
+    ? camps.find((camp) => camp.id === expedition.destinationCampId)
+    : undefined;
+
+  if (!validCampPoint(origin) || !validCampPoint(destination)) return [];
+  return [
+    { latitude: origin.location.latitude, longitude: origin.location.longitude, label: origin.name },
+    { latitude: destination.location.latitude, longitude: destination.location.longitude, label: destination.name },
+  ];
+}
+
+function AdminExpeditionsLeafletMap({
+  camps,
+  expeditions,
+  selectedExpeditionId,
+  onSelectExpedition,
+}: {
+  camps: Camp[];
+  expeditions: UiExpedition[];
+  selectedExpeditionId: number | null;
+  onSelectExpedition: (id: number) => void;
+}) {
+  const mapRef = useRef<L.Map | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const routes = useMemo(() => expeditions.map((expedition) => ({
+    expedition,
+    points: routePointsFromExpedition(expedition, camps),
+  })), [camps, expeditions]);
+  const validRoutes = routes.filter((route) => route.points.length >= 2);
+  const missingRoutes = routes.filter((route) => route.points.length < 2);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    if (!mapRef.current) mapRef.current = createAdminLeafletMap(containerRef.current);
+    const map = mapRef.current;
+    const layer = L.layerGroup().addTo(map);
+    const bounds = L.latLngBounds([]);
+
+    camps.filter(validCampPoint).forEach((camp) => {
+      const latLng: L.LatLngExpression = [camp.location.latitude, camp.location.longitude];
+      bounds.extend(latLng);
+      L.marker(latLng, { icon: createMapMarker(camp.name.slice(0, 10).toUpperCase(), "base") })
+        .bindTooltip(`<strong>${escapeMapHtml(camp.name)}</strong><br/>${camp.currentPopulation}/${camp.capacity} personas`, { sticky: true })
+        .addTo(layer);
+    });
+
+    validRoutes.forEach(({ expedition, points }) => {
+      const tone = expeditionRouteTone(expedition.status);
+      const latLngs: L.LatLngExpression[] = points.map((point) => [point.latitude, point.longitude]);
+      latLngs.forEach((latLng) => bounds.extend(latLng));
+      L.polyline(latLngs, {
+        color: tone.color,
+        weight: selectedExpeditionId === expedition.id ? 4 : 2.5,
+        opacity: selectedExpeditionId === expedition.id ? 0.95 : 0.62,
+        className: tone.className,
+      })
+        .on("click", () => onSelectExpedition(expedition.id))
+        .bindTooltip(`<strong>${escapeMapHtml(expedition.name)}</strong><br/>${tone.status}<br/>${escapeMapHtml(points[0].label)} -> ${escapeMapHtml(points[points.length - 1].label)}`, { sticky: true })
+        .addTo(layer);
+    });
+
+    if (bounds.isValid()) map.fitBounds(bounds.pad(0.22), { maxZoom: 7 });
+    window.setTimeout(() => map.invalidateSize(), 80);
+
+    return () => { layer.remove(); };
+  }, [camps, onSelectExpedition, selectedExpeditionId, validRoutes]);
+
+  useEffect(() => () => {
+    mapRef.current?.remove();
+    mapRef.current = null;
+  }, []);
+
+  return (
+    <div className="admin-ui-v2-leaflet-console">
+      <div className="admin-ui-v2-leaflet-map" ref={containerRef} />
+      <aside className="admin-ui-v2-leaflet-side">
+        <div className="admin-ui-v2-section-head"><span>Rutas backend</span><span>{validRoutes.length} visibles</span></div>
+        {validRoutes.map(({ expedition, points }) => (
+          <button
+            className={`admin-ui-v2-leaflet-route-row${selectedExpeditionId === expedition.id ? " is-selected" : ""}`}
+            key={expedition.id}
+            onClick={() => onSelectExpedition(expedition.id)}
+            type="button"
+          >
+            <strong>{expedition.name}</strong>
+            <span>{points[0].label} &gt; {points[points.length - 1].label}</span>
+            <em>{expedition.status}</em>
+          </button>
+        ))}
+        {missingRoutes.length > 0 && (
+          <div className="admin-ui-v2-leaflet-warning">
+            {missingRoutes.length} expedición(es) no incluyen ruta geográfica o destino con coordenadas en backend.
+          </div>
+        )}
+      </aside>
+    </div>
+  );
+}
+
+function transferStatusTone(status: UiTransfer["status"]): { label: string; color: string; className: string } {
+  if (status === "ENTREGADA") return { label: "ENTREGADA", color: "#48c58f", className: "is-completed" };
+  if (status === "CANCELADA") return { label: "CANCELADA", color: "#f37b7b", className: "is-cancelled" };
+  if (status === "EN_TRANSITO") return { label: "EN TRÁNSITO", color: "#efc16e", className: "is-transit" };
+  return { label: "PLANIFICADA", color: "#69bfb7", className: "is-planned" };
+}
+
+function AdminIntercampLeafletMap({ camps, requests, transfers }: { camps: Camp[]; requests: UiIntercampRequest[]; transfers: UiTransfer[] }) {
+  const mapRef = useRef<L.Map | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
+
+  const routes = useMemo(() => requests.flatMap((request) => {
+    const origin = camps.find((camp) => camp.id === request.originCampId);
+    const destination = camps.find((camp) => camp.id === request.destinationCampId);
+    if (!validCampPoint(origin) || !validCampPoint(destination)) return [];
+    const relatedTransfers = transfers.filter((transfer) => transfer.requestId === request.id);
+    return [{ request, origin, destination, transfers: relatedTransfers }];
+  }), [camps, requests, transfers]);
+
+  const missingRoutes = requests.length - routes.length;
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    if (!mapRef.current) mapRef.current = createAdminLeafletMap(containerRef.current);
+    const map = mapRef.current;
+    const layer = L.layerGroup().addTo(map);
+    const bounds = L.latLngBounds([]);
+
+    camps.filter(validCampPoint).forEach((camp) => {
+      const latLng: L.LatLngExpression = [camp.location.latitude, camp.location.longitude];
+      bounds.extend(latLng);
+      L.marker(latLng, { icon: createMapMarker(camp.name.slice(0, 10).toUpperCase(), camp.status === "COMPROMISED" ? "danger" : "base") })
+        .bindTooltip(`<strong>${escapeMapHtml(camp.name)}</strong><br/>${camp.status}`, { sticky: true })
+        .addTo(layer);
+    });
+
+    routes.forEach(({ request, origin, destination, transfers: relatedTransfers }) => {
+      const latestTransfer = relatedTransfers[0] ?? null;
+      const tone = latestTransfer ? transferStatusTone(latestTransfer.status) : { label: request.status, color: request.urgent ? "#f37b7b" : "#69bfb7", className: request.urgent ? "is-urgent" : "is-planned" };
+      const latLngs: L.LatLngExpression[] = [
+        [origin.location.latitude, origin.location.longitude],
+        [destination.location.latitude, destination.location.longitude],
+      ];
+      latLngs.forEach((latLng) => bounds.extend(latLng));
+      L.polyline(latLngs, {
+        color: tone.color,
+        weight: selectedRequestId === request.id ? 4 : 2.5,
+        opacity: selectedRequestId === request.id ? 0.95 : 0.62,
+        className: `admin-ui-v2-leaflet-route ${tone.className}`,
+      })
+        .on("click", () => setSelectedRequestId(request.id))
+        .bindTooltip(`<strong>Solicitud #${request.id}</strong><br/>${escapeMapHtml(origin.name)} -> ${escapeMapHtml(destination.name)}<br/>${tone.label}`, { sticky: true })
+        .addTo(layer);
+    });
+
+    if (bounds.isValid()) map.fitBounds(bounds.pad(0.22), { maxZoom: 7 });
+    window.setTimeout(() => map.invalidateSize(), 80);
+    return () => { layer.remove(); };
+  }, [camps, routes, selectedRequestId]);
+
+  useEffect(() => () => {
+    mapRef.current?.remove();
+    mapRef.current = null;
+  }, []);
+
+  const selectedRoute = routes.find((route) => route.request.id === selectedRequestId) ?? routes[0] ?? null;
+
+  return (
+    <div className="admin-ui-v2-leaflet-console admin-ui-v2-intercamp-map-console">
+      <div className="admin-ui-v2-leaflet-map" ref={containerRef} />
+      <aside className="admin-ui-v2-leaflet-side">
+        <div className="admin-ui-v2-section-head"><span>Conexiones backend</span><span>{routes.length} rutas</span></div>
+        {selectedRoute ? (
+          <div className="admin-ui-v2-leaflet-detail">
+            <strong>Solicitud #{selectedRoute.request.id}</strong>
+            <span>{selectedRoute.origin.name} &gt; {selectedRoute.destination.name}</span>
+            <p>{selectedRoute.request.text}</p>
+            <small>Creado por: {selectedRoute.request.createdBy ?? "No informado"}</small>
+            <small>Respondido por: {selectedRoute.request.respondedBy ?? "Pendiente"}</small>
+            {selectedRoute.transfers.map((transfer) => (
+              <div className="admin-ui-v2-leaflet-transfer" key={transfer.id}>
+                <span>Transferencia #{transfer.id}</span>
+                <strong>{transferStatusTone(transfer.status).label}</strong>
+                <small>Raciones: {transfer.rationsForTrip}</small>
+              </div>
+            ))}
+          </div>
+        ) : <div className="admin-ui-v2-empty-cell">Sin conexiones con coordenadas.</div>}
+        {missingRoutes > 0 && <div className="admin-ui-v2-leaflet-warning">{missingRoutes} solicitud(es) no tienen origen/destino con coordenadas backend.</div>}
+      </aside>
+    </div>
+  );
+}
+
 const ExpeditionsModule = memo(function ExpeditionsModule({
   sub,
   expeditions,
@@ -4112,7 +4970,6 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
   consumedResources: ResourceLedgerEntry[];
   gainedResources: ResourceLedgerEntry[];
 }) {
-  const [selectedCampId, setSelectedCampId] = useState<number | null>(null);
   const [selectedExpeditionId, setSelectedExpeditionId] = useState<number | null>(null);
   const effectiveExpeditions = expeditions;
 
@@ -4137,17 +4994,6 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
     return backendPoints;
   }, [campCatalog]);
 
-  useEffect(() => {
-    if (mappedCamps.length === 0) {
-      setSelectedCampId(null);
-      return;
-    }
-    setSelectedCampId((prev) => {
-      if (prev && mappedCamps.some((camp) => camp.id === prev)) return prev;
-      return mappedCamps[0].id;
-    });
-  }, [mappedCamps]);
-
   const activeExpeditions = effectiveExpeditions.filter((item) => item.status !== "COMPLETADA");
   const plannedExpeditions = effectiveExpeditions.filter((item) => item.status === "PROGRAMADA");
   const historyExpeditions = effectiveExpeditions.filter((item) => item.status === "COMPLETADA");
@@ -4161,27 +5007,6 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
 
   const selectedExpedition = visibleExpeditions.find((item) => item.id === selectedExpeditionId) ?? null;
   const selectedExpeditionRoute = selectedExpedition ? buildExpeditionRoute(selectedExpedition, mappedCamps) : null;
-
-  useEffect(() => {
-    if (sub !== "Mapa operativo") return;
-
-    const idleApi = window as Window & {
-      requestIdleCallback?: (callback: () => void) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-
-    if (typeof idleApi.requestIdleCallback === "function") {
-      const idleCallbackId = idleApi.requestIdleCallback(() => prefetchExpeditionsWorldMap());
-      return () => {
-        if (typeof idleApi.cancelIdleCallback === "function") {
-          idleApi.cancelIdleCallback(idleCallbackId);
-        }
-      };
-    }
-
-    const timer = window.setTimeout(() => prefetchExpeditionsWorldMap(), 120);
-    return () => window.clearTimeout(timer);
-  }, [sub]);
 
   useEffect(() => {
     setSelectedExpeditionId((prev) => {
@@ -4220,14 +5045,19 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
       </div>
 
       {sub === "Mapa operativo" && (
-        mappedCamps.length > 1 ? (
-          <div className="admin-ui-v2-map-shell">
-            <ExpeditionsWorldMap camps={mappedCamps} selectedCampId={selectedCampId} onSelectCamp={setSelectedCampId} />
+        campCatalog.filter(validCampPoint).length > 1 ? (
+          <div className="admin-ui-v2-map-shell admin-ui-v2-map-shell-leaflet">
+            <AdminExpeditionsLeafletMap
+              camps={campCatalog}
+              expeditions={effectiveExpeditions}
+              selectedExpeditionId={selectedExpeditionId}
+              onSelectExpedition={setSelectedExpeditionId}
+            />
           </div>
         ) : (
           <div className="admin-ui-v2-module-card">
             <h3>Mapa operativo</h3>
-            <p>Se requieren al menos dos campamentos con coordenadas para renderizar rutas intercampamento.</p>
+            <p>Se requieren al menos dos campamentos con coordenadas reales del backend para renderizar rutas de expedición.</p>
           </div>
         )
       )}

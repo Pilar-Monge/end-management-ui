@@ -81,8 +81,15 @@ export default function LoginPage() {
     try {
       const response = await loginRequest(form)
       const normalizedUser = {
-        ...response.user,
+        id: response.user.id,
+        ...(typeof response.user.personId === 'number' ? { personId: response.user.personId } : {}),
+        ...(typeof response.user.person_id === 'number' ? { person_id: response.user.person_id } : {}),
+        ...(typeof response.user.userId === 'number' ? { userId: response.user.userId } : {}),
+        username: response.user.username,
+        rol: response.user.rol,
         role: normalizeUserRole(response.user.rol),
+        campId: response.user.campId,
+        status: response.user.status,
       }
       const token = response.token ?? response.accessToken
       const savedPath = localStorage.getItem('last_secure_path')
@@ -94,6 +101,7 @@ export default function LoginPage() {
       localStorage.setItem('token', token)
       localStorage.setItem('accessToken', token)
       localStorage.setItem('user', JSON.stringify(normalizedUser))
+      localStorage.removeItem('admin_settings_v2')
       localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(response.user.campId))
       window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
 

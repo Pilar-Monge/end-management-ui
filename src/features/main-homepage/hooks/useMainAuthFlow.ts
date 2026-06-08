@@ -86,6 +86,7 @@ export function useMainAuthFlow(): UseMainAuthFlowReturn {
         localStorage.setItem('accessToken', token)
         window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
         localStorage.setItem('user', JSON.stringify(normalizedUser))
+        localStorage.removeItem('admin_settings_v2')
         localStorage.setItem('last_selected_camp_id', String(response.user.campId))
 
         const sessionMessage = (window.history.state?.usr as { sessionMessage?: string } | undefined)?.sessionMessage

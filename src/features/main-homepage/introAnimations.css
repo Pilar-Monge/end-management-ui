@@ -349,6 +349,14 @@
   z-index: 0;
 }
 
+.panel-title-white {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  mix-blend-mode: normal !important;
+  position: relative;
+  z-index: 20;
+}
+
 .audio-panel-brush {
   position: fixed;
   background: linear-gradient(135deg, rgba(8, 18, 50, 0.98), rgba(0, 0, 0, 0.98));
@@ -423,7 +431,14 @@
   left: 1.5rem;
   bottom: 6.4rem;
   width: min(420px, calc(100vw - 3rem));
+  max-height: calc(100dvh - 8rem);
+  overflow-y: auto;
+  scrollbar-width: none;
   z-index: 110;
+}
+
+.credits-panel-fixed::-webkit-scrollbar {
+  display: none;
 }
 
 .studio-badge-title,
@@ -555,6 +570,44 @@
   background: rgba(18, 38, 58, 0.68);
   color: #ffffff;
   transform: translateX(4px);
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .credits-panel-fixed {
+    left: max(0.75rem, env(safe-area-inset-left));
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    width: min(390px, calc(100vw - 1.5rem));
+    max-height: calc(100dvh - 1.5rem);
+  }
+
+  .credits-panel-fixed .credits-header {
+    align-items: center;
+    margin-bottom: 0.35rem !important;
+    padding-bottom: 0.65rem !important;
+  }
+
+  .credits-panel-fixed .credits-header h2 {
+    font-size: 1.15rem;
+    margin-top: 0;
+  }
+
+  .credits-panel-fixed .credits-list {
+    gap: 0.38rem;
+    padding: 0.4rem 0 0;
+  }
+
+  .credits-panel-fixed .credits-member {
+    min-height: 2.3rem;
+    padding: 0.45rem 0.7rem !important;
+    font-size: 0.62rem;
+  }
+
+  .credits-panel-fixed .credits-member span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .credits-github {

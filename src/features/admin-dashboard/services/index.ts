@@ -4,6 +4,7 @@ export {
 } from './admissionRequests.service'
 
 export {
+  listCampInventoryEntries,
   getCampInventoryEntry,
   upsertCampInventory,
   deleteCampInventory,
@@ -39,6 +40,7 @@ export {
 
 export {
   listIntercampRequests,
+  listTransfers,
   updateIntercampRequestStatus,
   getIntercampRequestById,
   getTransferById,
@@ -71,6 +73,7 @@ export {
 export type {
   AdminAdmissionRequest,
   AdminExpeditionRecord,
+  AdminTransferRecord,
   AdminNotificationRecord,
   AuditRecord,
   CampInventoryEntry,
@@ -90,4 +93,5 @@ export type {
   UiAdmission,
   UiExpedition,
   UiIntercampRequest,
+  UiTransfer,
 } from './adminDashboardBootstrap'

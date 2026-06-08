@@ -409,7 +409,7 @@ export default function ExpeditionsThreeScene({
       <Suspense fallback={null}>
         <Canvas
           dpr={[1, 1.5]}
-          shadows={{ type: THREE.PCFSoftShadowMap }}
+          shadows={{ type: THREE.PCFShadowMap }}
           camera={{ position: [12, 12, 12], fov: 45 }}
           gl={{ antialias: false }}
           performance={{ min: 0.5 }}

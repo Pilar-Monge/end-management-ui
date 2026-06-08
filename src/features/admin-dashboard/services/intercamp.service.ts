@@ -1,5 +1,5 @@
 import { ApiHttpError, apiRequest } from '../../../shared/services/httpClient'
-import type { IntercampRecord } from './types'
+import type { AdminTransferRecord, IntercampRecord } from './types'
 
 type IntercampDecision = 'APPROVED' | 'REJECTED' | 'PENDING' | 'CONFIRMED'
 
@@ -38,8 +38,12 @@ function extractIntercampList(payload: unknown): IntercampRecord[] {
 }
 
 export async function listIntercampRequests(): Promise<IntercampRecord[]> {
-  const payload = await apiRequest<unknown>('/intercamp-requests')
+  const payload = await apiRequest<unknown>('/intercamp-requests?page=1&limit=100')
   return extractIntercampList(payload)
+}
+
+export async function listTransfers(): Promise<AdminTransferRecord[]> {
+  return []
 }
 
 export async function updateIntercampRequestStatus(id: number, status: IntercampDecision): Promise<IntercampRecord> {

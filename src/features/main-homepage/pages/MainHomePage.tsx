@@ -23,11 +23,15 @@ import {
 } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { MEDIA_URLS } from '../config/mediaUrls'
-import { loginRequest } from '../../login/services/authApi'
+import {
+  loginRequest,
+  requestPasswordReset,
+  resetPasswordWithCode,
+} from '../../login/services/authApi'
 import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
 import { getPostLoginRoute, normalizeUserRole } from '../../../shared/services/postLoginRouting'
 import { getErrorMessage } from '../../../shared/services/errorMessages'
-import type { LoginErrors, LoginForm } from '../../login/types'
+import type { LoginErrors, LoginForm, PasswordResetErrors } from '../../login/types'
 import { useAuthDispatch } from '../../../shared/context/AuthContext'
 import { PopupMessage } from '../../../shared/components/PopupMessage'
 
@@ -62,6 +66,13 @@ type appState =
   | 'camp-detail'
 
 const LAST_SELECTED_CAMP_ID_KEY = 'last_selected_camp_id'
+const PASSWORD_RESET_REQUEST_SUCCESS =
+  'Si el correo pertenece a un usuario registrado, recibiras instrucciones para restablecer la contrasena.'
+const PASSWORD_RESET_SUCCESS =
+  'Tu contrasena fue actualizada correctamente. Inicia sesion con tu nueva contrasena.'
+const PASSWORD_RESET_GENERIC_ERROR = 'El codigo es invalido, expiro o ya fue utilizado.'
+
+type PopupVariant = 'info' | 'success' | 'warning' | 'error'
 
 export function MainHomePage() {
   const navigate = useNavigate()
@@ -91,6 +102,7 @@ export function MainHomePage() {
     if (sessionMessage) {
       setAppState('login')
       setAuthErrors((prev) => ({ ...prev, general: sessionMessage }))
+      setPopupVariant('error')
       setPopupMessage(sessionMessage)
     }
   }, [sessionMessage])
@@ -130,6 +142,7 @@ export function MainHomePage() {
   const [showCredits, setShowCredits] = useState(false)
   const [isGlobeLoaded, setIsGlobeLoaded] = useState(false)
   const [popupMessage, setPopupMessage] = useState<string | null>(null)
+  const [popupVariant, setPopupVariant] = useState<PopupVariant>('error')
   void selectedCamp
   void setSelectedCamp
   void isLocked
@@ -167,6 +180,16 @@ export function MainHomePage() {
   })
   const [authErrors, setAuthErrors] = useState<LoginErrors>({})
   const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false)
+  const [passwordResetUsername, setPasswordResetUsername] = useState('')
+  const [passwordResetEmail, setPasswordResetEmail] = useState('')
+  const [passwordResetCode, setPasswordResetCode] = useState('')
+  const [passwordResetNewPassword, setPasswordResetNewPassword] = useState('')
+  const [passwordResetConfirmPassword, setPasswordResetConfirmPassword] = useState('')
+  const [passwordResetErrors, setPasswordResetErrors] = useState<PasswordResetErrors>({})
+  const [isResetCodeSent, setIsResetCodeSent] = useState(false)
+  const [isRequestingPasswordReset, setIsRequestingPasswordReset] = useState(false)
+  const [isResettingPassword, setIsResettingPassword] = useState(false)
   const loginVideos = [
     MEDIA_URLS.images.characters.principal,
     MEDIA_URLS.images.characters.mecanico,
@@ -207,6 +230,7 @@ export function MainHomePage() {
     if (appState !== 'login') {
       setAuthErrors({})
       setIsAuthenticating(false)
+      resetPasswordResetState()
     }
   }, [appState])
 
@@ -231,7 +255,10 @@ export function MainHomePage() {
     }
 
     setAuthErrors(nextErrors)
-    if (nextErrors.campId) setPopupMessage(nextErrors.campId)
+    if (nextErrors.campId) {
+      setPopupVariant('error')
+      setPopupMessage(nextErrors.campId)
+    }
     return Object.keys(nextErrors).length === 0
   }
 
@@ -276,6 +303,7 @@ export function MainHomePage() {
       localStorage.setItem('accessToken', token)
       window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
       localStorage.setItem('user', JSON.stringify(normalizedUser))
+      localStorage.removeItem('admin_settings_v2')
       localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(response.user.campId))
 
       const redirectPath = getPostLoginRoute(normalizedUser.role, {
@@ -289,9 +317,159 @@ export function MainHomePage() {
       setAuthErrors({
         general: message,
       })
+      setPopupVariant('error')
       setPopupMessage(message)
     } finally {
       setIsAuthenticating(false)
+    }
+  }
+
+  function getPasswordResetCampId(): number | null {
+    if (authForm.campId && authForm.campId > 0) return authForm.campId
+    return readPersistedCampId()
+  }
+
+  function resetPasswordResetState() {
+    setIsPasswordResetOpen(false)
+    setPasswordResetUsername('')
+    setPasswordResetEmail('')
+    setPasswordResetCode('')
+    setPasswordResetNewPassword('')
+    setPasswordResetConfirmPassword('')
+    setPasswordResetErrors({})
+    setIsResetCodeSent(false)
+    setIsRequestingPasswordReset(false)
+    setIsResettingPassword(false)
+  }
+
+  function handleOpenPasswordReset() {
+    const campId = getPasswordResetCampId()
+    if (!campId) {
+      const message = 'Debes seleccionar un campamento antes de restablecer la contrasena.'
+      setPopupVariant('error')
+      setPopupMessage(message)
+      return
+    }
+
+    setAuthForm((prev) => (prev.campId === campId ? prev : { ...prev, campId }))
+    setPasswordResetUsername(authForm.username.trim())
+    setPasswordResetErrors({})
+    setIsPasswordResetOpen(true)
+  }
+
+  function validatePasswordResetRequest(): { username: string; email: string; campId: number } | null {
+    const username = passwordResetUsername.trim()
+    const email = passwordResetEmail.trim()
+    const campId = getPasswordResetCampId()
+    const nextErrors: PasswordResetErrors = {}
+
+    if (!username) {
+      nextErrors.username = 'Usuario requerido'
+    } else if (username.length < 3) {
+      nextErrors.username = 'Minimo 3 caracteres'
+    }
+
+    if (!email) {
+      nextErrors.email = 'Correo requerido'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      nextErrors.email = 'Correo invalido'
+    }
+
+    if (!campId) {
+      nextErrors.general = 'Debes seleccionar un campamento antes de restablecer la contrasena.'
+    }
+
+    setPasswordResetErrors(nextErrors)
+    if (nextErrors.general) {
+      setPopupVariant('error')
+      setPopupMessage(nextErrors.general)
+    }
+
+    return username && email && campId && Object.keys(nextErrors).length === 0
+      ? { username, email, campId }
+      : null
+  }
+
+  function validatePasswordResetConfirm() {
+    const requestPayload = validatePasswordResetRequest()
+    const nextErrors: PasswordResetErrors = {}
+
+    if (!requestPayload) return null
+
+    if (!/^\d{8}$/.test(passwordResetCode)) {
+      nextErrors.code = 'El codigo debe tener 8 digitos'
+    }
+
+    if (!passwordResetNewPassword) {
+      nextErrors.newPassword = 'Nueva contrasena requerida'
+    } else if (passwordResetNewPassword.length < 8) {
+      nextErrors.newPassword = 'Minimo 8 caracteres'
+    }
+
+    if (!passwordResetConfirmPassword) {
+      nextErrors.confirmPassword = 'Confirma la nueva contrasena'
+    } else if (passwordResetConfirmPassword !== passwordResetNewPassword) {
+      nextErrors.confirmPassword = 'Las contrasenas no coinciden'
+    }
+
+    setPasswordResetErrors(nextErrors)
+
+    return Object.keys(nextErrors).length === 0
+      ? {
+          ...requestPayload,
+          code: passwordResetCode,
+          newPassword: passwordResetNewPassword,
+        }
+      : null
+  }
+
+  async function submitPasswordResetRequest() {
+    const payload = validatePasswordResetRequest()
+    if (!payload) return
+
+    setIsRequestingPasswordReset(true)
+    setPasswordResetErrors({})
+
+    try {
+      await requestPasswordReset(payload)
+      setIsResetCodeSent(true)
+      setPopupVariant('success')
+      setPopupMessage(PASSWORD_RESET_REQUEST_SUCCESS)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo solicitar el codigo.'
+      setPasswordResetErrors({ general: message })
+      setPopupVariant('error')
+      setPopupMessage(message)
+    } finally {
+      setIsRequestingPasswordReset(false)
+    }
+  }
+
+  async function handlePasswordResetRequestSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await submitPasswordResetRequest()
+  }
+
+  async function handlePasswordResetConfirmSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const payload = validatePasswordResetConfirm()
+    if (!payload) return
+
+    setIsResettingPassword(true)
+    setPasswordResetErrors({})
+
+    try {
+      await resetPasswordWithCode(payload)
+      resetPasswordResetState()
+      setPopupVariant('success')
+      setPopupMessage(PASSWORD_RESET_SUCCESS)
+    } catch {
+      setPasswordResetErrors({ general: PASSWORD_RESET_GENERIC_ERROR })
+      setPopupVariant('error')
+      setPopupMessage(PASSWORD_RESET_GENERIC_ERROR)
+    } finally {
+      setIsResettingPassword(false)
     }
   }
 
@@ -354,6 +532,17 @@ export function MainHomePage() {
   const mistRef = useRef<THREE.Points | null>(null)
   const bridgeVideoRef = useRef<HTMLVideoElement>(null)
   const mainVideoRef = useRef<HTMLVideoElement>(null)
+  const isTransitionImage = /\.(webp|png|jpe?g|gif|avif)(?:[?#]|$)/i.test(
+    MEDIA_URLS.videos.transition,
+  )
+
+  const goToGlobalMap = useCallback(() => {
+    if (cameraRef.current) {
+      cameraRef.current.position.set(0, 10, 450)
+      cameraRef.current.lookAt(0, 0, 0)
+    }
+    setAppState('global-map')
+  }, [])
 
   useEffect(() => {
     if (bridgeVideoRef.current) {
@@ -368,6 +557,12 @@ export function MainHomePage() {
       else if (appState === 'video') mainVideoRef.current.play().catch(() => {})
     }
   }, [isPaused, appState])
+
+  useEffect(() => {
+    if (appState !== 'video' || !isTransitionImage || isPaused) return
+    const timer = setTimeout(goToGlobalMap, 6000)
+    return () => clearTimeout(timer)
+  }, [appState, goToGlobalMap, isPaused, isTransitionImage])
 
   useEffect(() => {
     if (audioRef.current) {
@@ -399,8 +594,6 @@ export function MainHomePage() {
     if (!sceneRef.current) return
     const config = MODES[currentMode]
     const scene = sceneRef.current
-
-    console.log(`Changing mode to: ${currentMode}`, config)
 
     scene.background = new THREE.Color(config.skyColor)
     if (scene.fog instanceof THREE.FogExp2) {
@@ -508,7 +701,7 @@ export function MainHomePage() {
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.shadowMap.enabled = true
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    renderer.shadowMap.type = THREE.PCFShadowMap
     renderer.setClearColor(0x000000, 1)
 
     if (containerRef.current) {
@@ -699,11 +892,11 @@ export function MainHomePage() {
 
     const gltfLoader = new GLTFLoader()
     const signUrl =
-      'https://tuieldonbxswmopvyryx.supabase.co/storage/v1/object/public/1.principal/quarantine_sign.glb'
+      'https://pub-9d9e76b894c2469985b070f298268aad.r2.dev/3d-models-intro/quarantine_sign%20(1).glb'
     const lightPoleUrl =
-      'https://tuieldonbxswmopvyryx.supabase.co/storage/v1/object/public/1.principal/ligthpole.glb'
+      'https://pub-9d9e76b894c2469985b070f298268aad.r2.dev/3d-models-intro/ligthpole%20(1).glb'
     const areaSignUrl =
-      'https://tuieldonbxswmopvyryx.supabase.co/storage/v1/object/public/1.principal/areasing.glb'
+      'https://pub-9d9e76b894c2469985b070f298268aad.r2.dev/3d-models-intro/areasing%20(1).glb'
 
     const signPositions = [
       { x: 120, z: -150 },
@@ -1520,33 +1713,32 @@ export function MainHomePage() {
                   }}
                   className="absolute inset-0 flex items-center justify-center overflow-hidden"
                 >
-                  <video
-                    ref={mainVideoRef}
-                    autoPlay
-                    playsInline
-                    preload="metadata"
-                    poster={MEDIA_URLS.branding.background}
-                    onCanPlay={(e) => (e.currentTarget.volume = 0.3)}
-                    onTimeUpdate={(e) => {
-                      if (e.currentTarget.currentTime >= 6.0) {
-                        if (cameraRef.current) {
-                          cameraRef.current.position.set(0, 10, 450)
-                          cameraRef.current.lookAt(0, 0, 0)
+                  {isTransitionImage ? (
+                    <img
+                      src={MEDIA_URLS.videos.transition}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      onError={() => setTimeout(goToGlobalMap, 3000)}
+                    />
+                  ) : (
+                    <video
+                      ref={mainVideoRef}
+                      autoPlay
+                      playsInline
+                      preload="metadata"
+                      poster={MEDIA_URLS.branding.background}
+                      onCanPlay={(e) => (e.currentTarget.volume = 0.3)}
+                      onTimeUpdate={(e) => {
+                        if (e.currentTarget.currentTime >= 6.0) {
+                          goToGlobalMap()
                         }
-                        setAppState('global-map')
-                      }
-                    }}
-                    onEnded={() => {
-                      if (cameraRef.current) {
-                        cameraRef.current.position.set(0, 10, 450)
-                        cameraRef.current.lookAt(0, 0, 0)
-                      }
-                      setAppState('global-map')
-                    }}
-                    onError={() => setTimeout(() => setAppState('global-map'), 3000)}
-                    className="w-full h-full object-cover"
-                    src={MEDIA_URLS.videos.transition}
-                  />
+                      }}
+                      onEnded={goToGlobalMap}
+                      onError={() => setTimeout(goToGlobalMap, 3000)}
+                      className="w-full h-full object-cover"
+                      src={MEDIA_URLS.videos.transition}
+                    />
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1579,8 +1771,8 @@ export function MainHomePage() {
                 <div className="space-y-4">
                   <div className="mb-6">
                     <h2
-                      className="text-xl font-black italic uppercase tracking-tighter text-white mb-2"
-                      style={{ fontFamily: "'Oswald', sans-serif" }}
+                      className="relative z-10 text-xl font-black italic uppercase tracking-tighter text-white mb-2"
+                      style={{ fontFamily: "'Oswald', sans-serif", color: '#ffffff' }}
                     >
                       ATMÓSFERA
                     </h2>
@@ -1923,6 +2115,17 @@ export function MainHomePage() {
                       )}
                     </div>
 
+                    {appState === 'login' && (
+                      <button
+                        type="button"
+                        onClick={handleOpenPasswordReset}
+                        className="w-full max-w-[260px] text-left text-[10px] uppercase font-black tracking-[0.24em] text-blue-300/80 hover:text-blue-300 transition-colors"
+                        style={{ fontFamily: "'Oswald', sans-serif" }}
+                      >
+                        Restablecer contraseña
+                      </button>
+                    )}
+
                     {appState === 'register' && (
                       <div className="space-y-3 w-full max-w-[260px]">
                         <label className="text-[11px] uppercase font-bold tracking-[0.2em] text-white block">
@@ -2105,6 +2308,212 @@ export function MainHomePage() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {isPasswordResetOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/75 backdrop-blur-md p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 30 }}
+              transition={{ duration: 0.28, ease: [0.19, 1, 0.22, 1] }}
+              className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto panel-brush panel-contrast-accent border border-blue-400/20 bg-black/80 p-8 md:p-10 shadow-[0_0_80px_rgba(0,0,0,0.85)]"
+            >
+              <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
+
+              <button
+                type="button"
+                onClick={resetPasswordResetState}
+                className="absolute top-5 right-5 z-20 p-2 text-white/60 hover:text-blue-400 transition-all duration-300 hover:rotate-90 hover:scale-110 active:scale-95 border border-white/10 hover:border-blue-400/50 rounded-full"
+                aria-label="Cerrar restablecimiento de contraseña"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="relative z-10 space-y-8">
+                <div>
+                  <p className="text-[10px] uppercase font-black tracking-[0.4em] text-blue-300/80 mb-3 font-mono">
+                    Protocolo de recuperación
+                  </p>
+                  <h2
+                    className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter text-white leading-none"
+                    style={{ fontFamily: "'Oswald', sans-serif" }}
+                  >
+                    Restablecer contraseña
+                  </h2>
+                  <div className="h-1 w-16 bg-blue-400 mt-4" />
+                  <p className="mt-5 text-xs md:text-sm leading-relaxed text-white/55 font-mono">
+                    Ingresá tu usuario y correo registrado. Si coinciden con el campamento
+                    seleccionado, recibirás un código de 8 dígitos para crear una nueva contraseña.
+                  </p>
+                </div>
+
+                <form className="space-y-4" onSubmit={handlePasswordResetRequestSubmit} noValidate>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-3">
+                      <label className="text-[11px] uppercase font-bold tracking-[0.2em] text-white block">
+                        Nombre de usuario
+                      </label>
+                      <input
+                        type="text"
+                        value={passwordResetUsername}
+                        onChange={(event) => setPasswordResetUsername(event.target.value)}
+                        className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all font-mono text-xs placeholder:text-white/10"
+                        placeholder="ID_USUARIO"
+                        autoComplete="username"
+                      />
+                      {passwordResetErrors.username && (
+                        <p className="text-[10px] text-red-400 uppercase tracking-[0.08em]">
+                          {passwordResetErrors.username}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-[11px] uppercase font-bold tracking-[0.2em] text-white block">
+                        Correo electrónico
+                      </label>
+                      <input
+                        type="email"
+                        value={passwordResetEmail}
+                        onChange={(event) => setPasswordResetEmail(event.target.value)}
+                        className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all font-mono text-xs placeholder:text-white/10"
+                        placeholder="usuario@correo.com"
+                        autoComplete="email"
+                      />
+                      {passwordResetErrors.email && (
+                        <p className="text-[10px] text-red-400 uppercase tracking-[0.08em]">
+                          {passwordResetErrors.email}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isRequestingPasswordReset}
+                    className="group relative w-full py-4 font-black uppercase tracking-[0.32em] text-xs transition-all menu-brush text-white text-left px-8 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ fontFamily: "'Oswald', sans-serif" }}
+                  >
+                    <span className="relative z-10">
+                      {isRequestingPasswordReset ? 'Enviando código...' : 'Enviar código'}
+                    </span>
+                  </button>
+                </form>
+
+                <AnimatePresence>
+                  {isResetCodeSent && (
+                    <motion.form
+                      initial={{ opacity: 0, y: 18 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 12 }}
+                      className="space-y-5 border-t border-white/10 pt-7"
+                      onSubmit={handlePasswordResetConfirmSubmit}
+                      noValidate
+                    >
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-3 md:col-span-2">
+                          <label className="text-[11px] uppercase font-bold tracking-[0.2em] text-white block">
+                            Código recibido
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={passwordResetCode}
+                            onChange={(event) =>
+                              setPasswordResetCode(event.target.value.replace(/\D/g, '').slice(0, 8))
+                            }
+                            className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all font-mono text-xs tracking-[0.35em] placeholder:tracking-normal placeholder:text-white/10"
+                            placeholder="12345678"
+                            autoComplete="one-time-code"
+                          />
+                          {passwordResetErrors.code && (
+                            <p className="text-[10px] text-red-400 uppercase tracking-[0.08em]">
+                              {passwordResetErrors.code}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-3">
+                          <label className="text-[11px] uppercase font-bold tracking-[0.2em] text-white block">
+                            Nueva contraseña
+                          </label>
+                          <input
+                            type="password"
+                            value={passwordResetNewPassword}
+                            onChange={(event) => setPasswordResetNewPassword(event.target.value)}
+                            className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all font-mono text-xs placeholder:text-white/10"
+                            placeholder="Mínimo 8 caracteres"
+                            autoComplete="new-password"
+                          />
+                          {passwordResetErrors.newPassword && (
+                            <p className="text-[10px] text-red-400 uppercase tracking-[0.08em]">
+                              {passwordResetErrors.newPassword}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-3">
+                          <label className="text-[11px] uppercase font-bold tracking-[0.2em] text-white block">
+                            Confirmar contraseña
+                          </label>
+                          <input
+                            type="password"
+                            value={passwordResetConfirmPassword}
+                            onChange={(event) => setPasswordResetConfirmPassword(event.target.value)}
+                            className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all font-mono text-xs placeholder:text-white/10"
+                            placeholder="Repetí la contraseña"
+                            autoComplete="new-password"
+                          />
+                          {passwordResetErrors.confirmPassword && (
+                            <p className="text-[10px] text-red-400 uppercase tracking-[0.08em]">
+                              {passwordResetErrors.confirmPassword}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {passwordResetErrors.general && (
+                        <p className="text-[10px] text-red-400 uppercase tracking-[0.08em] font-mono">
+                          {passwordResetErrors.general}
+                        </p>
+                      )}
+
+                      <div className="flex flex-col md:flex-row gap-3">
+                        <button
+                          type="submit"
+                          disabled={isResettingPassword}
+                          className="group relative flex-1 py-4 font-black uppercase tracking-[0.24em] text-xs transition-all menu-brush text-white text-left px-7 disabled:opacity-50 disabled:cursor-not-allowed"
+                          style={{ fontFamily: "'Oswald', sans-serif" }}
+                        >
+                          <span className="relative z-10">
+                            {isResettingPassword ? 'Actualizando...' : 'Actualizar contraseña'}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void submitPasswordResetRequest()}
+                          disabled={isRequestingPasswordReset || isResettingPassword}
+                          className="px-5 py-4 border border-white/10 text-[10px] uppercase font-black tracking-[0.2em] text-white/70 hover:text-blue-300 hover:border-blue-400/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          style={{ fontFamily: "'Oswald', sans-serif" }}
+                        >
+                          Nuevo código
+                        </button>
+                      </div>
+                    </motion.form>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {}
       <AnimatePresence>
         {appState === 'global-map' && (
@@ -2131,9 +2540,11 @@ export function MainHomePage() {
                   }}
                   onSelectCamp={(campId) => {
                     if (campId > 0) {
-                      authDispatch({ type: 'SELECT_CAMP', payload: campId })
-                      setAuthForm((prev) => ({ ...prev, campId }))
-                      localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(campId))
+                      window.setTimeout(() => {
+                        authDispatch({ type: 'SELECT_CAMP', payload: campId })
+                        setAuthForm((prev) => ({ ...prev, campId }))
+                        localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(campId))
+                      }, 0)
                     }
                   }}
                 />
@@ -2256,8 +2667,8 @@ export function MainHomePage() {
               <div className="space-y-8">
                 <div className="text-center">
                   <h2
-                    className="text-3xl font-black italic uppercase tracking-tighter text-white mb-2"
-                    style={{ fontFamily: "'Oswald', sans-serif" }}
+                    className="panel-title-white text-3xl font-black italic uppercase tracking-tighter text-white mb-2"
+                    style={{ fontFamily: "'Oswald', sans-serif", color: '#ffffff' }}
                   >
                     GUÍA DEL SOBREVIVIENTE
                   </h2>
@@ -2325,8 +2736,8 @@ export function MainHomePage() {
                 {}
                 <div className="text-center mb-8">
                   <h2
-                    className="text-3xl font-black italic uppercase tracking-tighter text-white mb-2"
-                    style={{ fontFamily: "'Oswald', sans-serif" }}
+                    className="panel-title-white text-3xl font-black italic uppercase tracking-tighter text-white mb-2"
+                    style={{ fontFamily: "'Oswald', sans-serif", color: '#ffffff' }}
                   >
                     SISTEMA CENTRAL
                   </h2>
@@ -2524,7 +2935,7 @@ export function MainHomePage() {
       <PopupMessage
         message={popupMessage}
         onClose={() => setPopupMessage(null)}
-        variant="error"
+        variant={popupVariant}
       />
     </div>
   )

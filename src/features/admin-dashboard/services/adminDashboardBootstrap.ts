@@ -10,10 +10,12 @@ import {
   mapAdmissionFromApi,
   mapExpeditionFromApi,
   mapIntercampFromApi,
+  mapTransferFromApi,
 } from '../mappers/adminMappers'
 import {
   type AdminAdmissionRequest,
   type AdminExpeditionRecord,
+  type AdminTransferRecord,
   type GeneralDashboardPayload,
   type InventoryDashboardPayload,
   type ExpeditionsDashboardPayload,
@@ -22,7 +24,7 @@ import {
 import { listAdmissionRequests } from './admissionRequests.service'
 import { getExpeditionsDashboard, getGeneralDashboard, getInventoryDashboard } from './dashboard.service'
 import { listExpeditions } from './expeditions.service'
-import { listIntercampRequests } from './intercamp.service'
+import { listIntercampRequests, listTransfers } from './intercamp.service'
 
 export const ADMIN_DASHBOARD_BOOT_MIN_MS = 1400
 export const ADMIN_DASHBOARD_BOOT_MAX_VISUAL_LEAD = 8
@@ -71,6 +73,9 @@ export interface UiExpedition {
   status: 'EN CURSO' | 'PROGRAMADA' | 'REGRESANDO' | 'COMPLETADA'
   objective: string
   sector: string
+  originCampId?: number
+  destinationCampId?: number
+  routePoints: Array<{ latitude: number; longitude: number; label?: string }>
 }
 
 export interface UiIntercampRequest {
@@ -81,6 +86,26 @@ export interface UiIntercampRequest {
   status: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | 'CONFIRMADO'
   urgent: boolean
   type: 'solicitud' | 'traslado' | 'oferta'
+  originCampId?: number
+  destinationCampId?: number
+  plannedDepartureDate?: string
+  plannedArrivalDate?: string
+  createdBy?: string
+  respondedBy?: string
+}
+
+export interface UiTransfer {
+  id: number
+  requestId: number | null
+  status: 'PLANIFICADA' | 'EN_TRANSITO' | 'ENTREGADA' | 'CANCELADA'
+  plannedDepartureDate?: string
+  actualDepartureDate?: string
+  plannedArrivalDate?: string
+  actualArrivalDate?: string
+  departureApprovedBy?: string
+  arrivalApprovedBy?: string
+  rationsForTrip: number
+  receptionNotes: string
 }
 
 export interface AdminDashboardBootstrapData {
@@ -90,6 +115,7 @@ export interface AdminDashboardBootstrapData {
   admissions: UiAdmission[]
   expeditions: UiExpedition[]
   intercampRequests: UiIntercampRequest[]
+  transfers: UiTransfer[]
   dashboardKpi: DashboardKpi
   criticalFailedCount: number
   readOnlySkippedCount: number
@@ -119,6 +145,7 @@ function buildDashboardKpi({
   personsData,
   expeditionsData,
   intercampData,
+  transfersData,
   generalDashboard,
   inventoryDashboard,
   expeditionsDashboard,
@@ -126,6 +153,7 @@ function buildDashboardKpi({
   personsData: Person[]
   expeditionsData: AdminExpeditionRecord[]
   intercampData: IntercampRecord[]
+  transfersData: AdminTransferRecord[]
   generalDashboard: GeneralDashboardPayload
   inventoryDashboard: InventoryDashboardPayload
   expeditionsDashboard: ExpeditionsDashboardPayload
@@ -134,7 +162,7 @@ function buildDashboardKpi({
     populationTotal: extractNumberByHint(generalDashboard, ['population', 'persons', 'totalpeople', 'total'], personsData.length),
     criticalResources: extractNumberByHint(inventoryDashboard, ['critical', 'alert', 'low'], 0),
     activeExpeditions: extractNumberByHint(expeditionsDashboard, ['active', 'ongoing'], expeditionsData.length),
-    pendingIntercamp: extractNumberByHint(generalDashboard, ['intercamp', 'transfer', 'pending'], intercampData.length),
+    pendingIntercamp: extractNumberByHint(generalDashboard, ['intercamp', 'transfer', 'pending'], intercampData.length + transfersData.length),
     activePopulation: extractNumberByHint(
       generalDashboard,
       ['active', 'healthy'],
@@ -194,6 +222,7 @@ export async function bootstrapAdminDashboard(options: BootstrapOptions = {}): P
     admissionsData,
     expeditionsData,
     intercampData,
+    transfersData,
     generalDashboard,
     inventoryDashboard,
     expeditionsDashboard,
@@ -216,6 +245,7 @@ export async function bootstrapAdminDashboard(options: BootstrapOptions = {}): P
       completeBootStep('intercamp', 'Conectando inter-campamentos...')
       return value
     }, [] as IntercampRecord[]),
+    safeRunReadOnly(listTransfers, [] as AdminTransferRecord[]),
     safeRunCritical(getGeneralDashboard, {} as GeneralDashboardPayload),
     safeRunCritical(getInventoryDashboard, {} as InventoryDashboardPayload),
     safeRunCritical(getExpeditionsDashboard, {} as ExpeditionsDashboardPayload),
@@ -225,6 +255,7 @@ export async function bootstrapAdminDashboard(options: BootstrapOptions = {}): P
     personsData,
     expeditionsData,
     intercampData,
+    transfersData,
     generalDashboard,
     inventoryDashboard,
     expeditionsDashboard,
@@ -239,6 +270,7 @@ export async function bootstrapAdminDashboard(options: BootstrapOptions = {}): P
     admissions: admissionsData.map((item) => mapAdmissionFromApi(item)),
     expeditions: expeditionsData.map((item) => mapExpeditionFromApi(item)),
     intercampRequests: intercampData.map((item) => mapIntercampFromApi(item)),
+    transfers: transfersData.map((item) => mapTransferFromApi(item)),
     dashboardKpi,
     criticalFailedCount,
     readOnlySkippedCount,

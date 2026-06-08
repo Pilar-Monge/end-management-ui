@@ -157,6 +157,7 @@ export default function SplashIntro({
   return (
     <motion.div
       id="splash-curtain-container"
+      className="splash-curtain-container"
       initial={{ y: 0 }}
       animate={{ y: isTriggered ? '-100%' : 0 }}
       transition={curtainTransition}
@@ -165,11 +166,12 @@ export default function SplashIntro({
         inset: 0,
         zIndex: 9999,
         overflow: 'hidden',
+        boxSizing: 'border-box',
         background: '#020617',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        padding: '24px 48px',
+        padding: 'var(--splash-padding, 24px 48px)',
       }}
     >
       <div
@@ -194,11 +196,12 @@ export default function SplashIntro({
           margin: '0 auto',
           zIndex: 10,
           position: 'relative',
-          height: '24px',
+          height: 'var(--splash-top-spacer-height, 24px)',
         }}
       />
 
       <div
+        className="splash-main-stage"
         style={{
           display: 'flex',
           flexDirection: 'column',
@@ -206,8 +209,8 @@ export default function SplashIntro({
           justifyContent: 'center',
           zIndex: 10,
           flex: 1,
-          paddingTop: '48px',
-          paddingBottom: '48px',
+          paddingTop: 'var(--splash-main-padding-y, 48px)',
+          paddingBottom: 'var(--splash-main-padding-y, 48px)',
           position: 'relative',
           textAlign: 'center',
           opacity: isTriggered ? 0 : 1,
@@ -217,9 +220,9 @@ export default function SplashIntro({
         <div
           style={{
             position: 'relative',
-            marginBottom: '32px',
-            width: '96px',
-            height: '96px',
+            marginBottom: 'var(--splash-logo-margin-bottom, 32px)',
+            width: 'var(--splash-logo-size, 96px)',
+            height: 'var(--splash-logo-size, 96px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -249,8 +252,8 @@ export default function SplashIntro({
           <svg
             viewBox="0 0 100 100"
             style={{
-              width: '64px',
-              height: '64px',
+              width: 'var(--splash-mark-size, 64px)',
+              height: 'var(--splash-mark-size, 64px)',
               filter: 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.5))',
               cursor: 'pointer',
             }}
@@ -298,7 +301,7 @@ export default function SplashIntro({
           <div
             className="title-distressed title-glitch-hover title-decoding-flicker"
             style={{
-              fontSize: '56px',
+              fontSize: 'var(--splash-title-size, 56px)',
               lineHeight: 1,
               paddingTop: '8px',
               paddingBottom: '8px',
@@ -315,7 +318,7 @@ export default function SplashIntro({
           style={{
             width: '256px',
             maxWidth: '100%',
-            marginTop: '40px',
+            marginTop: 'var(--splash-progress-margin-top, 40px)',
             position: 'relative',
           }}
         >
@@ -392,6 +395,7 @@ export default function SplashIntro({
       </div>
 
       <div
+        className="splash-enter-stage"
         style={{
           display: 'flex',
           flexDirection: 'column',
@@ -401,9 +405,9 @@ export default function SplashIntro({
           width: '100%',
           maxWidth: '448px',
           margin: '0 auto',
-          minHeight: '96px',
+          minHeight: 'var(--splash-enter-stage-height, 96px)',
           position: 'relative',
-          marginBottom: '16px',
+          marginBottom: 'var(--splash-enter-margin-bottom, 16px)',
         }}
       >
         {isReadyToEnter ? (
@@ -425,8 +429,8 @@ export default function SplashIntro({
               cursor: 'pointer',
               boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
               transition: 'all 300ms',
-              width: '56px',
-              height: '56px',
+              width: 'var(--splash-enter-button-size, 56px)',
+              height: 'var(--splash-enter-button-size, 56px)',
               color: '#f1f5f9',
             }}
             onMouseEnter={(e) => {

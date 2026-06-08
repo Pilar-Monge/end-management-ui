@@ -1,95 +1,134 @@
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { CheckCircle2, XCircle, AlertTriangle, Info, X } from 'lucide-react'
 
-type PopupVariant = 'info' | 'success' | 'warning' | 'error'
+export type PopupVariant = 'info' | 'success' | 'warning' | 'error'
 
-interface PopupMessageProps {
+export interface PopupMessageProps {
   message: string | null
+  title?: string
   onClose: () => void
   durationMs?: number
   variant?: PopupVariant
 }
 
-const POPUP_STYLES: Record<PopupVariant, { border: string; text: string; background: string }> = {
-  info: {
-    border: 'rgba(110,190,255,0.45)',
-    text: '#a7d9ff',
-    background: 'rgba(22,44,68,0.92)',
-  },
+const VARIANT_CONFIG = {
   success: {
-    border: 'rgba(89,201,122,0.45)',
-    text: '#9be4b1',
-    background: 'rgba(19,52,34,0.92)',
-  },
-  warning: {
-    border: 'rgba(255,193,87,0.45)',
-    text: '#ffd89b',
-    background: 'rgba(64,44,17,0.92)',
+    bg: 'bg-slate-900/90 border-emerald-500/30 text-slate-100',
+    iconClass: 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20',
+    barClass: 'bg-emerald-500',
+    glowClass: 'shadow-[0_0_20px_rgba(16,185,129,0.25)]',
+    defaultTitle: 'SISTEMA ESTABILIZADO',
+    Icon: CheckCircle2,
   },
   error: {
-    border: 'rgba(224,80,80,0.45)',
-    text: '#f2a3a3',
-    background: 'rgba(64,24,24,0.92)',
+    bg: 'bg-slate-900/90 border-rose-500/30 text-slate-100',
+    iconClass: 'text-rose-400 bg-rose-500/10 border border-rose-500/20',
+    barClass: 'bg-rose-500',
+    glowClass: 'shadow-[0_0_20px_rgba(244,63,94,0.25)]',
+    defaultTitle: 'FALLO DE SISTEMA',
+    Icon: XCircle,
+  },
+  warning: {
+    bg: 'bg-slate-900/90 border-amber-500/30 text-slate-100',
+    iconClass: 'text-amber-400 bg-amber-500/10 border border-amber-500/20',
+    barClass: 'bg-amber-500',
+    glowClass: 'shadow-[0_0_20px_rgba(245,158,11,0.25)]',
+    defaultTitle: 'ADVERTENCIA TÁCTICA',
+    Icon: AlertTriangle,
+  },
+  info: {
+    bg: 'bg-slate-900/90 border-sky-500/30 text-slate-100',
+    iconClass: 'text-sky-400 bg-sky-500/10 border border-sky-500/20',
+    barClass: 'bg-sky-500',
+    glowClass: 'shadow-[0_0_20px_rgba(14,165,233,0.25)]',
+    defaultTitle: 'REPORTE DE CONTROL',
+    Icon: Info,
   },
 }
 
 export function PopupMessage({
   message,
+  title,
   onClose,
   durationMs = 3800,
   variant = 'error',
 }: PopupMessageProps) {
+  const [internalMessage, setInternalMessage] = useState<string | null>(null)
+  const [internalVariant, setInternalVariant] = useState<PopupVariant>('error')
+  const [internalTitle, setInternalTitle] = useState<string | null>(null)
+  const [show, setShow] = useState(false)
+
   useEffect(() => {
-    if (!message) return
+    if (!message) {
+      setShow(false)
+      return
+    }
+
+    setInternalMessage(message)
+    setInternalVariant(variant)
+    setInternalTitle(title || null)
+    setShow(true)
+
     const timer = window.setTimeout(onClose, durationMs)
     return () => window.clearTimeout(timer)
-  }, [durationMs, message, onClose])
+  }, [message, variant, title, durationMs, onClose])
 
-  if (!message) return null
-
-  const style = POPUP_STYLES[variant]
+  const config = VARIANT_CONFIG[internalVariant]
+  const IconComponent = config.Icon
 
   return (
-    <div
-      role="alert"
-      style={{
-        position: 'fixed',
-        top: 18,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 4000,
-        minWidth: 280,
-        maxWidth: 'calc(100vw - 32px)',
-        border: `1px solid ${style.border}`,
-        background: style.background,
-        color: style.text,
-        borderRadius: 8,
-        padding: '10px 38px 10px 12px',
-        fontFamily: "'Courier New', monospace",
-        fontSize: 11,
-        letterSpacing: '0.6px',
-        boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
-      }}
-    >
-      {message}
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Cerrar mensaje"
-        style={{
-          position: 'absolute',
-          right: 10,
-          top: 8,
-          border: 'none',
-          background: 'transparent',
-          color: style.text,
-          cursor: 'pointer',
-          fontSize: 14,
-          lineHeight: 1,
-          padding: 0,
-        }}
-      >
-        x
-      </button>
-    </div>
+    <AnimatePresence>
+      {show && internalMessage && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-sm sm:max-w-md pointer-events-none px-4">
+          <motion.div
+            role="alert"
+            initial={{ opacity: 0, y: -20, scale: 0.93 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.85, y: -10 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 280 }}
+            className={`pointer-events-auto flex items-start gap-3.5 relative overflow-hidden p-4 rounded-xl border backdrop-blur-md shadow-2xl transition-all duration-300 ${config.bg} ${config.glowClass}`}
+          >
+            {/* Timer Progress Bar */}
+            {durationMs > 0 && (
+              <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-slate-800/40">
+                <motion.div
+                  key={internalMessage}
+                  initial={{ width: '100%' }}
+                  animate={{ width: '0%' }}
+                  transition={{ duration: durationMs / 1000, ease: 'linear' }}
+                  className={`h-full ${config.barClass}`}
+                />
+              </div>
+            )}
+
+            {/* Left Icon Container */}
+            <div className={`flex-shrink-0 p-2 rounded-lg ${config.iconClass}`}>
+              <IconComponent className="w-5 h-5" strokeWidth={2.2} />
+            </div>
+
+            {/* Notification Text Content */}
+            <div className="flex-1 min-w-0 pr-6">
+              <h4 className="text-xs font-mono font-bold tracking-wider text-slate-300 uppercase">
+                {internalTitle || config.defaultTitle}
+              </h4>
+              <p className="text-sm font-sans font-medium text-slate-400 mt-1 leading-relaxed">
+                {internalMessage}
+              </p>
+            </div>
+
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar mensaje"
+              className="flex-shrink-0 p-1 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800/60 transition-colors duration-150 absolute top-3 right-3"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   )
 }

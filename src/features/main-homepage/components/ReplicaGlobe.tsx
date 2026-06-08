@@ -29,7 +29,11 @@ const ParticleSystem: React.FC<ParticleSystemProps> = React.memo(({ progress, is
   const swarmMaterialRef = useRef<THREE.PointsMaterial>(null!)
   const cyberRef = useRef<THREE.Points>(null!)
   const initialSwarmPositions = useMemo(() => new Float32Array(FORMATION_COUNT * 3), [particleData])
-  const fallbackColors = useMemo(() => new Float32Array(FORMATION_COUNT * 3), [])
+  const fallbackColors = useMemo(() => {
+    const colors = new Float32Array(FORMATION_COUNT * 3)
+    colors.fill(1)
+    return colors
+  }, [])
   const fallbackCyberPositions = useMemo(() => new Float32Array(CYBER_COUNT * 3), [])
   const readyTimestamp = useRef<number | null>(null)
 
@@ -177,14 +181,15 @@ interface Campamento {
   description: string
 }
 
+
 const CAMPAMENTOS_DATA: Campamento[] = [
   {
     id: 1,
     lat: 39.8283,
     lng: -98.5795,
-    name: 'Santuario Omega',
-    status: 'Estable',
-    survivors: 240,
+    name: 'Alpha Bunker',
+    status: 'ACTIVE',
+    survivors: 300, 
     description:
       'Antiguo búnker subterráneo en el interior del continente. Sistema de purificación de agua al 85%.',
   },
@@ -192,9 +197,9 @@ const CAMPAMENTOS_DATA: Campamento[] = [
     id: 2,
     lat: 52.52,
     lng: 13.405,
-    name: 'Bastión Central',
-    status: 'Próspero',
-    survivors: 620,
+    name: 'Sierra Base',
+    status: 'ACTIVE',
+    survivors: 700,
     description:
       'Fortaleza reconstruida en tierras altas. Centro logístico principal para el suministro de energía.',
   },
@@ -202,9 +207,9 @@ const CAMPAMENTOS_DATA: Campamento[] = [
     id: 3,
     lat: -34.6037,
     lng: -58.3816,
-    name: 'Refugio del Sur',
-    status: 'Estable',
-    survivors: 185,
+    name: 'Delta Refuge',
+    status: 'ACTIVE',
+    survivors: 250, 
     description:
       'Asentamiento agrícola protegido en las llanuras. Invernaderos de clima controlado.',
   },
@@ -212,9 +217,9 @@ const CAMPAMENTOS_DATA: Campamento[] = [
     id: 4,
     lat: 35.6762,
     lng: 139.6503,
-    name: 'Estación Aurora',
-    status: 'Aislado',
-    survivors: 310,
+    name: 'Omega Fortress',
+    status: 'ACTIVE',
+    survivors: 400, 
     description:
       'Instalación de alta tecnología en zona montañosa. Mantiene comunicación satelital intermitente.',
   },
@@ -222,9 +227,9 @@ const CAMPAMENTOS_DATA: Campamento[] = [
     id: 5,
     lat: -22.5621,
     lng: 17.0658,
-    name: 'Ciudadela Arena',
-    status: 'En Alerta',
-    survivors: 95,
+    name: 'Echo Outpost',
+    status: 'ACTIVE',
+    survivors: 150,
     description:
       'Puerto estratégico de vigilancia en la meseta. Control estricto de accesos perimetrales.',
   },
@@ -482,17 +487,26 @@ const ReplicaGlobe = ({
         }
       `}</style>
 
-      <div
-        className={`absolute inset-0 pointer-events-none transition-all duration-1000 ${isReady ? 'z-[15] opacity-50' : 'z-[80]'}`}
-      >
-        <Canvas
-          camera={{ position: [0, 0, 250], fov: 45 }}
-          style={{ width: '100%', height: '100%' }}
-        >
-          {React.createElement('ambientLight' as any, { intensity: 0.5 })}
-          <ParticleSystem progress={formationProgress} isReady={isReady} />
-        </Canvas>
-      </div>
+      <AnimatePresence>
+        {isLoading && (
+          <motion.div
+            key="particle-canvas"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: isReady ? 0.5 : 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8 }}
+            className={`absolute inset-0 pointer-events-none ${isReady ? 'z-[15]' : 'z-[80]'}`}
+          >
+            <Canvas
+              camera={{ position: [0, 0, 250], fov: 45 }}
+              style={{ width: '100%', height: '100%' }}
+            >
+              {React.createElement('ambientLight' as any, { intensity: 0.5 })}
+              <ParticleSystem progress={formationProgress} isReady={isReady} />
+            </Canvas>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {!isReady && (
@@ -612,16 +626,15 @@ const ReplicaGlobe = ({
               el.className = 'group relative'
               el.style.pointerEvents = 'none'
 
-              const statusColor =
-                camp.status === 'Estable'
-                  ? '#4ade80'
-                  : camp.status === 'Próspero'
-                    ? 'white'
-                    : '#fbbf24'
+              
+              const statusColor = '#4ade80'
               const isSelected = camp.isSelected
 
               const homeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-300 group-hover:scale-110"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`
               const fileIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-300 group-hover:translate-y-[-1px]"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>`
+
+              
+              const formattedId = `#${camp.id.toString().padStart(3, '0')}`
 
               el.innerHTML = `
             <div class="marker-root relative" style="pointer-events: none;">
@@ -646,7 +659,7 @@ const ReplicaGlobe = ({
                   </div>
                   <div class="mt-2 flex items-center gap-2 camp-info-card__badge-row">
                     <div class="w-2.5 h-2.5 rounded-full bg-green-400 pulse-green shadow-[0_0_8px_#4ade80]"></div>
-                    <div class="bg-black/60 text-white/80 text-[11px] font-mono font-bold tracking-widest px-2 py-0.5 border border-white/20 camp-info-card__badge">CAMP_ID_00${camp.id}</div>
+                    <div class="bg-black/60 text-white/80 text-[11px] font-mono font-bold tracking-widest px-2 py-0.5 border border-white/20 camp-info-card__badge">${formattedId}</div>
                   </div>
                 </div>
 
@@ -656,7 +669,7 @@ const ReplicaGlobe = ({
                     <div class="text-[15px] font-black tracking-tighter italic uppercase camp-info-card__value" style="color: ${statusColor}">${camp.status}</div>
                   </div>
                   <div class="space-y-1">
-                    <div class="text-white/50 text-[9px] uppercase font-bold tracking-[0.2em] font-mono camp-info-card__label">POBLACIÓN</div>
+                    <div class="text-white/50 text-[9px] uppercase font-bold tracking-[0.2em] font-mono camp-info-card__label">POBLACIÓN MÁX</div>
                     <div class="text-white text-[15px] font-black tracking-tighter italic uppercase font-mono camp-info-card__value">${camp.survivors}</div>
                   </div>
                 </div>

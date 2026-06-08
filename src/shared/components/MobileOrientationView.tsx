@@ -5,7 +5,7 @@ import * as THREE from 'three'
 
 function PhoneModel({ isRotating }: { isRotating: boolean }) {
   const { scene } = useGLTF(
-    'https://uktykxlgteizvminvbmt.supabase.co/storage/v1/object/public/animaciones%20pantalla%20carga/smartphone.glb',
+    'https://pub-9d9e76b894c2469985b070f298268aad.r2.dev/animations/smartphone%20(1).glb',
   )
   const group = useRef<THREE.Group>(null)
 

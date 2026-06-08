@@ -91,15 +91,13 @@ export function usePersonForm(onSuccess?: () => void) {
 
     try {
       if (formData.id) {
+        const [lastName1 = '', ...lastName2Parts] = formData.lastName.trim().split(/\s+/).filter(Boolean)
         const payload: UpdatePersonRequest = {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          alias: formData.alias || undefined,
-          age: formData.age,
-          campId: formData.campId,
+          name: formData.firstName.trim(),
+          lastName1,
+          lastName2: lastName2Parts.join(' ') || null,
           occupationId: formData.occupationId,
-          notes: formData.notes || undefined,
-          status: formData.status,
+          currentStatus: formData.status,
         }
         await updateMutation.mutateAsync({ id: formData.id, data: payload })
       } else {
