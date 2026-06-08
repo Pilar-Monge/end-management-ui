@@ -14,6 +14,7 @@ export function FullscreenButton() {
 
   return (
     <button
+      className="fullscreen-toggle-button"
       onClick={toggleFullscreen}
       aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
       title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
