@@ -48,7 +48,8 @@ import {
   ViewOficiosCobertura,
   ViewNotificaciones,
   ViewPersonalDashboard,
-  ViewHistorialDeTraslado
+  ViewHistorialDeTraslado,
+  ROSTER_PEOPLE
 } from "../views/ResourceManagementViews";
 import { WorldMapDashboard } from "../views/WorldMapView";
 import { LoadingScreen } from "../components/ResourcePanelLoadingScreen";
@@ -104,6 +105,10 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   const [activeNav, setActiveNav] = useState<string | null>("almacenes");
   const [activeSub, setActiveSub] = useState<string>("Inventario actual");
   const [lastActiveNav, setLastActiveNav] = useState<string>("almacenes");
+
+  const [catalogsLoaded, setCatalogsLoaded] = useState(false);
+  const [hasPeoplePermission, setHasPeoplePermission] = useState(true);
+  const [hasCoveragePermission, setHasCoveragePermission] = useState(true);
 
   
   const [camps, setCamps] = useState<Camp[]>(INITIAL_CAMPS);
@@ -176,7 +181,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   const [occupations, setOccupationsState] = useState<Occupation[]>(INITIAL_OCCUPATIONS);
   const [occupationCoverages, setOccupationCoverages] = useState<OccupationCoverage[]>(INITIAL_OCCUPATION_COVERAGES);
   const [notifications, setNotifications] = useState<OperationalNotification[]>(INITIAL_NOTIFICATIONS);
-  const [people, setPeople] = useState<CampPerson[]>([]);
+  const [people, setPeople] = useState<CampPerson[]>(ROSTER_PEOPLE);
   const [requestPopupMessage, setRequestPopupMessage] = useState<string | null>(null);
   const [requestPopupVariant, setRequestPopupVariant] = useState<"success" | "error">("success");
 
@@ -197,66 +202,90 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   };
 
   const fetchAllSystemData = async () => {
-    const results = await Promise.allSettled([
-      resourceApi.listCamps(),
-      resourceApi.listResourceTypes(),
-      resourceApi.listOccupations(),
-      resourceApi.listCampInventory(),
-      resourceApi.listDailyCollectionRecords(),
-      resourceApi.listInventoryMovements(),
-      resourceApi.listInventoryAlerts(),
-      resourceApi.listIntercampRequests(),
-      resourceApi.listRequestResourceDetails(),
-      resourceApi.listTransfers(),
-      resourceApi.listTransferPersons(),
-      resourceApi.listTransferHistory(),
-      resourceApi.listDeliveredTransferResources(),
-      resourceApi.listOccupationCoverage(),
-      resourceApi.listNotifications(),
-      resourceApi.listPeople(),
-    ]);
+    const promises: Promise<any>[] = [];
+    const indexMap: string[] = [];
 
-    const [
-      campsResult,
-      resourceTypesResult,
-      occupationsResult,
-      inventoriesResult,
-      dailyCollectionsResult,
-      movementsResult,
-      alertsResult,
-      requestsResult,
-      detailsResult,
-      transfersResult,
-      transferPersonsResult,
-      transferHistoryResult,
-      deliveredResourcesResult,
-      coverageResult,
-      notificationsResult,
-      peopleResult,
-    ] = results;
+    if (!catalogsLoaded) {
+      promises.push(resourceApi.listCamps());
+      indexMap.push("camps");
+      promises.push(resourceApi.listResourceTypes());
+      indexMap.push("resourceTypes");
+      promises.push(resourceApi.listOccupations());
+      indexMap.push("occupations");
+    }
 
-    if (campsResult.status === "fulfilled") applyList(campsResult.value, setCamps);
-    if (resourceTypesResult.status === "fulfilled") applyList(resourceTypesResult.value, setResourceTypesState);
-    if (occupationsResult.status === "fulfilled") applyList(occupationsResult.value, setOccupationsState);
-    if (inventoriesResult.status === "fulfilled") setCampInventories(inventoriesResult.value);
-    if (dailyCollectionsResult.status === "fulfilled") setDailyCollectionRecords(dailyCollectionsResult.value);
-    if (movementsResult.status === "fulfilled") applyList(movementsResult.value, setInventoryMovements);
-    if (alertsResult.status === "fulfilled") applyList(alertsResult.value, setInventoryAlerts);
-    if (requestsResult.status === "fulfilled") applyList(requestsResult.value, setIntercampRequests);
-    if (detailsResult.status === "fulfilled") applyList(detailsResult.value, setRequestResourceDetails);
-    if (transfersResult.status === "fulfilled") applyList(transfersResult.value, setTransfers);
-    if (transferPersonsResult.status === "fulfilled") applyList(transferPersonsResult.value, setTransferPersons);
-    if (transferHistoryResult.status === "fulfilled") applyList(transferHistoryResult.value, setTransferHistories);
-    if (deliveredResourcesResult.status === "fulfilled") applyList(deliveredResourcesResult.value, setDeliveredTransferResources);
-    if (coverageResult.status === "fulfilled") applyList(coverageResult.value, setOccupationCoverages);
-    if (notificationsResult.status === "fulfilled") applyList(notificationsResult.value, setNotifications);
-    if (peopleResult.status === "fulfilled") setPeople(peopleResult.value);
+    promises.push(resourceApi.listCampInventory());
+    indexMap.push("campInventory");
+    promises.push(resourceApi.listDailyCollectionRecords());
+    indexMap.push("dailyCollectionRecords");
+    promises.push(resourceApi.listInventoryMovements());
+    indexMap.push("inventoryMovements");
+    promises.push(resourceApi.listInventoryAlerts());
+    indexMap.push("inventoryAlerts");
+    promises.push(resourceApi.listIntercampRequests());
+    indexMap.push("intercampRequests");
+    promises.push(resourceApi.listRequestResourceDetails());
+    indexMap.push("requestResourceDetails");
+    promises.push(resourceApi.listTransfers());
+    indexMap.push("transfers");
+    promises.push(resourceApi.listTransferPersons());
+    indexMap.push("transferPersons");
+    promises.push(resourceApi.listTransferHistory());
+    indexMap.push("transferHistory");
+    promises.push(resourceApi.listDeliveredTransferResources());
+    indexMap.push("deliveredTransferResources");
 
-    results.forEach((result, index) => {
-      if (result.status === "rejected") {
-        console.warn(`Could not load resources dataset #${index} from backend. Keeping current data.`, result.reason);
+    if (hasCoveragePermission) {
+      promises.push(resourceApi.listOccupationCoverage());
+      indexMap.push("occupationCoverage");
+    }
+    promises.push(resourceApi.listNotifications());
+    indexMap.push("notifications");
+
+    if (hasPeoplePermission) {
+      promises.push(resourceApi.listPeople());
+      indexMap.push("people");
+    }
+
+    const results = await Promise.allSettled(promises);
+
+    results.forEach((result, idx) => {
+      const type = indexMap[idx];
+      if (result.status === "fulfilled") {
+        const val = result.value;
+        if (type === "camps") applyList(val, setCamps);
+        else if (type === "resourceTypes") applyList(val, setResourceTypesState);
+        else if (type === "occupations") applyList(val, setOccupationsState);
+        else if (type === "campInventory") setCampInventories(val);
+        else if (type === "dailyCollectionRecords") setDailyCollectionRecords(val);
+        else if (type === "inventoryMovements") applyList(val, setInventoryMovements);
+        else if (type === "inventoryAlerts") applyList(val, setInventoryAlerts);
+        else if (type === "intercampRequests") applyList(val, setIntercampRequests);
+        else if (type === "requestResourceDetails") applyList(val, setRequestResourceDetails);
+        else if (type === "transfers") applyList(val, setTransfers);
+        else if (type === "transferPersons") applyList(val, setTransferPersons);
+        else if (type === "transferHistory") applyList(val, setTransferHistories);
+        else if (type === "deliveredTransferResources") applyList(val, setDeliveredTransferResources);
+        else if (type === "occupationCoverage") applyList(val, setOccupationCoverages);
+        else if (type === "notifications") applyList(val, setNotifications);
+        else if (type === "people") setPeople(val);
+      } else {
+        console.warn(`Could not load dataset ${type} from backend. Keeping current data.`, result.reason);
+        const isForbiddenOrNotFound = 
+          result.reason instanceof ApiHttpError && 
+          (result.reason.statusCode === 403 || result.reason.statusCode === 404);
+        
+        if (type === "people" && isForbiddenOrNotFound) {
+          setHasPeoplePermission(false);
+        } else if (type === "occupationCoverage" && isForbiddenOrNotFound) {
+          setHasCoveragePermission(false);
+        }
       }
     });
+
+    if (!catalogsLoaded) {
+      setCatalogsLoaded(true);
+    }
   };
 
   useEffect(() => {
@@ -411,15 +440,16 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     return record.id;
   };
 
-  const handleSubmitIntercampRequest = async (id: string) => {
+  const handleSubmitIntercampRequest = async (id: string): Promise<boolean> => {
     try {
       await resourceApi.submitIntercampRequest(id);
       await fetchAllSystemData();
       showRequestSuccess("Solicitud intercampamento enviada correctamente.");
-      return;
+      return true;
     } catch (error) {
       console.warn("Could not submit intercamp request.", error);
       showRequestError("No se pudo enviar la solicitud en la API.", error);
+      return false;
     }
   };
 
@@ -644,14 +674,48 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     }
   };
 
-  const handleSaveCollection = (data: Omit<DailyCollectionRecord, "id">) => {
+  const handleSaveCollection = async (data: Omit<DailyCollectionRecord, "id">) => {
+    const tempId = `col-${Date.now().toString().slice(-5)}`;
     setDailyCollectionRecords(prev => [
       {
         ...data,
-        id: `col-${Date.now().toString().slice(-5)}`
+        id: tempId
       },
       ...prev
     ]);
+
+    // Optimistically update local inventory balance
+    setCampInventories(prev =>
+      prev.map(item =>
+        String(item.campId) === String(data.campId) && String(item.resourceTypeId) === String(data.resourceTypeId)
+          ? { ...item, currentAmount: Math.max(0, item.currentAmount + Number(data.actualAmount)) }
+          : item
+      )
+    );
+
+    try {
+      await resourceApi.createDailyCollectionRecord(data);
+    } catch (error) {
+      console.warn("Could not save daily collection record in API.", error);
+    }
+
+    try {
+      await resourceApi.createInventoryMovement({
+        campId: String(data.campId),
+        resourceTypeId: String(data.resourceTypeId),
+        amount: Number(data.actualAmount),
+        movementType: "DAILY_COLLECTION",
+        sourceId: tempId,
+        sourceType: "DAILY_COLLECTION_RECORD",
+        recordedBy: String(data.recordedBy),
+        date: new Date().toISOString().split("T")[0],
+        description: `Recolección diaria: ${data.differenceReason || ""}`,
+      });
+    } catch (error) {
+      console.warn("Could not create daily collection movement in API.", error);
+    }
+
+    await fetchAllSystemData();
   };
 
   const handleAdjustRecord = (id: string, actualAmount: number, reason: string) => {
