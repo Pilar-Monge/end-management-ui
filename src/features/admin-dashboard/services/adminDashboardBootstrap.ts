@@ -173,7 +173,11 @@ function buildDashboardKpi({
       ['injured'],
       personsData.filter((person) => person.status === 'INJURED').length,
     ),
-    sickPopulation: extractNumberByHint(generalDashboard, ['sick', 'ill'], 0),
+    sickPopulation: extractNumberByHint(
+      generalDashboard,
+      ['sick', 'ill'],
+      personsData.filter((person) => person.status === 'SICK').length,
+    ),
     outPopulation: extractNumberByHint(
       generalDashboard,
       ['missing', 'outside', 'out'],
