@@ -440,7 +440,7 @@ export const resourceApi = {
       body: JSON.stringify(toApiIntercampRequest(data)),
     });
     const record = asRecord(payload);
-    const dataRecord = asRecord(record.data);
+    const dataRecord = record.data !== undefined && record.data !== null ? asRecord(record.data) : record;
     return dataRecord.id !== undefined ? mapIntercampRequest(dataRecord) : null;
   },
 
