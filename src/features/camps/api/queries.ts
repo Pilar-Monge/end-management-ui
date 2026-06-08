@@ -6,7 +6,6 @@ const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('ac
 
 const getHeaders = (): HeadersInit => ({
   'Content-Type': 'application/json',
-  Authorization: `Bearer ${getToken() || ''}`,
 })
 
 function unwrapPayload<T>(payload: unknown): T {
@@ -62,7 +61,7 @@ function normalizeCamp(rawCamp: Camp): Camp {
 }
 
 export async function fetchCamps(): Promise<Camp[]> {
-  const res = await fetch(ENDPOINTS.camps, { headers: getHeaders() })
+  const res = await fetch(ENDPOINTS.camps, { headers: getHeaders(), credentials: 'include' })
   if (!res.ok) throw new Error('Failed to fetch camps')
   const payload = await res.json()
   return unwrapList<Camp>(payload).map(normalizeCamp)
@@ -79,7 +78,7 @@ export function useCamps(
 }
 
 export async function fetchCampById(id: number): Promise<CampWithStats> {
-  const res = await fetch(`${ENDPOINTS.camps}/${id}`, { headers: getHeaders() })
+  const res = await fetch(`${ENDPOINTS.camps}/${id}`, { headers: getHeaders(), credentials: 'include' })
   if (!res.ok) throw new Error('Failed to fetch camp')
   const payload = await res.json()
   return normalizeCamp(unwrapPayload<CampWithStats>(payload)) as CampWithStats
@@ -97,7 +96,7 @@ export function useCampById(
 }
 
 export async function fetchCampStats(): Promise<CampsStats> {
-  const res = await fetch(ENDPOINTS.campStats, { headers: getHeaders() })
+  const res = await fetch(ENDPOINTS.campStats, { headers: getHeaders(), credentials: 'include' })
   if (!res.ok) throw new Error('Failed to fetch camp stats')
   const payload = await res.json()
   return unwrapPayload<CampsStats>(payload)
@@ -114,7 +113,7 @@ export function useCampStats(
 }
 
 export async function fetchCampResources(campId: number): Promise<CampResourceItem[]> {
-  const res = await fetch(`${ENDPOINTS.campResources}?campId=${campId}`, { headers: getHeaders() })
+  const res = await fetch(`${ENDPOINTS.campResources}?campId=${campId}`, { headers: getHeaders(), credentials: 'include' })
   if (!res.ok) throw new Error('Failed to fetch camp resources')
   const payload = await res.json()
   return unwrapList<CampResourceItem>(payload)

@@ -8,7 +8,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['html', { outputFolder: 'playwright-report' }], ['list']],
   use: {
-    baseURL: process.env.BASE_URL ?? 'http://localhost:5173',
+    baseURL:'http://endmgmt-app.pentadev.engineer',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

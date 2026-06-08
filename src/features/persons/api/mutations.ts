@@ -21,18 +21,13 @@ const API_ORIGIN = (() => {
 })()
 
 function buildHeaders(): HeadersInit {
-  const token = getToken()
   return {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
 }
 
 function buildAuthHeaders(): HeadersInit {
-  const token = getToken()
-  return {
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
+  return {}
 }
 
 function unwrapPayload<T>(payload: unknown): T {
@@ -140,6 +135,7 @@ export async function createPerson(data: CreatePersonRequest): Promise<Person> {
   const res = await fetch(ENDPOINTS.persons, {
     method: 'POST',
     headers: buildHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
 
@@ -167,6 +163,7 @@ export async function updatePerson(id: number, data: UpdatePersonRequest): Promi
   const res = await fetch(`${ENDPOINTS.persons}/${id}`, {
     method: 'PUT',
     headers: buildHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
 
@@ -188,6 +185,7 @@ export async function updatePersonPhoto(id: number, photo: File): Promise<Person
   const res = await fetch(endpoint, {
     method: 'PUT',
     headers: buildAuthHeaders(), // buildAuthHeaders envía Authorization pero sin Content-Type
+    credentials: 'include',
     body: formData,
   })
 
@@ -266,6 +264,7 @@ export async function deletePerson(id: number): Promise<void> {
   const res = await fetch(`${ENDPOINTS.persons}/${id}`, {
     method: 'DELETE',
     headers: buildHeaders(),
+    credentials: 'include',
   })
 
   if (!res.ok) throw new Error('Failed to delete person')
@@ -293,6 +292,7 @@ export async function updatePersonStatus(
   const res = await fetch(`${ENDPOINTS.persons}/${id}/status`, {
     method: 'PUT',
     headers: buildHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
 

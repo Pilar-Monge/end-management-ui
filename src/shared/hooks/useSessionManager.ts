@@ -11,10 +11,10 @@ export function useSessionManager() {
   const isInitializedRef = useRef(false)
 
   useEffect(() => {
-    const token = localStorage.getItem('token') ?? localStorage.getItem('accessToken')
+    const user = localStorage.getItem('user')
     const isPublicPath = PUBLIC_PATHS.has(location.pathname)
 
-    if (!token && !isPublicPath) {
+    if (!user && !isPublicPath) {
       navigate('/main-homepage', {
         replace: true,
         state: {
@@ -25,7 +25,7 @@ export function useSessionManager() {
       return
     }
 
-    if (token && !isPublicPath) {
+    if (user && !isPublicPath) {
       localStorage.setItem(LAST_SECURE_PATH_KEY, location.pathname)
     }
   }, [location.pathname, navigate])
@@ -46,9 +46,9 @@ export function useSessionManager() {
     }
 
     const syncSessionManager = () => {
-      const token = localStorage.getItem('token') ?? localStorage.getItem('accessToken')
+      const user = localStorage.getItem('user')
 
-      if (!token) {
+      if (!user) {
         sessionService.stop()
         isInitializedRef.current = false
         return

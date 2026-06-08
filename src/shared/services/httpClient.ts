@@ -67,19 +67,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     ...customHeaders,
   }
 
-  if (withAuth) {
-    const token = getToken()
-    if (token) {
-      headers.Authorization = `Bearer ${token}`
-    }
-  }
-
   if (requestOptions.body !== undefined && !(requestOptions.body instanceof FormData)) {
     headers['Content-Type'] = headers['Content-Type'] ?? 'application/json'
   }
 
   const response = await fetch(`${API_BASE_URL}${normalizePath(path)}`, {
     ...requestOptions,
+    credentials: 'include',
     headers,
   })
 

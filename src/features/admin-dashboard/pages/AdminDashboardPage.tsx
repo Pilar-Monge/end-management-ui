@@ -1287,7 +1287,7 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     const evaluateSession = () => {
-      const hasToken = Boolean(localStorage.getItem("token") ?? localStorage.getItem("accessToken"));
+      const hasToken = Boolean(localStorage.getItem("user"));
       if (!hasToken) {
         setSessionState((prev) => (prev === "INACTIVA" ? prev : "INACTIVA"));
         return;

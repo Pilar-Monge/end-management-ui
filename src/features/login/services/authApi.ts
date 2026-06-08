@@ -50,6 +50,7 @@ export async function loginRequest(form: LoginForm): Promise<LoginApiResponse> {
   const res = await fetch(`${BASE_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({
       username: form.username,
       password: form.password,
@@ -60,17 +61,7 @@ export async function loginRequest(form: LoginForm): Promise<LoginApiResponse> {
   const data = await res.json()
   if (!res.ok) throw new Error(authErrorMessage(res.status))
 
-  const payload = data.data as LoginApiResponse
-  const token = payload.token ?? payload.accessToken
-  if (!token) {
-    throw new Error('Respuesta de login sin token de acceso')
-  }
-
-  return {
-    ...payload,
-    token,
-    accessToken: token,
-  }
+  return data.data as LoginApiResponse
 }
 
 export async function requestPasswordReset(

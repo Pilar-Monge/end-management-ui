@@ -6,7 +6,6 @@ const getToken = (): string | null => localStorage.getItem('token') ?? localStor
 
 const getHeaders = (): HeadersInit => ({
   'Content-Type': 'application/json',
-  Authorization: `Bearer ${getToken() || ''}`,
 })
 
 function admissionErrorMessage(status: number, action: 'submit' | 'pending' | 'detail' | 'ai' | 'review'): string {
@@ -27,13 +26,10 @@ function admissionErrorMessage(status: number, action: 'submit' | 'pending' | 'd
 export async function submitAdmission(
   payload: FormData | Record<string, any>,
 ): Promise<AdmissionRequest> {
-  const token = getToken()
   if (payload instanceof FormData) {
     const res = await fetch(`${BASE_URL}/admission-requests`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token || ''}`,
-      },
+      credentials: 'include',
       body: payload,
     })
 
@@ -46,6 +42,7 @@ export async function submitAdmission(
   const res = await fetch(`${BASE_URL}/admission-requests`, {
     method: 'POST',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(payload),
   })
 
@@ -58,6 +55,7 @@ export async function submitAdmission(
 export async function fetchPendingAdmissions(campId: number): Promise<AdmissionRequest[]> {
   const res = await fetch(`${BASE_URL}/admission-requests/camps/${campId}/pending`, {
     headers: getHeaders(),
+    credentials: 'include',
   })
 
   const data = await res.json()
@@ -69,6 +67,7 @@ export async function fetchPendingAdmissions(campId: number): Promise<AdmissionR
 export async function fetchAdmissionRequestById(id: number): Promise<AdmissionRequest> {
   const res = await fetch(`${BASE_URL}/admission-requests/${id}`, {
     headers: getHeaders(),
+    credentials: 'include',
   })
 
   const data = await res.json()
@@ -84,6 +83,7 @@ export async function processAdmissionWithAI(
   const res = await fetch(`${BASE_URL}/admission-requests/${id}/process-ai`, {
     method: 'POST',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(payload),
   })
 
@@ -100,6 +100,7 @@ export async function reviewAdmissionRequest(
   const res = await fetch(`${BASE_URL}/admission-requests/${id}/review`, {
     method: 'POST',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(payload),
   })
 
