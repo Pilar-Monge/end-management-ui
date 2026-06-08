@@ -43,3 +43,8 @@ RESUMEN_IMPLEMENTACION.md
 eslint-current.json
 lint_results.txt
 lint_results_after.txt
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
