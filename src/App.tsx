@@ -1,6 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import HomePage from './pages/HomePage'
 import LoginPage from './features/login/pages/LoginPage'
 import { MobileOrientationView } from './shared/components/MobileOrientationView'
 import { FullscreenButton } from './shared/components/FullscreenButton'
@@ -251,7 +250,7 @@ function App() {
     <>
       <FullscreenButton />
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={withSuspense(<LoadingPage />)} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/loading" element={withSuspense(<LoadingPage />)} />
         <Route path="/main-homepage" element={withSuspense(<MainHomePage />)} />
