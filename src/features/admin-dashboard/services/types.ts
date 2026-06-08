@@ -38,6 +38,8 @@ export interface AdminAdmissionRequest {
 export interface CampInventoryEntry {
   campId: number
   resourceTypeId: number
+  resourceTypeKey?: string
+  resourceTypeName?: string
   quantity: number
   updatedAt?: string
 }

@@ -4,6 +4,7 @@ export {
 } from './admissionRequests.service'
 
 export {
+  listCampInventoryEntries,
   getCampInventoryEntry,
   upsertCampInventory,
   deleteCampInventory,

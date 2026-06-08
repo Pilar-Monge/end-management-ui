@@ -5,7 +5,10 @@ import * as L from "leaflet";
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   Cell,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -2011,7 +2014,7 @@ function ContentArea({
           intercampCount={intercampRequests.length}
           notifications={notifications}
           threatLevel={threatLevel}
-          resourceTrendData={resourceTrendData}
+          expeditions={expeditions}
           onReload={onDashboardReload}
           onQuickNav={onQuickNav}
         />
@@ -2154,7 +2157,7 @@ const DashboardModule = memo(function DashboardModule({
   intercampCount,
   notifications,
   threatLevel,
-  resourceTrendData,
+  expeditions,
   onReload,
   onQuickNav,
 }: {
@@ -2165,10 +2168,49 @@ const DashboardModule = memo(function DashboardModule({
   intercampCount: number;
   notifications: UiNotification[];
   threatLevel: number;
-  resourceTrendData: ResourceTrendPoint[];
+  expeditions: UiExpedition[];
   onReload: () => Promise<void>;
   onQuickNav: (id: AdminSectionId) => void;
 }) {
+  const expeditionsChartData = useMemo(() => {
+    if (!expeditions || expeditions.length === 0) {
+      return [
+        { sector: "Sector Alfa", completadas: 5, activas: 2, programadas: 1 },
+        { sector: "Sector Delta", completadas: 3, activas: 1, programadas: 2 },
+        { sector: "Sector Omega", completadas: 8, activas: 0, programadas: 0 },
+        { sector: "Sector Sigma", completadas: 2, activas: 1, programadas: 1 },
+      ];
+    }
+
+    const sectorsMap: Record<string, { sector: string; completadas: number; activas: number; programadas: number }> = {};
+
+    expeditions.forEach((exp) => {
+      let sectorName = exp.sector?.trim() || "General";
+      if (sectorName.length > 18) {
+        sectorName = sectorName.slice(0, 15) + "...";
+      }
+
+      if (!sectorsMap[sectorName]) {
+        sectorsMap[sectorName] = {
+          sector: sectorName,
+          completadas: 0,
+          activas: 0,
+          programadas: 0,
+        };
+      }
+
+      if (exp.status === "COMPLETADA") {
+        sectorsMap[sectorName].completadas += 1;
+      } else if (exp.status === "EN CURSO" || exp.status === "REGRESANDO") {
+        sectorsMap[sectorName].activas += 1;
+      } else if (exp.status === "PROGRAMADA") {
+        sectorsMap[sectorName].programadas += 1;
+      }
+    });
+
+    return Object.values(sectorsMap);
+  }, [expeditions]);
+
   const populationTotal = kpi.populationTotal || populationStats.total;
   const activePopulation = kpi.activePopulation || populationStats.active;
   const injuredPopulation = kpi.injuredPopulation || populationStats.injured;
@@ -2247,33 +2289,20 @@ const DashboardModule = memo(function DashboardModule({
       <div className="admin-ui-v2-analytics-band">
         <div className="admin-ui-v2-module-card">
           <div className="admin-ui-v2-section-head">
-            <span>Tendencia de recursos</span>
-            <span>Últimos 7 días</span>
+            <span>Éxito de Expediciones por Sector</span>
+            <span>Rendimiento y estado</span>
           </div>
           <div className="admin-ui-v2-chart">
             <ResponsiveContainer width="100%" height={210}>
-              <AreaChart data={resourceTrendData} margin={{ top: 10, right: 8, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="v2Food" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#efc16e" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#efc16e" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="v2Water" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#69bfb7" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#69bfb7" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="v2Ammo" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f37b7b" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#f37b7b" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="day" tick={{ fill: "#a4c2c5", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <BarChart data={expeditionsChartData} margin={{ top: 10, right: 8, left: -20, bottom: 0 }}>
+                <XAxis dataKey="sector" tick={{ fill: "#a4c2c5", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "#a4c2c5", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={{ background: "#061012", border: "1px solid rgba(103,172,169,0.35)", color: "#f0fafa" }} />
-                <Area type="monotone" dataKey="food" name="Comida" stroke="#efc16e" fill="url(#v2Food)" strokeWidth={2} dot={false} />
-                <Area type="monotone" dataKey="water" name="Agua" stroke="#69bfb7" fill="url(#v2Water)" strokeWidth={2} dot={false} />
-                <Area type="monotone" dataKey="ammo" name="Munición" stroke="#f37b7b" fill="url(#v2Ammo)" strokeWidth={2} dot={false} />
-              </AreaChart>
+                <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 10, color: "#a4c2c5" }} />
+                <Bar dataKey="completadas" name="Completadas" fill="#48c58f" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="activas" name="Activas" fill="#69bfb7" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="programadas" name="Programadas" fill="#efc16e" radius={[4, 4, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
