@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import {
+  fetchCurrentUserProfile,
   fetchWorkerDailyCollectionRecord,
   fetchWorkerNotificationById,
   fetchWorkerNotifications,
@@ -9,6 +11,7 @@ import {
   updateWorkerNotificationReadState,
 } from '../services/workerMainViewApi'
 import type {
+  CurrentUserProfile,
   PaginationInfo,
   WorkerAuthenticatedUser,
   WorkerDailyCollectionRecord,
@@ -16,9 +19,12 @@ import type {
   WorkerOccupation,
   
 } from '../types'
+import { WorkerApiError } from '../services/workerMainViewApi'
+import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
 import '../pages/worker-main-view.css'
+import endWorkerBg from '../assets/images/end-worker.jpg'
 
-type WorkerSectionId = 'recoleccion' | 'notificaciones' | 'ocupaciones'
+type WorkerSectionId = 'recoleccion' | 'notificaciones' | 'ocupaciones' | 'perfil'
 
 type WorkerSection = {
   id: WorkerSectionId
@@ -28,6 +34,7 @@ type WorkerSection = {
 }
 
 const WORKER_NAV_DATA: WorkerSection[] = [
+  { id: 'perfil', label: 'Mi perfil', shortLabel: 'PF', icon: <ProfileIcon /> },
   { id: 'recoleccion', label: 'Recolección diaria', shortLabel: 'RC', icon: <CollectionIcon /> },
   { id: 'notificaciones', label: 'Notificaciones', shortLabel: 'NT', icon: <NotificationIcon /> },
   { id: 'ocupaciones', label: 'Ocupaciones', shortLabel: 'OC', icon: <OccupationIcon /> },
@@ -81,10 +88,12 @@ const WORKER_LOADING_ART = `data:image/svg+xml;charset=UTF-8,${encodeURIComponen
 `)}`
 
 export function WorkerMainViewPage() {
+  const navigate = useNavigate()
   const [showLoading, setShowLoading] = useState(true)
   const [isLoaded, setIsLoaded] = useState(false)
   const [hasEntered, setHasEntered] = useState(false)
   const [activeSectionId, setActiveSectionId] = useState<WorkerSectionId>('recoleccion')
+  const [currentGlobalTime, setCurrentGlobalTime] = useState(() => new Date())
 
   const sessionUser = useMemo<WorkerAuthenticatedUser | null>(() => {
     const raw = localStorage.getItem('user')
@@ -103,6 +112,8 @@ export function WorkerMainViewPage() {
     }
   }, [])
 
+  const hudUser = useMemo(() => getStoredWorkerHudUser(sessionUser), [sessionUser])
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setIsLoaded(true)
@@ -110,6 +121,22 @@ export function WorkerMainViewPage() {
 
     return () => window.clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    const tickInterval = window.setInterval(() => {
+      setCurrentGlobalTime(new Date())
+    }, 1000)
+
+    return () => window.clearInterval(tickInterval)
+  }, [])
+
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('user')
+    window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
+    navigate('/main-homepage', { state: { initialAppState: 'explore' } })
+  }
 
   const activeSection = useMemo(
     () => WORKER_NAV_DATA.find((item) => item.id === activeSectionId) ?? WORKER_NAV_DATA[0],
@@ -131,7 +158,12 @@ export function WorkerMainViewPage() {
 
       {hasEntered ? (
         <>
-          <TopHud />
+          <TopHud
+            currentGlobalTime={currentGlobalTime}
+            username={hudUser.username}
+            roleLabel={hudUser.roleLabel}
+            onLogout={handleLogout}
+          />
 
           <div className="main-area">
             <div className="content-scroll">
@@ -167,24 +199,71 @@ export function WorkerMainViewPage() {
 
 export default WorkerMainViewPage
 
-function TopHud() {
+function TopHud({
+  currentGlobalTime,
+  username,
+  roleLabel,
+  onLogout,
+}: {
+  currentGlobalTime: Date
+  username: string
+  roleLabel: string
+  onLogout: () => void
+}) {
   return (
-    <header className="worker-top-hud pointer-events-none flex items-center justify-between px-3 pt-3 pb-2 text-[10px] font-black uppercase tracking-[-0.02em] text-[#A4C2C5]/80">
-      <button className="pointer-events-auto worker-hud-btn" type="button">
-        <span className="btn-text">
-          <span className="flex items-center gap-[1px] text-[#69BFB7]">
-            <ChevronLeft />
-            <ChevronLeft />
+    <header className="worker-top-hud pointer-events-none flex items-start justify-between px-3 pt-3 pb-2 text-[10px] font-black uppercase tracking-[-0.02em] text-[#A4C2C5]/80">
+      <div className="worker-hud-chip pointer-events-auto flex items-center gap-2.5 bg-[#0d1414]/90 border border-[#67ACA9]/25 px-2.5 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-[-0.02em] text-white shadow-md shrink-0">
+        <div className="inline-flex items-center shrink-0 text-[#69BFB7]">
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+          </svg>
+        </div>
+
+        <div className="flex flex-col justify-center leading-tight">
+          <div className="flex items-center gap-1">
+            <span className="text-[#A4C2C5]/50 font-black">FECHA:</span>
+            <span className="text-white font-black">
+              {currentGlobalTime.getUTCDate().toString().padStart(2, '0')}/{(currentGlobalTime.getUTCMonth() + 1).toString().padStart(2, '0')}/{currentGlobalTime.getUTCFullYear()}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1 mt-0.5">
+            <span className="text-[#A4C2C5]/50 font-black">HORA:</span>
+            <span className="text-white font-black">
+              {currentGlobalTime.getUTCHours().toString().padStart(2, '0')}:{currentGlobalTime.getUTCMinutes().toString().padStart(2, '0')}:{currentGlobalTime.getUTCSeconds().toString().padStart(2, '0')} UTC
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="pointer-events-auto flex items-center gap-2.5 bg-[#0d1414]/90 border border-[#67ACA9]/25 px-2.5 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-[-0.02em] text-white shadow-md shrink-0">
+          <div className="inline-flex items-center shrink-0">
+            <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+            </svg>
+          </div>
+
+          <div className="flex flex-col justify-center leading-tight">
+            <div className="flex items-center gap-1">
+              <span className="text-[#A4C2C5]/50 font-black">USUARIO:</span>
+              <span className="text-white font-black">{username}</span>
+            </div>
+
+            <div className="flex items-center gap-1 mt-0.5">
+              <span className="text-[#A4C2C5]/50 font-black">ROL:</span>
+              <span className="text-white font-black">{roleLabel}</span>
+            </div>
+          </div>
+        </div>
+
+        <button className="pointer-events-auto worker-hud-btn shrink-0" type="button" onClick={onLogout}>
+          <span className="btn-text">
+            CERRAR SESIÓN
+            <span className="logout-mark" aria-hidden="true" />
           </span>
-          Centro operativo
-        </span>
-      </button>
-      <button className="pointer-events-auto worker-hud-btn" type="button">
-        <span className="btn-text">
-          Panel trabajador
-          <span className="logout-mark" aria-hidden="true" />
-        </span>
-      </button>
+        </button>
+      </div>
     </header>
   )
 }
@@ -260,18 +339,6 @@ function BottomDock({
   )
 }
 
- 
-
-function ChevronLeft() {
-  return (
-    <svg aria-hidden="true" className="h-4 w-3" fill="none" viewBox="0 0 10 16">
-      <path d="M8 2 2 8l6 6" stroke="currentColor" strokeLinecap="square" strokeWidth="3" />
-    </svg>
-  )
-}
-
- 
-
 function LoadingOverlay({
   show,
   isLoaded,
@@ -292,6 +359,15 @@ function LoadingOverlay({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.7, ease: 'easeInOut' }}
         >
+          <div className="absolute inset-0 select-none pointer-events-none overflow-hidden bg-[#020706]">
+            <img
+              src={endWorkerBg}
+              alt="Fondo de carga del trabajador"
+              className="w-full h-full object-cover opacity-75 md:opacity-85 filter brightness-[0.65] contrast-[1.05]"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+
           <div className="worker-loading-art" aria-hidden="true" style={{ backgroundImage: `url("${WORKER_LOADING_ART}")` }} />
           <div
             className="absolute inset-0 pointer-events-none"
@@ -390,9 +466,89 @@ function GenericWorkerContent({
       return <NotificationsSection sessionUser={sessionUser} />
     case 'ocupaciones':
       return <OccupationsSection sessionUser={sessionUser} />
+    case 'perfil':
+      return <CurrentUserProfileSection />
     default:
       return <ModuleStateCard title={section.label} message="Sin datos disponibles para este módulo." />
   }
+}
+
+function CurrentUserProfileSection() {
+  const [profile, setProfile] = useState<CurrentUserProfile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [sessionIssue, setSessionIssue] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadProfile() {
+      setLoading(true)
+      setError(null)
+      setSessionIssue(false)
+
+      try {
+        const result = await fetchCurrentUserProfile()
+        if (isMounted) {
+          setProfile(result)
+        }
+      } catch (fetchError) {
+        if (!isMounted) return
+
+        const translated = translateCurrentUserProfileError(fetchError)
+        if (translated.requiresSession) {
+          setSessionIssue(true)
+          setError(null)
+        } else {
+          setError(translated.message)
+        }
+        setProfile(null)
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    }
+
+    void loadProfile()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  if (loading) {
+    return <ModuleStateCard title="Cargando perfil" message="Obteniendo la información personal del usuario autenticado..." />
+  }
+
+  if (sessionIssue) {
+    return <ModuleStateCard title="Sesión no disponible" message="Tu sesión expiró o no tiene autorización para consultar el perfil." />
+  }
+
+  if (error) {
+    return <ModuleStateCard title="No se pudo cargar el perfil" message={error} />
+  }
+
+  if (!profile) {
+    return <ModuleStateCard title="Sin datos" message="No fue posible recuperar el perfil del usuario." />
+  }
+
+  return (
+    <div className="worker-content-grid worker-content-grid-single">
+      <article className="worker-card worker-card-wide">
+        <div className="worker-card-label">Perfil del usuario</div>
+        <div className="worker-detail-stack">
+          <p>Información personal registrada en el sistema.</p>
+          <div className="worker-detail-grid worker-detail-grid-two-up">
+            <DetailRow label="Usuario" value={profile.username} />
+            <DetailRow label="Correo" value={profile.email} />
+            <DetailRow label="Rol" value={formatRoleLabel(profile.role)} />
+            <DetailRow label="Estado" value={formatStatusLabel(profile.status)} />
+            <DetailRow label="Campamento" value={`#${profile.campId}`} />
+            <DetailRow label="Identificador" value={String(profile.id)} />
+          </div>
+        </div>
+      </article>
+    </div>
+  )
 }
 
 function NotificationsSection({ sessionUser }: { sessionUser: WorkerAuthenticatedUser | null }) {
@@ -995,6 +1151,136 @@ function translateOccupationError(message: string): { message: string; requiresS
   }
 }
 
+function translateCurrentUserProfileError(error: unknown): { message: string; requiresSession: boolean } {
+  if (error instanceof WorkerApiError) {
+    if (error.statusCode === 401) {
+      return {
+        message: 'Sesión inválida o expirada. Inicia sesión otra vez para ver tu perfil.',
+        requiresSession: true,
+      }
+    }
+
+    if (error.statusCode === 400) {
+      return {
+        message: 'El contexto autenticado no es válido. Intenta iniciar sesión de nuevo.',
+        requiresSession: true,
+      }
+    }
+
+    if (error.statusCode === 404) {
+      return {
+        message: 'No se encontró el usuario autenticado o no coincide con el campId actual.',
+        requiresSession: false,
+      }
+    }
+
+    return {
+      message: 'No se pudo cargar el perfil del usuario. Intenta de nuevo más tarde.',
+      requiresSession: false,
+    }
+  }
+
+  if (error instanceof Error) {
+    const normalized = error.message.trim().toLowerCase()
+
+    if (normalized.includes('unauthorized') || normalized.includes('token') || normalized.includes('authorization')) {
+      return {
+        message: 'Sesión inválida o expirada. Inicia sesión otra vez para ver tu perfil.',
+        requiresSession: true,
+      }
+    }
+  }
+
+  return {
+    message: 'No se pudo cargar el perfil del usuario. Intenta de nuevo más tarde.',
+    requiresSession: false,
+  }
+}
+
+function formatRoleLabel(role: CurrentUserProfile['role']): string {
+  switch (role) {
+    case 'WORKER':
+      return 'Trabajador'
+    case 'RESOURCE_MANAGEMENT':
+      return 'Gestión de recursos'
+    case 'TRAVEL_MANAGER':
+      return 'Gestión de viajes'
+    case 'SYSTEM_ADMIN':
+      return 'Administrador del sistema'
+    default:
+      return role
+  }
+}
+
+function getStoredWorkerHudUser(sessionUser: WorkerAuthenticatedUser | null) {
+  if (typeof window === 'undefined') {
+    return {
+      username: 'TRABAJADOR',
+      role: 'WORKER',
+      roleLabel: 'Trabajador',
+    }
+  }
+
+  const savedDisplayName = localStorage.getItem('game_username')
+  const rawUser = localStorage.getItem('session_user') ?? localStorage.getItem('user')
+
+  try {
+    const parsed = rawUser ? JSON.parse(rawUser) as {
+      username?: unknown
+      name?: unknown
+      fullName?: unknown
+      rol?: unknown
+      role?: unknown
+    } : null
+
+    const sessionName = String(parsed?.username ?? parsed?.name ?? parsed?.fullName ?? sessionUser?.username ?? '').trim()
+    const role = String(parsed?.rol ?? parsed?.role ?? sessionUser?.role ?? 'WORKER').toUpperCase()
+    const roleLabel = role === 'WORKER'
+      ? 'Trabajador'
+      : formatWorkerHudRoleLabel(role)
+
+    return {
+      username: sessionName || savedDisplayName || 'TRABAJADOR',
+      role,
+      roleLabel,
+    }
+  } catch {
+    const role = String(sessionUser?.role ?? 'WORKER').toUpperCase()
+
+    return {
+      username: savedDisplayName || sessionUser?.username || 'TRABAJADOR',
+      role,
+      roleLabel: role === 'WORKER' ? 'Trabajador' : formatWorkerHudRoleLabel(role),
+    }
+  }
+}
+
+function formatWorkerHudRoleLabel(role: string): string {
+  switch (role) {
+    case 'RESOURCE_MANAGEMENT':
+      return 'Gestión de recursos'
+    case 'TRAVEL_MANAGER':
+      return 'Gestión de viajes'
+    case 'SYSTEM_ADMIN':
+      return 'Administrador del sistema'
+    default:
+      return role.replace(/_/g, ' ')
+  }
+}
+
+function formatStatusLabel(status: CurrentUserProfile['status']): string {
+  switch (status) {
+    case 'ACTIVE':
+      return 'Activo'
+    case 'BLOCKED':
+      return 'Bloqueado'
+    case 'INACTIVE':
+      return 'Inactivo'
+    default:
+      return status
+  }
+}
+
 function IconSvg({ children }: { children: ReactNode }) {
   return (
     <svg aria-hidden="true" fill="none" viewBox="0 0 24 24" className="worker-svg-icon">
@@ -1027,6 +1313,16 @@ function OccupationIcon() {
     <IconSvg>
       <circle cx="12" cy="8" r="3" stroke="currentColor" strokeWidth="1.7" />
       <path d="M5 19c1.4-3.2 4.2-5 7-5s5.6 1.8 7 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </IconSvg>
+  )
+}
+
+function ProfileIcon() {
+  return (
+    <IconSvg>
+      <circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M5.5 19c1.3-3.1 4-4.8 6.5-4.8S17.2 15.9 18.5 19" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M7.5 11.5h9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" opacity="0.8" />
     </IconSvg>
   )
 }

@@ -7,6 +7,7 @@ import type {
   InventoryMovement,
   InventoryAlert,
   IntercampRequest,
+  RequestPersonDetail,
   RequestResourceDetail,
   Transfer,
   TransferPerson,
@@ -15,7 +16,8 @@ import type {
   DeliveredTransferResource,
   Occupation,
   OccupationCoverage,
-  OperationalNotification
+  OperationalNotification,
+  CampPerson
 } from "../types/resourceManagementTypes";
 
 type UnknownRecord = Record<string, unknown>;
@@ -77,16 +79,35 @@ function normalizeMovementType(value: unknown): InventoryMovement["movementType"
 }
 
 function normalizeRequestStatus(value: unknown): IntercampRequest["status"] {
-  return status<IntercampRequest["status"]>(value, "PENDING", ["PENDING", "APPROVED", "REJECTED", "CANCELED"]);
+  return status<IntercampRequest["status"]>(value, "DRAFT", ["DRAFT", "PENDING", "APPROVED", "REJECTED", "CANCELED"]);
+}
+
+function normalizePersonDetailType(value: unknown): RequestPersonDetail["detailType"] {
+  return status<RequestPersonDetail["detailType"]>(value, "BY_OCCUPATION", ["BY_OCCUPATION", "SPECIFIC"]);
+}
+
+function normalizePersonDetailStatus(value: unknown): RequestPersonDetail["status"] {
+  return status<RequestPersonDetail["status"]>(value, "PROPOSED", ["PROPOSED", "CONFIRMED", "REJECTED"]);
 }
 
 function normalizeTransferPersonStatus(value: unknown): TransferPerson["status"] {
   return status<TransferPerson["status"]>(value, "CONFIRMED", ["CONFIRMED", "IN_TRANSIT", "DELIVERED", "CANCELED"]);
 }
 
+function normalizePersonStatus(value: unknown): CampPerson["status"] {
+  const raw = str(value, "ACTIVE").toUpperCase();
+  if (["ACTIVE", "SICK", "INJURED", "OUTSIDE_CAMP", "ON_EXPEDITION"].includes(raw)) return raw;
+  return raw || "ACTIVE";
+}
+
 function numericId(value: string): number {
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
+  if (Number.isFinite(parsed)) return parsed;
+
+  const match = value.match(/\d+/);
+  if (!match) return 0;
+  const parsedFromText = Number(match[0]);
+  return Number.isFinite(parsedFromText) ? parsedFromText : 0;
 }
 
 function readCurrentUserId(): number {
@@ -103,15 +124,14 @@ function readCurrentUserId(): number {
       const parsed = JSON.parse(raw) as { userId?: unknown; id?: unknown };
       const id = Number(parsed.userId ?? parsed.id);
       if (Number.isFinite(id) && id > 0) return id;
-    } catch {
-      // Ignore malformed local session data and keep looking.
-    }
+    } catch {}
   }
 
   return 3;
 }
 
 function toBackendTransferStatus(statusValue?: Transfer["status"]) {
+  if (statusValue === "EN_ROUTE" || statusValue === "IN_TRANSIT") return "IN_TRANSIT";
   if (statusValue === "DELIVERED" || statusValue === "COMPLETED") return "COMPLETED";
   if (statusValue === "CANCELED") return "CANCELED";
   return "PENDING_DEPARTURE";
@@ -119,10 +139,11 @@ function toBackendTransferStatus(statusValue?: Transfer["status"]) {
 
 function fromBackendTransferStatus(item: UnknownRecord): Transfer["status"] {
   const rawStatus = str(item.status, "PENDING_DEPARTURE").toUpperCase();
-  if (rawStatus === "COMPLETED") return "DELIVERED";
+  if (rawStatus === "PENDING_DEPARTURE") return "PENDING_DEPARTURE";
+  if (rawStatus === "IN_TRANSIT") return "IN_TRANSIT";
+  if (rawStatus === "COMPLETED") return "COMPLETED";
   if (rawStatus === "CANCELED") return "CANCELED";
-  if (item.actualDepartureDate) return "EN_ROUTE";
-  return "PLANNING";
+  return "PENDING_DEPARTURE";
 }
 
 function mapTransfer(item: UnknownRecord): Transfer {
@@ -261,22 +282,30 @@ export function toApiInventoryMovement(data: Omit<InventoryMovement, "id">) {
 }
 
 export function toApiIntercampRequest(data: Omit<IntercampRequest, "id">) {
-  const personRequirements = data.personRequirements
-    .map(requirement => ({
-      occupationId: numericId(requirement.occupationId),
-      quantity: requirement.quantity,
-    }))
-    .filter(requirement => requirement.occupationId > 0 && requirement.quantity > 0);
-
   return {
     originCampId: numericId(data.originCampId),
     destinationCampId: numericId(data.destinationCampId),
-    status: data.status,
     description: data.description,
     plannedDepartureDate: data.plannedDepartureDate,
     plannedArrivalDate: data.plannedArrivalDate,
-    personRequirements,
     createdBy: numericId(data.createdBy) || readCurrentUserId(),
+  };
+}
+
+function mapIntercampRequest(item: UnknownRecord): IntercampRequest {
+  return {
+    id: str(item.id),
+    originCampId: str(item.originCampId ?? item.fromCampId),
+    destinationCampId: str(item.destinationCampId ?? item.toCampId),
+    status: normalizeRequestStatus(item.status),
+    description: str(item.description ?? item.message ?? item.title),
+    plannedDepartureDate: dateStr(item.plannedDepartureDate ?? item.departureDate),
+    plannedArrivalDate: dateStr(item.plannedArrivalDate ?? item.arrivalDate),
+    personRequirements: Array.isArray(item.personRequirements) ? item.personRequirements as IntercampRequest["personRequirements"] : [],
+    createdDate: dateStr(item.createdDate ?? item.createdAt),
+    responseDate: item.responseDate === undefined ? undefined : dateStr(item.responseDate),
+    createdBy: str(item.createdBy ?? item.userId, "Sistema"),
+    respondedBy: item.respondedBy === undefined ? undefined : str(item.respondedBy),
   };
 }
 
@@ -298,8 +327,9 @@ export const resourceApi = {
     return listFromPayload(payload, item => ({
       id: str(item.id ?? item.campId),
       name: str(item.name ?? item.nombre, `Campamento ${item.id ?? ""}`),
-      location: str(item.location ?? item.ubicacion ?? item.zone, "Sin ubicacion"),
+      location: str(item.location ?? item.ubicacion ?? item.zone ?? item.description, "Sin ubicacion"),
       personnelCount: num(item.personnelCount ?? item.population ?? item.peopleCount ?? item.activePersons, 0),
+      maxPersonCapacity: num(item.maxPersonCapacity ?? item.maximumCapacity ?? item.capacity, 0),
     }));
   },
 
@@ -401,32 +431,65 @@ export const resourceApi = {
 
   listIntercampRequests: async (): Promise<IntercampRequest[]> => {
     const payload = await apiRequest<unknown>("/intercamp-requests?page=1&limit=100");
+    return listFromPayload(payload, mapIntercampRequest);
+  },
+
+  createIntercampRequest: async (data: Omit<IntercampRequest, "id">): Promise<IntercampRequest | null> => {
+    const payload = await apiRequest<unknown>("/intercamp-requests", {
+      method: "POST",
+      body: JSON.stringify(toApiIntercampRequest(data)),
+    });
+    const record = asRecord(payload);
+    const dataRecord = asRecord(record.data);
+    return dataRecord.id !== undefined ? mapIntercampRequest(dataRecord) : null;
+  },
+
+  updateIntercampRequestStatus: (id: string, requestStatus: IntercampRequest["status"], respondedBy: string, transportPersonIds?: string[]) =>
+    apiRequest<unknown>(`/intercamp-requests/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        status: requestStatus,
+        respondedBy: numericId(respondedBy),
+        responseDate: new Date().toISOString(),
+        ...(transportPersonIds && transportPersonIds.length > 0
+          ? { transportPersonIds: transportPersonIds.map(numericId).filter(idValue => idValue > 0) }
+          : {}),
+      }),
+    }),
+
+  submitIntercampRequest: (id: string) =>
+    apiRequest<unknown>(`/intercamp-requests/${id}/submit`, {
+      method: "POST",
+    }),
+
+  listRequestPersonDetails: async (): Promise<RequestPersonDetail[]> => {
+    const payload = await apiRequest<unknown>("/request-person-details?page=1&limit=100");
     return listFromPayload(payload, item => ({
       id: str(item.id),
-      originCampId: str(item.originCampId ?? item.fromCampId),
-      destinationCampId: str(item.destinationCampId ?? item.toCampId),
-      status: normalizeRequestStatus(item.status),
-      description: str(item.description ?? item.message ?? item.title),
-      plannedDepartureDate: dateStr(item.plannedDepartureDate ?? item.departureDate),
-      plannedArrivalDate: dateStr(item.plannedArrivalDate ?? item.arrivalDate),
-      personRequirements: Array.isArray(item.personRequirements) ? item.personRequirements as IntercampRequest["personRequirements"] : [],
-      createdDate: dateStr(item.createdDate ?? item.createdAt),
-      responseDate: item.responseDate === undefined ? undefined : dateStr(item.responseDate),
-      createdBy: str(item.createdBy ?? item.userId, "Sistema"),
-      respondedBy: item.respondedBy === undefined ? undefined : str(item.respondedBy),
+      requestId: str(item.requestId ?? item.intercampRequestId),
+      detailType: normalizePersonDetailType(item.detailType),
+      personId: item.personId === null || item.personId === undefined ? null : str(item.personId),
+      occupationId: item.occupationId === null || item.occupationId === undefined ? null : str(item.occupationId),
+      amount: num(item.amount, 1),
+      status: normalizePersonDetailStatus(item.status),
     }));
   },
 
-  createIntercampRequest: (data: Omit<IntercampRequest, "id">) => apiRequest<unknown>("/intercamp-requests", {
-    method: "POST",
-    body: JSON.stringify(toApiIntercampRequest(data)),
-  }),
-
-  updateIntercampRequestStatus: (id: string, requestStatus: IntercampRequest["status"], respondedBy: string) =>
-    apiRequest<unknown>(`/intercamp-requests/${id}`, {
-      method: "PUT",
-      body: JSON.stringify({ status: requestStatus, respondedBy: numericId(respondedBy) }),
+  createRequestPersonDetail: (data: Omit<RequestPersonDetail, "id">) =>
+    apiRequest<unknown>("/request-person-details", {
+      method: "POST",
+      body: JSON.stringify({
+        requestId: numericId(data.requestId),
+        detailType: data.detailType,
+        personId: data.personId ? numericId(data.personId) : null,
+        occupationId: data.occupationId ? numericId(data.occupationId) : null,
+        amount: data.amount,
+        status: data.status,
+      }),
     }),
+
+  deleteRequestPersonDetail: (id: string) =>
+    apiRequest<void>(`/request-person-details/${id}`, { method: "DELETE" }),
 
   listRequestResourceDetails: async (): Promise<RequestResourceDetail[]> => {
     const payload = await apiRequest<unknown>("/request-resource-details?page=1&limit=100");
@@ -445,8 +508,8 @@ export const resourceApi = {
       body: JSON.stringify({
         requestId: numericId(requestId),
         resourceTypeId: numericId(resourceTypeId),
-        requestedAmount,
-        approvedAmount: requestedAmount,
+        requestedAmount: String(requestedAmount),
+        approvedAmount: null,
       }),
     }),
 
@@ -466,6 +529,14 @@ export const resourceApi = {
       return listAccessibleTransfers();
     }
   },
+
+  updateTransferTransportStaff: (id: string, transportPersonIds: string[]) =>
+    apiRequest<unknown>(`/transfers/${id}/transport-staff`, {
+      method: "PUT",
+      body: JSON.stringify({
+        transportPersonIds: transportPersonIds.map(numericId).filter(idValue => idValue > 0),
+      }),
+    }),
 
   createTransfer: (data: Omit<Transfer, "id">) => apiRequest<unknown>("/transfers", {
     method: "POST",
@@ -528,8 +599,7 @@ export const resourceApi = {
   }),
 
   listTransferHistory: async (): Promise<TransferHistory[]> => {
-    const payload = await apiRequest<unknown>("/transfer-history?page=1&limit=100");
-    return listFromPayload(payload, item => ({
+    const mapHistory = (item: UnknownRecord): TransferHistory => ({
       id: str(item.id),
       transferId: str(item.transferId),
       previousStatus: fromBackendTransferStatus({ status: item.previousStatus }),
@@ -537,7 +607,23 @@ export const resourceApi = {
       date: dateStr(item.date ?? item.createdAt),
       userId: str(item.userId ?? item.createdBy),
       comment: item.comment === undefined ? undefined : str(item.comment),
-    }));
+    });
+
+    try {
+      const payload = await apiRequest<unknown>("/transfer-history?page=1&limit=100");
+      return listFromPayload(payload, mapHistory);
+    } catch {
+      const transfers = await listAccessibleTransfers();
+      const batches = await Promise.allSettled(
+        transfers.map(transfer => apiRequest<unknown>(`/transfer-history?transferId=${encodeURIComponent(transfer.id)}&page=1&limit=100`)),
+      );
+
+      return batches.flatMap(result => (
+        result.status === "fulfilled"
+          ? listFromPayload(result.value, mapHistory)
+          : []
+      ));
+    }
   },
 
   createTransferHistory: (data: Omit<TransferHistory, "id">) => apiRequest<unknown>("/transfer-history", {
@@ -562,6 +648,18 @@ export const resourceApi = {
       ));
     }
   },
+
+  listPeople: async (): Promise<CampPerson[]> => {
+    const payload = await apiRequest<unknown>("/person?page=1&limit=100");
+    return listFromPayload(payload, item => ({
+      id: str(item.id ?? item.personId),
+      name: str(item.name ?? item.fullName ?? item.username ?? `Persona ${item.id ?? ""}`),
+      campId: str(item.campId ?? childId(item, "camp")),
+      status: normalizePersonStatus(item.currentStatus ?? item.status ?? item.current_status),
+      occupationId: str(item.occupationId ?? childId(item, "occupation")),
+    }));
+  },
+
 
   createDeliveredTransferResource: (data: Omit<DeliveredTransferResource, "id">) => apiRequest<unknown>("/delivered-transfer-resources", {
     method: "POST",

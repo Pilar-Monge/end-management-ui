@@ -14,6 +14,15 @@ export type ExpeditionStatus =
   | 'RETURNED_AFTER_LOST'
   | 'CANCELED'
 
+export interface CurrentUserProfile {
+  id: number
+  username: string
+  email: string
+  role: 'WORKER' | 'RESOURCE_MANAGEMENT' | 'TRAVEL_MANAGER' | 'SYSTEM_ADMIN'
+  status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED'
+  campId: number
+}
+
 export interface WorkerNotification {
   id: number
   campId: number
@@ -49,6 +58,19 @@ export interface WorkerOccupation {
   preferredWorkers: number | null
   criticalThresholdPercent: string
   createdAt: string
+}
+
+export interface WorkerDailyCollectionRecord {
+  id: number
+  campId: number
+  personId: number
+  resourceTypeId: number
+  date: string
+  expectedAmount: string
+  actualAmount: string
+  differenceReason: string | null
+  recordedBy: number
+  movementId: number | null
 }
 
 export interface WorkerOccupationCoverage {
@@ -97,17 +119,4 @@ export interface WorkerAutoAssignmentResult {
     fromOccupation: string
     toOccupation: string
   }
-}
-
-export interface WorkerDailyCollectionRecord {
-  id: number
-  campId: number
-  personId: number
-  resourceTypeId: number
-  date: string
-  expectedAmount: string
-  actualAmount: string
-  differenceReason: string | null
-  recordedBy: number
-  movementId: number | null
 }
