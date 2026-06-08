@@ -17,6 +17,8 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /opt/repos/end-management-ui
+            git reset --hard HEAD
             git pull origin main
+
             cd /opt/deploy/end-management
-            ./deploy.sh build
+            docker-compose --env-file .env.production -f docker-compose.prod.yml up -d --build frontend
