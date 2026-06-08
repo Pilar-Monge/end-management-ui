@@ -624,6 +624,7 @@ function resolvePersonOccupationLabel(person: Person | null | undefined, occupat
 function legacyPopulationStatus(status: Person["status"]): "Activo" | "Herido" | "Enfermo" | "Fuera" {
   if (status === "ACTIVE") return "Activo";
   if (status === "INJURED") return "Herido";
+  if (status === "SICK") return "Enfermo";
   return "Fuera";
 }
 
@@ -1409,6 +1410,7 @@ export default function AdminDashboardPage() {
         "success",
         decision === "approved" ? "Admision aprobada correctamente." : "Admision rechazada correctamente.",
       );
+      await loadCoreData();
     } catch (error) {
       setDataError(getErrorMessage(error, "update_admission"));
     }
@@ -2922,6 +2924,7 @@ const PopulationModule = memo(function PopulationModule({
       });
 
       setAssignments(await loadTempAssignments());
+      await onReload();
       setRevocationTargetId(null);
       setRevocationReason("");
       onNotice("poblacion", "success", "Asignación creada y usuario notificado por correo.");
@@ -2977,6 +2980,7 @@ const PopulationModule = memo(function PopulationModule({
       });
 
       setAssignments(await loadTempAssignments());
+      await onReload();
       setRevocationTargetId(null);
       setRevocationReason("");
       onNotice("poblacion", "success", "Asignación revocada y usuario notificado por correo.");

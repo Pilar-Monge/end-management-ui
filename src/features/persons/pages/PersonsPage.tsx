@@ -1,14 +1,26 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { EmptyState, ErrorState, LoadingSkeleton } from '../../catalogs/components/StateComponents'
-import { usePersons, usePersonsStats } from '../api/queries'
+import { usePersons } from '../api/queries'
 import type { Person } from '../types'
 import { usePersonForm } from '../hooks/usePersonForm'
 import { usePersonFiltering, STATUS_OPTIONS } from '../hooks/usePersonFiltering'
 
 export function PersonsPage() {
   const { data: persons = [], isLoading, error, refetch } = usePersons()
-  const { data: stats } = usePersonsStats()
+
+  const stats = useMemo(() => {
+    const totalPersons = persons.length
+    const activePersons = persons.filter((p) => p.status === 'ACTIVE').length
+    const injuredPersons = persons.filter((p) => p.status === 'INJURED').length
+    const missingPersons = persons.filter((p) => p.status === 'OUTSIDE_CAMP' || p.status === 'ON_EXPEDITION').length
+    return {
+      totalPersons,
+      activePersons,
+      injuredPersons,
+      missingPersons,
+    }
+  }, [persons])
 
   const {
     showForm,
