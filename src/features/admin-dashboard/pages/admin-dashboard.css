@@ -4611,3 +4611,80 @@
     grid-column: auto;
   }
 }
+
+@media (max-height: 600px) and (orientation: landscape) {
+  /* 1. Optimización del Contenedor de Modales */
+  .admin-ui-v2-modal-backdrop {
+  }
+
+  .admin-ui-v2-modal {
+    max-height: 96vh;
+    padding: 12px 18px;
+    gap: 8px;
+  }
+
+  /* 2. Reducción de Escala en Ficha de Persona */
+  .admin-ui-v2-person-modal-body {
+    gap: 8px;
+    grid-template-columns: 100px minmax(0, 1fr); /* Compacta columna de foto */
+  }
+
+  .admin-ui-v2-person-modal-avatar {
+    height: 48px; /* Reduce tamaño del avatar */
+    width: 48px;
+    font-size: 13px;
+  }
+
+  .admin-ui-v2-person-modal-photo-panel {
+    padding: 6px;
+    gap: 4px;
+  }
+
+  .admin-ui-v2-person-modal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); /* Mantiene 2 columnas pero más compactas */
+    gap: 4px;
+  }
+
+  .admin-ui-v2-person-modal-grid > div,
+  .admin-ui-v2-person-modal-achievements,
+  .admin-ui-v2-person-modal-notes {
+    padding: 4px 6px;
+  }
+
+  .admin-ui-v2-person-modal-title h2 {
+    font-size: 13px;
+  }
+
+  /* 3. Rediseño del Formulario de Edición de Persona */
+  .admin-ui-v2-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); /* Grid de 2 columnas compacto */
+    gap: 6px;
+    max-height: 52vh; /* Permite scroll interno si el formulario es muy largo */
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  /* 4. Optimización de Admisiones IA (Modal Bilateral) */
+  .admin-ui-v2-adm-detail {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Coloca la ficha a la izquierda y el formulario de aprobación a la derecha */
+    gap: 12px;
+    align-items: start;
+  }
+
+  .admin-ui-v2-adm-detail img.admin-ui-v2-settings-photo-preview {
+    max-height: 80px;
+    object-fit: cover;
+    grid-column: span 2; /* Centra la foto arriba en el layout */
+  }
+
+  .admin-ui-v2-adm-detail > div {
+    font-size: 11px;
+  }
+
+  /* 5. Reducción de Espaciado General en Contenido del Dashboard */
+  .inner-content {
+    padding: 12px 16px;
+  }
+}
+
