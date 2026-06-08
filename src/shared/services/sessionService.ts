@@ -28,23 +28,18 @@ export class SessionService {
   }
 
   private clearSession(): void {
-    localStorage.removeItem('token')
-    localStorage.removeItem('accessToken')
     localStorage.removeItem('user')
     localStorage.removeItem('admin_settings_v2')
     window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
   }
 
-  private async checkSession(): Promise<string | null> {
+  private async checkSession(): Promise<boolean> {
     try {
-      const token = this.getToken()
-      if (!token) return null
-
       const response = await fetch(`${BASE_URL}/auth/check-session`, {
         method: 'GET',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
       })
 
@@ -52,23 +47,13 @@ export class SessionService {
         if (response.status === 401) {
           this.expireSession()
         }
-        return null
+        return false
       }
 
-      const authHeader = response.headers.get('Authorization')
-      if (authHeader) {
-        const token = authHeader.replace(/^Bearer\s+/i, '').trim()
-        if (token) {
-          this.saveToken(token)
-          this.onTokenRefreshed?.()
-          return token
-        }
-      }
-
-      return token
+      return true
     } catch (error) {
       console.error('Error checking session:', error)
-      return null
+      return false
     }
   }
 
@@ -120,7 +105,7 @@ export class SessionService {
     this.onSessionExpired = onSessionExpired
     this.onTokenRefreshed = onTokenRefreshed
 
-    if (!this.getToken()) {
+    if (!this.isTokenValid()) {
       return
     }
 
@@ -162,7 +147,7 @@ export class SessionService {
   }
 
   public isTokenValid(): boolean {
-    return !!this.getToken()
+    return !!localStorage.getItem('user')
   }
 }
 

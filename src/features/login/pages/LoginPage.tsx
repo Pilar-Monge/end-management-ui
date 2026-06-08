@@ -94,12 +94,10 @@ export default function LoginPage() {
       const token = response.token ?? response.accessToken
       const savedPath = localStorage.getItem('last_secure_path')
 
-      if (!token) {
-        throw new Error('No se recibió token de acceso')
+      if (token) {
+        localStorage.setItem('token', token)
+        localStorage.setItem('accessToken', token)
       }
-
-      localStorage.setItem('token', token)
-      localStorage.setItem('accessToken', token)
       localStorage.setItem('user', JSON.stringify(normalizedUser))
       localStorage.removeItem('admin_settings_v2')
       localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(response.user.campId))
