@@ -2022,6 +2022,7 @@ function ContentArea({
           sub={sub}
           persons={persons}
           camps={campNameById}
+          campCatalog={campCatalog}
           occupations={occupationNameById}
           currentAdminUserId={currentAdminUserId}
           currentAdminPersonId={currentAdminPersonId}
@@ -2422,6 +2423,7 @@ const PopulationModule = memo(function PopulationModule({
   sub,
   persons,
   camps,
+  campCatalog,
   occupations,
   currentAdminUserId,
   currentAdminPersonId,
@@ -2432,6 +2434,7 @@ const PopulationModule = memo(function PopulationModule({
   sub: string;
   persons: Person[];
   camps: Map<number, string>;
+  campCatalog: Camp[];
   occupations: Map<number, string>;
   currentAdminUserId: number | null;
   currentAdminPersonId: number | null;
@@ -2440,7 +2443,10 @@ const PopulationModule = memo(function PopulationModule({
   onNotice: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
 }) {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"Todos" | "Activo" | "Herido" | "Desaparecido" | "Fallecido">("Todos");
+  const [statusFilter, setStatusFilter] = useState<"Todos" | "Activo" | "Herido" | "Enfermo" | "Fuera">("Todos");
+  const [campFilter, setCampFilter] = useState("Todos");
+  const [occupationFilter, setOccupationFilter] = useState("Todos");
+  const [populationViewMode, setPopulationViewMode] = useState<"table" | "cards">("table");
   const [userPage, setUserPage] = useState(1);
   const usersPerPage = 8;
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
@@ -2566,12 +2572,53 @@ const PopulationModule = memo(function PopulationModule({
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8);
   }, [persons, camps]);
 
+  const campById = useMemo(() => new Map(campCatalog.map((camp) => [camp.id, camp])), [campCatalog]);
+
+  const campDensities = useMemo(() => {
+    if (campCatalog.length > 0) {
+      return campCatalog.map((camp) => {
+        const occupied = persons.filter((person) => person.campId === camp.id).length;
+        const capacity = Math.max(1, Number(camp.capacity) || Number(camp.currentPopulation) || occupied || 1);
+        const pct = Math.min(100, Math.round((occupied / capacity) * 100));
+        return { id: camp.id, name: camp.name, zone: camp.location?.zone ?? "N/A", status: camp.status, occupied, capacity, pct };
+      });
+    }
+
+    return sectorDistribution.map(([name, occupied], index) => ({
+      id: index,
+      name,
+      zone: "N/A",
+      status: "ACTIVE" as Camp["status"],
+      occupied,
+      capacity: Math.max(occupied, 1),
+      pct: occupied > 0 ? 100 : 0,
+    }));
+  }, [campCatalog, persons, sectorDistribution]);
+
+  const totalCapacity = useMemo(() => {
+    if (campDensities.length === 0) return Math.max(persons.length, 1);
+    return campDensities.reduce((total, camp) => total + camp.capacity, 0);
+  }, [campDensities, persons.length]);
+
+  const globalOccupancyPercentage = totalCapacity > 0 ? Math.min(100, Math.round((persons.length / totalCapacity) * 100)) : 0;
+
+  const medicalAlerts = useMemo(
+    () => persons.filter((person) => person.status === "SICK" || person.status === "INJURED").slice(0, 4),
+    [persons],
+  );
+
+  const averageAge = persons.length > 0
+    ? (persons.reduce((total, person) => total + (Number(person.age) || 0), 0) / persons.length).toFixed(1)
+    : "0";
+
   const filteredPersons = useMemo(() => {
     const query = search.trim().toLowerCase();
     return persons.filter((person) => {
       const normalizedStatus = legacyPopulationStatus(person.status);
       const matchStatus = statusFilter === "Todos" || normalizedStatus === statusFilter;
       if (!matchStatus) return false;
+      if (campFilter !== "Todos" && person.campId !== Number(campFilter)) return false;
+      if (occupationFilter !== "Todos" && Number(person.occupationId) !== Number(occupationFilter)) return false;
       if (!query) return true;
 
       const name = personFullName(person).toLowerCase();
@@ -2579,7 +2626,7 @@ const PopulationModule = memo(function PopulationModule({
       const sector = (camps.get(person.campId) ?? "").toLowerCase();
       return name.includes(query) || role.includes(query) || sector.includes(query);
     });
-  }, [persons, search, statusFilter, occupations, camps]);
+  }, [persons, search, statusFilter, campFilter, occupationFilter, occupations, camps]);
 
   const assignCandidates = useMemo(() => {
     const query = assignSearch.trim().toLowerCase();
@@ -2642,7 +2689,7 @@ const PopulationModule = memo(function PopulationModule({
 
   useEffect(() => {
     setUserPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, campFilter, occupationFilter]);
 
   useEffect(() => {
     if (userPage > userTotalPages) {
@@ -2922,20 +2969,6 @@ const PopulationModule = memo(function PopulationModule({
     }
   };
 
-  const legacyFilterFromStatus = (value: typeof statusFilter): "Todos" | "Activo" | "Herido" | "Enfermo" | "Fuera" => {
-    if (value === "Todos") return "Todos";
-    if (value === "Activo") return "Activo";
-    if (value === "Herido") return "Herido";
-    return "Fuera";
-  };
-
-  const legacyToStatusFilter = (value: "Todos" | "Activo" | "Herido" | "Enfermo" | "Fuera"): typeof statusFilter => {
-    if (value === "Todos") return "Todos";
-    if (value === "Activo") return "Activo";
-    if (value === "Herido") return "Herido";
-    return "Desaparecido";
-  };
-
   const statusPillFromLegacy = (value: "Activo" | "Herido" | "Enfermo" | "Fuera") => {
     if (value === "Activo") return "is-ok";
     if (value === "Herido") return "is-warn";
@@ -2963,37 +2996,124 @@ const PopulationModule = memo(function PopulationModule({
     <div className="admin-ui-v2-population">
       {sub === "Estadísticas" && (
         <>
-          <div className="admin-ui-v2-grid admin-ui-v2-grid-4">
-            <MetricCard label="Activo" value={legacyCounts.Activo} tone="ok" />
-            <MetricCard label="Herido" value={legacyCounts.Herido} tone="warn" />
-            <MetricCard label="Enfermo" value={legacyCounts.Enfermo} tone="warn" />
-            <MetricCard label="Fuera" value={legacyCounts.Fuera} tone="danger" />
-          </div>
-
-          <div className="admin-ui-v2-grid admin-ui-v2-grid-2">
-            <div className="admin-ui-v2-module-card">
-              <h3>Distribución por Rol</h3>
-              <div className="admin-ui-v2-stat-list">
-                {roleDistribution.map(([role, total]) => (
-                  <div key={role} className="admin-ui-v2-stat-row">
-                    <span>{role}</span>
-                    <strong>{total}</strong>
-                  </div>
-                ))}
-                {roleDistribution.length === 0 && <div className="admin-ui-v2-muted">No hay roles disponibles.</div>}
+          <div className="admin-ui-v2-pop-overview-band">
+            <div className="admin-ui-v2-grid admin-ui-v2-grid-4 admin-ui-v2-pop-kpi-grid">
+              <div className="admin-ui-v2-metric info admin-ui-v2-dashboard-metric">
+                <span className="admin-ui-v2-metric-label">Censo total</span>
+                <span className="admin-ui-v2-metric-value">{persons.length}</span>
+                <span className="admin-ui-v2-metric-detail">Personas registradas</span>
+              </div>
+              <div className="admin-ui-v2-metric ok admin-ui-v2-dashboard-metric">
+                <span className="admin-ui-v2-metric-label">Operativos</span>
+                <span className="admin-ui-v2-metric-value">{legacyCounts.Activo}</span>
+                <span className="admin-ui-v2-metric-detail">Estado disponible</span>
+              </div>
+              <div className="admin-ui-v2-metric warn admin-ui-v2-dashboard-metric">
+                <span className="admin-ui-v2-metric-label">Atención médica</span>
+                <span className="admin-ui-v2-metric-value">{legacyCounts.Herido + legacyCounts.Enfermo}</span>
+                <span className="admin-ui-v2-metric-detail">Heridos y enfermos</span>
+              </div>
+              <div className="admin-ui-v2-metric danger admin-ui-v2-dashboard-metric">
+                <span className="admin-ui-v2-metric-label">Fuera de base</span>
+                <span className="admin-ui-v2-metric-value">{legacyCounts.Fuera}</span>
+                <span className="admin-ui-v2-metric-detail">Expedición o inactivo</span>
               </div>
             </div>
 
-            <div className="admin-ui-v2-module-card">
-              <h3>Ocupación por Sector</h3>
-              <div className="admin-ui-v2-stat-list">
-                {sectorDistribution.map(([sector, total]) => (
-                  <div key={sector} className="admin-ui-v2-stat-row">
-                    <span>{sector}</span>
-                    <strong>{total}</strong>
+            <div className="admin-ui-v2-module-card admin-ui-v2-pop-density-card">
+              <div className="admin-ui-v2-section-head">
+                <span>Densidad poblacional</span>
+                <span className={`admin-ui-v2-pill ${globalOccupancyPercentage >= 80 ? "is-danger" : globalOccupancyPercentage >= 50 ? "is-warn" : "is-ok"}`}>{globalOccupancyPercentage}% red</span>
+              </div>
+              <div className="admin-ui-v2-threat-meter">
+                <div className="admin-ui-v2-threat-value">{globalOccupancyPercentage}%</div>
+                <div className="admin-ui-v2-threat-track">
+                  <span className={globalOccupancyPercentage >= 80 ? "is-danger" : globalOccupancyPercentage >= 50 ? "is-warn" : "is-ok"} style={{ width: `${globalOccupancyPercentage}%` }} />
+                </div>
+              </div>
+              <p>{persons.length} / {totalCapacity} camas ocupadas. Evita saturación crítica en los nodos activos.</p>
+            </div>
+          </div>
+
+          <div className="admin-ui-v2-pop-stats-grid">
+            <div className="admin-ui-v2-module-card admin-ui-v2-pop-stat-panel">
+              <div className="admin-ui-v2-section-head">
+                <span>Densidad y saturación por nodo</span>
+                <span>Alojamiento</span>
+              </div>
+              <div className="admin-ui-v2-pop-density-list">
+                {campDensities.map((camp) => (
+                  <div key={`${camp.id}-${camp.name}`} className="admin-ui-v2-pop-density-row">
+                    <div className="admin-ui-v2-pop-density-row-head">
+                      <div>
+                        <strong>{camp.name}</strong>
+                        <span>Zona: {camp.zone}</span>
+                      </div>
+                      <em>{camp.occupied} / {camp.capacity} camas ({camp.pct}%)</em>
+                    </div>
+                    <div className="admin-ui-v2-pop-meter"><span className={camp.pct >= 85 ? "is-danger" : camp.pct >= 50 ? "is-warn" : "is-ok"} style={{ width: `${camp.pct}%` }} /></div>
+                    <div className="admin-ui-v2-pop-density-row-foot">
+                      <span>{Math.max(camp.capacity - camp.occupied, 0)} camas libres</span>
+                      <span>{camp.status === "COMPROMISED" ? "Nodo comprometido" : camp.pct >= 80 ? "Capacidad al límite" : "Nodo operativo"}</span>
+                    </div>
                   </div>
                 ))}
-                {sectorDistribution.length === 0 && <div className="admin-ui-v2-muted">No hay sectores disponibles.</div>}
+                {campDensities.length === 0 && <div className="admin-ui-v2-muted">No hay nodos disponibles.</div>}
+              </div>
+            </div>
+
+            <div className="admin-ui-v2-module-card admin-ui-v2-pop-stat-panel">
+              <div className="admin-ui-v2-section-head">
+                <span>Demografía y alertas clínicas</span>
+                <span>Reporte</span>
+              </div>
+              <div className="admin-ui-v2-pop-demography-grid">
+                <div>
+                  <span>Edad promedio</span>
+                  <strong>{averageAge}<small> años</small></strong>
+                </div>
+                <div>
+                  <span>Disponibilidad sanitaria</span>
+                  <strong>{persons.length > 0 ? Math.round((legacyCounts.Activo / persons.length) * 100) : 100}<small>%</small></strong>
+                </div>
+              </div>
+              <div className="admin-ui-v2-pop-alert-stack">
+                {medicalAlerts.map((person) => (
+                  <button key={person.id} className="admin-ui-v2-pop-alert-row" type="button" onClick={() => openPersonModal(person, false)}>
+                    <div>
+                      <strong>{personFullName(person)}</strong>
+                      <span>{person.notes || "Reporte sin descripción clínica."}</span>
+                    </div>
+                    <span className={`admin-ui-v2-pill ${person.status === "SICK" ? "is-danger" : "is-warn"}`}>{legacyPopulationStatus(person.status)}</span>
+                  </button>
+                ))}
+                {medicalAlerts.length === 0 && <div className="admin-ui-v2-empty-cell">Sin alertas sanitarias activas.</div>}
+              </div>
+            </div>
+
+            <div className="admin-ui-v2-module-card admin-ui-v2-pop-workload-card">
+              <div>
+                <div className="admin-ui-v2-section-head">
+                  <span>Proporción de fuerza técnica</span>
+                  <span>Mano de obra</span>
+                </div>
+                <p>Análisis dinámico de oficios registrados para detectar concentración operativa y brechas de asignación.</p>
+                <div className="admin-ui-v2-pop-workload-summary">
+                  <div><span>Personal operativo</span><strong>{legacyCounts.Activo} pers.</strong></div>
+                  <div><span>Personal con atención</span><strong>{legacyCounts.Herido + legacyCounts.Enfermo} pers.</strong></div>
+                </div>
+              </div>
+              <div className="admin-ui-v2-pop-role-bars">
+                {roleDistribution.map(([role, total]) => {
+                  const pct = persons.length > 0 ? Math.round((total / persons.length) * 100) : 0;
+                  return (
+                    <div key={role}>
+                      <div><span>{role}</span><strong>{total} ({pct}%)</strong></div>
+                      <div className="admin-ui-v2-pop-meter"><span className="is-info" style={{ width: `${pct}%` }} /></div>
+                    </div>
+                  );
+                })}
+                {roleDistribution.length === 0 && <div className="admin-ui-v2-muted">No hay roles disponibles.</div>}
               </div>
             </div>
           </div>
@@ -3002,118 +3122,182 @@ const PopulationModule = memo(function PopulationModule({
 
       {sub === "Usuarios" && (
         <>
-          <div className="admin-ui-v2-toolbar admin-ui-v2-toolbar-population">
-            <input
-              className="v-input admin-ui-v2-search"
-              placeholder="Buscar por nombre, rol o sector"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <div className="admin-ui-v2-filter-group">
-              {(["Todos", "Activo", "Herido", "Enfermo", "Fuera"] as const).map((legacyFilter) => (
-                <button
-                  key={legacyFilter}
-                  className={`admin-ui-v2-btn ${legacyFilterFromStatus(statusFilter) === legacyFilter ? "is-info" : ""}`}
-                  onClick={() => setStatusFilter(legacyToStatusFilter(legacyFilter))}
-                  type="button"
-                >
-                  {legacyFilter}
-                </button>
-              ))}
-            </div>
-          </div>
+          <div className="admin-ui-v2-pop-users-layout">
+            <div className="admin-ui-v2-pop-users-main">
+              <div className="admin-ui-v2-pop-status-bar">
+                <span>Estado:</span>
+                {(["Todos", "Activo", "Herido", "Enfermo", "Fuera"] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    className={`admin-ui-v2-pop-status-btn ${statusFilter === filter ? "is-active" : ""} is-${filter === "Activo" ? "ok" : filter === "Herido" || filter === "Enfermo" ? "warn" : filter === "Fuera" ? "danger" : "neutral"}`}
+                    onClick={() => setStatusFilter(filter)}
+                    type="button"
+                  >
+                    <span>{filter}</span>
+                    <strong>{filter === "Todos" ? persons.length : legacyCounts[filter]}</strong>
+                  </button>
+                ))}
+              </div>
 
-          <table className="v-table admin-ui-v2-table">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Rol</th>
-                <th>Estado</th>
-                <th>Cuenta</th>
-                <th>Edad</th>
-                <th>Sector</th>
-                <th>Ingreso</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagedPersons.map((person) => {
-                const profileImage = resolvePersonProfileImage(person);
-                const isOwnRecord = isCurrentAdminPerson(person.id);
-                return (
-                  <tr key={person.id}>
-                    <td>
-                      <div className="admin-ui-v2-person-cell">
-                        {profileImage ? (
-                          <img
-                            src={profileImage}
-                            alt={`Perfil de ${personFullName(person)}`}
-                            className="admin-ui-v2-person-avatar"
-                            loading="lazy"
-                            decoding="async"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <span className="admin-ui-v2-person-avatar admin-ui-v2-avatar-fallback" aria-hidden="true">
-                            {personInitials(person)}
-                          </span>
-                        )}
-                        <span>{personFullName(person)}</span>
-                      </div>
-                    </td>
-                    <td>{resolvePersonOccupationLabel(person, occupations)}</td>
-                    <td>
-                      <span className={`admin-ui-v2-pill ${statusPillFromLegacy(legacyPopulationStatus(person.status))}`}>
-                        {legacyPopulationStatus(person.status)}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`admin-ui-v2-pill ${accountStatusPill(person.accountStatus)}`}>
-                        {normalizeAccountStatus(person.accountStatus)}
-                      </span>
-                    </td>
-                    <td>{person.age}</td>
-                    <td>{camps.get(person.campId) ?? `Camp #${person.campId}`}</td>
-                    <td>{new Date(person.admissionDate).toLocaleDateString("es-CR")}</td>
-                    <td>
-                      <div className="admin-ui-v2-actions">
-                        <button className="admin-ui-v2-btn" onClick={() => openPersonModal(person, false)} type="button">Ver</button>
-                        <button className="admin-ui-v2-btn is-info" onClick={() => openPersonModal(person, true)} type="button" disabled={isOwnRecord} title={isOwnRecord ? "Edita tu perfil desde Configuracion" : undefined}>Editar</button>
-                        <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(person.id)} type="button" disabled={isOwnRecord} title={isOwnRecord ? "No puedes eliminar tu propio registro" : undefined}>Eliminar</button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {filteredPersons.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="admin-ui-v2-empty-cell">No hay personas para mostrar con esos filtros.</td>
-                </tr>
+              <div className="admin-ui-v2-toolbar admin-ui-v2-toolbar-population admin-ui-v2-pop-toolbar">
+                <input className="v-input admin-ui-v2-search" placeholder="Buscar por nombre, rol o sector" value={search} onChange={(event) => setSearch(event.target.value)} />
+                <select className="v-select" value={campFilter} onChange={(event) => setCampFilter(event.target.value)}>
+                  <option value="Todos">Campamento (Todos)</option>
+                  {Array.from(camps.entries()).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                </select>
+                <select className="v-select" value={occupationFilter} onChange={(event) => setOccupationFilter(event.target.value)}>
+                  <option value="Todos">Oficio (Todos)</option>
+                  {Array.from(occupations.entries()).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                </select>
+                <div className="admin-ui-v2-pop-view-toggle" aria-label="Modo de vista">
+                  <button className={populationViewMode === "table" ? "is-active" : ""} type="button" onClick={() => setPopulationViewMode("table")}>Tabla</button>
+                  <button className={populationViewMode === "cards" ? "is-active" : ""} type="button" onClick={() => setPopulationViewMode("cards")}>Tarjetas</button>
+                </div>
+              </div>
+
+              {populationViewMode === "table" ? (
+                <div className="admin-ui-v2-pop-table-shell">
+                  <table className="v-table admin-ui-v2-table admin-ui-v2-pop-table">
+                    <thead>
+                      <tr>
+                        <th>Usuario / Alias</th>
+                        <th>ID</th>
+                        <th>Edad</th>
+                        <th>Oficio asignado</th>
+                        <th>Campamento</th>
+                        <th>Ingreso</th>
+                        <th>Estado</th>
+                        <th>Cuenta</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedPersons.map((person) => {
+                        const profileImage = resolvePersonProfileImage(person);
+                        const isOwnRecord = isCurrentAdminPerson(person.id);
+                        const camp = campById.get(person.campId);
+                        return (
+                          <tr key={person.id} className="admin-ui-v2-pop-table-row" onClick={() => openPersonModal(person, false)}>
+                            <td>
+                              <div className="admin-ui-v2-person-cell admin-ui-v2-pop-person-cell">
+                                {profileImage ? (
+                                  <img src={profileImage} alt={`Perfil de ${personFullName(person)}`} className="admin-ui-v2-person-avatar" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <span className="admin-ui-v2-person-avatar admin-ui-v2-avatar-fallback" aria-hidden="true">{personInitials(person)}</span>
+                                )}
+                                <span><strong>{personFullName(person)}</strong><small>{person.alias ? `Alias: ${person.alias}` : "Ficha demográfica"}</small></span>
+                              </div>
+                            </td>
+                            <td>#{person.id}</td>
+                            <td>{person.age} años</td>
+                            <td>{resolvePersonOccupationLabel(person, occupations)}</td>
+                            <td><span className={camp?.status === "COMPROMISED" ? "admin-ui-v2-pop-danger-text" : undefined}>{camps.get(person.campId) ?? `Camp #${person.campId}`}</span></td>
+                            <td>{new Date(person.admissionDate).toLocaleDateString("es-CR")}</td>
+                            <td><span className={`admin-ui-v2-pill ${statusPillFromLegacy(legacyPopulationStatus(person.status))}`}>{legacyPopulationStatus(person.status)}</span></td>
+                            <td><span className={`admin-ui-v2-pill ${accountStatusPill(person.accountStatus)}`}>{normalizeAccountStatus(person.accountStatus)}</span></td>
+                            <td onClick={(event) => event.stopPropagation()}>
+                              <div className="admin-ui-v2-actions">
+                                <button className="admin-ui-v2-btn" onClick={() => openPersonModal(person, false)} type="button">Ver</button>
+                                <button className="admin-ui-v2-btn is-info" onClick={() => openPersonModal(person, true)} type="button" disabled={isOwnRecord} title={isOwnRecord ? "Edita tu perfil desde Configuracion" : undefined}>Editar</button>
+                                <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(person.id)} type="button" disabled={isOwnRecord} title={isOwnRecord ? "No puedes eliminar tu propio registro" : undefined}>Eliminar</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="admin-ui-v2-pop-card-grid">
+                  {pagedPersons.map((person) => {
+                    const profileImage = resolvePersonProfileImage(person);
+                    const isOwnRecord = isCurrentAdminPerson(person.id);
+                    const camp = campById.get(person.campId);
+                    return (
+                      <article className="admin-ui-v2-pop-card-v2" key={person.id} onClick={() => openPersonModal(person, false)}>
+                        <div className="admin-ui-v2-pop-card-v2-identity">
+                          {profileImage ? (
+                            <img src={profileImage} alt={`Perfil de ${personFullName(person)}`} className="admin-ui-v2-pop-card-v2-img" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+                          ) : (
+                            <span className="admin-ui-v2-pop-card-v2-avatar-fallback">{personInitials(person)}</span>
+                          )}
+                          <div className="admin-ui-v2-pop-card-v2-info">
+                            <h3>{personFullName(person)}</h3>
+                            <span>{resolvePersonOccupationLabel(person, occupations)}</span>
+                          </div>
+                        </div>
+                        <div className="admin-ui-v2-pop-card-v2-meta-grid">
+                          <div><span>Campamento</span><strong className={camp?.status === "COMPROMISED" ? "admin-ui-v2-pop-danger-text" : undefined}>{camps.get(person.campId) ?? `Camp #${person.campId}`}</strong></div>
+                          <div><span>Edad</span><strong>{person.age} años</strong></div>
+                          <div><span>Ingreso</span><strong>{new Date(person.admissionDate).toLocaleDateString("es-CR")}</strong></div>
+                          <div><span>Registro</span><strong>#{person.id}</strong></div>
+                        </div>
+                        <div className="admin-ui-v2-pop-card-v2-badges">
+                          <span className={`admin-ui-v2-pill ${statusPillFromLegacy(legacyPopulationStatus(person.status))}`}>{legacyPopulationStatus(person.status)}</span>
+                          <span className={`admin-ui-v2-pill ${accountStatusPill(person.accountStatus)}`}>{normalizeAccountStatus(person.accountStatus)}</span>
+                        </div>
+                        <p>{person.notes || "Ficha sin anotaciones clínicas o reportes operativos registrados."}</p>
+                        <div className="admin-ui-v2-pop-card-v2-actions" onClick={(event) => event.stopPropagation()}>
+                          <button className="admin-ui-v2-btn is-info" onClick={() => openPersonModal(person, true)} type="button" disabled={isOwnRecord}>Editar ficha</button>
+                          <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(person.id)} type="button" disabled={isOwnRecord}>Eliminar</button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
               )}
-            </tbody>
-          </table>
 
-          <div className="admin-ui-v2-pagination">
-            <span className="admin-ui-v2-muted">Registros: {filteredPersons.length}</span>
-            <div className="admin-ui-v2-actions">
-              <button
-                className="admin-ui-v2-btn"
-                type="button"
-                onClick={() => setUserPage((prev) => Math.max(1, prev - 1))}
-                disabled={userPage <= 1}
-              >
-                Ant
-              </button>
-              <span className="admin-ui-v2-muted">Pág {userPage} / {userTotalPages}</span>
-              <button
-                className="admin-ui-v2-btn"
-                type="button"
-                onClick={() => setUserPage((prev) => Math.min(userTotalPages, prev + 1))}
-                disabled={userPage >= userTotalPages}
-              >
-                Sig
-              </button>
+              {filteredPersons.length === 0 && (
+                <div className="admin-ui-v2-pop-empty">
+                  <p>No hay personas para mostrar con esos filtros.</p>
+                  <button className="admin-ui-v2-btn is-info" type="button" onClick={() => { setSearch(""); setStatusFilter("Todos"); setCampFilter("Todos"); setOccupationFilter("Todos"); }}>Restaurar filtros</button>
+                </div>
+              )}
+
+              <div className="admin-ui-v2-pagination admin-ui-v2-pop-pagination">
+                <span className="admin-ui-v2-muted">Mostrando {filteredPersons.length === 0 ? 0 : (userPage - 1) * usersPerPage + 1} - {Math.min(userPage * usersPerPage, filteredPersons.length)} de {filteredPersons.length}</span>
+                <div className="admin-ui-v2-actions">
+                  <button className="admin-ui-v2-btn" type="button" onClick={() => setUserPage((prev) => Math.max(1, prev - 1))} disabled={userPage <= 1}>Ant</button>
+                  <span className="admin-ui-v2-muted">Pág {userPage} / {userTotalPages}</span>
+                  <button className="admin-ui-v2-btn" type="button" onClick={() => setUserPage((prev) => Math.min(userTotalPages, prev + 1))} disabled={userPage >= userTotalPages}>Sig</button>
+                </div>
+              </div>
             </div>
+
+            <aside className="admin-ui-v2-pop-side-panel">
+              <div className="admin-ui-v2-module-card">
+                <div className="admin-ui-v2-section-head">
+                  <span>Densidad por nodo</span>
+                  <span>Filas</span>
+                </div>
+                <div className="admin-ui-v2-pop-density-list is-compact">
+                  {campDensities.map((camp) => (
+                    <div key={`side-${camp.id}-${camp.name}`} className="admin-ui-v2-pop-density-row">
+                      <div className="admin-ui-v2-pop-density-row-head"><strong>{camp.name}</strong><em>{camp.occupied}/{camp.capacity}</em></div>
+                      <div className="admin-ui-v2-pop-meter"><span className={camp.pct >= 85 ? "is-danger" : camp.pct >= 50 ? "is-warn" : "is-ok"} style={{ width: `${camp.pct}%` }} /></div>
+                      <div className="admin-ui-v2-pop-density-row-foot"><span>{camp.pct}% uso</span><span>{camp.zone}</span></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="admin-ui-v2-module-card admin-ui-v2-priority-card">
+                <div className="admin-ui-v2-section-head">
+                  <span>Alertas sanitarias</span>
+                  <span className="admin-ui-v2-pill is-danger">{medicalAlerts.length} críticas</span>
+                </div>
+                <div className="admin-ui-v2-pop-alert-stack">
+                  {medicalAlerts.map((person) => (
+                    <button key={`side-alert-${person.id}`} className="admin-ui-v2-pop-alert-row" type="button" onClick={() => openPersonModal(person, false)}>
+                      <div><strong>{personFullName(person)}</strong><span>{camps.get(person.campId) ?? `Camp #${person.campId}`} - {person.age} años</span></div>
+                      <span className={`admin-ui-v2-pill ${person.status === "SICK" ? "is-danger" : "is-warn"}`}>{legacyPopulationStatus(person.status)}</span>
+                    </button>
+                  ))}
+                  {medicalAlerts.length === 0 && <div className="admin-ui-v2-empty-cell">Población médica estable.</div>}
+                </div>
+              </div>
+            </aside>
           </div>
         </>
       )}
@@ -3404,7 +3588,7 @@ const PopulationModule = memo(function PopulationModule({
 
       {selectedPerson && (
         <div className="admin-ui-v2-modal-backdrop" onClick={closePersonModal}>
-          <div className="admin-ui-v2-modal" onClick={(event) => event.stopPropagation()}>
+          <div className={`admin-ui-v2-modal ${isEditMode ? "" : "admin-ui-v2-person-modal-shell"}`} onClick={(event) => event.stopPropagation()}>
             <div className="admin-ui-v2-modal-header">
               <h3>{isEditMode ? "Editar Persona" : "Ficha de Persona"}</h3>
               <button className="admin-ui-v2-btn" type="button" onClick={closePersonModal}>Cerrar</button>
@@ -3461,25 +3645,90 @@ const PopulationModule = memo(function PopulationModule({
                   <button className="admin-ui-v2-btn" onClick={() => setIsEditMode(false)} type="button" disabled={isSaving}>Cancelar</button>
                 </div>
               </div>
-            ) : (
-              <div className="admin-ui-v2-person-detail">
-                <div><strong>Nombre:</strong> {personFullName(selectedPerson)}</div>
-                <div><strong>Edad:</strong> {selectedPerson.age}</div>
-                <div><strong>Estado:</strong> {normalizeStatusLabel(selectedPerson.status)}</div>
-                <div><strong>Estado de cuenta:</strong> {selectedPerson.accountStatus ?? "ACTIVE"}</div>
-                <div><strong>Rol:</strong> {resolvePersonOccupationLabel(selectedPerson, occupations)}</div>
-                <div><strong>Sector:</strong> {camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}</div>
-                <div><strong>Ingreso:</strong> {new Date(selectedPerson.admissionDate).toLocaleDateString("es-CR")}</div>
-                <div><strong>Notas:</strong> {selectedPerson.notes || "Sin notas"}</div>
-                <div className="admin-ui-v2-actions">
-                  {isCurrentAdminPerson(selectedPerson.id) && (
-                    <div className="admin-ui-v2-muted">Tu propio perfil se edita desde Configuracion.</div>
-                  )}
-                  <button className="admin-ui-v2-btn is-info" onClick={() => setIsEditMode(true)} type="button" disabled={isCurrentAdminPerson(selectedPerson.id)}>Editar</button>
-                  <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(selectedPerson.id)} type="button" disabled={isSaving || isCurrentAdminPerson(selectedPerson.id)}>Eliminar</button>
+            ) : (() => {
+              const selectedCamp = campById.get(selectedPerson.campId);
+              const selectedImage = resolvePersonProfileImage(selectedPerson);
+              const selectedStatus = legacyPopulationStatus(selectedPerson.status);
+              const isOwnRecord = isCurrentAdminPerson(selectedPerson.id);
+              const achievementIds = selectedPerson.achievementIds ?? [];
+              const formattedAdmissionDate = selectedPerson.admissionDate
+                ? new Date(selectedPerson.admissionDate).toLocaleDateString("es-CR", { day: "numeric", month: "long", year: "numeric" })
+                : "No especificado";
+
+              return (
+                <div className="admin-ui-v2-person-modal">
+                  <div className="admin-ui-v2-person-modal-head">
+                    <span>Ficha demográfica detallada</span>
+                    <strong>Registro #{selectedPerson.id}</strong>
+                  </div>
+
+                  <div className="admin-ui-v2-person-modal-body">
+                    <aside className="admin-ui-v2-person-modal-photo-panel">
+                      <span>Foto de identificación</span>
+                      {selectedImage ? (
+                        <img src={selectedImage} alt={`Perfil de ${personFullName(selectedPerson)}`} className="admin-ui-v2-person-modal-avatar" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="admin-ui-v2-person-modal-avatar admin-ui-v2-avatar-fallback">{personInitials(selectedPerson)}</div>
+                      )}
+                      <div className="admin-ui-v2-person-modal-registry">
+                        <small>Registro único</small>
+                        <strong>#{selectedPerson.id}</strong>
+                      </div>
+                      <div className="admin-ui-v2-person-modal-status">
+                        <small>Sinopsis clínica</small>
+                        <span className={`admin-ui-v2-pill ${statusPillFromLegacy(selectedStatus)}`}>{selectedStatus}</span>
+                      </div>
+                    </aside>
+
+                    <section className="admin-ui-v2-person-modal-info">
+                      <div className="admin-ui-v2-person-modal-title">
+                        {selectedPerson.alias && <span>Alias: {selectedPerson.alias}</span>}
+                        <h2>{personFullName(selectedPerson)}</h2>
+                        <p>Ingresó formalmente el {formattedAdmissionDate}</p>
+                      </div>
+
+                      <div className="admin-ui-v2-person-modal-grid">
+                        <div><span>Edad</span><strong>{selectedPerson.age} años</strong></div>
+                        <div>
+                          <span>Nodo campamento</span>
+                          <strong className={selectedCamp?.status === "COMPROMISED" ? "admin-ui-v2-pop-danger-text" : undefined}>{camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}</strong>
+                          <small>Zona: {selectedCamp?.location?.zone ?? "N/A"} | Capacidad: {selectedCamp?.capacity ?? "N/A"}</small>
+                        </div>
+                        <div>
+                          <span>Oficio asignado</span>
+                          <strong>{resolvePersonOccupationLabel(selectedPerson, occupations)}</strong>
+                          <small>{selectedPerson.occupation?.description ?? "Sin descripción de operaciones registrada."}</small>
+                        </div>
+                        <div><span>Identificación</span><strong>{selectedPerson.identificationNumber || "No registrada"}</strong></div>
+                        <div><span>Cuenta</span><strong>{normalizeAccountStatus(selectedPerson.accountStatus)}</strong></div>
+                        <div><span>Rol de sistema</span><strong>{selectedPerson.accountRole ?? "WORKER"}</strong></div>
+                      </div>
+
+                      {achievementIds.length > 0 && (
+                        <div className="admin-ui-v2-person-modal-achievements">
+                          <span>Condecoraciones / logros</span>
+                          <div>
+                            {achievementIds.map((achievementId) => <em key={achievementId}>Logro táctico #{achievementId}</em>)}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="admin-ui-v2-person-modal-notes">
+                        <span>Observaciones clínicas y de campo</span>
+                        <p>{selectedPerson.notes && selectedPerson.notes.trim() ? selectedPerson.notes : "Ficha sin anotaciones clínicas o reportes operativos registrados."}</p>
+                      </div>
+                    </section>
+                  </div>
+
+                  <div className="admin-ui-v2-person-modal-footer">
+                    {isOwnRecord && <span className="admin-ui-v2-muted">Tu propio perfil se edita desde Configuracion.</span>}
+                    <button className="admin-ui-v2-btn" onClick={closePersonModal} type="button">Cerrar</button>
+                    <button className="admin-ui-v2-btn is-info" onClick={() => setIsEditMode(true)} type="button" disabled={isOwnRecord}>Editar ficha</button>
+                    <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(selectedPerson.id)} type="button" disabled={isSaving || isOwnRecord}>Eliminar</button>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       )}
