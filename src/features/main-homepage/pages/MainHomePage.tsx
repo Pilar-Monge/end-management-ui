@@ -159,8 +159,12 @@ export function MainHomePage() {
     appState === 'login' ||
     appState === 'register' ||
     appState === 'global-map'
-  const shouldMountScene =
-    appState !== 'landing' && appState !== 'login' && appState !== 'register'
+  const shouldMountScene = appState !== 'landing'
+  const shouldShowSceneNav =
+    shouldMountScene &&
+    appState !== 'login' &&
+    appState !== 'register' &&
+    appState !== 'global-map'
 
   useEffect(() => {
     if (appState === 'global-map') {
@@ -309,12 +313,10 @@ export function MainHomePage() {
       const token = response.token ?? response.accessToken
       const savedPath = localStorage.getItem('last_secure_path')
 
-      if (!token) {
-        throw new Error('No se recibio token de acceso')
+      if (token) {
+        localStorage.setItem('token', token)
+        localStorage.setItem('accessToken', token)
       }
-
-      localStorage.setItem('token', token)
-      localStorage.setItem('accessToken', token)
       window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
       localStorage.setItem('user', JSON.stringify(normalizedUser))
       localStorage.removeItem('admin_settings_v2')
@@ -719,7 +721,8 @@ export function MainHomePage() {
       alpha: false,
     })
     renderer.setSize(window.innerWidth, window.innerHeight)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    const renderPixelRatioLimit = window.innerWidth < 900 || window.innerHeight < 600 ? 1.25 : 1.5
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, renderPixelRatioLimit))
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFShadowMap
     renderer.setClearColor(0x000000, 1)
@@ -1314,8 +1317,11 @@ export function MainHomePage() {
     setIsSceneReady(true)
 
     let frame = 0
+    let animationFrameId = 0
+    let isDisposed = false
     const animate = () => {
-      requestAnimationFrame(animate)
+      if (isDisposed) return
+      animationFrameId = requestAnimationFrame(animate)
 
       const paused = isPausedRef.current
       const appSt = appStateRef.current
@@ -1478,37 +1484,6 @@ export function MainHomePage() {
           }
         }
 
-        if (mistRef.current) {
-          const pos = mistRef.current.geometry.attributes.position.array as Float32Array
-          const count = pos.length / 3
-          for (let i = 0; i < count; i++) {
-            const idx = i * 3
-
-            pos[idx] += 0.15
-
-            pos[idx + 1] += Math.sin(frame * 0.3 + i) * 0.03
-
-            if (pos[idx] > 600) pos[idx] = -600
-            if (pos[idx + 1] > 80) pos[idx + 1] = 0
-          }
-          mistRef.current.geometry.attributes.position.needsUpdate = true
-        }
-
-        if (cloudGroupRef.current) {
-          cloudGroupRef.current.children.forEach((cloud, i) => {
-            cloud.position.x += 0.05
-            cloud.position.y += Math.sin(frame * 0.2 + i) * 0.02
-            if (cloud.position.x > 800) cloud.position.x = -800
-          })
-        }
-
-        if (treeGroupRef.current) {
-          treeGroupRef.current.children.forEach((tree, i) => {
-            tree.rotation.x = Math.sin(frame + i) * 0.02
-            tree.rotation.z = Math.cos(frame * 0.8 + i) * 0.02
-          })
-        }
-
         if (appSt === 'explore') {
           coordsRef.current = {
             lat: 9.9281 + camera.position.z / 5000,
@@ -1522,7 +1497,9 @@ export function MainHomePage() {
         }
       }
 
-      renderer.render(scene, camera)
+      if (!isDisposed) {
+        renderer.render(scene, camera)
+      }
     }
     animate()
 
@@ -1534,7 +1511,7 @@ export function MainHomePage() {
       camera.aspect = width / height
       camera.updateProjectionMatrix()
       renderer.setSize(width, height)
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, renderPixelRatioLimit))
     }
 
     const resizeObserver = new ResizeObserver(() => {
@@ -1549,6 +1526,8 @@ export function MainHomePage() {
     onResize()
 
     return () => {
+      isDisposed = true
+      cancelAnimationFrame(animationFrameId)
       resizeObserver.disconnect()
       window.removeEventListener('resize', onResize)
       window.removeEventListener('mousemove', onMouseMove)
@@ -1561,8 +1540,38 @@ export function MainHomePage() {
       window.removeEventListener('keyup', onKeyUp)
       controls.dispose()
       fpControls.dispose()
+      scene.traverse((object) => {
+        if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.LineSegments) {
+          object.geometry?.dispose()
+          const materials = Array.isArray(object.material) ? object.material : [object.material]
+          materials.forEach((material) => {
+            if (!material) return
+            Object.values(material).forEach((value) => {
+              if (value instanceof THREE.Texture) value.dispose()
+            })
+            material.dispose()
+          })
+        }
+      })
       renderer.dispose()
       renderer.domElement.parentElement?.removeChild(renderer.domElement)
+      sceneRef.current = null
+      cameraRef.current = null
+      rendererRef.current = null
+      controlsRef.current = null
+      fpControlsRef.current = null
+      treeGroupRef.current = null
+      birdsRef.current = null
+      threatsRef.current = null
+      starsRef.current = null
+      rainRef.current = null
+      sunRef.current = null
+      sunGlowRef.current = null
+      moonRef.current = null
+      moonGlowRef.current = null
+      cloudGroupRef.current = null
+      godRaysRef.current = null
+      mistRef.current = null
     }
   }, [shouldMountScene])
 
@@ -1591,7 +1600,7 @@ export function MainHomePage() {
 
       {}
       <AnimatePresence>
-        {shouldMountScene && appState !== 'global-map' && (
+        {shouldShowSceneNav && (
           <motion.nav
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -2072,7 +2081,7 @@ export function MainHomePage() {
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 50 }}
-              animate={{ scale: 1, opacity: 1, y: -40 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1] }}
               className="login-flow-dialog w-[1000px] max-w-[92vw] h-[580px] max-h-[82vh] flex flex-col-reverse md:flex-row relative panel-brush panel-contrast-accent overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.8)]"
             >

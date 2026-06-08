@@ -86,6 +86,35 @@
   animation: pulse-green 2s infinite;
 }
 
+.login-flow-dialog {
+  overflow: visible;
+}
+
+.login-flow-form-panel {
+  overflow: hidden;
+}
+
+.login-flow-form-panel > div.relative {
+  height: 100%;
+  overflow-y: auto;
+  padding-top: 0.75rem;
+  scrollbar-width: none;
+}
+
+.login-flow-form-panel > div.relative::-webkit-scrollbar {
+  display: none;
+}
+
+.login-flow-header {
+  padding-top: 0.25rem;
+}
+
+.login-flow-close {
+  width: 2.6rem;
+  height: 2.6rem;
+  flex: 0 0 auto;
+}
+
 @media (orientation: landscape) and (max-height: 560px) {
   .global-map-shell {
     align-items: stretch;
@@ -245,26 +274,44 @@
     max-height: calc(100dvh - 2rem);
     transform: none !important;
     flex-direction: row;
+    overflow: visible !important;
   }
 
   .login-flow-form-panel {
     width: min(32vw, 14.5rem);
     height: 100%;
-    padding: 0.8rem 0.95rem;
-    justify-content: center;
+    padding: 1.3rem 0.95rem 0.55rem;
+    justify-content: flex-start;
+    overflow: hidden !important;
     border-top: 0;
     border-right: 1px solid rgba(255, 255, 255, 0.05);
   }
 
+  .login-flow-form-panel > div.relative {
+    height: 100%;
+    overflow-y: auto;
+    padding-top: 0.9rem !important;
+    scrollbar-width: none;
+  }
+
+  .login-flow-form-panel > div.relative::-webkit-scrollbar {
+    display: none;
+  }
+
   .login-flow-header {
     gap: 0.8rem;
-    margin-bottom: 0.7rem;
+    margin-bottom: 0.8rem;
+    padding-top: 0 !important;
+    transform: translateY(0.15rem);
   }
 
   .login-flow-close {
-    padding: 0.55rem;
+    width: 2.15rem;
+    height: 2.15rem;
+    padding: 0;
     position: relative;
     z-index: 40;
+    flex: 0 0 auto;
   }
 
   .login-flow-header h2 {
@@ -459,15 +506,23 @@
     width: min(100%, 47rem);
     height: calc(100dvh - 1rem);
     max-height: calc(100dvh - 1rem);
+    overflow: visible !important;
   }
 
   .login-flow-form-panel {
     width: min(32vw, 13.5rem);
-    padding: 0.55rem 0.72rem;
+    padding: 0.95rem 0.72rem 0.4rem;
+    overflow: hidden !important;
+  }
+
+  .login-flow-form-panel > div.relative {
+    padding-top: 0.75rem !important;
   }
 
   .login-flow-header {
-    margin-bottom: 0.65rem;
+    margin-bottom: 0.7rem;
+    padding-top: 0 !important;
+    transform: translateY(0.1rem);
   }
 
   .login-flow-form {

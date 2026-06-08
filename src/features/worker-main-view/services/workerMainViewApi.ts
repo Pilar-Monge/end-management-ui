@@ -19,7 +19,6 @@ function getToken(): string | null {
 function getHeaders(): HeadersInit {
   return {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${getToken() || ''}`,
   }
 }
 
@@ -46,6 +45,7 @@ function buildQuery(params: Record<string, string | number | boolean | null | un
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE_URL}${path}`, {
     ...init,
+    credentials: 'include',
     headers: {
       ...getHeaders(),
       ...(init?.headers || {}),

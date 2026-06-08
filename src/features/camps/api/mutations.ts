@@ -15,13 +15,13 @@ const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('ac
 
 const getHeaders = (): HeadersInit => ({
   'Content-Type': 'application/json',
-  Authorization: `Bearer ${getToken() || ''}`,
 })
 
 export async function createCamp(data: CreateCampRequest): Promise<Camp> {
   const res = await fetch(ENDPOINTS.camps, {
     method: 'POST',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to create camp')
@@ -45,6 +45,7 @@ export async function updateCamp(id: number, data: UpdateCampRequest): Promise<C
   const res = await fetch(`${ENDPOINTS.camps}/${id}`, {
     method: 'PUT',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to update camp')
@@ -72,6 +73,7 @@ export async function deleteCamp(id: number): Promise<void> {
   const res = await fetch(`${ENDPOINTS.camps}/${id}`, {
     method: 'DELETE',
     headers: getHeaders(),
+    credentials: 'include',
   })
   if (!res.ok) throw new Error('Failed to delete camp')
 }
@@ -93,6 +95,7 @@ export async function updateCampStatus(id: number, data: CampStatusUpdateRequest
   const res = await fetch(`${ENDPOINTS.camps}/${id}/status`, {
     method: 'PUT',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to update camp status')
@@ -120,6 +123,7 @@ export async function addCampResource(data: CampResourceRequest): Promise<CampRe
   const res = await fetch(`${ENDPOINTS.campResources}`, {
     method: 'POST',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to add resource to camp')
@@ -148,6 +152,7 @@ export async function updateCampResource(
   const res = await fetch(`${ENDPOINTS.campResources}/${campId}/${resourceTypeId}`, {
     method: 'PUT',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to update camp resource')
@@ -187,6 +192,7 @@ export async function removeCampResource(campId: number, resourceTypeId: number)
   const res = await fetch(`${ENDPOINTS.campResources}/${campId}/${resourceTypeId}`, {
     method: 'DELETE',
     headers: getHeaders(),
+    credentials: 'include',
   })
   if (!res.ok) throw new Error('Failed to remove resource from camp')
 }

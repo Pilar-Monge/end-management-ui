@@ -20,13 +20,13 @@ const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('ac
 
 const getHeaders = (): HeadersInit => ({
   'Content-Type': 'application/json',
-  Authorization: `Bearer ${getToken() || ''}`,
 })
 
 export async function createResourceType(data: CreateResourceTypeRequest): Promise<ResourceType> {
   const res = await fetch(ENDPOINTS.resourceTypes, {
     method: 'POST',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to create resource type')
@@ -56,6 +56,7 @@ export async function updateResourceType(
   const res = await fetch(`${ENDPOINTS.resourceTypes}/${id}`, {
     method: 'PUT',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to update resource type')
@@ -83,6 +84,7 @@ export async function deleteResourceType(id: number): Promise<void> {
   const res = await fetch(`${ENDPOINTS.resourceTypes}/${id}`, {
     method: 'DELETE',
     headers: getHeaders(),
+    credentials: 'include',
   })
   if (!res.ok) throw new Error('Failed to delete resource type')
 }
@@ -103,6 +105,7 @@ export async function createOccupation(data: CreateOccupationRequest): Promise<O
   const res = await fetch(ENDPOINTS.occupations, {
     method: 'POST',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to create occupation')
@@ -129,6 +132,7 @@ export async function updateOccupation(
   const res = await fetch(`${ENDPOINTS.occupations}/${id}`, {
     method: 'PUT',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to update occupation')
@@ -156,6 +160,7 @@ export async function deleteOccupation(id: number): Promise<void> {
   const res = await fetch(`${ENDPOINTS.occupations}/${id}`, {
     method: 'DELETE',
     headers: getHeaders(),
+    credentials: 'include',
   })
   if (!res.ok) throw new Error('Failed to delete occupation')
 }
@@ -178,6 +183,7 @@ export async function createOccupationCriteria(
   const res = await fetch(ENDPOINTS.criteria, {
     method: 'POST',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to create criteria')
@@ -215,6 +221,7 @@ export async function updateOccupationCriteria(
   const res = await fetch(`${ENDPOINTS.criteria}/${id}`, {
     method: 'PUT',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to update criteria')
@@ -250,6 +257,7 @@ export async function deleteOccupationCriteria(id: number): Promise<void> {
   const res = await fetch(`${ENDPOINTS.criteria}/${id}`, {
     method: 'DELETE',
     headers: getHeaders(),
+    credentials: 'include',
   })
   if (!res.ok) throw new Error('Failed to delete criteria')
 }
@@ -270,6 +278,7 @@ export async function createAchievement(data: CreateAchievementRequest): Promise
   const res = await fetch(ENDPOINTS.achievements, {
     method: 'POST',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to create achievement')
@@ -296,6 +305,7 @@ export async function updateAchievement(
   const res = await fetch(`${ENDPOINTS.achievements}/${id}`, {
     method: 'PUT',
     headers: getHeaders(),
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error('Failed to update achievement')
@@ -323,6 +333,7 @@ export async function deleteAchievement(id: number): Promise<void> {
   const res = await fetch(`${ENDPOINTS.achievements}/${id}`, {
     method: 'DELETE',
     headers: getHeaders(),
+    credentials: 'include',
   })
   if (!res.ok) throw new Error('Failed to delete achievement')
 }

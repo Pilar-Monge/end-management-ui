@@ -12,12 +12,12 @@ const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('ac
 
 const getHeaders = (): HeadersInit => ({
   'Content-Type': 'application/json',
-  Authorization: `Bearer ${getToken() || ''}`,
 })
 
 export async function fetchResourceTypes(): Promise<ResourceType[]> {
   const res = await fetch(ENDPOINTS.resourceTypes, {
     headers: getHeaders(),
+    credentials: 'include',
   })
   if (!res.ok) throw new Error('Failed to fetch resource types')
   const data = await res.json()
@@ -27,6 +27,7 @@ export async function fetchResourceTypes(): Promise<ResourceType[]> {
 export async function fetchResourceTypeById(id: number): Promise<ResourceType> {
   const res = await fetch(`${ENDPOINTS.resourceTypes}/${id}`, {
     headers: getHeaders(),
+    credentials: 'include',
   })
   if (!res.ok) throw new Error('Failed to fetch resource type')
   const data = await res.json()
@@ -45,6 +46,7 @@ export function useResourceTypes(
 export async function fetchOccupations(): Promise<Occupation[]> {
   const res = await fetch(ENDPOINTS.occupations, {
     headers: getHeaders(),
+    credentials: 'include',
   })
   if (!res.ok) throw new Error('Failed to fetch occupations')
   const data = await res.json()
@@ -63,6 +65,7 @@ export function useOccupations(
 export async function fetchOccupationCriteria(): Promise<OccupationAssignmentCriteria[]> {
   const res = await fetch(ENDPOINTS.criteria, {
     headers: getHeaders(),
+    credentials: 'include',
   })
   if (!res.ok) throw new Error('Failed to fetch occupation criteria')
   const data = await res.json()
@@ -84,6 +87,7 @@ export async function fetchOccupationCriteriaByOccupation(
 ): Promise<OccupationAssignmentCriteria[]> {
   const res = await fetch(`${ENDPOINTS.criteria}?occupationId=${occupationId}`, {
     headers: getHeaders(),
+    credentials: 'include',
   })
   if (!res.ok) throw new Error('Failed to fetch criteria for occupation')
   const data = await res.json()
@@ -92,6 +96,7 @@ export async function fetchOccupationCriteriaByOccupation(
 export async function fetchAchievements(): Promise<Achievement[]> {
   const res = await fetch(ENDPOINTS.achievements, {
     headers: getHeaders(),
+    credentials: 'include',
   })
   if (!res.ok) throw new Error('Failed to fetch achievements')
   const data = await res.json()
