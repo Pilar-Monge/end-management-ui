@@ -3240,6 +3240,25 @@ export function ViewSolicitudesIntercampamento({
   const pendingRequests = intercampRequests.filter(r => r.status === "PENDING");
   const selectedRequest = intercampRequests.find(r => r.id === activeReqId);
   const currentDetails = requestResourceDetails.filter(d => d.requestId === activeReqId);
+
+  const [resourceSearch, setResourceSearch] = useState("");
+  const [localQtys, setLocalQtys] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const newQtys: Record<string, string> = {};
+    currentDetails.forEach(det => {
+      newQtys[det.resourceTypeId] = String(det.requestedAmount);
+    });
+    setLocalQtys(prev => ({ ...prev, ...newQtys }));
+  }, [requestResourceDetails, activeReqId]);
+
+  const handleQuickAddOrUpdate = async (rtId: string | number, quantity: number, existingDetailId?: string | number) => {
+    if (!activeReqId) return;
+    if (existingDetailId) {
+      await onDeleteRequestResource(String(existingDetailId));
+    }
+    await onAddResourceToRequest(activeReqId, String(rtId), quantity);
+  };
   const evaluatingRequest = intercampRequests.find(r => r.id === evaluatingReqId);
   const evaluatingDetails = evaluatingRequest ? requestResourceDetails.filter(d => d.requestId === evaluatingRequest.id) : [];
   const evaluatingOriginCampName = evaluatingRequest ? getCampDisplayName(camps, evaluatingRequest.originCampId) : "Campamento no definido";
@@ -3671,29 +3690,118 @@ export function ViewSolicitudesIntercampamento({
                       <span className="font-mono text-[#A4C2C5]/50 hover:text-white bg-black/40 px-2 py-0.5 rounded-sm">{currentDetails.length} recursos</span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 mb-1.5 items-end text-xs">
-                      <div className="sm:col-span-6 flex flex-col gap-1">
-                        <span className="text-[#A4C2C5]/70 font-semibold font-mono text-[9px]">Seleccionar Recurso</span>
-                        <select value={resourceTypeId} onChange={e => setResourceTypeId(e.target.value)} className="v-select text-xs">
-                          {resourceTypes.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
-                        </select>
+                    <div className="flex flex-col gap-2 mb-2">
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          placeholder="Buscar recurso..." 
+                          value={resourceSearch} 
+                          onChange={e => setResourceSearch(e.target.value)} 
+                          className="v-input py-1 text-xs w-full"
+                        />
+                        {resourceSearch && (
+                          <button 
+                            onClick={() => setResourceSearch("")} 
+                            className="text-xs text-zinc-400 hover:text-white font-mono px-2 transition-colors"
+                          >
+                            Limpiar
+                          </button>
+                        )}
                       </div>
-                      <div className="sm:col-span-3 flex flex-col gap-1">
-                        <span className="text-[#A4C2C5]/70 font-semibold font-mono text-[9px]">Cantidad</span>
-                        <input type="number" value={qty} onChange={e => setQty(e.target.value)} className="v-input py-1 text-center" placeholder="0" />
-                      </div>
-                      <div className="sm:col-span-3">
-                        <Btn small variant="primary" style={{ width: "100%", padding: "8px" }} onClick={() => {
-                          const quantityNum = Number(qty);
-                          if (isNaN(quantityNum) || quantityNum <= 0) {
-                            showValidationPopup("Ingrese una cantidad numérica mayor a 0.");
-                            return;
-                          }
-                          onAddResourceToRequest(selectedRequest.id, resourceTypeId, quantityNum);
-                          setQty("");
-                        }}>
-                          ＋ Sumar
-                        </Btn>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1 select-none">
+                        {resourceTypes
+                          .filter(rt => 
+                            rt.name.toLowerCase().includes(resourceSearch.toLowerCase()) ||
+                            String(rt.category || "").toLowerCase().includes(resourceSearch.toLowerCase())
+                          )
+                          .map(rt => {
+                            const alreadyAdded = currentDetails.find(d => d.resourceTypeId === rt.id);
+                            const value = localQtys[rt.id] || "";
+                            const hasChanged = alreadyAdded && String(alreadyAdded.requestedAmount) !== value;
+                            
+                            let categoryColor = "border-zinc-500/30 text-zinc-400";
+                            if (rt.category === "FOOD") categoryColor = "border-emerald-500/20 text-emerald-400 bg-emerald-950/20";
+                            else if (rt.category === "WATER") categoryColor = "border-blue-500/20 text-blue-400 bg-blue-950/20";
+                            else if (rt.category === "MEDICAL") categoryColor = "border-rose-500/20 text-rose-400 bg-rose-950/20";
+                            else if (rt.category === "DEFENSE" || rt.category === "AMMUNITION") categoryColor = "border-amber-500/20 text-amber-400 bg-amber-950/20";
+                            
+                            return (
+                              <div 
+                                key={rt.id} 
+                                className={`p-2 border rounded-xs flex flex-col justify-between gap-1 transition-all duration-200 ${
+                                  alreadyAdded 
+                                    ? "bg-[#67ACA9]/5 border-[#69BFB7]/40 shadow-sm shadow-[#69BFB7]/5" 
+                                    : "bg-[#0d1414]/40 border-[#67ACA9]/10 hover:border-[#67ACA9]/30"
+                                }`}
+                              >
+                                <div className="flex justify-between items-start gap-1">
+                                  <div className="flex flex-col">
+                                    <span className="text-[10.5px] font-bold text-white uppercase tracking-tight line-clamp-1">{rt.name}</span>
+                                    <span className={`text-[7.5px] font-mono font-bold uppercase border px-1 py-0.2 rounded-xs self-start mt-0.5 ${categoryColor}`}>
+                                      {rt.category || "OTRO"}
+                                    </span>
+                                  </div>
+                                  <span className="text-[8.5px] font-mono text-zinc-500 shrink-0">{rt.unitOfMeasure || "u"}</span>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <input 
+                                    type="number" 
+                                    value={value} 
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setLocalQtys(prev => ({ ...prev, [rt.id]: val }));
+                                    }} 
+                                    className="v-input py-0.5 text-center text-xs font-mono w-16 h-[26px] bg-black/45" 
+                                    placeholder="0"
+                                  />
+
+                                  {alreadyAdded ? (
+                                    <div className="flex gap-1 items-center ml-auto">
+                                      {hasChanged && (
+                                        <button 
+                                          onClick={() => {
+                                            const numVal = Number(value);
+                                            if (isNaN(numVal) || numVal <= 0) {
+                                              showValidationPopup("Ingrese una cantidad mayor a 0.");
+                                              return;
+                                            }
+                                            handleQuickAddOrUpdate(rt.id, numVal, alreadyAdded.id);
+                                          }}
+                                          className="px-2 h-[26px] bg-[#69BFB7] hover:bg-[#69BFB7]/80 text-[#0d1414] rounded-xs text-[9.5px] font-bold uppercase transition-colors"
+                                          title="Guardar cambios"
+                                        >
+                                          ✓ Guardar
+                                        </button>
+                                      )}
+                                      <button 
+                                        onClick={() => onDeleteRequestResource(alreadyAdded.id)}
+                                        className="p-1 h-[26px] w-[26px] border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 rounded-xs flex items-center justify-center transition-all"
+                                        title="Quitar de la solicitud"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button 
+                                      onClick={() => {
+                                        const numVal = Number(value || "10");
+                                        if (isNaN(numVal) || numVal <= 0) {
+                                          showValidationPopup("Ingrese una cantidad mayor a 0.");
+                                          return;
+                                        }
+                                        handleQuickAddOrUpdate(rt.id, numVal);
+                                      }}
+                                      className="ml-auto px-2.5 h-[26px] bg-[#67ACA9]/20 border border-[#69BFB7] text-[#69BFB7] hover:bg-[#67ACA9]/30 rounded-xs text-[9.5px] font-mono font-bold uppercase tracking-tight transition-all"
+                                    >
+                                      ＋ Agregar
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                       </div>
                     </div>
 
