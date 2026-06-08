@@ -16,7 +16,6 @@ const API_ORIGIN = (() => {
 function buildHeaders() {
   return {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${getToken()}`,
   }
 }
 
@@ -246,7 +245,7 @@ export function mapPersonRecord(record: unknown): Person {
 }
 
 export async function fetchAuthMeProfile(): Promise<AuthMeProfile> {
-  const res = await fetch(`${API_BASE}/auth/me`, { headers: buildHeaders() })
+  const res = await fetch(`${API_BASE}/auth/me`, { headers: buildHeaders(), credentials: 'include' })
   if (!res.ok) throw new Error('Failed to fetch current profile')
 
   const payload = await res.json()
@@ -272,7 +271,7 @@ export async function fetchAuthMeProfile(): Promise<AuthMeProfile> {
 }
 
 export async function fetchPersons(): Promise<Person[]> {
-  const res = await fetch(ENDPOINTS.persons, { headers: buildHeaders() })
+  const res = await fetch(ENDPOINTS.persons, { headers: buildHeaders(), credentials: 'include' })
   if (!res.ok) throw new Error('Failed to fetch persons')
   const payload = await res.json()
   return unwrapList<Person>(payload).map((item) => mapPersonRecord(item))
@@ -289,7 +288,7 @@ export function usePersons(
 }
 
 export async function fetchPersonById(id: number): Promise<PersonWithStats> {
-  const res = await fetch(`${ENDPOINTS.persons}/${id}`, { headers: buildHeaders() })
+  const res = await fetch(`${ENDPOINTS.persons}/${id}`, { headers: buildHeaders(), credentials: 'include' })
   if (!res.ok) throw new Error('Failed to fetch person')
   const payload = await res.json()
   const data = unwrapPayload<PersonWithStats>(payload)
@@ -312,7 +311,7 @@ export function usePersonById(
 }
 
 export async function fetchPersonsStats(): Promise<PersonsStats> {
-  const res = await fetch(ENDPOINTS.personsStats, { headers: buildHeaders() })
+  const res = await fetch(ENDPOINTS.personsStats, { headers: buildHeaders(), credentials: 'include' })
   if (!res.ok) throw new Error('Failed to fetch persons stats')
   const payload = await res.json()
   return unwrapPayload<PersonsStats>(payload)
