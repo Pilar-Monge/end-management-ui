@@ -4615,6 +4615,7 @@
 @media (max-height: 600px) and (orientation: landscape) {
   /* 1. Optimización del Contenedor de Modales */
   .admin-ui-v2-modal-backdrop {
+    padding: 8px 12px; /* Reduce espacio externo */
   }
 
   .admin-ui-v2-modal {
