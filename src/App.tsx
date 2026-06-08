@@ -52,7 +52,7 @@ const routeFallback = (
 const withSuspense = (node: ReactNode) => <Suspense fallback={routeFallback}>{node}</Suspense>
 
 function getSessionToken(): string | null {
-  return localStorage.getItem('token') ?? localStorage.getItem('accessToken')
+  return localStorage.getItem('user')
 }
 
 function normalizeRole(role: string | null | undefined): string {
