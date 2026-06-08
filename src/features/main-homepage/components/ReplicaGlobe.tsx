@@ -239,10 +239,12 @@ const ReplicaGlobe = ({
   onLoadingComplete,
   onLoginClick,
   onSelectCamp,
+  skipIntro = false,
 }: {
   onLoadingComplete?: () => void
   onLoginClick?: () => void
   onSelectCamp?: (campId: number) => void
+  skipIntro?: boolean
 }) => {
   const navigate = useNavigate()
   const globeEl = useRef<any>(null)
@@ -254,10 +256,10 @@ const ReplicaGlobe = ({
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   const [isSearchExpanded, setIsSearchExpanded] = useState(false)
   const [isGuideOpen, setIsGuideOpen] = useState(false)
-  const [isReady, setIsReady] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [formationProgress, setFormationProgress] = useState(0)
-  const [displayProgress, setDisplayProgress] = useState(0)
+  const [isReady, setIsReady] = useState(skipIntro)
+  const [isLoading, setIsLoading] = useState(!skipIntro)
+  const [formationProgress, setFormationProgress] = useState(skipIntro ? 1 : 0)
+  const [displayProgress, setDisplayProgress] = useState(skipIntro ? 1 : 0)
 
   useEffect(() => {
     if (isReady && onLoadingComplete) {
@@ -310,6 +312,14 @@ const ReplicaGlobe = ({
   const isCompactViewport = isTouchDevice && dimensions.width <= 1024 && dimensions.height <= 700
 
   useEffect(() => {
+    if (skipIntro) {
+      setFormationProgress(1)
+      setDisplayProgress(1)
+      setIsReady(true)
+      setIsLoading(false)
+      return
+    }
+
     let frameId: number
     const chaosDuration = 2000
     const formationDuration = 4000
@@ -363,7 +373,7 @@ const ReplicaGlobe = ({
 
     frameId = requestAnimationFrame(animate)
     return () => cancelAnimationFrame(frameId)
-  }, [])
+  }, [skipIntro])
 
   const filteredCampamentos = useMemo(() => {
     if (!searchTerm) return CAMPAMENTOS_DATA
@@ -407,83 +417,117 @@ const ReplicaGlobe = ({
           right: auto !important;
           top: 50% !important;
           bottom: auto !important;
-          width: min(calc(100vw - 0.75rem), 21rem) !important;
-          max-height: calc(100dvh - 0.75rem) !important;
+          width: min(calc(100vw - 1.5rem), 23rem) !important;
+          max-height: calc(100dvh - 1rem) !important;
           overflow-y: auto !important;
           overscroll-behavior: contain;
           transform: translate(-50%, -50%) !important;
           border-radius: 0.9rem !important;
-          padding: 0.75rem !important;
+          padding: 1rem !important;
         }
 
         .camp-info-card--compact .camp-info-card__title {
-          font-size: 0.9rem !important;
+          font-size: 1.1rem !important;
           line-height: 1.1 !important;
         }
 
         .camp-info-card--compact .camp-info-card__header {
-          margin-bottom: 0.5rem !important;
-          padding-right: 2rem !important;
+          margin-bottom: 1rem !important;
+          padding-right: 2.25rem !important;
         }
 
         .camp-info-card--compact .camp-info-card__badge-row {
-          gap: 0.3rem !important;
-          margin-top: 0.35rem !important;
+          gap: 0.55rem !important;
+          margin-top: 0.65rem !important;
         }
 
         .camp-info-card--compact .camp-info-card__badge {
-          font-size: 0.5rem !important;
-          letter-spacing: 0.12em !important;
-          padding-top: 0.12rem !important;
-          padding-bottom: 0.12rem !important;
+          font-size: 0.62rem !important;
+          letter-spacing: 0.16em !important;
+          padding: 0.2rem 0.45rem !important;
         }
 
         .camp-info-card--compact .camp-info-card__meta {
-          gap: 0.5rem !important;
-          margin-bottom: 0.7rem !important;
+          gap: 1.75rem !important;
+          margin-bottom: 1.15rem !important;
         }
 
         .camp-info-card--compact .camp-info-card__meta > div > div:first-child {
-          font-size: 0.58rem !important;
-          letter-spacing: 0.14em !important;
+          font-size: 0.62rem !important;
+          letter-spacing: 0.18em !important;
         }
 
         .camp-info-card--compact .camp-info-card__meta > div > div:last-child {
-          font-size: 0.82rem !important;
-          line-height: 1.05 !important;
+          font-size: 0.95rem !important;
+          line-height: 1.1 !important;
         }
 
         .camp-info-card--compact .camp-info-card__desc {
-          min-height: 1.5rem !important;
-          margin-bottom: 0.7rem !important;
-          padding-left: 0.7rem !important;
+          min-height: 3rem !important;
+          margin-bottom: 1rem !important;
+          padding-left: 0.9rem !important;
         }
 
         .camp-info-card--compact .camp-info-card__desc p {
-          font-size: 0.62rem !important;
-          line-height: 1.25 !important;
-          max-height: 2.8rem !important;
-          overflow: hidden !important;
+          font-size: 0.72rem !important;
+          line-height: 1.35 !important;
+          max-height: none !important;
+          overflow: visible !important;
         }
 
         .camp-info-card--compact .camp-info-card__actions {
-          gap: 0.4rem !important;
+          gap: 0.7rem !important;
         }
 
         .camp-info-card--compact .camp-info-card__action {
-          padding-top: 0.55rem !important;
-          padding-bottom: 0.55rem !important;
+          padding-top: 0.75rem !important;
+          padding-bottom: 0.75rem !important;
         }
 
         .camp-info-card--compact .camp-info-card__action-text {
-          font-size: 0.58rem !important;
-          letter-spacing: 0.14em !important;
+          font-size: 0.7rem !important;
+          letter-spacing: 0.2em !important;
         }
 
         .camp-info-card--compact .camp-info-card__close {
-          top: 0.1rem !important;
-          right: 0.1rem !important;
-          padding: 0.25rem !important;
+          top: 0.35rem !important;
+          right: 0.35rem !important;
+          padding: 0.35rem !important;
+        }
+
+        @media (orientation: landscape) and (max-height: 420px) {
+          .camp-info-card--compact {
+            width: min(calc(100vw - 1rem), 21.75rem) !important;
+            max-height: calc(100dvh - 0.8rem) !important;
+            padding: 0.8rem !important;
+          }
+
+          .camp-info-card--compact .camp-info-card__title {
+            font-size: 1rem !important;
+          }
+
+          .camp-info-card--compact .camp-info-card__header {
+            margin-bottom: 0.7rem !important;
+          }
+
+          .camp-info-card--compact .camp-info-card__meta {
+            margin-bottom: 0.8rem !important;
+          }
+
+          .camp-info-card--compact .camp-info-card__desc {
+            min-height: 2.25rem !important;
+            margin-bottom: 0.75rem !important;
+          }
+
+          .camp-info-card--compact .camp-info-card__desc p {
+            font-size: 0.66rem !important;
+            line-height: 1.3 !important;
+          }
+
+          .camp-info-card--compact .camp-info-card__action {
+            padding-top: 0.62rem !important;
+            padding-bottom: 0.62rem !important;
+          }
         }
       `}</style>
 
@@ -862,7 +906,7 @@ const ReplicaGlobe = ({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5, duration: 0.8 }}
               onClick={() => setIsGuideOpen(true)}
-              className="px-8 py-3 transition-all menu-brush text-white uppercase tracking-[0.2em] font-bold text-[11px] absolute bottom-10 left-10 z-50 group"
+              className="replica-guide-trigger px-8 py-3 transition-all menu-brush text-white uppercase tracking-[0.2em] font-bold text-[11px] absolute bottom-10 left-10 z-50 group"
               style={{ fontFamily: "'Oswald', sans-serif" }}
             >
               <span className="relative z-10 flex items-center gap-2">
@@ -883,13 +927,13 @@ const ReplicaGlobe = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md"
+            className="replica-guide-overlay absolute inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 30 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 30 }}
-              className="w-full max-w-md p-5 md:p-8 relative shadow-2xl panel-brush max-h-[85vh] flex flex-col"
+              className="replica-guide-dialog w-full max-w-md p-5 md:p-8 relative shadow-2xl panel-brush max-h-[85vh] flex flex-col"
             >
               <button
                 onClick={() => setIsGuideOpen(false)}
@@ -898,9 +942,9 @@ const ReplicaGlobe = ({
                 <X size={20} />
               </button>
 
-              <div className="overflow-y-auto scrollbar-hide pr-1">
-                <div className="space-y-6">
-                  <div className="text-center pt-1 shrink-0">
+              <div className="replica-guide-scroll overflow-y-auto scrollbar-hide pr-1">
+                <div className="replica-guide-content space-y-6">
+                  <div className="replica-guide-header text-center pt-1 shrink-0">
                     <h2
                       className="text-xl md:text-2xl font-black italic uppercase tracking-tighter text-white mb-1"
                       style={{ fontFamily: "'Oswald', sans-serif" }}
@@ -910,8 +954,8 @@ const ReplicaGlobe = ({
                     <div className="h-0.5 w-16 bg-blue-400 mx-auto" />
                   </div>
 
-                  <div className="space-y-3 md:space-y-4">
-                    <div className="bg-white/5 border border-white/10 p-3 md:p-4 rounded-lg">
+                  <div className="replica-guide-sections space-y-3 md:space-y-4">
+                    <div className="replica-guide-card bg-white/5 border border-white/10 p-3 md:p-4 rounded-lg">
                       <h3 className="text-[9px] font-black uppercase text-blue-400 tracking-widest mb-1 font-mono">
                         EXPLORACIÓN GLOBAL
                       </h3>
@@ -921,7 +965,7 @@ const ReplicaGlobe = ({
                       </p>
                     </div>
 
-                    <div className="bg-white/5 border border-white/10 p-3 md:p-4 rounded-lg">
+                    <div className="replica-guide-card bg-white/5 border border-white/10 p-3 md:p-4 rounded-lg">
                       <h3 className="text-[9px] font-black uppercase text-blue-400 tracking-widest mb-1 font-mono">
                         LOCALIZACIÓN DE CAMPAMENTOS
                       </h3>
