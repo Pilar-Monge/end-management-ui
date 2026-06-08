@@ -15,7 +15,8 @@ import {
   ChevronRight,
   Truck,
   Users,
-  Briefcase
+  Briefcase,
+  Send
 } from "lucide-react";
 import {
   PieChart, Pie, Cell,
@@ -3194,11 +3195,20 @@ export function ViewSolicitudesIntercampamento({
     setPlannedArrivalDate(new Date(serverNow.getTime() + 25 * 60 * 60 * 1000).toISOString());
   }, [serverNow]);
   const [activeReqId, setActiveReqId] = useState<string | null>(null);
-  const [resourceTypeId, setResourceTypeId] = useState("2");
+  const [resourceTypeId, setResourceTypeId] = useState(() => resourceTypes[0]?.id ? String(resourceTypes[0].id) : "2");
   const [qty, setQty] = useState("");
 
-  const [occupationId, setOccupationId] = useState("6");
+  const [occupationId, setOccupationId] = useState(SPECIALISTS_OCCUPATIONS[0]?.id || "6");
   const [personQty, setPersonQty] = useState("");
+
+  useEffect(() => {
+    if (resourceTypes && resourceTypes.length > 0) {
+      const exists = resourceTypes.some(rt => String(rt.id) === String(resourceTypeId));
+      if (!exists || resourceTypeId === "2") {
+        setResourceTypeId(String(resourceTypes[0].id));
+      }
+    }
+  }, [resourceTypes, resourceTypeId]);
   const pendingRequests = intercampRequests.filter(r => r.status === "PENDING");
   const selectedRequest = intercampRequests.find(r => r.id === activeReqId);
   const currentDetails = requestResourceDetails.filter(d => d.requestId === activeReqId);
@@ -3773,10 +3783,11 @@ export function ViewSolicitudesIntercampamento({
                     <Btn 
                       variant="success" 
                       onClick={handleSendRequest} 
-                      style={{ padding: "10px 24px" }}
+                      style={{ padding: "10px 24px", display: "inline-flex", alignItems: "center", gap: "6px" }}
                       disabled={currentDetails.length === 0 && (!selectedRequest.personRequirements || selectedRequest.personRequirements.length === 0)}
                     >
-                      🚀 Confirmar y Enviar Solicitud
+                      <Send className="h-3.5 w-3.5" />
+                      Confirmar y Enviar Solicitud
                     </Btn>
                   </div>
                 </div>
@@ -4342,7 +4353,7 @@ export function ViewSolicitudesIntercampamento({
                 <div>
                   <span className="text-[10px] uppercase text-[#A4C2C5]/50 block">Estado del Convoy</span>
                   <strong className="text-cyan-300 font-sans uppercase font-black tracking-wider text-[11px]">
-                    {transfer.status === "PENDING_DEPARTURE" ? "Pendiente de Salida" : transfer.status === "IN_TRANSIT" ? "En Tránsito 🚀" : transfer.status === "COMPLETED" ? "Completado ✓" : "Cancelado ✕"}
+                    {transfer.status === "PENDING_DEPARTURE" ? "Pendiente de Salida" : transfer.status === "IN_TRANSIT" ? "En Tránsito" : transfer.status === "COMPLETED" ? "Completado ✓" : "Cancelado ✕"}
                   </strong>
                 </div>
                 <div>
