@@ -1,6 +1,8 @@
-﻿
+
 import "./resource-control-panel.css";
 import { memo, useEffect, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { SESSION_TOKEN_CHANGED_EVENT } from "../../../shared/services/sessionService";
 import type {
   Camp,
   ResourceType,
@@ -94,6 +96,7 @@ interface ResourceControlPanelPageProps {
 }
 
 export default function ResourceControlPanelPage({ onExit }: ResourceControlPanelPageProps) {
+  const navigate = useNavigate();
   const [showLoading, setShowLoading] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasEntered, setHasEntered] = useState(false);
@@ -287,13 +290,11 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   };
 
   const handleLogout = () => {
-    if (onExit) {
-      onExit();
-      return;
-    }
-
-    setHasEntered(false);
-    setShowLoading(true);
+    localStorage.removeItem('token');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('user');
+    window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT));
+    navigate('/main-homepage', { state: { initialAppState: 'explore' } });
   };
 
   const handleNavClick = (navId: string) => {
@@ -898,13 +899,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       {hasEntered && (
         <TopHud 
           onLogout={handleLogout} 
-          onVolver={() => {
-            if (activeNav) {
-              handleNavClick("mapa");
-            } else {
-              handleNavClick(lastActiveNav);
-            }
-          }} 
+          onVolver={() => onExit?.()} 
           globalTimeState={globalTimeState}
         />
       )}
