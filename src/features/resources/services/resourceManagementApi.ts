@@ -384,6 +384,20 @@ export const resourceApi = {
     }));
   },
 
+  createDailyCollectionRecord: (data: Omit<DailyCollectionRecord, "id">) =>
+    apiRequest<unknown>("/daily-collection-records", {
+      method: "POST",
+      body: JSON.stringify({
+        campId: numericId(String(data.campId)),
+        personId: numericId(String(data.personId)),
+        resourceTypeId: numericId(String(data.resourceTypeId)),
+        expectedAmount: String(data.expectedAmount),
+        actualAmount: String(data.actualAmount),
+        differenceReason: data.differenceReason,
+        recordedBy: numericId(String(data.recordedBy)),
+      }),
+    }),
+
   listInventoryMovements: async (): Promise<InventoryMovement[]> => {
     const payload = await apiRequest<unknown>("/inventory-movements?page=1&limit=100");
     return listFromPayload(payload, item => ({
