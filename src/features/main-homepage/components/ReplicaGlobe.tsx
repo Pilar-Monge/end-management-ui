@@ -181,7 +181,7 @@ interface Campamento {
   description: string
 }
 
-// DATOS ACTUALIZADOS SEGÚN SOLICITUD
+
 const CAMPAMENTOS_DATA: Campamento[] = [
   {
     id: 1,
@@ -189,7 +189,7 @@ const CAMPAMENTOS_DATA: Campamento[] = [
     lng: -98.5795,
     name: 'Alpha Bunker',
     status: 'ACTIVE',
-    survivors: 300, // maxPersonCapacity
+    survivors: 300, 
     description:
       'Antiguo búnker subterráneo en el interior del continente. Sistema de purificación de agua al 85%.',
   },
@@ -199,7 +199,7 @@ const CAMPAMENTOS_DATA: Campamento[] = [
     lng: 13.405,
     name: 'Sierra Base',
     status: 'ACTIVE',
-    survivors: 700, // maxPersonCapacity
+    survivors: 700,
     description:
       'Fortaleza reconstruida en tierras altas. Centro logístico principal para el suministro de energía.',
   },
@@ -209,7 +209,7 @@ const CAMPAMENTOS_DATA: Campamento[] = [
     lng: -58.3816,
     name: 'Delta Refuge',
     status: 'ACTIVE',
-    survivors: 250, // maxPersonCapacity
+    survivors: 250, 
     description:
       'Asentamiento agrícola protegido en las llanuras. Invernaderos de clima controlado.',
   },
@@ -219,7 +219,7 @@ const CAMPAMENTOS_DATA: Campamento[] = [
     lng: 139.6503,
     name: 'Omega Fortress',
     status: 'ACTIVE',
-    survivors: 400, // maxPersonCapacity
+    survivors: 400, 
     description:
       'Instalación de alta tecnología en zona montañosa. Mantiene comunicación satelital intermitente.',
   },
@@ -229,7 +229,7 @@ const CAMPAMENTOS_DATA: Campamento[] = [
     lng: 17.0658,
     name: 'Echo Outpost',
     status: 'ACTIVE',
-    survivors: 150, // maxPersonCapacity
+    survivors: 150,
     description:
       'Puerto estratégico de vigilancia en la meseta. Control estricto de accesos perimetrales.',
   },
@@ -626,14 +626,14 @@ const ReplicaGlobe = ({
               el.className = 'group relative'
               el.style.pointerEvents = 'none'
 
-              // Todos los estados son ACTIVE, así que siempre usamos verde
+              
               const statusColor = '#4ade80'
               const isSelected = camp.isSelected
 
               const homeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-300 group-hover:scale-110"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`
               const fileIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-300 group-hover:translate-y-[-1px]"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>`
 
-              // Formatear ID como #001, #002, etc.
+              
               const formattedId = `#${camp.id.toString().padStart(3, '0')}`
 
               el.innerHTML = `

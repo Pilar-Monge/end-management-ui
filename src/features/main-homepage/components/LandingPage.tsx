@@ -22,7 +22,8 @@ const TEAM_MEMBERS = [
   { name: 'Jeison Saldaña Rios', git: 'https://github.com/JeisonSaldanaRios' },
 ]
 
-const BACKGROUND_IMAGE_URL = '/images/bg2.jpg'
+const BACKGROUND_IMAGE_URL =
+  'https://pub-9d9e76b894c2469985b070f298268aad.r2.dev/videos-images-intro/background-intro.webp'
 
 const GitHubIcon = memo(function GitHubIcon({ className = '' }: { className?: string }) {
   return (
@@ -63,22 +64,19 @@ const LandingPage = memo(function LandingPage({
   setIsAudioEnabled,
   onExit,
 }: LandingPageProps) {
-  const decodeChars = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
   const [showUI, setShowUI] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showCredits, setShowCredits] = useState(false)
   const [active, setActive] = useState<'intro' | 'menu'>('menu')
   const [showVolumePanel, setShowVolumePanel] = useState(false)
-  const [isDecoding, setIsDecoding] = useState(true)
-  const [decodedTitle, setDecodedTitle] = useState('END MANAGEMENT')
-  const [subtitleText, setSubtitleText] = useState('')
+  const isDecoding = false
+  const decodedTitle = 'END MANAGEMENT'
+  const subtitleText = 'SURVIVAL SYSTEM - PROJECT X'
   const [isBackgroundReady, setIsBackgroundReady] = useState(false)
-  const subtitleFull = 'SURVIVAL SYSTEM — PROJECT X'
-  const subtitleStarted = useRef(false)
 
   useEffect(() => {
-    const uiTimer = window.setTimeout(() => setShowUI(true), 800)
-    const menuTimer = window.setTimeout(() => setShowMenu(true), 1500)
+    const uiTimer = window.setTimeout(() => setShowUI(true), 100)
+    const menuTimer = window.setTimeout(() => setShowMenu(true), 180)
     return () => {
       window.clearTimeout(uiTimer)
       window.clearTimeout(menuTimer)
@@ -87,78 +85,32 @@ const LandingPage = memo(function LandingPage({
 
   useEffect(() => {
     let isMounted = true
-    const loadBackground = () => {
-      const image = new Image()
-      image.decoding = 'async'
-      image.onload = () => {
+
+    const preloadLink = document.createElement('link')
+    preloadLink.rel = 'preload'
+    preloadLink.as = 'image'
+    preloadLink.href = BACKGROUND_IMAGE_URL
+    document.head.appendChild(preloadLink)
+
+    const image = new Image()
+    image.decoding = 'async'
+    image.onload = () => {
+      void image.decode().catch(() => undefined).finally(() => {
         if (isMounted) setIsBackgroundReady(true)
-      }
-      image.src = BACKGROUND_IMAGE_URL
+      })
+    }
+    image.src = BACKGROUND_IMAGE_URL
+
+    if (image.complete) {
+      void image.decode().catch(() => undefined).finally(() => {
+        if (isMounted) setIsBackgroundReady(true)
+      })
     }
 
-    const scheduler = window as Window &
-      typeof globalThis & {
-        requestIdleCallback?: (
-          callback: IdleRequestCallback,
-          options?: IdleRequestOptions,
-        ) => number
-        cancelIdleCallback?: (handle: number) => void
-      }
-
-    if (scheduler.requestIdleCallback && scheduler.cancelIdleCallback) {
-      const idleId = scheduler.requestIdleCallback(loadBackground, { timeout: 700 })
-      return () => {
-        isMounted = false
-        scheduler.cancelIdleCallback?.(idleId)
-      }
-    }
-
-    const timeoutId = window.setTimeout(loadBackground, 250)
     return () => {
       isMounted = false
-      window.clearTimeout(timeoutId)
+      preloadLink.remove()
     }
-  }, [])
-
-  useEffect(() => {
-    const target = 'END MANAGEMENT'
-    let iteration = 0
-
-    const interval = window.setInterval(() => {
-      setDecodedTitle(
-        target
-          .split('')
-          .map((char, index) => {
-            if (char === ' ') return ' '
-            if (index < iteration) return target[index]
-            return decodeChars[Math.floor(Math.random() * decodeChars.length)]
-          })
-          .join(''),
-      )
-
-      iteration += 0.3
-      if (iteration >= target.length + 1) {
-        window.clearInterval(interval)
-        setDecodedTitle(target)
-        setIsDecoding(false)
-      }
-    }, 90)
-
-    return () => window.clearInterval(interval)
-  }, [])
-
-  useEffect(() => {
-    const startDelay = window.setTimeout(() => {
-      if (subtitleStarted.current) return
-      subtitleStarted.current = true
-      let idx = 0
-      const interval = window.setInterval(() => {
-        idx += 1
-        setSubtitleText(subtitleFull.slice(0, idx))
-        if (idx >= subtitleFull.length) window.clearInterval(interval)
-      }, 55)
-    }, 800)
-    return () => window.clearTimeout(startDelay)
   }, [])
 
   const [titleTop, titleBottom] = useMemo(() => {
@@ -197,8 +149,6 @@ const LandingPage = memo(function LandingPage({
             "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.9'/></svg>\")",
         }}
       />
-
-      <div className="absolute inset-0 pointer-events-none z-30 scanlines" />
 
       <div
         className={`absolute top-5 right-6 flex items-start gap-5 z-20 transition-all duration-1000 ${
@@ -436,7 +386,7 @@ const LandingPage = memo(function LandingPage({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
               id="studio-credits"
-              className="panel-brush pointer-events-auto p-12 credits-panel-fixed"
+              className="panel-brush pointer-events-auto p-5 sm:p-8 lg:p-12 credits-panel-fixed"
               aria-label="Creditos de PentaDev Studio"
             >
               <div className="credits-header border-b border-white/10 pb-6 mb-3">
