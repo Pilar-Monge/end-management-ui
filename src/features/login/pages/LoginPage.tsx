@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ApocInput } from '../components/ApocInput'
 import { LandingGhosts } from '../components/LandingGhosts'
 import { HudCorners, Scanlines } from '../components/BackgroundEffects'
@@ -16,7 +16,9 @@ const LAST_SELECTED_CAMP_ID_KEY = 'last_selected_camp_id'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const authState = useAuthState()
+  const sessionMessage = (location.state as { sessionMessage?: string } | null)?.sessionMessage
 
   const [form, setForm] = useState<LoginForm>({ username: '', password: '', campId: null })
   const [errors, setErrors] = useState<LoginErrors>({})
@@ -95,11 +97,10 @@ export default function LoginPage() {
       localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(response.user.campId))
       window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
 
-      const defaultRoute = getPostLoginRoute(normalizedUser.role)
-      const redirectPath =
-        normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard')
-          ? savedPath
-          : defaultRoute
+      const redirectPath = getPostLoginRoute(normalizedUser.role, {
+        savedPath,
+        restoreSavedAdminDashboard: Boolean(sessionMessage),
+      })
       localStorage.removeItem('last_secure_path')
       
       localStorage.setItem('postLoadingRoute', redirectPath)

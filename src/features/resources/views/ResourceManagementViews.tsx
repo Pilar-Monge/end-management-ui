@@ -2381,14 +2381,12 @@ export function ViewMovimientosInventario({
   camps,
   resourceTypes,
   inventoryMovements,
-  onAddManualMovement,
-  onDeleteMovement
+  onAddManualMovement
 }: {
   camps: Camp[];
   resourceTypes: ResourceType[];
   inventoryMovements: InventoryMovement[];
   onAddManualMovement: (data: Omit<InventoryMovement, "id">) => void;
-  onDeleteMovement: (id: string) => void;
 }) {
   const campId = currentUser.campId;
   const legacyCampId = String(campId);
@@ -2469,7 +2467,7 @@ export function ViewMovimientosInventario({
             <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="v-input" placeholder="Por ej. Ajuste de stock por auditoría" />
           </label>
 
-          <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Insertar Operación en Historial</Btn>
+          <Btn type="submit" variant="primary" style={{ width: "100%", padding: "8px" }}>Insertar Operación en Historial</Btn>
         </form>
 
         
@@ -2789,7 +2787,7 @@ export function ViewSolicitudesIntercampamento({
             <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="v-input" placeholder="e.g. Alimento crítico para el personal minero de Bravo" />
           </label>
 
-          <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Crear Solicitud Intercampamento</Btn>
+          <Btn type="submit" variant="primary" style={{ width: "100%", padding: "8px" }}>Crear Solicitud Intercampamento</Btn>
         </form>
 
         
@@ -2945,8 +2943,7 @@ export function ViewTraslados({
   onAddTransfer,
   onUpdateTransferStatus,
   onAddPersonToTransfer,
-  onUpdatePersonStatus,
-  onDeletePersonFromTransfer
+  onUpdatePersonStatus
 }: {
   camps: Camp[];
   intercampRequests: IntercampRequest[];
@@ -2956,7 +2953,6 @@ export function ViewTraslados({
   onUpdateTransferStatus: (id: string, status: Transfer["status"], notes: string) => void;
   onAddPersonToTransfer: (transferId: string, personId: string) => void;
   onUpdatePersonStatus: (id: string, status: TransferPerson["status"]) => void;
-  onDeletePersonFromTransfer: (id: string) => void;
 }) {
   const [requestId, setRequestId] = useState("");
   const [depDate, setDepDate] = useState("2026-05-20");
@@ -3052,7 +3048,7 @@ export function ViewTraslados({
                 <span className="text-[9px] text-[#A4C2C5]/50 italic leading-snug">Las raciones definitivas se sincronizan automáticamente una vez asigne escoltas al convoy de traslado.</span>
               </div>
 
-              <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Habilitar Manifiesto de Convoy</Btn>
+              <Btn type="submit" variant="primary" style={{ width: "100%", padding: "8px" }}>Habilitar Manifiesto de Convoy</Btn>
             </form>
           ) : (
             <div className="text-[10px] text-amber-300 bg-amber-950/20 p-4 text-center rounded-sm border border-amber-500/20">
@@ -3169,7 +3165,7 @@ export function ViewTraslados({
                         </td>
                         <td className="text-right">
                           <div className="flex justify-end gap-1">
-                            <Btn small variant="danger" disabled={selectedTransfer.status !== "PLANNING"} onClick={() => onDeletePersonFromTransfer(tp.id)}>Quitar</Btn>
+                            <Btn small variant="danger" disabled={selectedTransfer.status !== "PLANNING"} onClick={() => onUpdatePersonStatus(tp.id, "CANCELED")}>Quitar</Btn>
                           </div>
                         </td>
                       </tr>
@@ -3402,7 +3398,7 @@ export function ViewRecursosEntregados({
             <input type="text" value={recordedBy} onChange={e => setRecordedBy(e.target.value)} className="v-input" />
           </label>
 
-          <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>📊 Archivar Comprobante de Arribo</Btn>
+          <Btn type="submit" variant="primary" style={{ width: "100%", padding: "8px" }}>📊 Archivar Comprobante de Arribo</Btn>
         </form>
 
         
@@ -3897,7 +3893,7 @@ export function ViewNotificaciones({
 }: {
   camps: Camp[];
   notifications: OperationalNotification[];
-  onAddNotification: (data: Omit<OperationalNotification, "id">) => void;
+  onAddNotification: (data: Omit<OperationalNotification, "id">) => Promise<void> | void;
   onMarkAsRead: (id: string) => void;
 }) {
   const campIdVal = currentUser.campId;
@@ -3909,15 +3905,21 @@ export function ViewNotificaciones({
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [type, setType] = useState<OperationalNotification["type"]>("INFO");
+  const [sending, setSending] = useState(false);
+  const [sentToast, setSentToast] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !message) {
       alert("Por favor complete todos los campos obligatorios.");
       return;
     }
 
-    const chosenUserId = destType === "user" ? selectedUserId : "";
+    const chosenUserId = destType === "user"
+      ? selectedUserId
+      : targetRole === currentUser.rol
+        ? String(currentUser.userId)
+        : "";
     const chosenTargetRole = destType === "role" ? targetRole : "";
 
     if (destType === "user" && !chosenUserId) {
@@ -3929,22 +3931,44 @@ export function ViewNotificaciones({
       return;
     }
 
-    onAddNotification({
-      campId,
-      userId: chosenUserId,
-      targetRole: chosenTargetRole,
-      type,
-      title,
-      message,
-      read: false,
-      createdDate: new Date().toLocaleTimeString("es-ES") + " UTC"
-    });
-    setTitle("");
-    setMessage("");
+    setSending(true);
+    try {
+      await onAddNotification({
+        campId,
+        userId: chosenUserId,
+        targetRole: chosenTargetRole,
+        type,
+        title,
+        message,
+        read: false,
+        createdDate: new Date().toISOString()
+      });
+      setTitle("");
+      setMessage("");
+      setSentToast(true);
+      window.setTimeout(() => setSentToast(false), 2600);
+    } catch {
+      alert("No se pudo trasmitir la notificación en la API. Revisa conexión y permisos.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
     <SectionShell kicker="MENSAJERÍA TÁCTICA" title="Notificaciones Operativas y Boletas de Guardia">
+      {sentToast && (
+        <div className="fixed top-24 right-8 z-[80] w-[min(360px,calc(100vw-2rem))] border border-[#69BFB7]/45 bg-[#071111]/95 shadow-[0_0_24px_rgba(105,191,183,0.22)] px-4 py-3 rounded-sm animate-in slide-in-from-right-4 duration-200">
+          <div className="text-[9px] font-black tracking-[0.32em] uppercase text-[#69BFB7] font-mono">
+            INFO • Red Operativa
+          </div>
+          <div className="mt-1 text-sm font-black text-white uppercase">
+            Notificación enviada
+          </div>
+          <div className="mt-0.5 text-[10px] text-[#A4C2C5]/80">
+            El comunicado fue transmitido al canal seleccionado.
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
         
@@ -4021,7 +4045,9 @@ export function ViewNotificaciones({
             <textarea value={message} onChange={e => setMessage(e.target.value)} className="v-input min-h-12" placeholder="Escribir detalles del envío o anomalías..." />
           </label>
 
-          <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Trasmitir Notificación</Btn>
+          <Btn type="submit" variant="primary" disabled={sending} style={{ width: "100%", padding: "8px" }}>
+            {sending ? "Trasmitiendo..." : "Trasmitir Notificación"}
+          </Btn>
         </form>
 
         
@@ -4171,7 +4197,7 @@ export function ViewDetalleRecursosSolicitados({
             />
           </label>
 
-          <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Agregar Recurso</Btn>
+          <Btn type="submit" variant="primary" style={{ width: "100%", padding: "8px" }}>Agregar Recurso</Btn>
         </form>
 
         
@@ -4332,7 +4358,7 @@ export function ViewPersonasEnTraslado({
             />
           </label>
 
-          <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Añadir Escolta de Convoy</Btn>
+          <Btn type="submit" variant="primary" style={{ width: "100%", padding: "8px" }}>Añadir Escolta de Convoy</Btn>
         </form>
 
         

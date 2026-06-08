@@ -38,34 +38,8 @@ function extractIntercampList(payload: unknown): IntercampRecord[] {
 }
 
 export async function listIntercampRequests(): Promise<IntercampRecord[]> {
-  const attempts = [
-    '/intercamp-requests',
-    '/inter-camp-requests',
-    '/transfers',
-    '/transfer-history',
-  ]
-
-  let lastError: unknown = null
-
-  for (const path of attempts) {
-    try {
-      const payload = await apiRequest<unknown>(path)
-      const extracted = extractIntercampList(payload)
-      if (extracted.length > 0) return extracted
-    } catch (error) {
-      if (error instanceof ApiHttpError && [400, 401, 403, 404].includes(error.statusCode)) {
-        lastError = error
-        continue
-      }
-      throw error
-    }
-  }
-
-  if (lastError instanceof ApiHttpError && lastError.statusCode === 401) {
-    throw lastError
-  }
-
-  return []
+  const payload = await apiRequest<unknown>('/intercamp-requests')
+  return extractIntercampList(payload)
 }
 
 export async function updateIntercampRequestStatus(id: number, status: IntercampDecision): Promise<IntercampRecord> {

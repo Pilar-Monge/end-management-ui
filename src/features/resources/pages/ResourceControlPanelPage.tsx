@@ -1,6 +1,6 @@
 ﻿
 import "./resource-control-panel.css";
-import { useState, useEffect, type ReactNode } from "react";
+import { memo, useEffect, useState, type ReactNode } from "react";
 import type {
   Camp,
   ResourceType,
@@ -136,8 +136,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     status: 'syncing',
   });
 
-  const [currentGlobalTime, setCurrentGlobalTime] = useState<Date>(new Date("2026-05-25T06:25:47Z"));
-
   const syncGlobalTime = async () => {
     setGlobalTimeState(prev => ({ ...prev, status: 'syncing' }));
     try {
@@ -174,15 +172,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     return () => clearInterval(syncInterval);
   }, []);
 
-
-  useEffect(() => {
-    const tickInterval = setInterval(() => {
-      const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
-      setCurrentGlobalTime(new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs));
-    }, 1000);
-
-    return () => clearInterval(tickInterval);
-  }, [globalTimeState]);
 
   const [resourceTypes, setResourceTypesState] = useState<ResourceType[]>(INITIAL_RESOURCE_TYPES);
   const [campInventories, setCampInventories] = useState<CampInventory[]>(INITIAL_CAMP_INVENTORIES);
@@ -403,18 +392,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     );
   };
 
-  const handleDeleteMovement = async (id: string) => {
-    try {
-      await resourceApi.deleteInventoryMovement(id);
-      await fetchAllSystemData();
-      return;
-    } catch (error) {
-      console.warn("Could not delete inventory movement.", error);
-      alert("No se pudo eliminar el movimiento en la API. Se ocultará solo en pantalla.");
-    }
-    setInventoryMovements(prev => prev.filter(m => m.id !== id));
-  };
-
   const handleResolveAlert = async (id: string, resolvedBy: string) => {
     try {
       await resourceApi.resolveInventoryAlert(id, resolvedBy);
@@ -629,30 +606,44 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   };
 
   const handleAddNotification = async (data: Omit<OperationalNotification, "id">) => {
+    const currentHudUser = getStoredHudUser();
+    const optimisticRecord: OperationalNotification = {
+      ...data,
+      id: `not-${Date.now().toString().slice(-4)}`,
+    };
+
+    setNotifications(prev => [optimisticRecord, ...prev]);
+
     try {
-      await resourceApi.createNotification(data);
-      await fetchAllSystemData();
+      const created = await resourceApi.createNotification(data);
+      const createdUserId = Number(created.userId);
+      const belongsToCurrentUser = Number.isFinite(createdUserId) && createdUserId === currentHudUser.userId;
+      const belongsToCurrentRole = created.targetRole === currentHudUser.role;
+
+      setNotifications(prev => (
+        belongsToCurrentUser || belongsToCurrentRole
+          ? [created, ...prev.filter(item => item.id !== optimisticRecord.id)]
+          : prev.filter(item => item.id !== optimisticRecord.id)
+      ));
       return;
     } catch (error) {
       console.warn("Could not create notification.", error);
+      throw error;
     }
-
-    const record: OperationalNotification = { ...data, id: `not-${Date.now().toString().slice(-4)}` };
-    setNotifications(prev => [record, ...prev]);
   };
 
   const handleMarkAsRead = async (id: string) => {
-    try {
-      await resourceApi.markNotificationRead(id);
-      await fetchAllSystemData();
-      return;
-    } catch (error) {
-      console.warn("Could not mark notification as read.", error);
-    }
-
     setNotifications(prev =>
       prev.map(n => (n.id === id ? { ...n, read: true, readDate: "Hoy" } : n))
     );
+
+    try {
+      await resourceApi.markNotificationRead(id);
+      return;
+    } catch (error) {
+      console.warn("Could not mark notification as read.", error);
+      alert("No se pudo marcar la notificación como leída en la API. Se mantendrá actualizada solo en pantalla.");
+    }
   };
 
   const activeNavData = NAVIGATION_DATA.find((item) => item.id === activeNav);
@@ -679,7 +670,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             onResolveAlert={handleResolveAlert}
             onUpdateInventory={handleUpdateInventory}
             onNavigateToSub={handleInnerNavigation}
-            externalTime={currentGlobalTime}
             syncStatus={globalTimeState.status}
           />
         );
@@ -743,7 +733,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             resourceTypes={resourceTypes}
             inventoryMovements={inventoryMovements}
             onAddManualMovement={handleAddManualMovement}
-            onDeleteMovement={handleDeleteMovement}
           />
         );
       case "Alertas de inventario":
@@ -808,17 +797,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             onUpdateTransferStatus={handleUpdateTransferStatus}
             onAddPersonToTransfer={handleAddPersonToTransfer}
             onUpdatePersonStatus={handleUpdatePersonStatus}
-            onDeletePersonFromTransfer={async (id: string) => {
-              try {
-                await resourceApi.deleteTransferPerson(id);
-                await fetchAllSystemData();
-                return;
-              } catch (error) {
-                console.warn("Could not delete transfer person.", error);
-                alert("No se pudo quitar la persona en la API. Se quitará solo en pantalla.");
-              }
-              setTransferPersons(prev => prev.filter(tp => tp.id !== id));
-            }}
           />
         );
       case "Personas en traslado":
@@ -940,7 +918,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             }
           }} 
           globalTimeState={globalTimeState}
-          currentGlobalTime={currentGlobalTime}
         />
       )}
 
@@ -1007,30 +984,96 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   );
 }
 
-function TopHud({ 
+function getStoredHudUser() {
+  if (typeof window === "undefined") {
+    return {
+      userId: 0,
+      username: "OPERADOR",
+      role: "RESOURCE_MANAGEMENT",
+      roleLabel: "ADMINISTRADOR DE RECURSOS",
+    };
+  }
+
+  const savedDisplayName = localStorage.getItem("game_username");
+  const rawUser = localStorage.getItem("session_user") ?? localStorage.getItem("user");
+
+  try {
+    const parsed = rawUser ? JSON.parse(rawUser) as {
+      username?: unknown;
+      name?: unknown;
+      fullName?: unknown;
+      userId?: unknown;
+      id?: unknown;
+      rol?: unknown;
+      role?: unknown;
+    } : null;
+
+    const sessionName = String(parsed?.username ?? parsed?.name ?? parsed?.fullName ?? "").trim();
+    const role = String(parsed?.rol ?? parsed?.role ?? "RESOURCE_MANAGEMENT").toUpperCase();
+    const roleLabel = role === "RESOURCE_MANAGEMENT"
+      ? "ADMINISTRADOR DE RECURSOS"
+      : role.replace(/_/g, " ");
+    const userId = Number(parsed?.userId ?? parsed?.id ?? 0);
+
+    return {
+      userId: Number.isFinite(userId) ? userId : 0,
+      username: sessionName || savedDisplayName || "OPERADOR",
+      role,
+      roleLabel,
+    };
+  } catch {
+    return {
+      userId: 0,
+      username: savedDisplayName || "OPERADOR",
+      role: "RESOURCE_MANAGEMENT",
+      roleLabel: "ADMINISTRADOR DE RECURSOS",
+    };
+  }
+}
+
+const TopHud = memo(function TopHud({ 
   onLogout, 
   activeNav, 
   onVolver,
-  globalTimeState,
-  currentGlobalTime
+  globalTimeState
 }: { 
   onLogout: () => void; 
   activeNav: string | null; 
   onVolver: () => void;
-  globalTimeState: { status: 'synced' | 'syncing' | 'error' };
-  currentGlobalTime: Date;
+  globalTimeState: {
+    baseServerTime: Date;
+    syncedAtClientMs: number;
+    status: 'synced' | 'syncing' | 'error';
+  };
 }) {
+  const initialHudUser = getStoredHudUser();
+  const username = initialHudUser.username;
+  const roleLabel = initialHudUser.roleLabel;
+  const [currentGlobalTime, setCurrentGlobalTime] = useState(() => {
+    const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
+    return new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs);
+  });
+
+  useEffect(() => {
+    const tickInterval = window.setInterval(() => {
+      const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
+      setCurrentGlobalTime(new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs));
+    }, 1000);
+
+    return () => window.clearInterval(tickInterval);
+  }, [globalTimeState.baseServerTime, globalTimeState.syncedAtClientMs]);
+
   return (
     <header className="game-hud-header pointer-events-none flex items-center justify-between px-3 pt-3 pb-2 text-[10px] font-black uppercase tracking-[-0.02em] text-[#A4C2C5]/80">
-      <div className="flex items-center gap-4">
-        <button className="pointer-events-auto top-hud-btn" type="button" onClick={onVolver}>
+      <div className="flex flex-wrap items-center gap-3">
+        <button className="pointer-events-auto top-hud-btn shrink-0" type="button" onClick={onVolver}>
           <span className="btn-text">
             ◀ VOLVER
           </span>
         </button>
 
         
-        <div className="pointer-events-auto flex items-center gap-2 bg-[#0d1414]/90 border border-[#67ACA9]/25 px-2.5 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-[-0.02em] text-white shadow-md">
+        <div className="pointer-events-auto flex items-center gap-2 bg-[#0d1414]/90 border border-[#67ACA9]/25 px-2.5 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-[-0.02em] text-white shadow-md shrink-0">
           <div className="inline-flex items-center shrink-0">
             {globalTimeState.status === "synced" && (
               <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -1060,15 +1103,37 @@ function TopHud({
           </span>
         </div>
       </div>
-      <button className="pointer-events-auto top-hud-btn" type="button" onClick={onLogout}>
-        <span className="btn-text">
-          CERRAR SESIÓN
-          <span className="logout-mark" aria-hidden="true" />
-        </span>
-      </button>
+      <div className="flex items-center gap-3">
+        <div className="pointer-events-auto flex items-center gap-2.5 bg-[#0d1414]/90 border border-[#67ACA9]/25 px-2.5 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-[-0.02em] text-white shadow-md shrink-0">
+          <div className="inline-flex items-center shrink-0">
+            <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+            </svg>
+          </div>
+
+          <div className="flex flex-col justify-center leading-tight">
+            <div className="flex items-center gap-1">
+              <span className="text-[#A4C2C5]/50 font-black">USUARIO:</span>
+              <span className="text-white font-black">{username}</span>
+            </div>
+
+            <div className="flex items-center gap-1 mt-0.5">
+              <span className="text-[#A4C2C5]/50 font-black">ROL:</span>
+              <span className="text-white font-black">{roleLabel}</span>
+            </div>
+          </div>
+        </div>
+
+        <button className="pointer-events-auto top-hud-btn shrink-0" type="button" onClick={onLogout}>
+          <span className="btn-text">
+            CERRAR SESIÓN
+            <span className="logout-mark" aria-hidden="true" />
+          </span>
+        </button>
+      </div>
     </header>
   );
-}
+});
 
 function SectionTitle({ title }: { title: string }) {
   return (

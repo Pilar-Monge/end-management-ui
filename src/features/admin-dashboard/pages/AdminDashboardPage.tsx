@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Area,
@@ -13,43 +13,38 @@ import {
   YAxis,
 } from "recharts";
 import { WorldMap } from "../../expeditions-ui/components/WorldMap";
-import { fetchPersons } from "../../persons/api/queries";
 import type { Person } from "../../persons/types";
-import { deletePerson, updatePerson } from "../../persons/api/mutations";
-import { fetchCamps } from "../../camps/api/queries";
+import { deletePerson, updatePerson, updatePersonPhoto } from "../../persons/api/mutations";
 import type { Camp } from "../../camps/types";
-import { fetchOccupations } from "../../catalogs/api/queries";
 import type { Occupation } from "../../catalogs/types";
 import {
-  completeExpedition,
-  getDeliveredTransferResourceById,
-  getExpeditionsDashboard,
-  getGeneralDashboard,
-  getInventoryDashboard,
-  getIntercampRequestById,
-  getTransferById,
-  getTransferHistoryById,
-  getTransferPersonById,
-  listExpeditions,
-  listAdmissionRequests,
-  listIntercampRequests,
-  listInventoryMovements,
+  getCampAchievementsProgress,
+  getServerTime,
+  getLatestCampAchievementUnlocks,
   listNotifications,
-  updateIntercampRequestStatus,
+  markCampAchievementSeen,
   updateAdmissionRequestStatus,
+  getSystemTimeOffset,
+  advanceSystemTime,
+  ADMIN_DASHBOARD_BOOT_MAX_VISUAL_LEAD,
+  ADMIN_DASHBOARD_BOOT_MIN_MS,
+  INITIAL_DASHBOARD_KPI,
+  bootstrapAdminDashboard,
+  type CampAchievementProgress,
+  type CampAchievementUnlock,
+  type AdminDashboardBootstrapData,
+  type SystemTimeUnit,
+  type SystemTimeOffset,
+  type AdvanceSystemTimeResult,
 } from "../services";
 import {
-  extractNumberByHint,
-  mapAdmissionFromApi,
-  mapExpeditionFromApi,
-  mapIntercampFromApi,
   mapNotificationFromApi,
 } from "../mappers/adminMappers";
-import { ExpeditionsWorldMap } from "../expeditions/components/ExpeditionsWorldMap";
+import { ExpeditionsWorldMap, prefetchExpeditionsWorldMap } from "../expeditions/components/ExpeditionsWorldMap";
 import type { MappedCampPoint } from "../expeditions/types";
-import { AdminBootOverlay } from "../components/AdminBootOverlay";
+import { AdminSyncOverlay } from "../components/AdminSyncOverlay";
 import { SESSION_TOKEN_CHANGED_EVENT } from "../../../shared/services/sessionService";
-import { ApiHttpError } from "../../../shared/services/httpClient";
+import { ApiHttpError, apiRequest } from "../../../shared/services/httpClient";
 import { getErrorMessage } from "../../../shared/services/errorMessages";
 import { PopupMessage } from "../../../shared/components/PopupMessage";
 import "../../expeditions-ui/expeditionsUi.css";
@@ -60,9 +55,9 @@ type AdminSectionId =
   | "centro"
   | "poblacion"
   | "admisiones"
-  | "inventario"
   | "expediciones"
   | "intercamp"
+  | "logros"
   | "seguridad"
   | "notificaciones"
   | "configuracion";
@@ -156,14 +151,18 @@ interface ResourceLedgerEntry {
 
 interface SessionAdminUser {
   id?: number;
+  personId?: number;
+  person_id?: number;
+  userId?: number;
   username?: string;
   displayName?: string;
   firstName?: string;
-  middleName?: string;
   lastName1?: string;
   lastName2?: string;
   role?: string;
   campId?: number;
+  photoUrl?: string;
+  imageUrl?: string;
   profileImage?: string;
   avatar?: string;
   photo?: string;
@@ -174,30 +173,23 @@ interface AdminProfileSummary {
   username: string;
   displayName: string;
   firstName: string;
-  middleName: string;
   lastName1: string;
   lastName2: string;
   role: string;
   occupation: string;
   camp: string;
   status: string;
-  avatarUrl: string;
+  avatarUrl: string | null;
   sessionState: "ACTIVA" | "INACTIVA";
 }
 
+interface GlobalTimeState {
+  baseServerTime: Date;
+  syncedAtClientMs: number;
+  status: "synced" | "syncing" | "error";
+}
+
 const SESSION_TIMEOUT_MS = 20 * 60 * 1000;
-const ADMIN_BOOT_MIN_MS = 1400;
-const ADMIN_BOOT_MAX_VISUAL_LEAD = 8;
-
-type BootStep = "persons" | "admissions" | "intercamp" | "notifications" | "session";
-
-const BOOT_STEP_WEIGHTS: Record<BootStep, number> = {
-  persons: 20,
-  admissions: 25,
-  intercamp: 25,
-  notifications: 15,
-  session: 15,
-};
 
 interface TempRoleAssignment {
   id: number;
@@ -211,9 +203,69 @@ interface TempRoleAssignment {
   status: "ACTIVA" | "FINALIZADA";
 }
 
+type TemporaryView = "sectors" | "timeline" | "quick" | "history";
+
+interface TemporarySector {
+  id: string;
+  name: string;
+  tag: string;
+  description: string;
+  primaryRole: string;
+  basePerformance: number;
+  keywords: string[];
+}
+
+const TEMPORARY_SECTORS: TemporarySector[] = [
+  {
+    id: "alfa",
+    name: "Sector Alfa",
+    tag: "ALFA_DEF",
+    description: "Guardia perimetral, seguridad interna y cobertura defensiva del campamento.",
+    primaryRole: "Centinela de Perímetro",
+    basePerformance: 68,
+    keywords: ["centinela", "guardia", "defensa", "perimetro", "perímetro", "seguridad", "explorador"],
+  },
+  {
+    id: "delta",
+    name: "Sector Delta",
+    tag: "DELTA_LOG",
+    description: "Logística, inventario, reparaciones críticas y soporte técnico operativo.",
+    primaryRole: "Operador de Suministros",
+    basePerformance: 62,
+    keywords: ["suministro", "logistica", "logística", "mecanico", "mecánico", "tecnico", "técnico", "redes", "estructural"],
+  },
+  {
+    id: "omega",
+    name: "Sector Omega",
+    tag: "OMEGA_MED",
+    description: "Unidad clínica, contención sanitaria y respuesta médica de emergencia.",
+    primaryRole: "Soporte Sanitario de Campo",
+    basePerformance: 76,
+    keywords: ["clinico", "clínico", "medico", "médico", "sanitario", "salud", "enfermer", "farmacia", "cirugia", "cirugía"],
+  },
+  {
+    id: "sigma",
+    name: "Sector Sigma",
+    tag: "SIGMA_AGR",
+    description: "Producción alimentaria, agua, cultivos protegidos y estabilidad ambiental.",
+    primaryRole: "Ingeniero Hidropónico",
+    basePerformance: 54,
+    keywords: ["hidropon", "agr", "cultivo", "botan", "agua", "alimento", "invernadero"],
+  },
+  {
+    id: "general",
+    name: "Reserva General",
+    tag: "GEN_POOL",
+    description: "Asignaciones sin sector específico derivado del oficio temporal.",
+    primaryRole: "Operario General",
+    basePerformance: 50,
+    keywords: [],
+  },
+];
+
 const NAVIGATION_DATA: NavItem[] = [
   { id: "centro", label: "Centro de Mando", icon: <RadarIcon />, subOptions: ["Resumen táctico", "Monitoreo general"] },
-  { id: "poblacion", label: "Población", icon: <ProfileIcon />, subOptions: ["Estadísticas", "Usuarios", "Roles temporales"] },
+  { id: "poblacion", label: "Población", icon: <ProfileIcon />, subOptions: ["Estadísticas", "Usuarios", "Oficios temporales"] },
   { id: "admisiones", label: "Admisiones IA", icon: <ShieldIcon />, subOptions: ["Pendientes", "Historial"] },
   {
     id: "expediciones",
@@ -222,34 +274,24 @@ const NAVIGATION_DATA: NavItem[] = [
     subOptions: ["Mapa operativo", "Misiones activas", "Historial", "Recursos"],
   },
   { id: "intercamp", label: "Inter-campamentos", icon: <VehicleIcon />, subOptions: ["Pendientes", "Historial"] },
+  { id: "logros", label: "Logros", icon: <TrophyIcon />, subOptions: ["Progreso", "Desbloqueados", "Historial"] },
   { id: "seguridad", label: "Seguridad", icon: <SecurityIcon />, subOptions: ["En vivo", "Errores", "Sistema"] },
   { id: "notificaciones", label: "Notificaciones", icon: <AlertIcon />, subOptions: ["Todas", "No leídas", "Críticas"] },
-  { id: "configuracion", label: "Configuración", icon: <GearIcon />, subOptions: ["Campamento", "Sistema"] },
+  { id: "configuracion", label: "Configuración", icon: <GearIcon />, subOptions: ["Campamento", "Tiempo lógico"] },
 ];
 
-const BOTTOM_DOCK_ORDER: AdminSectionId[] = ["poblacion", "admisiones", "expediciones", "intercamp"];
+const BOTTOM_DOCK_ORDER: AdminSectionId[] = ["poblacion", "admisiones", "expediciones", "intercamp", "logros"];
 
 const SECTION_DESCRIPTIONS: Record<AdminSectionId, string> = {
   centro: "Vista global del sistema, alertas y salud operativa del campamento.",
   poblacion: "Gestión de supervivientes, estado individual y asignaciones temporales.",
   admisiones: "Análisis asistido para admisiones nuevas y validación de perfiles.",
-  inventario: "Control de recursos, niveles críticos, movimientos y ajustes.",
   expediciones: "Seguimiento de operaciones de campo, rutas y resultados.",
   intercamp: "Solicitudes y traslados entre campamentos aliados.",
+  logros: "Seguimiento de logros automáticos desbloqueados por desempeño del campamento.",
   seguridad: "Auditoría, trazas y eventos críticos del sistema.",
   notificaciones: "Centro de notificaciones con priorización por severidad.",
   configuracion: "Parámetros operativos y políticas del panel administrativo.",
-};
-
-const INITIAL_DASHBOARD_KPI: DashboardKpi = {
-  populationTotal: 0,
-  criticalResources: 0,
-  activeExpeditions: 0,
-  pendingIntercamp: 0,
-  activePopulation: 0,
-  injuredPopulation: 0,
-  sickPopulation: 0,
-  outPopulation: 0,
 };
 
 function expeditionRouteStatus(status: UiExpedition["status"]): string {
@@ -274,6 +316,135 @@ function buildExpeditionRoute(expedition: UiExpedition, points: MappedCampPoint[
 }
 
 const INITIAL_TEMP_ASSIGNMENTS: TempRoleAssignment[] = [];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object";
+}
+
+function firstNumberField(record: Record<string, unknown>, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
+function firstStringField(record: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim() !== "") return value;
+  }
+  return null;
+}
+
+function extractTemporaryAssignmentList(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return [];
+
+  for (const key of ["items", "records", "results", "assignments", "temporaryOccupationAssignments", "temporaryAssignments", "data"]) {
+    const value = payload[key];
+    if (Array.isArray(value)) return value;
+  }
+
+  return [];
+}
+
+function assignmentStatusFromApi(item: Record<string, unknown>): TempRoleAssignment["status"] {
+  const rawStatus = firstStringField(item, ["status", "state", "assignmentStatus"]);
+  const normalizedStatus = rawStatus?.trim().toUpperCase();
+  const revokedAt = firstStringField(item, ["revokedAt", "revoked_at", "deletedAt", "deleted_at", "finishedAt", "finished_at"]);
+
+  if (revokedAt || normalizedStatus === "FINALIZADA" || normalizedStatus === "FINISHED" || normalizedStatus === "REVOKED" || normalizedStatus === "INACTIVE") {
+    return "FINALIZADA";
+  }
+
+  return "ACTIVA";
+}
+
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function temporarySectorForRole(roleName: string): TemporarySector {
+  const normalized = normalizeSearchText(roleName);
+  return TEMPORARY_SECTORS.find((sector) => sector.keywords.some((keyword) => normalized.includes(normalizeSearchText(keyword))))
+    ?? TEMPORARY_SECTORS[TEMPORARY_SECTORS.length - 1];
+}
+
+function parseTemporaryDate(value: string): Date {
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  return new Date(value);
+}
+
+function temporaryAssignmentProgress(startDate: string, endDate: string): { value: number; urgent: boolean; label: string } {
+  const start = parseTemporaryDate(startDate).getTime();
+  const end = parseTemporaryDate(endDate).getTime();
+  const now = Date.now();
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return { value: 0, urgent: false, label: "Sin ventana definida" };
+  }
+
+  const value = Math.max(0, Math.min(100, Math.round(((now - start) / (end - start)) * 100)));
+  const urgent = now < end && end - now < 24 * 60 * 60 * 1000;
+  return { value, urgent, label: `${value}% completado` };
+}
+
+function temporaryDateLabel(value: string): string {
+  const parsed = parseTemporaryDate(value);
+  if (Number.isNaN(parsed.getTime())) return "Sin fecha";
+  return parsed.toLocaleDateString("es-CR");
+}
+
+function dateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateInputFromToday(daysToAdd = 0): string {
+  const date = new Date();
+  date.setDate(date.getDate() + daysToAdd);
+  return dateInputValue(date);
+}
+
+function startOfLocalDay(value: Date): number {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
+}
+
+function temporaryNameInitials(name: string): string {
+  return resolveInitials(name.split(/\s+/), 2);
+}
+
+function nestedName(record: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (!isRecord(value)) continue;
+
+    const directName = firstStringField(value, ["name", "fullName", "displayName", "nombre"]);
+    if (directName) return directName;
+
+    const firstName = firstStringField(value, ["firstName", "nombre", "primerNombre", "first_name"]);
+    const lastName = firstStringField(value, ["lastName", "apellido", "last_name"]);
+    const resolvedName = [firstName, lastName].filter(Boolean).join(" ").trim();
+    if (resolvedName) return resolvedName;
+  }
+
+  return null;
+}
 
 function buildResourceTrendData(records: Array<Record<string, unknown>>): ResourceTrendPoint[] {
   const byDay = new Map<string, ResourceTrendPoint>();
@@ -399,8 +570,9 @@ function buildResourceLedger(records: Array<Record<string, unknown>>): { consume
 function normalizeStatusLabel(status: Person["status"]): string {
   if (status === "ACTIVE") return "Activo";
   if (status === "INJURED") return "Herido";
-  if (status === "MISSING") return "Desaparecido";
-  return "Fallecido";
+  if (status === "SICK") return "Enfermo";
+  if (status === "OUTSIDE_CAMP" || status === "ON_EXPEDITION") return "Fuera";
+  return "Inactivo";
 }
 
 function legacyPopulationStatus(status: Person["status"]): "Activo" | "Herido" | "Enfermo" | "Fuera" {
@@ -427,6 +599,113 @@ function personFullName(person: Person): string {
   return `${person.firstName} ${person.lastName}`.trim();
 }
 
+function resolveInitials(parts: Array<string | null | undefined>, maxLetters = 3): string {
+  const initials = parts
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .filter(Boolean)
+    .slice(0, maxLetters)
+    .join("");
+  return initials || "USR";
+}
+
+function personInitials(person: Person): string {
+  const lastNameTokens = String(person.lastName ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  return resolveInitials([person.firstName, lastNameTokens[0], lastNameTokens[1]], 3);
+}
+
+function resolvePersonProfileImage(person: Person | null): string | null {
+  if (!person) return null;
+  const candidate =
+    (typeof person.photoUrl === "string" && person.photoUrl.trim()) ||
+    (typeof person.profileImage === "string" && person.profileImage.trim()) ||
+    (typeof person.avatar === "string" && person.avatar.trim()) ||
+    (typeof person.photo === "string" && person.photo.trim()) ||
+    (typeof person.imageUrl === "string" && person.imageUrl.trim()) ||
+    "";
+  return candidate || null;
+}
+
+function resolveSessionPerson(profile: SessionAdminUser, persons: Person[]): Person | null {
+  const explicitPersonId =
+    typeof profile.personId === "number"
+      ? profile.personId
+      : typeof profile.person_id === "number"
+        ? profile.person_id
+        : null;
+  if (explicitPersonId !== null) {
+    return persons.find((person) => person.id === explicitPersonId) ?? null;
+  }
+
+  const sessionId = typeof profile.id === "number" ? profile.id : typeof profile.userId === "number" ? profile.userId : null;
+  if (sessionId !== null) {
+    const linkedPerson = persons.find(
+      (person) => person.userId === sessionId || person.systemUserId === sessionId || person.accountId === sessionId,
+    );
+    if (linkedPerson) return linkedPerson;
+  }
+
+  const username = profile.username?.trim().toLowerCase();
+  if (username) {
+    return persons.find((person) => person.username?.trim().toLowerCase() === username) ?? null;
+  }
+
+  if (sessionId !== null) {
+    return persons.find((person) => person.id === sessionId) ?? null;
+  }
+
+  return null;
+}
+
+function resolveSessionPersonId(profile: SessionAdminUser, persons: Person[]): number | null {
+  if (typeof profile.personId === "number") return profile.personId;
+  if (typeof profile.person_id === "number") return profile.person_id;
+  return resolveSessionPerson(profile, persons)?.id ?? null;
+}
+
+function achievementUnlockKey(item: Pick<CampAchievementUnlock, "achievementId" | "unlockedAt">): string {
+  return `${item.achievementId}:${item.unlockedAt}`;
+}
+
+function achievementProgressRatio(item: CampAchievementProgress): number {
+  if (item.isUnlocked) return 1;
+  if (!Number.isFinite(item.targetValue) || item.targetValue <= 0) return 0;
+  if (item.progressSnapshot === null || item.progressSnapshot === undefined || !Number.isFinite(item.progressSnapshot)) return 0;
+  const normalized = Math.max(0, item.progressSnapshot / item.targetValue);
+  return Math.max(0, Math.min(1, normalized));
+}
+
+function achievementValueLabel(item: CampAchievementProgress): string {
+  const progressRaw = item.progressSnapshot;
+  if (progressRaw === null || progressRaw === undefined || !Number.isFinite(progressRaw)) {
+    return "En evaluacion por cron";
+  }
+
+  const progress = Number(progressRaw);
+  const metric = item.metricKey.toLowerCase();
+  if (metric.includes("rate") || item.targetValue <= 1) {
+    return `${Math.round(progress * 100)}% de ${Math.round(item.targetValue * 100)}%`;
+  }
+  return `${Math.round(progress)} de ${Math.round(item.targetValue)}`;
+}
+
+function achievementDateLabel(value?: string | null): string {
+  if (!value) return "Sin fecha";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("es-CR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function readSessionAdminUser(): SessionAdminUser {
   try {
     const rawUser = localStorage.getItem("user");
@@ -439,15 +718,8 @@ function readSessionAdminUser(): SessionAdminUser {
       parsedUser && typeof parsedUser === "object" ? parsedUser : {};
 
     if (parsedSettings && typeof parsedSettings === "object") {
-      if (typeof parsedSettings.adminName === "string" && parsedSettings.adminName.trim()) {
-        resolvedUser.username = parsedSettings.adminName.trim();
-        resolvedUser.displayName = parsedSettings.adminName.trim();
-      }
       if (typeof parsedSettings.firstName === "string") {
         resolvedUser.firstName = parsedSettings.firstName;
-      }
-      if (typeof parsedSettings.middleName === "string") {
-        resolvedUser.middleName = parsedSettings.middleName;
       }
       if (typeof parsedSettings.lastName1 === "string") {
         resolvedUser.lastName1 = parsedSettings.lastName1;
@@ -472,8 +744,10 @@ function normalizeRoleLabel(role?: string): string {
   return role.replace(/_/g, " ");
 }
 
-function resolveAdminProfileImage(sessionUser: SessionAdminUser, matchedPerson: Person | null): string {
+function resolveAdminProfileImage(sessionUser: SessionAdminUser, matchedPerson: Person | null): string | null {
   const storedProfileImage =
+    (typeof sessionUser.photoUrl === "string" && sessionUser.photoUrl.trim()) ||
+    (typeof sessionUser.imageUrl === "string" && sessionUser.imageUrl.trim()) ||
     (typeof sessionUser.profileImage === "string" && sessionUser.profileImage.trim()) ||
     (typeof sessionUser.avatar === "string" && sessionUser.avatar.trim()) ||
     (typeof sessionUser.photo === "string" && sessionUser.photo.trim()) ||
@@ -483,19 +757,46 @@ function resolveAdminProfileImage(sessionUser: SessionAdminUser, matchedPerson: 
     return storedProfileImage;
   }
 
-  if (typeof sessionUser.id === "number") {
-    return `https://i.pravatar.cc/96?img=${(sessionUser.id % 69) + 1}`;
-  }
+  return resolvePersonProfileImage(matchedPerson);
+}
 
-  if (matchedPerson) {
-    return `https://i.pravatar.cc/96?img=${(matchedPerson.id % 69) + 1}`;
-  }
+function formatHudDateTime(date: Date): { day: string; time: string } {
+  const day = `${String(date.getUTCDate()).padStart(2, "0")}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`;
+  const time = `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(date.getUTCSeconds()).padStart(2, "0")} UTC`;
+  return { day, time };
+}
 
-  return "https://i.pravatar.cc/80?img=12";
+function formatSystemDateTime(value?: string | null): string {
+  if (!value) return "Sin dato";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("es-CR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function formatOffsetMilliseconds(value?: number | null): string {
+  if (!Number.isFinite(value ?? NaN)) return "Sin dato";
+  const sign = Number(value) < 0 ? "-" : "+";
+  const totalMinutes = Math.floor(Math.abs(Number(value)) / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  return `${sign}${days}d ${hours}h ${minutes}m`;
 }
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const initialBootstrapDataRef = useRef(
+    (location.state as { bootstrappedDashboardData?: AdminDashboardBootstrapData } | null)?.bootstrappedDashboardData ?? null,
+  );
+  const initialBootstrapData = initialBootstrapDataRef.current;
 
   const [hasEntered] = useState(true);
 
@@ -504,29 +805,39 @@ export default function AdminDashboardPage() {
 
   const [dataError, setDataError] = useState<string | null>(null);
 
-  const [persons, setPersons] = useState<Person[]>([]);
-  const [camps, setCamps] = useState<Camp[]>([]);
-  const [occupations, setOccupations] = useState<Occupation[]>([]);
-  const [admissions, setAdmissions] = useState<UiAdmission[]>([]);
-  const [expeditions, setExpeditions] = useState<UiExpedition[]>([]);
-  const [intercampRequests, setIntercampRequests] = useState<UiIntercampRequest[]>([]);
-  const [dashboardKpi, setDashboardKpi] = useState<DashboardKpi>(INITIAL_DASHBOARD_KPI);
+  const [persons, setPersons] = useState<Person[]>(initialBootstrapData?.persons ?? []);
+  const [camps, setCamps] = useState<Camp[]>(initialBootstrapData?.camps ?? []);
+  const [occupations, setOccupations] = useState<Occupation[]>(initialBootstrapData?.occupations ?? []);
+  const [admissions, setAdmissions] = useState<UiAdmission[]>(initialBootstrapData?.admissions ?? []);
+  const [expeditions, setExpeditions] = useState<UiExpedition[]>(initialBootstrapData?.expeditions ?? []);
+  const [intercampRequests, setIntercampRequests] = useState<UiIntercampRequest[]>(initialBootstrapData?.intercampRequests ?? []);
+  const [dashboardKpi, setDashboardKpi] = useState<DashboardKpi>(initialBootstrapData?.dashboardKpi ?? INITIAL_DASHBOARD_KPI);
   const [notifications, setNotifications] = useState<UiNotification[]>([]);
   const [resourceTrendData, setResourceTrendData] = useState<ResourceTrendPoint[]>([]);
   const [consumedResources, setConsumedResources] = useState<ResourceLedgerEntry[]>([]);
   const [gainedResources, setGainedResources] = useState<ResourceLedgerEntry[]>([]);
-  const [lookupId, setLookupId] = useState("");
+  const [achievementProgress, setAchievementProgress] = useState<CampAchievementProgress[]>([]);
+  const [achievementUnlockQueue, setAchievementUnlockQueue] = useState<CampAchievementUnlock[]>([]);
+  const [activeAchievementUnlock, setActiveAchievementUnlock] = useState<CampAchievementUnlock | null>(null);
   const [sessionState, setSessionState] = useState<"ACTIVA" | "INACTIVA">("INACTIVA");
-  const [lastActivityAt, setLastActivityAt] = useState(Date.now());
   const [moduleFeedback, setModuleFeedback] = useState<ModuleFeedback | null>(null);
   const [sessionAdminUser, setSessionAdminUser] = useState<SessionAdminUser>(() => readSessionAdminUser());
   const [dashboardPopup, setDashboardPopup] = useState<{ id: number; message: string; type: ModuleMessageType } | null>(null);
+  const [globalTimeState, setGlobalTimeState] = useState<GlobalTimeState>({
+    baseServerTime: new Date(),
+    syncedAtClientMs: Date.now(),
+    status: "syncing",
+  });
   const lastActivityUpdateRef = useRef(0);
+  const lastActivityAtRef = useRef(Date.now());
   const bootStartedAtRef = useRef<number>(Date.now());
-  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const initialCoreLoadStartedRef = useRef(false);
+  const preloadedDeferredLoadStartedRef = useRef(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(!initialBootstrapData);
   const [bootDataProgress, setBootDataProgress] = useState(0);
   const [bootVisualProgress, setBootVisualProgress] = useState(0);
   const [bootPhase, setBootPhase] = useState("Inicializando consola tactica...");
+  const seenAchievementKeysRef = useRef<Set<string>>(new Set());
 
   const notifyModule = useCallback(
     (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => {
@@ -534,6 +845,69 @@ export default function AdminDashboardPage() {
     },
     [],
   );
+
+  const enqueueAchievementUnlocks = useCallback(
+    (items: CampAchievementUnlock[]) => {
+      if (items.length === 0) return;
+
+      setAchievementUnlockQueue((prev) => {
+        const queuedKeys = new Set(prev.map((item) => achievementUnlockKey(item)));
+        const activeKey = activeAchievementUnlock ? achievementUnlockKey(activeAchievementUnlock) : null;
+        const nextQueue = [...prev];
+
+        for (const item of items) {
+          if (item.isSeen) continue;
+          const key = achievementUnlockKey(item);
+          if (seenAchievementKeysRef.current.has(key) || queuedKeys.has(key) || key === activeKey) continue;
+          queuedKeys.add(key);
+          nextQueue.push(item);
+        }
+
+        return nextQueue;
+      });
+    },
+    [activeAchievementUnlock],
+  );
+
+  const applyBootstrapData = useCallback((data: AdminDashboardBootstrapData) => {
+    setPersons(data.persons);
+    setCamps(data.camps);
+    setOccupations(data.occupations);
+    setAdmissions(data.admissions);
+    setExpeditions(data.expeditions);
+    setIntercampRequests(data.intercampRequests);
+    setDashboardKpi(data.dashboardKpi);
+  }, []);
+
+  const loadDeferredDashboardData = useCallback(async () => {
+    let deferredFailedCount = 0;
+
+    const safeRunDeferred = async <T,>(runner: () => Promise<T>, fallback: T): Promise<T> => {
+      try {
+        return await runner();
+      } catch {
+        deferredFailedCount += 1;
+        return fallback;
+      }
+    };
+
+    const [notificationRecords, achievementProgressRecords, latestAchievementUnlocks] = await Promise.all([
+      safeRunDeferred(listNotifications, [] as Awaited<ReturnType<typeof listNotifications>>),
+      safeRunDeferred(getCampAchievementsProgress, [] as Awaited<ReturnType<typeof getCampAchievementsProgress>>),
+      safeRunDeferred(() => getLatestCampAchievementUnlocks(5), [] as Awaited<ReturnType<typeof getLatestCampAchievementUnlocks>>),
+    ]);
+
+    setNotifications(notificationRecords.map((item) => mapNotificationFromApi(item) as UiNotification));
+    setResourceTrendData([]);
+    setConsumedResources([]);
+    setGainedResources([]);
+    setAchievementProgress(achievementProgressRecords);
+    enqueueAchievementUnlocks(latestAchievementUnlocks);
+
+    if (deferredFailedCount > 0) {
+      notifyModule("global", "warning", `Carga diferida parcial: ${deferredFailedCount} modulo(s) secundarios fallaron.`);
+    }
+  }, [enqueueAchievementUnlocks, notifyModule]);
 
   useEffect(() => {
     if (!moduleFeedback) return;
@@ -567,94 +941,24 @@ export default function AdminDashboardPage() {
     setBootPhase("Inicializando consola tactica...");
     bootStartedAtRef.current = Date.now();
 
-    let progressAccumulator = 0;
-    const completeBootStep = (step: BootStep, phaseLabel: string) => {
-      progressAccumulator = Math.min(100, progressAccumulator + BOOT_STEP_WEIGHTS[step]);
-      setBootDataProgress(progressAccumulator);
-      setBootPhase(phaseLabel);
-    };
-
     try {
-      const trackedTasks = [
-        {
-          run: async () => {
-            const value = await fetchPersons();
-            completeBootStep("persons", "Sincronizando poblacion...");
-            return value;
-          },
+      const data = await bootstrapAdminDashboard({
+        onProgress: ({ progress, phase }) => {
+          setBootDataProgress(progress);
+          setBootPhase(phase);
         },
-        { run: fetchCamps },
-        { run: fetchOccupations },
-        {
-          run: async () => {
-            const value = await listAdmissionRequests();
-            completeBootStep("admissions", "Procesando admisiones IA...");
-            return value;
-          },
-        },
-        { run: listExpeditions },
-        {
-          run: async () => {
-            const value = await listIntercampRequests();
-            completeBootStep("intercamp", "Conectando inter-campamentos...");
-            return value;
-          },
-        },
-        { run: getGeneralDashboard },
-        { run: getInventoryDashboard },
-        { run: getExpeditionsDashboard },
-        {
-          run: async () => {
-            const value = await listNotifications();
-            completeBootStep("notifications", "Cargando notificaciones...");
-            return value;
-          },
-        },
-        { run: listInventoryMovements },
-      ] as const;
+      });
 
-      const results = await Promise.allSettled(trackedTasks.map((task) => task.run()));
+      applyBootstrapData(data);
 
-      const personsData = results[0].status === "fulfilled" ? results[0].value : [];
-      const campsData = results[1].status === "fulfilled" ? results[1].value : [];
-      const occupationsData = results[2].status === "fulfilled" ? results[2].value : [];
-      const admissionsData = results[3].status === "fulfilled" ? results[3].value : [];
-      const expeditionsData = results[4].status === "fulfilled" ? results[4].value : [];
-      const intercampData = results[5].status === "fulfilled" ? results[5].value : [];
-      const generalDashboard = results[6].status === "fulfilled" ? results[6].value : {};
-      const inventoryDashboard = results[7].status === "fulfilled" ? results[7].value : {};
-      const expeditionsDashboard = results[8].status === "fulfilled" ? results[8].value : {};
-      const notificationRecords = results[9].status === "fulfilled" ? results[9].value : [];
-      const inventoryMovements = results[10].status === "fulfilled" ? results[10].value : [];
-
-      const failedCount = results.filter((result) => result.status === "rejected").length;
-      if (failedCount > 0) {
-        notifyModule("global", "warning", `Se cargaron datos parciales: ${failedCount} modulo(s) fallaron en backend.`);
+      if (data.criticalFailedCount > 0) {
+        notifyModule("global", "warning", `Carga inicial parcial: ${data.criticalFailedCount} modulo(s) critico(s) fallaron en backend.`);
+      }
+      if (data.readOnlySkippedCount > 0) {
+        notifyModule("global", "info", `Algunos modulos de consulta no estan disponibles para este rol (${data.readOnlySkippedCount}).`);
       }
 
-      setPersons(personsData);
-      setCamps(campsData);
-      setOccupations(occupationsData);
-      setAdmissions(admissionsData.map((item) => mapAdmissionFromApi(item) as UiAdmission));
-      setExpeditions(expeditionsData.map((item) => mapExpeditionFromApi(item) as UiExpedition));
-      setIntercampRequests(intercampData.map((item) => mapIntercampFromApi(item) as UiIntercampRequest));
-      setNotifications(notificationRecords.map((item) => mapNotificationFromApi(item) as UiNotification));
-      const inventoryMovementRecords = inventoryMovements as unknown as Array<Record<string, unknown>>;
-      setResourceTrendData(buildResourceTrendData(inventoryMovementRecords));
-      const ledger = buildResourceLedger(inventoryMovementRecords);
-      setConsumedResources(ledger.consumed);
-      setGainedResources(ledger.gained);
-      setDashboardKpi({
-        populationTotal: extractNumberByHint(generalDashboard, ["population", "persons", "totalpeople", "total"], personsData.length),
-        criticalResources: extractNumberByHint(inventoryDashboard, ["critical", "alert", "low"], 0),
-        activeExpeditions: extractNumberByHint(expeditionsDashboard, ["active", "ongoing"], expeditionsData.length),
-        pendingIntercamp: extractNumberByHint(generalDashboard, ["intercamp", "transfer", "pending"], intercampData.length),
-        activePopulation: extractNumberByHint(generalDashboard, ["active", "healthy"], personsData.filter((person) => person.status === "ACTIVE").length),
-        injuredPopulation: extractNumberByHint(generalDashboard, ["injured"], personsData.filter((person) => person.status === "INJURED").length),
-        sickPopulation: extractNumberByHint(generalDashboard, ["sick", "ill"], 0),
-        outPopulation: extractNumberByHint(generalDashboard, ["missing", "outside", "out"], personsData.filter((person) => person.status === "MISSING").length),
-      });
-      completeBootStep("session", "Validando sesion y perfil...");
+      void loadDeferredDashboardData();
     } catch (error) {
       setDataError(getErrorMessage(error, "load_dashboard"));
       notifyModule("global", "error", "No se logro completar la sincronizacion general de modulos.");
@@ -662,13 +966,27 @@ export default function AdminDashboardPage() {
       setBootDataProgress(100);
       setBootPhase("Finalizando despliegue...");
       const elapsed = Date.now() - bootStartedAtRef.current;
-      const waitMs = Math.max(0, ADMIN_BOOT_MIN_MS - elapsed);
+      const waitMs = Math.max(0, ADMIN_DASHBOARD_BOOT_MIN_MS - elapsed);
       if (waitMs > 0) {
         await new Promise((resolve) => window.setTimeout(resolve, waitMs));
       }
       setIsBootstrapping(false);
     }
-  }, [notifyModule]);
+  }, [applyBootstrapData, loadDeferredDashboardData, notifyModule]);
+
+  const dismissAchievementUnlock = useCallback(async () => {
+    if (!activeAchievementUnlock) return;
+    const item = activeAchievementUnlock;
+    const unlockKey = achievementUnlockKey(item);
+    seenAchievementKeysRef.current.add(unlockKey);
+    setActiveAchievementUnlock(null);
+
+    try {
+      await markCampAchievementSeen(item.achievementId);
+    } catch {
+      notifyModule("logros", "warning", `No se pudo marcar como visto el logro #${item.achievementId}.`);
+    }
+  }, [activeAchievementUnlock, notifyModule]);
 
   useEffect(() => {
     if (!isBootstrapping) {
@@ -678,7 +996,7 @@ export default function AdminDashboardPage() {
 
     const timer = window.setInterval(() => {
       setBootVisualProgress((prev) => {
-        const target = Math.min(99, bootDataProgress + ADMIN_BOOT_MAX_VISUAL_LEAD);
+        const target = Math.min(99, bootDataProgress + ADMIN_DASHBOARD_BOOT_MAX_VISUAL_LEAD);
         if (prev >= target) return prev;
         return Math.min(target, prev + 1);
       });
@@ -689,15 +1007,103 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (!hasEntered) return;
+    if (initialBootstrapDataRef.current) return;
+    if (initialCoreLoadStartedRef.current) return;
+    initialCoreLoadStartedRef.current = true;
     void loadCoreData();
   }, [hasEntered, loadCoreData]);
+
+  useEffect(() => {
+    const data = initialBootstrapDataRef.current;
+    if (!data) return;
+    if (preloadedDeferredLoadStartedRef.current) return;
+    preloadedDeferredLoadStartedRef.current = true;
+
+    if (data.criticalFailedCount > 0) {
+      notifyModule("global", "warning", `Carga inicial parcial: ${data.criticalFailedCount} modulo(s) critico(s) fallaron en backend.`);
+    }
+    if (data.readOnlySkippedCount > 0) {
+      notifyModule("global", "info", `Algunos modulos de consulta no estan disponibles para este rol (${data.readOnlySkippedCount}).`);
+    }
+
+    void loadDeferredDashboardData();
+  }, [loadDeferredDashboardData, notifyModule]);
+
+  useEffect(() => {
+    if (!hasEntered) return;
+
+    const syncGlobalTime = async () => {
+      setGlobalTimeState((prev) => ({ ...prev, status: "syncing" }));
+      try {
+        const data = await getServerTime();
+        const parsed = new Date(data.serverTime);
+        if (Number.isNaN(parsed.getTime())) {
+          throw new Error("Invalid server time");
+        }
+
+        setGlobalTimeState({
+          baseServerTime: parsed,
+          syncedAtClientMs: Date.now(),
+          status: "synced",
+        });
+      } catch {
+        setGlobalTimeState((prev) => ({
+          ...prev,
+          baseServerTime: new Date(),
+          syncedAtClientMs: Date.now(),
+          status: "error",
+        }));
+      }
+    };
+
+    void syncGlobalTime();
+    const syncInterval = window.setInterval(() => {
+      void syncGlobalTime();
+    }, 60000);
+
+    return () => window.clearInterval(syncInterval);
+  }, [hasEntered]);
+
+  useEffect(() => {
+    if (activeAchievementUnlock || achievementUnlockQueue.length === 0) return;
+    const [nextUnlock, ...rest] = achievementUnlockQueue;
+    setAchievementUnlockQueue(rest);
+    setActiveAchievementUnlock(nextUnlock);
+  }, [activeAchievementUnlock, achievementUnlockQueue]);
+
+  useEffect(() => {
+    if (!activeAchievementUnlock) return;
+    const timer = window.setTimeout(() => {
+      void dismissAchievementUnlock();
+    }, 4200);
+    return () => window.clearTimeout(timer);
+  }, [activeAchievementUnlock, dismissAchievementUnlock]);
+
+  useEffect(() => {
+    if (!hasEntered) return;
+
+    const pollUnlocks = async () => {
+      try {
+        const latest = await getLatestCampAchievementUnlocks(5);
+        enqueueAchievementUnlocks(latest);
+      } catch {
+        // Ignore transient polling errors
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      void pollUnlocks();
+    }, 75000);
+
+    return () => window.clearInterval(interval);
+  }, [enqueueAchievementUnlocks, hasEntered]);
 
   useEffect(() => {
     const markActivity = () => {
       const now = Date.now();
       if (now - lastActivityUpdateRef.current < 500) return;
       lastActivityUpdateRef.current = now;
-      setLastActivityAt(now);
+      lastActivityAtRef.current = now;
     };
     const events: Array<keyof WindowEventMap> = ["mousemove", "mousedown", "click", "keydown", "touchstart", "scroll"];
     events.forEach((eventName) => window.addEventListener(eventName, markActivity, { passive: true }));
@@ -708,17 +1114,18 @@ export default function AdminDashboardPage() {
     const evaluateSession = () => {
       const hasToken = Boolean(localStorage.getItem("token") ?? localStorage.getItem("accessToken"));
       if (!hasToken) {
-        setSessionState("INACTIVA");
+        setSessionState((prev) => (prev === "INACTIVA" ? prev : "INACTIVA"));
         return;
       }
 
-      const idleMs = Date.now() - lastActivityAt;
-      setSessionState(idleMs >= SESSION_TIMEOUT_MS ? "INACTIVA" : "ACTIVA");
+      const idleMs = Date.now() - lastActivityAtRef.current;
+      const nextSessionState = idleMs >= SESSION_TIMEOUT_MS ? "INACTIVA" : "ACTIVA";
+      setSessionState((prev) => (prev === nextSessionState ? prev : nextSessionState));
     };
 
     evaluateSession();
 
-    const interval = setInterval(evaluateSession, 1000);
+    const interval = setInterval(evaluateSession, 5000);
     const onTokenChanged = () => evaluateSession();
     window.addEventListener(SESSION_TOKEN_CHANGED_EVENT, onTokenChanged);
 
@@ -726,7 +1133,7 @@ export default function AdminDashboardPage() {
       clearInterval(interval);
       window.removeEventListener(SESSION_TOKEN_CHANGED_EVENT, onTokenChanged);
     };
-  }, [lastActivityAt]);
+  }, []);
 
   const handleNavClick = (navId: AdminSectionId) => {
     const nextNavId: AdminSectionId = activeNav === navId ? "centro" : navId;
@@ -758,12 +1165,11 @@ export default function AdminDashboardPage() {
 
   const adminProfile = useMemo<AdminProfileSummary>(() => {
     const sessionUser = sessionAdminUser;
-    const matchedPerson = typeof sessionUser.id === "number" ? (persons.find((person) => person.id === sessionUser.id) ?? null) : null;
+    const matchedPerson = resolveSessionPerson(sessionUser, persons);
     const firstName = sessionUser.firstName?.trim() || matchedPerson?.firstName || "Administrador";
-    const middleName = sessionUser.middleName?.trim() || "";
     const lastName1 = sessionUser.lastName1?.trim() || matchedPerson?.lastName || "";
     const lastName2 = sessionUser.lastName2?.trim() || "";
-    const fullName = [firstName, middleName, lastName1, lastName2].filter(Boolean).join(" ").trim();
+    const fullName = [firstName, lastName1, lastName2].filter(Boolean).join(" ").trim();
     const displayName = fullName || sessionUser.username?.trim() || (matchedPerson ? personFullName(matchedPerson) : "Administrador");
     const occupation = matchedPerson ? occupationNameById.get(matchedPerson.occupationId) ?? `Ocupación #${matchedPerson.occupationId}` : "No disponible";
     const campId = matchedPerson?.campId ?? sessionUser.campId;
@@ -775,7 +1181,6 @@ export default function AdminDashboardPage() {
       username: sessionUser.username ?? "sin-usuario",
       displayName,
       firstName,
-      middleName,
       lastName1,
       lastName2,
       role: normalizeRoleLabel(sessionUser.role),
@@ -791,7 +1196,7 @@ export default function AdminDashboardPage() {
     const total = persons.length;
     const active = persons.filter((person) => person.status === "ACTIVE").length;
     const injured = persons.filter((person) => person.status === "INJURED").length;
-    const missing = persons.filter((person) => person.status === "MISSING").length;
+    const missing = persons.filter((person) => person.status === "OUTSIDE_CAMP" || person.status === "ON_EXPEDITION").length;
     return { total, active, injured, missing };
   }, [persons]);
 
@@ -833,66 +1238,6 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleCompleteExpedition = async (id: number) => {
-    try {
-      await completeExpedition(id);
-      setExpeditions((prev) => prev.map((expedition) => (expedition.id === id ? { ...expedition, status: "COMPLETADA" } : expedition)));
-      notifyModule("expediciones", "success", `Expedicion #${id} marcada como completada.`);
-    } catch (error) {
-      setDataError(getErrorMessage(error, "complete_expedition"));
-    }
-  };
-
-  const handleLookupIntercamp = async () => {
-    const id = Number(lookupId);
-    if (!Number.isFinite(id) || id <= 0) {
-      notifyModule("intercamp", "warning", "Ingresa un ID valido para buscar registros inter-campamento.");
-      return;
-    }
-
-    setDataError(null);
-
-    const loaders = [
-      () => getIntercampRequestById(id),
-      () => getTransferById(id),
-      () => getTransferHistoryById(id),
-      () => getTransferPersonById(id),
-      () => getDeliveredTransferResourceById(id),
-    ];
-
-    for (const load of loaders) {
-      try {
-        const record = await load();
-        const mapped = mapIntercampFromApi(record) as UiIntercampRequest;
-        setIntercampRequests((prev) => [mapped, ...prev.filter((item) => item.id !== mapped.id)]);
-        notifyModule("intercamp", "success", `Registro inter-campamento #${mapped.id} sincronizado.`);
-        return;
-      } catch {
-        // Keep trying remaining endpoints
-      }
-    }
-
-    notifyModule("intercamp", "warning", "No se encontro un registro inter-campamento con ese ID.");
-  };
-
-  const handleIntercampDecision = async (id: number, status: "APROBADO" | "RECHAZADO") => {
-    const backendStatus = status === "APROBADO" ? "APPROVED" : "REJECTED";
-    try {
-      const updated = await updateIntercampRequestStatus(id, backendStatus);
-      const mapped = mapIntercampFromApi(updated) as UiIntercampRequest;
-      setIntercampRequests((prev) => prev.map((item) => (item.id === id ? mapped : item)));
-      notifyModule(
-        "intercamp",
-        "success",
-        status === "APROBADO"
-          ? `Solicitud #${id} aprobada correctamente.`
-          : `Solicitud #${id} rechazada correctamente.`,
-      );
-    } catch (error) {
-      setDataError(getErrorMessage(error, "update_intercamp"));
-    }
-  };
-
   const threatLevel = Math.max(
     0,
     Math.min(
@@ -910,7 +1255,14 @@ export default function AdminDashboardPage() {
     <div className="game-screen-layout text-[#A4C2C5]">
       <div className="holo-grid" />
 
-      {hasEntered && <TopHud onBack={() => navigate("/admin-main-view-ui")} onLogout={handleLogout} profile={adminProfile} />}
+      {hasEntered && (
+        <TopHud
+          onBack={() => navigate("/admin-main-view-ui")}
+          onLogout={handleLogout}
+          profile={adminProfile}
+          globalTimeState={globalTimeState}
+        />
+      )}
 
       {hasEntered && (
         <div className="main-area">
@@ -930,6 +1282,7 @@ export default function AdminDashboardPage() {
                       notifications={notifications}
                       threatLevel={threatLevel}
                       populationStats={populationStats}
+                      achievementProgress={achievementProgress}
                       admissions={admissions}
                       admissionsQueue={admissionsQueue}
                       admissionsHistory={admissionsHistory}
@@ -937,15 +1290,10 @@ export default function AdminDashboardPage() {
                       consumedResources={consumedResources}
                       gainedResources={gainedResources}
                       intercampRequests={intercampRequests}
-                      lookupId={lookupId}
-                      setLookupId={setLookupId}
-                      onLookupIntercamp={handleLookupIntercamp}
                       campCatalog={camps}
                       campNameById={campNameById}
                       occupationNameById={occupationNameById}
                       onAdmissionDecision={handleAdmissionDecision}
-                      onCompleteExpedition={handleCompleteExpedition}
-                      onIntercampDecision={handleIntercampDecision}
                       onPopulationReload={loadCoreData}
                       onDashboardReload={loadCoreData}
                       resourceTrendData={resourceTrendData}
@@ -971,6 +1319,7 @@ export default function AdminDashboardPage() {
                         notifications={notifications}
                         threatLevel={threatLevel}
                         populationStats={populationStats}
+                        achievementProgress={achievementProgress}
                         admissions={admissions}
                         admissionsQueue={admissionsQueue}
                         admissionsHistory={admissionsHistory}
@@ -978,15 +1327,10 @@ export default function AdminDashboardPage() {
                         consumedResources={consumedResources}
                         gainedResources={gainedResources}
                         intercampRequests={intercampRequests}
-                        lookupId={lookupId}
-                        setLookupId={setLookupId}
-                        onLookupIntercamp={handleLookupIntercamp}
                         campCatalog={camps}
                         campNameById={campNameById}
                         occupationNameById={occupationNameById}
                         onAdmissionDecision={handleAdmissionDecision}
-                        onCompleteExpedition={handleCompleteExpedition}
-                        onIntercampDecision={handleIntercampDecision}
                         onPopulationReload={loadCoreData}
                         onDashboardReload={loadCoreData}
                         resourceTrendData={resourceTrendData}
@@ -1008,12 +1352,49 @@ export default function AdminDashboardPage() {
       {hasEntered && (
         <>
           <BottomDock activeDock={activeNav} onSelect={handleNavClick} />
-          <SupportLink />
           <SettingsHint onOpen={() => handleNavClick("configuracion")} />
         </>
       )}
 
-      <AdminBootOverlay visible={isBootstrapping} progress={Math.max(bootDataProgress, bootVisualProgress)} phase={bootPhase} />
+      <AdminSyncOverlay
+        visible={isBootstrapping}
+        isReady={false}
+        progress={Math.max(bootDataProgress, bootVisualProgress)}
+        phase={bootPhase}
+        presetName="CENTRO DE MANDO"
+        showActions={false}
+      />
+      <AnimatePresence>
+        {activeAchievementUnlock && (
+          <motion.div
+            className="admin-ui-v2-achievement-unlock-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            <motion.div
+              className="admin-ui-v2-achievement-unlock-card"
+              initial={{ opacity: 0, scale: 0.9, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 10 }}
+              transition={{ duration: 0.24, ease: "easeOut" }}
+            >
+              <div className="admin-ui-v2-achievement-unlock-badge">LOGRO DESBLOQUEADO</div>
+              <div className="admin-ui-v2-achievement-unlock-icon">{activeAchievementUnlock.icon ?? "🏆"}</div>
+              <h3>{activeAchievementUnlock.name}</h3>
+              <p>{activeAchievementUnlock.description}</p>
+              <div className="admin-ui-v2-achievement-unlock-meta">
+                <span>{activeAchievementUnlock.category ?? "GENERAL"}</span>
+                <span>{typeof activeAchievementUnlock.points === "number" ? `+${activeAchievementUnlock.points} pts` : "Sin puntaje"}</span>
+              </div>
+              <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void dismissAchievementUnlock()}>
+                Entendido
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <PopupMessage
         message={dashboardPopup?.message ?? null}
         onClose={() => setDashboardPopup(null)}
@@ -1031,9 +1412,23 @@ export default function AdminDashboardPage() {
   );
 }
 
-function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: () => void; profile: AdminProfileSummary }) {
+function TopHud({
+  onBack,
+  onLogout,
+  profile,
+  globalTimeState,
+}: {
+  onBack: () => void;
+  onLogout: () => void;
+  profile: AdminProfileSummary;
+  globalTimeState: GlobalTimeState;
+}) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProfilePreviewOpen, setIsProfilePreviewOpen] = useState(false);
+  const [currentGlobalTime, setCurrentGlobalTime] = useState<Date>(() => {
+    const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
+    return new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs);
+  });
   const profileWrapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -1069,6 +1464,23 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isProfilePreviewOpen]);
 
+  useEffect(() => {
+    const tickInterval = window.setInterval(() => {
+      const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
+      setCurrentGlobalTime(new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs));
+    }, 1000);
+
+    return () => window.clearInterval(tickInterval);
+  }, [globalTimeState.baseServerTime, globalTimeState.syncedAtClientMs]);
+
+  const hudDateTime = useMemo(() => formatHudDateTime(currentGlobalTime), [currentGlobalTime]);
+  const profileButtonLabel = `${profile.role} · @${profile.username}`;
+  const profileInitials = useMemo(
+    () => resolveInitials([profile.firstName, profile.lastName1, profile.lastName2, profile.displayName], 3),
+    [profile.firstName, profile.lastName1, profile.lastName2, profile.displayName],
+  );
+  const hasProfileImage = Boolean(profile.avatarUrl);
+
   return (
     <header className="game-hud-header pointer-events-none flex items-center justify-between px-3 pt-3 pb-2 text-[10px] font-black uppercase tracking-[-0.02em] text-[#A4C2C5]/80">
       <button className="pointer-events-auto top-hud-btn" type="button" onClick={onBack}>
@@ -1080,6 +1492,14 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
           Volver al Centro
         </span>
       </button>
+      <div className="admin-ui-v2-time-hud pointer-events-auto" aria-live="polite">
+        <span className="admin-ui-v2-time-day">{hudDateTime.day}</span>
+        <span className="admin-ui-v2-time-sep" aria-hidden="true">|</span>
+        <span className="admin-ui-v2-time-clock">{hudDateTime.time}</span>
+        <span className={`admin-ui-v2-time-status is-${globalTimeState.status}`}>
+          {globalTimeState.status === "synced" ? "Sincronizado" : globalTimeState.status === "syncing" ? "Sincronizando" : "Hora local"}
+        </span>
+      </div>
       <div className="admin-ui-v2-profile-hud-wrap pointer-events-auto" ref={profileWrapRef}>
         <button
           className={`top-hud-btn admin-ui-v2-profile-hud-btn ${isProfileOpen ? "is-open" : ""}`}
@@ -1089,7 +1509,7 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
           aria-haspopup="dialog"
         >
           <span className="btn-text">
-            Perfil
+            {profileButtonLabel}
             <span className="admin-ui-v2-profile-session-dot" data-state={profile.sessionState} aria-hidden="true" />
           </span>
         </button>
@@ -1098,12 +1518,29 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
           <div className="admin-ui-v2-profile-popover" role="dialog" aria-label="Información del perfil administrativo">
             <div className="admin-ui-v2-profile-popover-head">
               <button
-                className="admin-ui-v2-profile-avatar-button"
+                className={`admin-ui-v2-profile-avatar-button ${hasProfileImage ? "is-clickable" : "is-static"}`}
                 type="button"
-                onClick={() => setIsProfilePreviewOpen(true)}
-                aria-label="Ver foto de perfil ampliada"
+                onClick={() => {
+                  if (hasProfileImage) {
+                    setIsProfilePreviewOpen(true);
+                  }
+                }}
+                aria-label={hasProfileImage ? "Ver foto de perfil ampliada" : `Iniciales de ${profile.displayName}`}
               >
-                <img className="admin-ui-v2-profile-popover-avatar" src={profile.avatarUrl} alt={`Perfil de ${profile.displayName}`} />
+                {hasProfileImage ? (
+                  <img
+                    className="admin-ui-v2-profile-popover-avatar"
+                    src={profile.avatarUrl ?? undefined}
+                    alt={`Perfil de ${profile.displayName}`}
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="admin-ui-v2-profile-popover-avatar admin-ui-v2-avatar-fallback" aria-hidden="true">
+                    {profileInitials}
+                  </span>
+                )}
               </button>
               <div>
                 <strong>{profile.displayName}</strong>
@@ -1113,7 +1550,6 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
 
             <div className="admin-ui-v2-profile-popover-grid">
               <div><small>Primer nombre</small><strong>{profile.firstName || "-"}</strong></div>
-              <div><small>Segundo nombre</small><strong>{profile.middleName || "-"}</strong></div>
               <div><small>Primer apellido</small><strong>{profile.lastName1 || "-"}</strong></div>
               <div><small>Segundo apellido</small><strong>{profile.lastName2 || "-"}</strong></div>
               <div><small>Rol</small><strong>{profile.role}</strong></div>
@@ -1131,7 +1567,7 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
       </div>
 
       <AnimatePresence>
-        {isProfilePreviewOpen && (
+        {isProfilePreviewOpen && hasProfileImage && (
           <motion.div
             className="admin-ui-v2-photo-preview-overlay pointer-events-auto"
             role="dialog"
@@ -1155,7 +1591,13 @@ function TopHud({ onBack, onLogout, profile }: { onBack: () => void; onLogout: (
               >
                 CERRAR
               </button>
-              <img src={profile.avatarUrl} alt={`Perfil ampliado de ${profile.displayName}`} />
+              <img
+                src={profile.avatarUrl ?? undefined}
+                alt={`Perfil ampliado de ${profile.displayName}`}
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+              />
             </motion.div>
           </motion.div>
         )}
@@ -1211,6 +1653,7 @@ function ContentArea({
   notifications,
   threatLevel,
   resourceTrendData,
+  achievementProgress,
   populationStats,
   admissions,
   admissionsQueue,
@@ -1219,15 +1662,10 @@ function ContentArea({
   consumedResources,
   gainedResources,
   intercampRequests,
-  lookupId,
-  setLookupId,
-  onLookupIntercamp,
   campCatalog,
   campNameById,
   occupationNameById,
   onAdmissionDecision,
-  onCompleteExpedition,
-  onIntercampDecision,
   onPopulationReload,
   onDashboardReload,
   onQuickNav,
@@ -1243,6 +1681,7 @@ function ContentArea({
   notifications: UiNotification[];
   threatLevel: number;
   resourceTrendData: ResourceTrendPoint[];
+  achievementProgress: CampAchievementProgress[];
   populationStats: { total: number; active: number; injured: number; missing: number };
   admissions: UiAdmission[];
   admissionsQueue: UiAdmission[];
@@ -1251,9 +1690,6 @@ function ContentArea({
   consumedResources: ResourceLedgerEntry[];
   gainedResources: ResourceLedgerEntry[];
   intercampRequests: UiIntercampRequest[];
-  lookupId: string;
-  setLookupId: (value: string) => void;
-  onLookupIntercamp: () => void;
   campCatalog: Camp[];
   campNameById: Map<number, string>;
   occupationNameById: Map<number, string>;
@@ -1262,8 +1698,6 @@ function ContentArea({
     decision: "approved" | "rejected",
     options?: { finalOccupationId?: number; finalRole?: string; rejectionReason?: string },
   ) => Promise<void>;
-  onCompleteExpedition: (id: number) => Promise<void>;
-  onIntercampDecision: (id: number, status: "APROBADO" | "RECHAZADO") => Promise<void>;
   onPopulationReload: () => Promise<void>;
   onDashboardReload: () => Promise<void>;
   onQuickNav: (id: AdminSectionId) => void;
@@ -1314,13 +1748,6 @@ function ContentArea({
       return [];
     }
 
-    if (section === "inventario") {
-      if (dashboardKpi.criticalResources > 0) {
-        return [`Se detectaron ${dashboardKpi.criticalResources} recurso(s) en estado critico.`];
-      }
-      return [];
-    }
-
     if (section === "expediciones") {
       if (activeExpeditionsCount === 0) {
         return ["No hay expediciones activas. Valida si necesitas programar una operacion."];
@@ -1331,6 +1758,13 @@ function ContentArea({
     if (section === "intercamp") {
       if (pendingIntercampCount > 0) {
         return [`Hay ${pendingIntercampCount} solicitud(es) inter-campamento pendiente(s).`];
+      }
+      return [];
+    }
+
+    if (section === "logros") {
+      if (achievementProgress.length === 0) {
+        return ["Aun no hay logros cargados para este campamento."];
       }
       return [];
     }
@@ -1360,9 +1794,9 @@ function ContentArea({
     criticalUnreadCount,
     persons.length,
     admissionsQueue.length,
-    dashboardKpi.criticalResources,
     activeExpeditionsCount,
     pendingIntercampCount,
+    achievementProgress.length,
     unreadNotificationsCount,
   ]);
 
@@ -1397,6 +1831,7 @@ function ContentArea({
           persons={persons}
           camps={campNameById}
           occupations={occupationNameById}
+          currentAdminId={sessionAdminUser.id ?? null}
           onReload={onPopulationReload}
           onError={onSetDataError}
           onNotice={onSetModuleFeedback}
@@ -1421,22 +1856,13 @@ function ContentArea({
           campCatalog={campCatalog}
           consumedResources={consumedResources}
           gainedResources={gainedResources}
-          onCompleteExpedition={onCompleteExpedition}
         />
       )}
 
       {section === "intercamp" && (
         <>
-          <div className="admin-ui-v2-toolbar">
-            <input
-              className="v-input admin-ui-v2-search"
-              placeholder="Buscar por ID de solicitud/traslado"
-              value={lookupId}
-              onChange={(event) => setLookupId(event.target.value)}
-            />
-            <button className="admin-ui-v2-btn is-info" onClick={() => void onLookupIntercamp()}>
-              Sincronizar por ID
-            </button>
+          <div className="admin-ui-v2-module-card">
+            <p className="admin-ui-v2-muted">Módulo en modo solo lectura para el rol administrador del sistema.</p>
           </div>
 
           <table className="v-table admin-ui-v2-table">
@@ -1447,7 +1873,7 @@ function ContentArea({
                 <th>Tipo</th>
                 <th>Estado</th>
                 <th>Tiempo</th>
-                <th>Acción</th>
+                <th>Acceso</th>
               </tr>
             </thead>
             <tbody>
@@ -1460,26 +1886,7 @@ function ContentArea({
                     <td>{request.type}</td>
                     <td><span className={`admin-ui-v2-pill ${intercampPillClass(request.status)}`}>{request.status}</span></td>
                     <td>{request.time}</td>
-                    <td>
-                      {request.status === "PENDIENTE" ? (
-                        <div className="admin-ui-v2-actions">
-                            <button
-                              className="admin-ui-v2-btn is-ok"
-                              onClick={() => void onIntercampDecision(request.id, "APROBADO")}
-                            >
-                              Aprobar
-                            </button>
-                            <button
-                              className="admin-ui-v2-btn is-danger"
-                              onClick={() => void onIntercampDecision(request.id, "RECHAZADO")}
-                            >
-                              Rechazar
-                            </button>
-                        </div>
-                      ) : (
-                        <span className="admin-ui-v2-muted">Sin acción</span>
-                      )}
-                    </td>
+                    <td><span className="admin-ui-v2-muted">Solo lectura</span></td>
                   </tr>
                 ))}
             </tbody>
@@ -1491,9 +1898,15 @@ function ContentArea({
         <SettingsModule
           sub={sub}
           profile={sessionAdminUser}
+          persons={persons}
           onNotice={onSetModuleFeedback}
           onProfileRefresh={onRefreshAdminProfile}
+          onReloadPersons={onPopulationReload}
         />
+      )}
+
+      {section === "logros" && (
+        <AchievementsModule sub={sub} achievements={achievementProgress} />
       )}
 
       {(section === "seguridad" || section === "notificaciones") && (
@@ -1506,7 +1919,36 @@ function ContentArea({
   );
 }
 
-function DashboardModule({
+const CountdownClock = memo(function CountdownClock() {
+  const [countdown, setCountdown] = useState({ h: 0, m: 0, s: 0 });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      const target = new Date(now);
+      target.setHours(18, 0, 0, 0);
+      if (target.getTime() <= now.getTime()) {
+        target.setDate(target.getDate() + 1);
+      }
+      const remainingMs = Math.max(0, target.getTime() - now.getTime());
+      const totalSeconds = Math.floor(remainingMs / 1000);
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      setCountdown({ h, m, s });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="admin-ui-v2-countdown">
+      {String(countdown.h).padStart(2, "0")}:{String(countdown.m).padStart(2, "0")}:{String(countdown.s).padStart(2, "0")}
+    </div>
+  );
+});
+
+const DashboardModule = memo(function DashboardModule({
   kpi,
   populationStats,
   admissionsQueue,
@@ -1529,25 +1971,6 @@ function DashboardModule({
   onReload: () => Promise<void>;
   onQuickNav: (id: AdminSectionId) => void;
 }) {
-  const [countdown, setCountdown] = useState({ h: 0, m: 0, s: 0 });
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date();
-      const target = new Date(now);
-      target.setHours(18, 0, 0, 0);
-      if (target.getTime() <= now.getTime()) {
-        target.setDate(target.getDate() + 1);
-      }
-      const remainingMs = Math.max(0, target.getTime() - now.getTime());
-      const totalSeconds = Math.floor(remainingMs / 1000);
-      const h = Math.floor(totalSeconds / 3600);
-      const m = Math.floor((totalSeconds % 3600) / 60);
-      const s = totalSeconds % 60;
-      setCountdown({ h, m, s });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
   const populationTotal = kpi.populationTotal || populationStats.total;
   const activePopulation = kpi.activePopulation || populationStats.active;
   const injuredPopulation = kpi.injuredPopulation || populationStats.injured;
@@ -1756,9 +2179,7 @@ function DashboardModule({
         </div>
         <div className="admin-ui-v2-cycle-layout">
           <div>
-            <div className="admin-ui-v2-countdown">
-              {String(countdown.h).padStart(2, "0")}:{String(countdown.m).padStart(2, "0")}:{String(countdown.s).padStart(2, "0")}
-            </div>
+            <CountdownClock />
             <p>Automatización de consumo, colecta, alertas de inventario y reporte nocturno.</p>
           </div>
           <div className="admin-ui-v2-cycle-signals">
@@ -1771,7 +2192,7 @@ function DashboardModule({
       </div>
     </div>
   );
-}
+});
 
 function DashboardMetricCard({ label, value, detail, tone }: { label: string; value: number; detail: string; tone: "info" | "ok" | "warn" | "danger" }) {
   return (
@@ -1787,11 +2208,12 @@ function SignalTile({ label, tone }: { label: string; tone: "ok" | "warn" | "dan
   return <div className={`admin-ui-v2-signal is-${tone}`}>{label}</div>;
 }
 
-function PopulationModule({
+const PopulationModule = memo(function PopulationModule({
   sub,
   persons,
   camps,
   occupations,
+  currentAdminId,
   onReload,
   onError,
   onNotice,
@@ -1800,6 +2222,7 @@ function PopulationModule({
   persons: Person[];
   camps: Map<number, string>;
   occupations: Map<number, string>;
+  currentAdminId: number | null;
   onReload: () => Promise<void>;
   onError: (message: string | null) => void;
   onNotice: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
@@ -1813,10 +2236,10 @@ function PopulationModule({
   const [isSaving, setIsSaving] = useState(false);
   const [editForm, setEditForm] = useState({
     firstName: "",
-    lastName: "",
+    lastName1: "",
+    lastName2: "",
     age: 0,
     status: "ACTIVE" as Person["status"],
-    campId: 0,
     occupationId: 0,
     notes: "",
     accountStatus: "ACTIVE" as "ACTIVE" | "BLOCKED" | "INACTIVE",
@@ -1824,13 +2247,84 @@ function PopulationModule({
 
   const [assignments, setAssignments] = useState<TempRoleAssignment[]>(INITIAL_TEMP_ASSIGNMENTS);
   const [assignSearch, setAssignSearch] = useState("");
+  const [temporaryView, setTemporaryView] = useState<TemporaryView>("sectors");
+  const [revokingId, setRevokingId] = useState<number | null>(null);
+  const [revocationTargetId, setRevocationTargetId] = useState<number | null>(null);
+  const [revocationReason, setRevocationReason] = useState("");
+  const [quickPersonId, setQuickPersonId] = useState<number | null>(null);
+  const [quickOccupationId, setQuickOccupationId] = useState<number | null>(null);
+  const [quickReason, setQuickReason] = useState("");
   const [newAssignment, setNewAssignment] = useState({
     personId: 0,
     tempRole: "",
-    startDate: "",
-    endDate: "",
+    startDate: dateInputFromToday(),
+    endDate: dateInputFromToday(7),
     reason: "",
   });
+
+  const loadTempAssignments = useCallback(async () => {
+    const response = await apiRequest<unknown>("/temporary-occupation-assignments?page=1&limit=100");
+    const list = extractTemporaryAssignmentList(response);
+    const mapped: TempRoleAssignment[] = [];
+
+    list.forEach((rawItem) => {
+      if (!isRecord(rawItem)) return;
+
+      const assignmentId = firstNumberField(rawItem, ["id", "assignmentId", "temporaryOccupationAssignmentId", "temporaryAssignmentId"]);
+      const personId = firstNumberField(rawItem, ["personId", "person_id", "residentId", "survivorId"])
+        ?? (isRecord(rawItem.person) ? firstNumberField(rawItem.person, ["id", "personId"]) : null);
+      if (assignmentId === null || personId === null) return;
+
+      const temporaryOccupationId = firstNumberField(rawItem, ["temporaryOccupationId", "temporary_occupation_id", "occupationId", "occupation_id"])
+        ?? (isRecord(rawItem.temporaryOccupation) ? firstNumberField(rawItem.temporaryOccupation, ["id", "occupationId"]) : null);
+      const originalOccupationId = firstNumberField(rawItem, ["originalOccupationId", "baseOccupationId", "previousOccupationId"]);
+      const person = persons.find((candidate) => candidate.id === personId);
+      const personName = person ? personFullName(person) : nestedName(rawItem, ["person", "resident", "survivor"]) ?? `Usuario #${personId}`;
+      const fromRole = person
+        ? occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`
+        : originalOccupationId !== null
+          ? occupations.get(originalOccupationId) ?? `Ocupación #${originalOccupationId}`
+          : nestedName(rawItem, ["originalOccupation", "baseOccupation", "previousOccupation"]) ?? "Desconocido";
+      const tempRole = temporaryOccupationId !== null
+        ? occupations.get(temporaryOccupationId) ?? `Ocupación #${temporaryOccupationId}`
+        : firstStringField(rawItem, ["temporaryOccupationName", "occupationName", "temporaryRole", "tempRole"])
+          ?? nestedName(rawItem, ["temporaryOccupation", "occupation"])
+          ?? "Desconocido";
+      const startDate = firstStringField(rawItem, ["startDate", "start_date", "assignedAt", "assigned_at", "createdAt", "created_at"])
+        ?? new Date().toISOString();
+      const endDate = firstStringField(rawItem, ["endDate", "end_date", "expiresAt", "expires_at", "finishedAt", "finished_at", "revokedAt", "revoked_at"])
+        ?? startDate;
+
+      mapped.push({
+        id: assignmentId,
+        personId,
+        personName,
+        fromRole,
+        tempRole,
+        startDate,
+        endDate,
+        reason: firstStringField(rawItem, ["reason", "motivo", "description", "details"]) ?? "Sin motivo",
+        status: assignmentStatusFromApi(rawItem),
+      });
+    });
+
+    return mapped.sort((a, b) => b.id - a.id || b.startDate.localeCompare(a.startDate));
+  }, [occupations, persons]);
+
+  useEffect(() => {
+    if (sub !== "Oficios temporales") return;
+
+    let isMounted = true;
+    loadTempAssignments()
+      .then((mapped) => {
+        if (isMounted) setAssignments(mapped);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch temporary assignments", err);
+      });
+
+    return () => { isMounted = false; };
+  }, [loadTempAssignments, sub]);
 
   const roleDistribution = useMemo(() => {
     const map = new Map<string, number>();
@@ -1881,6 +2375,29 @@ function PopulationModule({
   const selectedCandidate = persons.find((person) => person.id === newAssignment.personId) ?? null;
   const activeAssignments = assignments.filter((item) => item.status === "ACTIVA");
   const historicalAssignments = assignments.filter((item) => item.status === "FINALIZADA");
+  const activeAssignedPersonIds = new Set(activeAssignments.map((assignment) => assignment.personId));
+  const availableTempCandidates = assignCandidates.filter((person) => !activeAssignedPersonIds.has(person.id));
+  const occupationOptions = Array.from(occupations.entries());
+  const quickSelectedPerson = quickPersonId === null ? null : availableTempCandidates.find((person) => person.id === quickPersonId) ?? null;
+  const quickSelectedOccupation = quickOccupationId === null ? null : occupations.get(quickOccupationId) ?? null;
+  const sectorSummaries = TEMPORARY_SECTORS.map((sector) => {
+    const workers = activeAssignments.filter((assignment) => temporarySectorForRole(assignment.tempRole).id === sector.id);
+    const performance = Math.min(100, sector.basePerformance + workers.length * 11);
+    const tone = workers.length === 0 ? "danger" : performance >= 80 ? "ok" : "warn";
+    return { sector, workers, performance, tone };
+  });
+  const quickVacancies = TEMPORARY_SECTORS.filter((sector) => sector.id !== "general").map((sector) => {
+    const matchedOccupation = occupationOptions.find(([, name]) => temporarySectorForRole(name).id === sector.id)
+      ?? occupationOptions.find(([, name]) => normalizeSearchText(name) === normalizeSearchText(sector.primaryRole))
+      ?? occupationOptions[0]
+      ?? null;
+    return {
+      sector,
+      occupationId: matchedOccupation?.[0] ?? 0,
+      occupationName: matchedOccupation?.[1] ?? sector.primaryRole,
+      activeCount: activeAssignments.filter((assignment) => temporarySectorForRole(assignment.tempRole).id === sector.id).length,
+    };
+  });
 
   const pagedPersons = useMemo(() => {
     const start = (userPage - 1) * usersPerPage;
@@ -1911,14 +2428,19 @@ function PopulationModule({
   }, [userPage, userTotalPages]);
 
   const openPersonModal = (person: Person, editMode: boolean) => {
+    const normalizedLastName = String(person.lastName ?? "").trim();
+    const lastNameParts = normalizedLastName.split(/\s+/).filter(Boolean);
+    const lastName1 = lastNameParts[0] ?? "";
+    const lastName2 = lastNameParts.slice(1).join(" ");
+
     setSelectedPerson(person);
     setIsEditMode(editMode);
     setEditForm({
       firstName: person.firstName,
-      lastName: person.lastName,
+      lastName1,
+      lastName2,
       age: person.age,
       status: person.status,
-      campId: person.campId,
       occupationId: person.occupationId,
       notes: person.notes ?? "",
       accountStatus: person.accountStatus ?? "ACTIVE",
@@ -1950,20 +2472,38 @@ function PopulationModule({
   const handleSavePerson = async () => {
     if (!selectedPerson) return;
 
+    const isSelfAccountEdit = currentAdminId !== null && selectedPerson.id === currentAdminId;
+    const originalAccountStatus = normalizeAccountStatus(selectedPerson.accountStatus);
+    const requestedAccountStatus = normalizeAccountStatus(editForm.accountStatus);
+
+    if (isSelfAccountEdit && requestedAccountStatus !== originalAccountStatus) {
+      onNotice("poblacion", "error", "No puedes cambiar el estado de tu propia cuenta. Debe hacerlo otro administrador.");
+      return;
+    }
+
     setIsSaving(true);
     onError(null);
     try {
       const normalizedFirstName = String(editForm.firstName ?? "").trim();
-      const normalizedLastName = String(editForm.lastName ?? "").trim();
+      const normalizedLastName1 = String(editForm.lastName1 ?? "").trim();
+      const normalizedLastName2 = String(editForm.lastName2 ?? "").trim();
+      const normalizedLastName = [normalizedLastName1, normalizedLastName2].filter(Boolean).join(" ");
       const normalizedNotes = String(editForm.notes ?? "").trim();
 
       const payload = {
         firstName: normalizedFirstName,
+        nombre: normalizedFirstName,
+        first_name: normalizedFirstName,
+        primer_nombre: normalizedFirstName,
         lastName: normalizedLastName,
+        lastName1: normalizedLastName1,
+        lastName2: normalizedLastName2 || null,
+        primer_apellido: normalizedLastName1,
+        segundo_apellido: normalizedLastName2 || null,
         age: Number(editForm.age),
         status: editForm.status,
         currentStatus: editForm.status,
-        campId: Number(editForm.campId),
+        campId: selectedPerson.campId,
         occupationId: Number(editForm.occupationId),
         notes: normalizedNotes || undefined,
       };
@@ -1991,37 +2531,124 @@ function PopulationModule({
     }
   };
 
-  const handleCreateTempAssignment = () => {
-    if (!selectedCandidate) return;
-    if (!newAssignment.tempRole.trim() || !newAssignment.startDate || !newAssignment.endDate) return;
+  const submitTempAssignment = async (person: Person, tempOccupationId: number, reason: string, startDate: string, endDate: string): Promise<boolean> => {
+    if (!Number.isFinite(tempOccupationId) || tempOccupationId <= 0) {
+      onNotice("poblacion", "warning", "Selecciona un oficio temporal válido antes de continuar.");
+      return false;
+    }
 
-    const role = occupations.get(selectedCandidate.occupationId) ?? `Ocupación #${selectedCandidate.occupationId}`;
-    setAssignments((prev) => [
-      {
-        id: Date.now(),
-        personId: selectedCandidate.id,
-        personName: personFullName(selectedCandidate),
-        fromRole: role,
-        tempRole: newAssignment.tempRole.trim(),
-        startDate: newAssignment.startDate,
-        endDate: newAssignment.endDate,
-        reason: newAssignment.reason.trim() || "Asignación temporal",
-        status: "ACTIVA",
-      },
-      ...prev,
-    ]);
-    setNewAssignment({ personId: 0, tempRole: "", startDate: "", endDate: "", reason: "" });
-    setAssignSearch("");
+    const normalizedStartDate = startDate.trim();
+    const normalizedEndDate = endDate.trim();
+    if (!normalizedStartDate || !normalizedEndDate) {
+      onNotice("poblacion", "warning", "Indica la fecha de inicio y la fecha de finalización antes de continuar.");
+      return false;
+    }
+
+    const startTime = parseTemporaryDate(normalizedStartDate).getTime();
+    const endTime = parseTemporaryDate(normalizedEndDate).getTime();
+    if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) {
+      onNotice("poblacion", "warning", "Las fechas de la asignación temporal no son válidas.");
+      return false;
+    }
+
+    if (startTime < startOfLocalDay(new Date())) {
+      onNotice("poblacion", "warning", "La fecha de inicio no puede ser menor al día actual.");
+      return false;
+    }
+
+    if (endTime < startTime) {
+      onNotice("poblacion", "warning", "La fecha de finalización no puede ser anterior a la fecha de inicio.");
+      return false;
+    }
+
+    try {
+      await apiRequest("/temporary-occupation-assignments", {
+        method: "POST",
+        body: JSON.stringify({
+          personId: person.id,
+          temporaryOccupationId: tempOccupationId,
+          reason: reason.trim() || "Asignación temporal",
+          assignedBy: currentAdminId ?? 1,
+          startDate: normalizedStartDate,
+          endDate: normalizedEndDate,
+        }),
+      });
+
+      setAssignments(await loadTempAssignments());
+      setRevocationTargetId(null);
+      setRevocationReason("");
+      onNotice("poblacion", "success", "Asignación creada y usuario notificado por correo.");
+      return true;
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "Error al crear la asignación temporal");
+      return false;
+    }
   };
 
-  const handleFinishAssignment = (assignmentId: number) => {
-    setAssignments((prev) =>
-      prev.map((assignment) =>
-        assignment.id === assignmentId
-          ? { ...assignment, status: "FINALIZADA" }
-          : assignment,
-      ),
-    );
+  const handleCreateTempAssignment = async () => {
+    if (!selectedCandidate) return;
+    if (!newAssignment.tempRole.trim()) return;
+
+    const tempOccupationId = Number(newAssignment.tempRole);
+    const created = await submitTempAssignment(selectedCandidate, tempOccupationId, newAssignment.reason, newAssignment.startDate, newAssignment.endDate);
+    if (created) {
+      setNewAssignment({ personId: 0, tempRole: "", startDate: dateInputFromToday(), endDate: dateInputFromToday(7), reason: "" });
+      setAssignSearch("");
+    }
+  };
+
+  const handleCreateQuickAssignment = async () => {
+    if (!quickSelectedPerson || quickOccupationId === null) return;
+    const sector = temporarySectorForRole(quickSelectedOccupation ?? "");
+    const reason = quickReason.trim() || `Refuerzo operacional sugerido para ${sector.name}`;
+    const created = await submitTempAssignment(quickSelectedPerson, quickOccupationId, reason, newAssignment.startDate, newAssignment.endDate);
+    if (created) {
+      setQuickPersonId(null);
+      setQuickOccupationId(null);
+      setQuickReason("");
+      setNewAssignment({ personId: 0, tempRole: "", startDate: dateInputFromToday(), endDate: dateInputFromToday(7), reason: "" });
+    }
+  };
+
+  const handleFinishAssignment = async (assignmentId: number) => {
+    if (revokingId !== null) return;
+    const targetAssignment = assignments.find((assignment) => assignment.id === assignmentId);
+    const normalizedReason = revocationReason.trim();
+    if (!normalizedReason) {
+      setRevocationTargetId(assignmentId);
+      onNotice("poblacion", "warning", "Indica el motivo de revocación antes de continuar.");
+      return;
+    }
+
+    setRevokingId(assignmentId);
+    try {
+      await apiRequest(`/temporary-occupation-assignments/${assignmentId}`, {
+        method: "DELETE",
+        body: JSON.stringify({
+          reason: normalizedReason,
+        }),
+      });
+
+      setAssignments(await loadTempAssignments());
+      setRevocationTargetId(null);
+      setRevocationReason("");
+      onNotice("poblacion", "success", "Asignación revocada y usuario notificado por correo.");
+    } catch (error) {
+      try {
+        setAssignments(await loadTempAssignments());
+      } catch (reloadError) {
+        console.error("Failed to reload temporary assignments after revoke error", reloadError);
+      }
+
+      if (error instanceof ApiHttpError && error.details) {
+        onError(`${error.message} ID_ASIGNACIÓN: ${assignmentId}${targetAssignment ? `, ID_OPERARIO: ${targetAssignment.personId}` : ""}. Detalle: ${error.details}`);
+      } else {
+        const fallbackMessage = error instanceof Error ? error.message : "Error al revocar la asignación temporal";
+        onError(`${fallbackMessage} ID_ASIGNACIÓN: ${assignmentId}${targetAssignment ? `, ID_OPERARIO: ${targetAssignment.personId}` : ""}.`);
+      }
+    } finally {
+      setRevokingId(null);
+    }
   };
 
   const legacyFilterFromStatus = (value: typeof statusFilter): "Todos" | "Activo" | "Herido" | "Enfermo" | "Fuera" => {
@@ -2042,6 +2669,19 @@ function PopulationModule({
     if (value === "Activo") return "is-ok";
     if (value === "Herido") return "is-warn";
     if (value === "Enfermo") return "is-warn";
+    return "is-danger";
+  };
+
+  const normalizeAccountStatus = (value: unknown): "ACTIVE" | "BLOCKED" | "INACTIVE" => {
+    const normalized = String(value ?? "ACTIVE").toUpperCase();
+    if (normalized === "ACTIVE" || normalized === "BLOCKED" || normalized === "INACTIVE") return normalized;
+    return "INACTIVE";
+  };
+
+  const accountStatusPill = (value: unknown) => {
+    const normalized = normalizeAccountStatus(value);
+    if (normalized === "ACTIVE") return "is-ok";
+    if (normalized === "BLOCKED") return "is-warn";
     return "is-danger";
   };
 
@@ -2123,41 +2763,53 @@ function PopulationModule({
               </tr>
             </thead>
             <tbody>
-              {pagedPersons.map((person) => (
-                <tr key={person.id}>
-                  <td>
-                    <div className="admin-ui-v2-person-cell">
-                      <img
-                        src={`https://i.pravatar.cc/60?img=${(person.id % 69) + 1}`}
-                        alt={`Perfil de ${personFullName(person)}`}
-                        className="admin-ui-v2-person-avatar"
-                      />
-                      <span>{personFullName(person)}</span>
-                    </div>
-                  </td>
-                  <td>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`}</td>
-                  <td>
-                    <span className={`admin-ui-v2-pill ${statusPillFromLegacy(legacyPopulationStatus(person.status))}`}>
-                      {legacyPopulationStatus(person.status)}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`admin-ui-v2-pill ${person.accountStatus === "ACTIVE" ? "is-ok" : person.accountStatus === "BLOCKED" ? "is-warn" : "is-danger"}`}>
-                      {person.accountStatus ?? "ACTIVE"}
-                    </span>
-                  </td>
-                  <td>{person.age}</td>
-                  <td>{camps.get(person.campId) ?? `Camp #${person.campId}`}</td>
-                  <td>{new Date(person.admissionDate).toLocaleDateString("es-CR")}</td>
-                  <td>
-                    <div className="admin-ui-v2-actions">
-                      <button className="admin-ui-v2-btn" onClick={() => openPersonModal(person, false)} type="button">Ver</button>
-                      <button className="admin-ui-v2-btn is-info" onClick={() => openPersonModal(person, true)} type="button">Editar</button>
-                      <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(person.id)} type="button">Eliminar</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {pagedPersons.map((person) => {
+                const profileImage = resolvePersonProfileImage(person);
+                return (
+                  <tr key={person.id}>
+                    <td>
+                      <div className="admin-ui-v2-person-cell">
+                        {profileImage ? (
+                          <img
+                            src={profileImage}
+                            alt={`Perfil de ${personFullName(person)}`}
+                            className="admin-ui-v2-person-avatar"
+                            loading="lazy"
+                            decoding="async"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <span className="admin-ui-v2-person-avatar admin-ui-v2-avatar-fallback" aria-hidden="true">
+                            {personInitials(person)}
+                          </span>
+                        )}
+                        <span>{personFullName(person)}</span>
+                      </div>
+                    </td>
+                    <td>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`}</td>
+                    <td>
+                      <span className={`admin-ui-v2-pill ${statusPillFromLegacy(legacyPopulationStatus(person.status))}`}>
+                        {legacyPopulationStatus(person.status)}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`admin-ui-v2-pill ${accountStatusPill(person.accountStatus)}`}>
+                        {normalizeAccountStatus(person.accountStatus)}
+                      </span>
+                    </td>
+                    <td>{person.age}</td>
+                    <td>{camps.get(person.campId) ?? `Camp #${person.campId}`}</td>
+                    <td>{new Date(person.admissionDate).toLocaleDateString("es-CR")}</td>
+                    <td>
+                      <div className="admin-ui-v2-actions">
+                        <button className="admin-ui-v2-btn" onClick={() => openPersonModal(person, false)} type="button">Ver</button>
+                        <button className="admin-ui-v2-btn is-info" onClick={() => openPersonModal(person, true)} type="button">Editar</button>
+                        <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(person.id)} type="button">Eliminar</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredPersons.length === 0 && (
                 <tr>
                   <td colSpan={8} className="admin-ui-v2-empty-cell">No hay personas para mostrar con esos filtros.</td>
@@ -2191,94 +2843,287 @@ function PopulationModule({
         </>
       )}
 
-      {sub === "Roles temporales" && (
-        <div className="admin-ui-v2-grid admin-ui-v2-grid-roles">
-          <div className="admin-ui-v2-module-card">
-            <h3>Asignaciones Activas</h3>
-            <div className="admin-ui-v2-role-list">
-              {activeAssignments.map((assignment) => (
-                <div key={assignment.id} className="admin-ui-v2-role-item">
-                  <div>
-                    <strong>{assignment.personName}</strong>
-                    <p>{assignment.fromRole} {"->"} {assignment.tempRole}</p>
-                    <p>{assignment.startDate} - {assignment.endDate}</p>
-                  </div>
-                  <button className="admin-ui-v2-btn is-ok" onClick={() => handleFinishAssignment(assignment.id)} type="button">
-                    Finalizar
-                  </button>
-                </div>
-              ))}
-              {activeAssignments.length === 0 && <div className="admin-ui-v2-muted">No hay coberturas temporales activas.</div>}
+      {sub === "Oficios temporales" && (
+        <div className="admin-ui-v2-temp-shell">
+          <div className="admin-ui-v2-temp-hero">
+            <div>
+              <span className="admin-ui-v2-temp-kicker">Consola de población</span>
+              <h2>Gestión Táctica de Oficios</h2>
+              <p>Reasignación temporal de personal sin turnos ni campos no soportados por el backend.</p>
+            </div>
+            <div className="admin-ui-v2-temp-kpis">
+              <MetricCard label="Activas" value={activeAssignments.length} tone="info" />
+              <MetricCard label="Disponibles" value={availableTempCandidates.length} tone="ok" />
+              <MetricCard label="Historial" value={historicalAssignments.length} tone="warn" />
             </div>
           </div>
 
-          <div className="admin-ui-v2-module-card">
-            <h3>Nueva Asignación</h3>
-            <input
-              className="v-input admin-ui-v2-search"
-              placeholder="Buscar persona activa"
-              value={assignSearch}
-              onChange={(event) => setAssignSearch(event.target.value)}
-            />
-            <div className="admin-ui-v2-candidate-list">
-              {assignCandidates.map((person) => (
-                <button
-                  key={person.id}
-                  type="button"
-                  className={`admin-ui-v2-candidate ${newAssignment.personId === person.id ? "is-selected" : ""}`}
-                  onClick={() => setNewAssignment((prev) => ({ ...prev, personId: person.id }))}
-                >
-                  <span>{personFullName(person)}</span>
-                  <small>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`}</small>
-                </button>
-              ))}
-            </div>
-
-            <div className="admin-ui-v2-form-grid">
-              <input
-                className="v-input"
-                placeholder="Oficio temporal"
-                value={newAssignment.tempRole}
-                onChange={(event) => setNewAssignment((prev) => ({ ...prev, tempRole: event.target.value }))}
-              />
-              <input
-                className="v-input"
-                type="date"
-                value={newAssignment.startDate}
-                onChange={(event) => setNewAssignment((prev) => ({ ...prev, startDate: event.target.value }))}
-              />
-              <input
-                className="v-input"
-                type="date"
-                value={newAssignment.endDate}
-                onChange={(event) => setNewAssignment((prev) => ({ ...prev, endDate: event.target.value }))}
-              />
-              <textarea
-                className="v-textarea"
-                placeholder="Motivo"
-                value={newAssignment.reason}
-                onChange={(event) => setNewAssignment((prev) => ({ ...prev, reason: event.target.value }))}
-              />
-              <button className="admin-ui-v2-btn is-info" onClick={handleCreateTempAssignment} type="button">
-                Asignar Temporalmente
+          <div className="admin-ui-v2-temp-nav" role="tablist" aria-label="Vistas de oficios temporales">
+            {([
+              ["sectors", "Cuadrícula de Sectores"],
+              ["timeline", "Cronograma de Asignaciones"],
+              ["quick", "Acoplamiento Rápido"],
+              ["history", "Historial"],
+            ] as Array<[TemporaryView, string]>).map(([view, label]) => (
+              <button
+                key={view}
+                className={`admin-ui-v2-temp-nav-btn ${temporaryView === view ? "is-active" : ""}`}
+                type="button"
+                onClick={() => setTemporaryView(view)}
+              >
+                {label}
               </button>
-            </div>
-
-            <h3 className="admin-ui-v2-subtitle">Histórico</h3>
-            <div className="admin-ui-v2-role-list">
-              {historicalAssignments.map((assignment) => (
-                <div key={assignment.id} className="admin-ui-v2-role-item is-historical">
-                  <div>
-                    <strong>{assignment.personName}</strong>
-                    <p>{assignment.fromRole} {"->"} {assignment.tempRole}</p>
-                    <p>{assignment.startDate} - {assignment.endDate}</p>
-                  </div>
-                  <span className="admin-ui-v2-pill is-neutral">Finalizada</span>
-                </div>
-              ))}
-              {historicalAssignments.length === 0 && <div className="admin-ui-v2-muted">Aún no hay asignaciones finalizadas.</div>}
-            </div>
+            ))}
           </div>
+
+          <AnimatePresence mode="wait">
+            {temporaryView === "sectors" && (
+              <motion.div
+                key="temp-sectors"
+                className="admin-ui-v2-temp-sector-grid"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {sectorSummaries.map(({ sector, workers, performance, tone }) => (
+                  <div key={sector.id} className={`admin-ui-v2-temp-sector-card is-${tone}`}>
+                    <div className="admin-ui-v2-temp-sector-head">
+                      <div>
+                        <span>{sector.tag}</span>
+                        <h3>{sector.name}</h3>
+                      </div>
+                      <span className={`admin-ui-v2-pill ${tone === "ok" ? "is-ok" : tone === "warn" ? "is-warn" : "is-danger"}`}>
+                        {workers.length === 0 ? "Déficit" : `${workers.length} activo${workers.length === 1 ? "" : "s"}`}
+                      </span>
+                    </div>
+                    <p>{sector.description}</p>
+                    <div className="admin-ui-v2-temp-sector-meter">
+                      <div><span style={{ width: `${performance}%` }} /></div>
+                      <strong>{performance}% eficacia estimada</strong>
+                    </div>
+                    <div className="admin-ui-v2-temp-worker-list">
+                      {workers.slice(0, 4).map((assignment) => (
+                        <div key={assignment.id} className="admin-ui-v2-temp-worker-row">
+                          <span className="admin-ui-v2-temp-avatar">{temporaryNameInitials(assignment.personName)}</span>
+                          <div>
+                            <strong>{assignment.personName}</strong>
+                            <small>{assignment.tempRole}</small>
+                          </div>
+                        </div>
+                      ))}
+                      {workers.length === 0 && <div className="admin-ui-v2-muted">Sin operarios temporales en este sector.</div>}
+                    </div>
+                    <button
+                      className="admin-ui-v2-btn is-info"
+                      type="button"
+                      onClick={() => {
+                        const vacancy = quickVacancies.find((item) => item.sector.id === sector.id);
+                        setQuickOccupationId(vacancy?.occupationId || null);
+                        setTemporaryView("quick");
+                      }}
+                      disabled={availableTempCandidates.length === 0 || sector.id === "general"}
+                    >
+                      Asignar refuerzo temporal
+                    </button>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+
+            {temporaryView === "timeline" && (
+              <motion.div
+                key="temp-timeline"
+                className="admin-ui-v2-temp-timeline"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {activeAssignments.map((assignment) => {
+                  const progress = temporaryAssignmentProgress(assignment.startDate, assignment.endDate);
+                  const sector = temporarySectorForRole(assignment.tempRole);
+                  return (
+                    <div key={assignment.id} className={`admin-ui-v2-temp-assignment-card ${progress.urgent ? "is-urgent" : ""}`}>
+                      <div className="admin-ui-v2-temp-assignment-head">
+                        <div className="admin-ui-v2-temp-person-line">
+                          <span className="admin-ui-v2-temp-avatar">{temporaryNameInitials(assignment.personName)}</span>
+                          <div>
+                            <strong>{assignment.personName}</strong>
+                            <small>ID_ASIGNACIÓN: {assignment.id} · ID_OPERARIO: {assignment.personId}</small>
+                          </div>
+                        </div>
+                        <div className="admin-ui-v2-actions">
+                          <span className="admin-ui-v2-pill is-info">{sector.name}</span>
+                          <button
+                            className="admin-ui-v2-btn is-danger"
+                            type="button"
+                            onClick={() => {
+                              setRevocationTargetId(assignment.id);
+                              setRevocationReason("");
+                            }}
+                            disabled={revokingId !== null}
+                          >
+                            {revokingId === assignment.id ? "Revocando" : "Revocar"}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="admin-ui-v2-temp-role-flow">
+                        <div><span>Oficio base</span><strong>{assignment.fromRole}</strong></div>
+                        <i>»</i>
+                        <div><span>Oficio temporal</span><strong>{assignment.tempRole}</strong></div>
+                      </div>
+                      <p className="admin-ui-v2-temp-reason">{assignment.reason}</p>
+                      <div className="admin-ui-v2-temp-progress-row">
+                        <span>Inicio: {temporaryDateLabel(assignment.startDate)}</span>
+                        <strong>{progress.label}</strong>
+                        <span>Fin: {temporaryDateLabel(assignment.endDate)}</span>
+                      </div>
+                      <div className="admin-ui-v2-timeline-bar-wrap">
+                        <div className={`admin-ui-v2-timeline-bar ${progress.urgent ? "is-urgent" : ""}`} style={{ width: `${progress.value}%` }} />
+                      </div>
+                      {revocationTargetId === assignment.id && (
+                        <div className="admin-ui-v2-temp-revoke-box">
+                          <textarea
+                            className="v-textarea"
+                            placeholder="Motivo de revocación"
+                            value={revocationReason}
+                            onChange={(event) => setRevocationReason(event.target.value)}
+                            disabled={revokingId !== null}
+                          />
+                          <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
+                            <button className="admin-ui-v2-btn is-danger" onClick={() => void handleFinishAssignment(assignment.id)} type="button" disabled={revokingId !== null || !revocationReason.trim()}>
+                              Confirmar revocación
+                            </button>
+                            <button className="admin-ui-v2-btn" onClick={() => { setRevocationTargetId(null); setRevocationReason(""); }} type="button" disabled={revokingId !== null}>
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {activeAssignments.length === 0 && <div className="admin-ui-v2-empty-cell">Ninguna asignación activa en progreso.</div>}
+              </motion.div>
+            )}
+
+            {temporaryView === "quick" && (
+              <motion.div
+                key="temp-quick"
+                className="admin-ui-v2-temp-quick"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="admin-ui-v2-temp-panel">
+                  <div className="admin-ui-v2-section-head"><span>1. Operarios aptos</span><span>{availableTempCandidates.length} disponibles</span></div>
+                  <input className="v-input admin-ui-v2-temp-field" placeholder="Buscar por nombre u oficio base" value={assignSearch} onChange={(event) => setAssignSearch(event.target.value)} />
+                  <div className="admin-ui-v2-temp-choice-list">
+                    {availableTempCandidates.map((person) => (
+                      <button
+                        key={person.id}
+                        className={`admin-ui-v2-temp-choice ${quickPersonId === person.id ? "is-selected" : ""}`}
+                        type="button"
+                        onClick={() => {
+                          setQuickPersonId(person.id);
+                          setNewAssignment((prev) => ({ ...prev, personId: person.id }));
+                        }}
+                      >
+                        <span className="admin-ui-v2-temp-avatar">{personInitials(person)}</span>
+                        <div><strong>{personFullName(person)}</strong><small>{occupations.get(person.occupationId) ?? `Ocupación #${person.occupationId}`} · {person.age} años</small></div>
+                      </button>
+                    ))}
+                    {availableTempCandidates.length === 0 && <div className="admin-ui-v2-empty-cell">No hay operarios disponibles con esos filtros.</div>}
+                  </div>
+                </div>
+
+                <div className="admin-ui-v2-temp-panel">
+                  <div className="admin-ui-v2-section-head"><span>2. Vacantes sugeridas</span><span>Derivadas por oficio</span></div>
+                  <div className="admin-ui-v2-temp-choice-list">
+                    {quickVacancies.map((vacancy) => (
+                      <button key={vacancy.sector.id} className={`admin-ui-v2-temp-vacancy ${quickOccupationId === vacancy.occupationId ? "is-selected" : ""}`} type="button" onClick={() => setQuickOccupationId(vacancy.occupationId)} disabled={vacancy.occupationId <= 0}>
+                        <div><strong>{vacancy.sector.name}</strong><small>{vacancy.sector.description}</small></div>
+                        <span>{vacancy.occupationName}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="admin-ui-v2-temp-panel admin-ui-v2-temp-create-panel">
+                  <div className="admin-ui-v2-section-head"><span>3. Confirmación de enlace</span><span>Payload compatible</span></div>
+                  <select className="v-select admin-ui-v2-temp-field" value={newAssignment.tempRole} onChange={(event) => setNewAssignment((prev) => ({ ...prev, tempRole: event.target.value }))}>
+                    <option value="">Crear manualmente: seleccionar oficio...</option>
+                    {occupationOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                  </select>
+                  <div className="admin-ui-v2-temp-date-grid">
+                    <label>
+                      <span>Fecha de inicio</span>
+                      <input
+                        className="v-input admin-ui-v2-temp-field"
+                        type="date"
+                        min={dateInputFromToday()}
+                        value={newAssignment.startDate}
+                        onChange={(event) => setNewAssignment((prev) => ({
+                          ...prev,
+                          startDate: event.target.value,
+                          endDate: prev.endDate && prev.endDate < event.target.value ? event.target.value : prev.endDate,
+                        }))}
+                      />
+                    </label>
+                    <label>
+                      <span>Fecha de finalización</span>
+                      <input
+                        className="v-input admin-ui-v2-temp-field"
+                        type="date"
+                        min={newAssignment.startDate || undefined}
+                        value={newAssignment.endDate}
+                        onChange={(event) => setNewAssignment((prev) => ({ ...prev, endDate: event.target.value }))}
+                      />
+                    </label>
+                  </div>
+                  <textarea className="v-textarea admin-ui-v2-temp-field" placeholder="Motivo operacional para el enlace rápido o manual" value={quickReason || newAssignment.reason} onChange={(event) => { setQuickReason(event.target.value); setNewAssignment((prev) => ({ ...prev, reason: event.target.value })); }} />
+                  <div className="admin-ui-v2-temp-link-preview">
+                    <div><span>Operario</span><strong>{quickSelectedPerson ? personFullName(quickSelectedPerson) : selectedCandidate ? personFullName(selectedCandidate) : "Sin selección"}</strong></div>
+                    <i>»</i>
+                    <div><span>Oficio temporal</span><strong>{quickSelectedOccupation ?? (newAssignment.tempRole ? occupations.get(Number(newAssignment.tempRole)) : null) ?? "Sin oficio"}</strong></div>
+                  </div>
+                  <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
+                    <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void handleCreateQuickAssignment()} disabled={!quickSelectedPerson || quickOccupationId === null}>
+                      Vincular vacante sugerida
+                    </button>
+                    <button className="admin-ui-v2-btn" type="button" onClick={() => void handleCreateTempAssignment()} disabled={!selectedCandidate || !newAssignment.tempRole}>
+                      Crear asignación manual
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {temporaryView === "history" && (
+              <motion.div
+                key="temp-history"
+                className="admin-ui-v2-temp-history"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {historicalAssignments.map((assignment) => (
+                  <div key={assignment.id} className="admin-ui-v2-tactical-history-item">
+                    <div>
+                      <h4>{assignment.personName}</h4>
+                      <p>{assignment.fromRole} » {assignment.tempRole}</p>
+                      <p>{temporaryDateLabel(assignment.startDate)} - {temporaryDateLabel(assignment.endDate)}</p>
+                    </div>
+                    <span className="admin-ui-v2-pill is-neutral">Finalizada</span>
+                  </div>
+                ))}
+                {historicalAssignments.length === 0 && <div className="admin-ui-v2-empty-cell">Sin registros previos.</div>}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
@@ -2293,7 +3138,8 @@ function PopulationModule({
             {isEditMode ? (
               <div className="admin-ui-v2-form-grid">
                 <input className="v-input" value={editForm.firstName} onChange={(event) => setEditForm((prev) => ({ ...prev, firstName: event.target.value }))} placeholder="Nombre" />
-                <input className="v-input" value={editForm.lastName} onChange={(event) => setEditForm((prev) => ({ ...prev, lastName: event.target.value }))} placeholder="Apellido" />
+                <input className="v-input" value={editForm.lastName1} onChange={(event) => setEditForm((prev) => ({ ...prev, lastName1: event.target.value }))} placeholder="Primer apellido" />
+                <input className="v-input" value={editForm.lastName2} onChange={(event) => setEditForm((prev) => ({ ...prev, lastName2: event.target.value }))} placeholder="Segundo apellido" />
                 <input className="v-input" type="number" value={editForm.age} onChange={(event) => setEditForm((prev) => ({ ...prev, age: Number(event.target.value) }))} placeholder="Edad" />
                 <select className="v-select" value={editForm.status} onChange={(event) => setEditForm((prev) => ({ ...prev, status: event.target.value as Person["status"] }))}>
                   <option value="ACTIVE">Activo</option>
@@ -2301,16 +3147,22 @@ function PopulationModule({
                   <option value="MISSING">Desaparecido</option>
                   <option value="DECEASED">Fallecido</option>
                 </select>
-                <select className="v-select" value={editForm.accountStatus} onChange={(event) => setEditForm((prev) => ({ ...prev, accountStatus: event.target.value as "ACTIVE" | "BLOCKED" | "INACTIVE" }))}>
+                <select
+                  className="v-select"
+                  value={editForm.accountStatus}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, accountStatus: event.target.value as "ACTIVE" | "BLOCKED" | "INACTIVE" }))}
+                  disabled={currentAdminId !== null && selectedPerson.id === currentAdminId}
+                >
                   <option value="ACTIVE">Cuenta activa</option>
                   <option value="BLOCKED">Cuenta bloqueada</option>
                   <option value="INACTIVE">Cuenta inactiva</option>
                 </select>
-                <select className="v-select" value={editForm.campId} onChange={(event) => setEditForm((prev) => ({ ...prev, campId: Number(event.target.value) }))}>
-                  {Array.from(camps.entries()).map(([id, name]) => (
-                    <option key={id} value={id}>{name}</option>
-                  ))}
-                </select>
+                {currentAdminId !== null && selectedPerson.id === currentAdminId && (
+                  <div className="admin-ui-v2-muted">No puedes cambiar el estado de tu propia cuenta.</div>
+                )}
+                <div className="v-input" aria-readonly="true">
+                  {camps.get(selectedPerson.campId) ?? `Camp #${selectedPerson.campId}`}
+                </div>
                 <select className="v-select" value={editForm.occupationId} onChange={(event) => setEditForm((prev) => ({ ...prev, occupationId: Number(event.target.value) }))}>
                   {Array.from(occupations.entries()).map(([id, name]) => (
                     <option key={id} value={id}>{name}</option>
@@ -2343,9 +3195,9 @@ function PopulationModule({
       )}
     </div>
   );
-}
+});
 
-function AdmissionsModule({
+const AdmissionsModule = memo(function AdmissionsModule({
   sub,
   admissions,
   admissionsQueue,
@@ -2532,30 +3384,104 @@ function AdmissionsModule({
       )}
     </div>
   );
-}
+});
 
-function SettingsModule({
+const AchievementsModule = memo(function AchievementsModule({
+  sub,
+  achievements,
+}: {
+  sub: string;
+  achievements: CampAchievementProgress[];
+}) {
+  const unlocked = useMemo(
+    () => achievements.filter((item) => item.isUnlocked).sort((a, b) => String(b.unlockedAt ?? "").localeCompare(String(a.unlockedAt ?? ""))),
+    [achievements],
+  );
+
+  const locked = useMemo(() => achievements.filter((item) => !item.isUnlocked), [achievements]);
+
+  const activeList =
+    sub === "Desbloqueados"
+      ? unlocked
+      : sub === "Historial"
+        ? unlocked
+        : achievements;
+
+  return (
+    <div className="admin-ui-v2-achievements-wrap">
+      <div className="admin-ui-v2-grid admin-ui-v2-grid-3 admin-ui-v2-achievement-kpi-grid">
+        <MetricCard label="Totales" value={achievements.length} tone="info" />
+        <MetricCard label="Desbloqueados" value={unlocked.length} tone="ok" />
+        <MetricCard label="Pendientes" value={locked.length} tone="warn" />
+      </div>
+
+      <div className="admin-ui-v2-achievement-grid">
+        {activeList.map((item) => {
+          const ratio = achievementProgressRatio(item);
+          const progressPercent = Math.round(ratio * 100);
+          const isUnlocked = item.isUnlocked;
+
+          return (
+            <article key={`${item.achievementId}-${item.metricKey}`} className={`admin-ui-v2-achievement-card ${isUnlocked ? "is-unlocked" : "is-locked"}`}>
+              <div className="admin-ui-v2-achievement-head">
+                <div>
+                  <h3>{item.name}</h3>
+                  <p>{item.description}</p>
+                </div>
+                <span className={`admin-ui-v2-pill ${isUnlocked ? "is-ok" : "is-warn"}`}>{isUnlocked ? "Desbloqueado" : "Bloqueado"}</span>
+              </div>
+
+              <div className="admin-ui-v2-achievement-meta">
+                <span>Metrica: {item.metricKey || "no definida"}</span>
+                <span>{achievementValueLabel(item)}</span>
+              </div>
+
+              {!isUnlocked && (
+                <div className="admin-ui-v2-achievement-progress">
+                  <div className="admin-ui-v2-achievement-progress-fill" style={{ width: `${progressPercent}%` }} />
+                </div>
+              )}
+
+              <div className="admin-ui-v2-achievement-foot">
+                <span>Meta: {Number.isFinite(item.targetValue) ? item.targetValue : 0}</span>
+                <span>{isUnlocked ? `Desbloqueado: ${achievementDateLabel(item.unlockedAt)}` : "En evaluacion"}</span>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      {activeList.length === 0 && (
+        <div className="admin-ui-v2-empty-cell">No hay logros para mostrar en esta vista.</div>
+      )}
+    </div>
+  );
+});
+
+const SettingsModule = memo(function SettingsModule({
   sub,
   profile,
+  persons,
   onNotice,
   onProfileRefresh,
+  onReloadPersons,
 }: {
   sub: string;
   profile: SessionAdminUser;
+  persons: Person[];
   onNotice: (section: AdminSectionId | "global", type: ModuleMessageType, message: string) => void;
   onProfileRefresh: () => void;
+  onReloadPersons: () => Promise<void>;
 }) {
+  const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+  const ALLOWED_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+  const SYSTEM_TIME_LIMITS: Record<SystemTimeUnit, number> = { minutes: 1440, hours: 168 };
+
   const [settings, setSettings] = useState(() => {
     const base = {
-      adminName: profile.username ?? "Administrador",
       firstName: profile.firstName ?? "",
-      middleName: profile.middleName ?? "",
       lastName1: profile.lastName1 ?? "",
       lastName2: profile.lastName2 ?? "",
-      autoBackup: true,
-      soundAlerts: true,
-      nightReport: true,
-      dailyConsumption: true,
     };
 
     const stored = localStorage.getItem("admin_settings_v2");
@@ -2568,24 +3494,131 @@ function SettingsModule({
       return base;
     }
   });
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [photoInputKey, setPhotoInputKey] = useState(0);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoMessage, setPhotoMessage] = useState<{ type: ModuleMessageType; text: string } | null>(null);
+  const [systemTime, setSystemTime] = useState<string | null>(null);
+  const [timeOffset, setTimeOffset] = useState<SystemTimeOffset | null>(null);
+  const [timeAmount, setTimeAmount] = useState(24);
+  const [timeUnit, setTimeUnit] = useState<SystemTimeUnit>("hours");
+  const [isLoadingTime, setIsLoadingTime] = useState(false);
+  const [isAdvancingTime, setIsAdvancingTime] = useState(false);
+  const [advanceResult, setAdvanceResult] = useState<AdvanceSystemTimeResult | null>(null);
+  const resolvedProfilePerson = useMemo(() => resolveSessionPerson(profile, persons), [profile, persons]);
+  const resolvedProfilePersonId = useMemo(() => resolveSessionPersonId(profile, persons), [profile, persons]);
 
-  const handleSave = () => {
-    localStorage.setItem("admin_settings_v2", JSON.stringify(settings));
+  const currentProfilePhoto = useMemo(
+    () =>
+      resolvePersonProfileImage(resolvedProfilePerson) ||
+      (typeof profile.photoUrl === "string" && profile.photoUrl.trim()) ||
+      (typeof profile.imageUrl === "string" && profile.imageUrl.trim()) ||
+      (typeof profile.profileImage === "string" && profile.profileImage.trim()) ||
+      (typeof profile.avatar === "string" && profile.avatar.trim()) ||
+      (typeof profile.photo === "string" && profile.photo.trim()) ||
+      null,
+    [resolvedProfilePerson, profile.photoUrl, profile.imageUrl, profile.profileImage, profile.avatar, profile.photo],
+  );
+  const currentProfileInitials = useMemo(
+    () => resolveInitials([profile.firstName, profile.lastName1, profile.lastName2, profile.displayName, profile.username], 3),
+    [profile.firstName, profile.lastName1, profile.lastName2, profile.displayName, profile.username],
+  );
+
+  const loadSystemTimeControls = useCallback(async () => {
+    setIsLoadingTime(true);
+    try {
+      const [serverTimeResult, offsetResult] = await Promise.all([
+        getServerTime(),
+        getSystemTimeOffset(),
+      ]);
+      setSystemTime(serverTimeResult.serverTime);
+      setTimeOffset(offsetResult);
+    } catch (error) {
+      onNotice("configuracion", "error", getErrorMessage(error, "load_dashboard"));
+    } finally {
+      setIsLoadingTime(false);
+    }
+  }, [onNotice]);
+
+  useEffect(() => {
+    if (sub !== "Tiempo lógico") return;
+    void loadSystemTimeControls();
+  }, [loadSystemTimeControls, sub]);
+
+  const validateTimeAdvance = (): number | null => {
+    const amount = Number(timeAmount);
+    const maxAmount = SYSTEM_TIME_LIMITS[timeUnit];
+    if (!Number.isInteger(amount) || amount <= 0) {
+      onNotice("configuracion", "warning", "Indica una cantidad entera mayor a cero.");
+      return null;
+    }
+    if (amount > maxAmount) {
+      onNotice("configuracion", "warning", `El maximo permitido es ${maxAmount} ${timeUnit === "hours" ? "horas" : "minutos"} por operacion.`);
+      return null;
+    }
+    return amount;
+  };
+
+  const handleAdvanceSystemTime = async (preset?: { unit: SystemTimeUnit; amount: number }) => {
+    if (isAdvancingTime) return;
+    const unit = preset?.unit ?? timeUnit;
+    const amount = preset?.amount ?? validateTimeAdvance();
+    if (amount === null) return;
+
+    const maxAmount = SYSTEM_TIME_LIMITS[unit];
+    if (amount > maxAmount) {
+      onNotice("configuracion", "warning", `El maximo permitido es ${maxAmount} ${unit === "hours" ? "horas" : "minutos"} por operacion.`);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Esta accion cambia el tiempo logico de la aplicacion y puede ejecutar ciclos diarios, consumo de recursos, expediciones, expiracion de sesiones y tokens. No cambia el reloj real del servidor. ¿Deseas continuar?",
+    );
+    if (!confirmed) return;
+
+    setIsAdvancingTime(true);
+    setAdvanceResult(null);
+    try {
+      const result = await advanceSystemTime({ unit, amount });
+      setAdvanceResult(result);
+      setSystemTime(result.currentSystemTime);
+      setTimeOffset({
+        offsetMilliseconds: result.offsetMilliseconds,
+        currentSystemTime: result.currentSystemTime,
+        lastModifiedAt: result.lastModifiedAt,
+      });
+      await loadSystemTimeControls();
+      onNotice("configuracion", "success", result.message || `Tiempo logico avanzado ${amount} ${unit}.`);
+    } catch (error) {
+      onNotice("configuracion", "error", getErrorMessage(error, "update_person"));
+    } finally {
+      setIsAdvancingTime(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl);
+      }
+    };
+  }, [photoPreviewUrl]);
+
+  const persistSettings = (nextSettings: typeof settings) => {
+    localStorage.setItem("admin_settings_v2", JSON.stringify(nextSettings));
 
     const rawUser = localStorage.getItem("user");
     if (rawUser) {
       try {
         const parsed = JSON.parse(rawUser) as Record<string, unknown>;
-        const updated = {
+        const updated: Record<string, unknown> = {
           ...parsed,
-          username: settings.adminName,
-          displayName: settings.adminName,
-          firstName: settings.firstName,
-          middleName: settings.middleName,
-          lastName1: settings.lastName1,
-          lastName2: settings.lastName2,
+          firstName: nextSettings.firstName,
+          lastName1: nextSettings.lastName1,
+          lastName2: nextSettings.lastName2,
         };
-        const profileName = [settings.firstName, settings.middleName, settings.lastName1, settings.lastName2]
+        const profileName = [nextSettings.firstName, nextSettings.lastName1, nextSettings.lastName2]
           .map((part) => String(part ?? "").trim())
           .filter(Boolean)
           .join(" ");
@@ -2602,114 +3635,327 @@ function SettingsModule({
     onNotice("configuracion", "success", "Configuracion guardada correctamente.");
   };
 
+  const handleSave = () => {
+    persistSettings(settings);
+  };
+
   const handleReset = () => {
     localStorage.removeItem("admin_settings_v2");
     onNotice("configuracion", "info", "Se restablecio la configuracion local del panel.");
   };
 
+  const handlePhotoSelection = (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0] ?? null;
+
+    if (!selectedFile) {
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl);
+      }
+      setPhotoFile(null);
+      setPhotoPreviewUrl(null);
+      setPhotoMessage({ type: "info", text: "Selecciona una imagen para habilitar la actualizacion." });
+      return;
+    }
+
+    if (!ALLOWED_PROFILE_PHOTO_TYPES.has(selectedFile.type)) {
+      event.target.value = "";
+      setPhotoMessage({ type: "warning", text: "Formato no permitido. Usa JPG, PNG o WEBP." });
+      onNotice("configuracion", "warning", "Formato no permitido. Usa JPG, PNG o WEBP.");
+      return;
+    }
+
+    if (selectedFile.size > PROFILE_PHOTO_MAX_BYTES) {
+      event.target.value = "";
+      setPhotoMessage({ type: "warning", text: "La imagen supera 5 MB. Selecciona un archivo mas liviano." });
+      onNotice("configuracion", "warning", "La imagen supera 5 MB. Selecciona un archivo mas liviano.");
+      return;
+    }
+
+    if (photoPreviewUrl) {
+      URL.revokeObjectURL(photoPreviewUrl);
+    }
+
+    setPhotoFile(selectedFile);
+    setPhotoPreviewUrl(URL.createObjectURL(selectedFile));
+    setPhotoMessage({ type: "info", text: `Imagen lista: ${selectedFile.name}. Presiona Actualizar foto.` });
+  };
+
+  const handlePhotoUpdate = async () => {
+    if (isUploadingPhoto) return;
+    if (!photoFile) {
+      setPhotoMessage({ type: "warning", text: "Primero selecciona una imagen." });
+      onNotice("configuracion", "warning", "Primero selecciona una imagen.");
+      return;
+    }
+    if (resolvedProfilePersonId === null) {
+      const message = "No se pudo identificar la persona enlazada a este usuario. Revisa que la cuenta tenga personId o username asociado.";
+      setPhotoMessage({ type: "error", text: message });
+      onNotice("configuracion", "error", message);
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    setPhotoMessage({ type: "info", text: "Subiendo imagen de perfil..." });
+    try {
+      const updatedPerson = await updatePersonPhoto(resolvedProfilePersonId, photoFile);
+      const resolvedPhotoUrl = resolvePersonProfileImage(updatedPerson);
+
+      const rawUser = localStorage.getItem("user");
+      if (rawUser) {
+        try {
+          const parsed = JSON.parse(rawUser) as Record<string, unknown>;
+          const updated: Record<string, unknown> = {
+            ...parsed,
+            personId: resolvedProfilePersonId,
+          };
+          if (resolvedPhotoUrl) {
+            updated.photoUrl = resolvedPhotoUrl;
+            updated.imageUrl = resolvedPhotoUrl;
+            updated.profileImage = resolvedPhotoUrl;
+            updated.avatar = resolvedPhotoUrl;
+            updated.photo = resolvedPhotoUrl;
+          }
+          localStorage.setItem("user", JSON.stringify(updated));
+        } catch {
+          // Ignore malformed cached user
+        }
+      }
+
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl);
+      }
+      setPhotoFile(null);
+      setPhotoPreviewUrl(null);
+      setPhotoInputKey((prev) => prev + 1);
+
+      await onReloadPersons();
+      onProfileRefresh();
+      setPhotoMessage({ type: "success", text: "Foto de perfil actualizada correctamente." });
+      onNotice("configuracion", "success", "Foto de perfil actualizada correctamente.");
+    } catch (error) {
+      const message = error instanceof Error && error.message.trim()
+        ? error.message
+        : getErrorMessage(error, "update_person");
+      setPhotoMessage({ type: "error", text: message });
+      onNotice("configuracion", "error", message);
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const settingsProfilePreview = photoPreviewUrl || currentProfilePhoto;
+
   return (
     <div className="admin-ui-v2-dashboard">
       <div className="admin-ui-v2-grid admin-ui-v2-grid-2">
-        {(sub === "Campamento" || sub === "Sistema") && (
-          <div className="admin-ui-v2-module-card">
-            <div className="admin-ui-v2-section-head">
-              <span>Configuracion del campamento</span>
-              <span>Operativa</span>
-            </div>
-            <div className="admin-ui-v2-form-grid">
-              <label className="admin-ui-v2-muted">Campamento asignado</label>
-              <div className="v-input" aria-readonly="true">
-                {`Campamento #${profile.campId ?? 1}`}
+        {sub === "Campamento" && (
+          <>
+            <div className="admin-ui-v2-module-card">
+              <div className="admin-ui-v2-section-head">
+                <span>Configuracion del campamento</span>
+                <span>Operativa</span>
               </div>
+              <div className="admin-ui-v2-form-grid">
+                <label className="admin-ui-v2-muted">Campamento asignado</label>
+                <div className="v-input" aria-readonly="true">
+                  {`Campamento #${profile.campId ?? 1}`}
+                </div>
 
-              <label className="admin-ui-v2-muted">Nombre del administrador</label>
-              <input
-                className="v-input"
-                value={settings.adminName}
-                onChange={(event) => setSettings((prev) => ({ ...prev, adminName: event.target.value }))}
-              />
+                <label className="admin-ui-v2-muted">Nombre de usuario</label>
+                <div className="v-input" aria-readonly="true">
+                  {profile.username ?? "sin-usuario"}
+                </div>
 
-              <label className="admin-ui-v2-muted">Primer nombre</label>
-              <input
-                className="v-input"
-                value={settings.firstName}
-                onChange={(event) => setSettings((prev) => ({ ...prev, firstName: event.target.value }))}
-              />
+                <label className="admin-ui-v2-muted">Primer nombre</label>
+                <input
+                  className="v-input"
+                  value={settings.firstName}
+                  onChange={(event) => setSettings((prev) => ({ ...prev, firstName: event.target.value }))}
+                />
 
-              <label className="admin-ui-v2-muted">Segundo nombre</label>
-              <input
-                className="v-input"
-                value={settings.middleName}
-                onChange={(event) => setSettings((prev) => ({ ...prev, middleName: event.target.value }))}
-              />
+                <label className="admin-ui-v2-muted">Primer apellido</label>
+                <input
+                  className="v-input"
+                  value={settings.lastName1}
+                  onChange={(event) => setSettings((prev) => ({ ...prev, lastName1: event.target.value }))}
+                />
 
-              <label className="admin-ui-v2-muted">Primer apellido</label>
-              <input
-                className="v-input"
-                value={settings.lastName1}
-                onChange={(event) => setSettings((prev) => ({ ...prev, lastName1: event.target.value }))}
-              />
+                <label className="admin-ui-v2-muted">Segundo apellido</label>
+                <input
+                  className="v-input"
+                  value={settings.lastName2}
+                  onChange={(event) => setSettings((prev) => ({ ...prev, lastName2: event.target.value }))}
+                />
 
-              <label className="admin-ui-v2-muted">Segundo apellido</label>
-              <input
-                className="v-input"
-                value={settings.lastName2}
-                onChange={(event) => setSettings((prev) => ({ ...prev, lastName2: event.target.value }))}
-              />
-
+              </div>
             </div>
-          </div>
+
+            <div className="admin-ui-v2-module-card">
+              <div className="admin-ui-v2-section-head">
+                <span>Foto de perfil</span>
+                <span>Cuenta</span>
+              </div>
+              <div className="admin-ui-v2-settings-photo-panel">
+                <div className="admin-ui-v2-settings-photo-preview-wrap">
+                  {settingsProfilePreview ? (
+                    <img
+                      src={settingsProfilePreview}
+                      alt={`Foto de perfil de ${profile.displayName ?? profile.username ?? "usuario"}`}
+                      className="admin-ui-v2-settings-photo-preview"
+                      loading="lazy"
+                      decoding="async"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <span className="admin-ui-v2-settings-photo-preview admin-ui-v2-avatar-fallback" aria-hidden="true">
+                      {currentProfileInitials}
+                    </span>
+                  )}
+                </div>
+
+                <div className="admin-ui-v2-form-grid">
+                  <label className="admin-ui-v2-muted" htmlFor="admin-profile-photo-input">Seleccionar nueva imagen</label>
+                  <input
+                    id="admin-profile-photo-input"
+                    key={photoInputKey}
+                    className="v-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handlePhotoSelection}
+                  />
+                  <small className="admin-ui-v2-muted">Formatos permitidos: JPG, PNG, WEBP. Límite de tamaño: 5MB.</small>
+                </div>
+
+                <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
+                  <button
+                    className="admin-ui-v2-btn is-info"
+                    type="button"
+                    disabled={isUploadingPhoto}
+                    onClick={() => void handlePhotoUpdate()}
+                  >
+                    {isUploadingPhoto ? "Actualizando foto..." : "Actualizar foto"}
+                  </button>
+                </div>
+
+                <div className={`admin-ui-v2-settings-photo-message is-${photoMessage?.type ?? "info"}`}>
+                  {photoMessage?.text ??
+                    (resolvedProfilePersonId === null
+                      ? "No se encontro una persona enlazada para este usuario."
+                      : "Selecciona una imagen JPG, PNG o WEBP para actualizarla.")}
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
-        {sub === "Sistema" && (
-          <div className="admin-ui-v2-module-card">
-            <div className="admin-ui-v2-section-head">
-              <span>Preferencias del sistema</span>
-              <span>Entorno</span>
-            </div>
-            <div className="admin-ui-v2-form-grid">
+        {sub === "Tiempo lógico" && (
+          <>
+            <div className="admin-ui-v2-module-card admin-ui-v2-time-control-card">
+              <div className="admin-ui-v2-section-head">
+                <span>Tiempo logico del sistema</span>
+                <span>{isLoadingTime ? "Sincronizando" : "Servidor"}</span>
+              </div>
+              <div className="admin-ui-v2-time-control-grid">
+                <div>
+                  <small>Hora logica actual</small>
+                  <strong>{formatSystemDateTime(systemTime ?? timeOffset?.currentSystemTime)}</strong>
+                </div>
+                <div>
+                  <small>Offset acumulado</small>
+                  <strong>{formatOffsetMilliseconds(timeOffset?.offsetMilliseconds)}</strong>
+                </div>
+                <div>
+                  <small>Ultima modificacion</small>
+                  <strong>{formatSystemDateTime(timeOffset?.lastModifiedAt)}</strong>
+                </div>
+              </div>
+              <p className="admin-ui-v2-time-warning">
+                Esta accion cambia el tiempo logico de la aplicacion y puede ejecutar ciclos diarios, consumo de recursos, expediciones, expiracion de sesiones y tokens. No cambia el reloj real del servidor.
+              </p>
               <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
-                <button
-                  className={`admin-ui-v2-btn ${settings.autoBackup ? "is-ok" : ""}`}
-                  type="button"
-                  onClick={() => setSettings((prev) => ({ ...prev, autoBackup: !prev.autoBackup }))}
-                >
-                  Auto-backup: {settings.autoBackup ? "ON" : "OFF"}
-                </button>
-                <button
-                  className={`admin-ui-v2-btn ${settings.soundAlerts ? "is-ok" : ""}`}
-                  type="button"
-                  onClick={() => setSettings((prev) => ({ ...prev, soundAlerts: !prev.soundAlerts }))}
-                >
-                  Alertas sonoras: {settings.soundAlerts ? "ON" : "OFF"}
-                </button>
-                <button
-                  className={`admin-ui-v2-btn ${settings.nightReport ? "is-ok" : ""}`}
-                  type="button"
-                  onClick={() => setSettings((prev) => ({ ...prev, nightReport: !prev.nightReport }))}
-                >
-                  Reporte nocturno: {settings.nightReport ? "ON" : "OFF"}
-                </button>
-                <button
-                  className={`admin-ui-v2-btn ${settings.dailyConsumption ? "is-ok" : ""}`}
-                  type="button"
-                  onClick={() => setSettings((prev) => ({ ...prev, dailyConsumption: !prev.dailyConsumption }))}
-                >
-                  Consumo diario: {settings.dailyConsumption ? "ON" : "OFF"}
+                <button className="admin-ui-v2-btn" type="button" onClick={() => void loadSystemTimeControls()} disabled={isLoadingTime || isAdvancingTime}>
+                  {isLoadingTime ? "Sincronizando..." : "Actualizar estado"}
                 </button>
               </div>
             </div>
-          </div>
+
+            <div className="admin-ui-v2-module-card">
+              <div className="admin-ui-v2-section-head">
+                <span>Avanzar tiempo</span>
+                <span>Max {timeUnit === "hours" ? "168 horas" : "1440 minutos"}</span>
+              </div>
+              <div className="admin-ui-v2-form-grid">
+                <label className="admin-ui-v2-muted">Cantidad</label>
+                <input
+                  className="v-input"
+                  type="number"
+                  min={1}
+                  max={SYSTEM_TIME_LIMITS[timeUnit]}
+                  value={timeAmount}
+                  onChange={(event) => setTimeAmount(Number(event.target.value))}
+                />
+
+                <label className="admin-ui-v2-muted">Unidad</label>
+                <select
+                  className="v-select"
+                  value={timeUnit}
+                  onChange={(event) => {
+                    const nextUnit = event.target.value as SystemTimeUnit;
+                    setTimeUnit(nextUnit);
+                    setTimeAmount((prev) => Math.min(Math.max(1, Number(prev) || 1), SYSTEM_TIME_LIMITS[nextUnit]));
+                  }}
+                >
+                  <option value="hours">Horas</option>
+                  <option value="minutes">Minutos</option>
+                </select>
+              </div>
+              <small className="admin-ui-v2-muted">Limite permitido: hasta 1440 minutos o 168 horas por operacion.</small>
+              <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap admin-ui-v2-time-actions">
+                <button className="admin-ui-v2-btn" type="button" onClick={() => void handleAdvanceSystemTime({ unit: "hours", amount: 1 })} disabled={isAdvancingTime}>+1 hora</button>
+                <button className="admin-ui-v2-btn" type="button" onClick={() => void handleAdvanceSystemTime({ unit: "hours", amount: 24 })} disabled={isAdvancingTime}>+24 horas</button>
+                <button className="admin-ui-v2-btn" type="button" onClick={() => void handleAdvanceSystemTime({ unit: "minutes", amount: 60 })} disabled={isAdvancingTime}>+60 minutos</button>
+                <button className="admin-ui-v2-btn is-info" type="button" onClick={() => void handleAdvanceSystemTime()} disabled={isAdvancingTime}>
+                  {isAdvancingTime ? "Avanzando..." : "Avanzar tiempo logico"}
+                </button>
+              </div>
+            </div>
+
+            {advanceResult && (
+              <div className="admin-ui-v2-module-card admin-ui-v2-time-result">
+                <div className="admin-ui-v2-section-head">
+                  <span>Resultado del avance</span>
+                  <span>{formatSystemDateTime(advanceResult.currentSystemTime)}</span>
+                </div>
+                <p>{advanceResult.message}</p>
+                <div className="admin-ui-v2-time-control-grid">
+                  <div>
+                    <small>Nuevo offset</small>
+                    <strong>{formatOffsetMilliseconds(advanceResult.offsetMilliseconds)}</strong>
+                  </div>
+                  <div>
+                    <small>Actualizado</small>
+                    <strong>{formatSystemDateTime(advanceResult.lastModifiedAt)}</strong>
+                  </div>
+                </div>
+                <div className="admin-ui-v2-time-result-list">
+                  {advanceResult.automations.map((item) => <span key={item}>{item}</span>)}
+                  {advanceResult.automations.length === 0 && <span>Sin automatizaciones ejecutadas.</span>}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
-        <button className="admin-ui-v2-btn is-info" type="button" onClick={handleSave}>Guardar configuracion</button>
-        <button className="admin-ui-v2-btn" type="button" onClick={handleReset}>Restablecer</button>
-      </div>
+      {sub === "Campamento" && (
+        <div className="admin-ui-v2-actions admin-ui-v2-actions-wrap">
+          <button className="admin-ui-v2-btn is-info" type="button" onClick={handleSave}>Guardar configuracion</button>
+          <button className="admin-ui-v2-btn" type="button" onClick={handleReset}>Restablecer</button>
+        </div>
+      )}
     </div>
   );
-}
+});
 
 function AdmissionReviewModal({
   admission,
@@ -2853,24 +4099,21 @@ function AdmissionReviewModal({
   );
 }
 
-function ExpeditionsModule({
+const ExpeditionsModule = memo(function ExpeditionsModule({
   sub,
   expeditions,
   campCatalog,
   consumedResources,
   gainedResources,
-  onCompleteExpedition,
 }: {
   sub: string;
   expeditions: UiExpedition[];
   campCatalog: Camp[];
   consumedResources: ResourceLedgerEntry[];
   gainedResources: ResourceLedgerEntry[];
-  onCompleteExpedition: (id: number) => Promise<void>;
 }) {
   const [selectedCampId, setSelectedCampId] = useState<number | null>(null);
   const [selectedExpeditionId, setSelectedExpeditionId] = useState<number | null>(null);
-  const [completingId, setCompletingId] = useState<number | null>(null);
   const effectiveExpeditions = expeditions;
 
   const mappedCamps = useMemo<MappedCampPoint[]>(() => {
@@ -2920,20 +4163,32 @@ function ExpeditionsModule({
   const selectedExpeditionRoute = selectedExpedition ? buildExpeditionRoute(selectedExpedition, mappedCamps) : null;
 
   useEffect(() => {
+    if (sub !== "Mapa operativo") return;
+
+    const idleApi = window as Window & {
+      requestIdleCallback?: (callback: () => void) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    if (typeof idleApi.requestIdleCallback === "function") {
+      const idleCallbackId = idleApi.requestIdleCallback(() => prefetchExpeditionsWorldMap());
+      return () => {
+        if (typeof idleApi.cancelIdleCallback === "function") {
+          idleApi.cancelIdleCallback(idleCallbackId);
+        }
+      };
+    }
+
+    const timer = window.setTimeout(() => prefetchExpeditionsWorldMap(), 120);
+    return () => window.clearTimeout(timer);
+  }, [sub]);
+
+  useEffect(() => {
     setSelectedExpeditionId((prev) => {
       if (prev && visibleExpeditions.some((item) => item.id === prev)) return prev;
       return visibleExpeditions[0]?.id ?? null;
     });
   }, [visibleExpeditions]);
-
-  const handleComplete = async (expeditionId: number) => {
-    setCompletingId(expeditionId);
-    try {
-      await onCompleteExpedition(expeditionId);
-    } finally {
-      setCompletingId(null);
-    }
-  };
 
   const deployedPeopleCount = activeExpeditions.reduce((sum, expedition) => sum + expedition.participants.length, 0);
   const averageProgress =
@@ -3089,20 +4344,7 @@ function ExpeditionsModule({
                     ))}
                   </div>
                 )}
-                {selectedExpedition.status !== "COMPLETADA" ? (
-                  <div className="admin-ui-v2-actions">
-                    <button
-                      className="admin-ui-v2-btn is-ok"
-                      onClick={() => void handleComplete(selectedExpedition.id)}
-                      type="button"
-                      disabled={completingId === selectedExpedition.id}
-                    >
-                      {completingId === selectedExpedition.id ? "Completando..." : "Completar expedición"}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="admin-ui-v2-muted">Misión cerrada y transferida a historial.</div>
-                )}
+                <div className="admin-ui-v2-muted">Vista de consulta habilitada para administración.</div>
               </div>
             ) : (
               <div className="admin-ui-v2-empty-cell">Selecciona una expedición para ver detalle.</div>
@@ -3112,7 +4354,7 @@ function ExpeditionsModule({
       )}
     </div>
   );
-}
+});
 
 function ResourceLedgerRow({
   entry,
@@ -3161,16 +4403,6 @@ function BottomDock({ activeDock, onSelect }: { activeDock: AdminSectionId; onSe
         </button>
       ))}
     </footer>
-  );
-}
-
-function SupportLink() {
-  return (
-    <button className="support-link" type="button">
-      <span className="btn-text">
-        <span>?</span> Support
-      </span>
-    </button>
   );
 }
 
@@ -3272,6 +4504,19 @@ function AlertIcon() {
       <path d="M16 5 3 27h26L16 5Z" />
       <path d="M16 13v7" />
       <circle cx="16" cy="23" r="1" />
+    </IconSvg>
+  );
+}
+
+function TrophyIcon() {
+  return (
+    <IconSvg>
+      <path d="M9 6h14v2a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5V6Z" />
+      <path d="M9 8H6a3 3 0 0 0 3 3" />
+      <path d="M23 8h3a3 3 0 0 1-3 3" />
+      <path d="M16 13v6" />
+      <path d="M12 27h8" />
+      <path d="M13 19h6" />
     </IconSvg>
   );
 }

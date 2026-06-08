@@ -12,10 +12,17 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html, OrbitControls, PerspectiveCamera, useGLTF, useProgress } from '@react-three/drei'
 import { useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { AudioLines, Check, ChevronLeft, LogOut } from 'lucide-react'
+import { AudioLines, ChevronLeft, LogOut } from 'lucide-react'
 import * as THREE from 'three'
 import './admin-main-view-ui.css'
 import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
+import { AdminSyncOverlay } from '../../admin-dashboard/components/AdminSyncOverlay'
+import {
+  ADMIN_DASHBOARD_BOOT_MAX_VISUAL_LEAD,
+  ADMIN_DASHBOARD_BOOT_MIN_MS,
+  bootstrapAdminDashboard,
+  type AdminDashboardBootstrapData,
+} from '../../admin-dashboard/services'
 
 type Vec3 = [number, number, number]
 type ViewMode = 'normal' | 'zoom'
@@ -819,153 +826,6 @@ function AdminMainViewUiLoader() {
   )
 }
 
-function SyncOverlay({
-  isSyncing,
-  syncState,
-  presetName,
-  onComplete,
-  onBack,
-}: {
-  isSyncing: boolean
-  syncState: SyncState
-  presetName: string
-  onComplete: () => void
-  onBack: () => void
-}) {
-  const [progress, setProgress] = useState(0)
-
-  useEffect(() => {
-    if (!isSyncing || syncState !== 'syncing') {
-      setProgress(0)
-      return
-    }
-
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          return 100
-        }
-        return prev + 2
-      })
-    }, 20)
-
-    return () => clearInterval(interval)
-  }, [isSyncing, syncState])
-
-  useEffect(() => {
-    if (progress >= 100 && syncState === 'syncing') {
-      onComplete();
-    }
-  }, [onComplete, progress, syncState]);
-
-  if (!isSyncing) return null
-
-  const isReady = syncState === 'ready' || progress >= 100
-  const canAccess = progress >= 100
-
-  return (
-    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-700">
-      <div className="flex flex-col items-center gap-10 w-full max-w-md">
-        <div className="relative w-40 h-40 flex items-center justify-center">
-          <div className="absolute inset-0 border-4 border-cyan-500/10 rounded-full" />
-          <div
-            className="absolute inset-0 border-4 border-t-cyan-400 border-l-cyan-400/30 rounded-full animate-spin"
-            style={{ animationDuration: '3s' }}
-          />
-          <div className="flex flex-col items-center">
-            {isReady ? (
-              <Check className="h-12 w-12 text-emerald-400" strokeWidth={3} />
-            ) : (
-              <span className="font-mono text-3xl font-black text-white leading-none">
-                {progress}%
-              </span>
-            )}
-            <span className="font-mono text-[8px] text-cyan-400/60 uppercase tracking-[0.3em] mt-1">
-              {isReady ? 'LINK_READY' : 'LINK_SYNC'}
-            </span>
-          </div>
-        </div>
-
-        <div className="w-full space-y-4 px-10">
-          <div className="flex flex-col items-center gap-2 text-center">
-            <p className="font-mono text-[10px] font-black text-cyan-400 tracking-[0.5em] uppercase">
-              {presetName}
-            </p>
-            <p className="font-mono text-[8px] text-white/30 uppercase tracking-widest">
-              {isReady ? 'Conexión establecida' : 'Estableciendo conexión segura...'}
-            </p>
-          </div>
-
-          <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-cyan-400 transition-all duration-300 shadow-[0_0_15px_rgba(34,211,238,0.8)]"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center gap-3 w-full px-8">
-          <button
-            onClick={canAccess ? onComplete : undefined}
-            disabled={!canAccess}
-            className={`group relative px-16 py-3 pointer-events-auto transition-all duration-300 ${
-              canAccess ? 'active:scale-95' : 'opacity-40 cursor-not-allowed'
-            }`}
-          >
-            <div
-              className={`absolute inset-0 transition-all duration-300 -z-10 shadow-lg ${
-                canAccess
-                  ? 'bg-[#020617]/95 group-hover:bg-cyan-300'
-                  : 'bg-[#020617]/40 border border-cyan-500/10'
-              }`}
-              style={{
-                clipPath: BRUSH_CLIP,
-                transform: 'skewX(-5deg)',
-              }}
-            />
-            <div className="relative z-10 flex items-center gap-3">
-              {canAccess ? (
-                <Check
-                  className="h-4 w-4 text-emerald-400 group-hover:text-black"
-                  strokeWidth={3}
-                />
-              ) : (
-                <span className="font-mono text-[10px] font-black text-cyan-400/50">
-                  {progress}%
-                </span>
-              )}
-              <span
-                className={`text-[10px] font-black tracking-[0.4em] uppercase drop-shadow-md transition-colors ${
-                  canAccess ? 'text-white group-hover:text-black' : 'text-white/40'
-                }`}
-              >
-                ACCEDER AL SISTEMA
-              </span>
-            </div>
-          </button>
-
-          <button
-            onClick={onBack}
-            className="pointer-events-auto flex items-center justify-center gap-2 group relative px-12 py-2.5"
-          >
-            <div
-              className="absolute inset-0 bg-[#020617]/60 group-hover:bg-blue-600/80 transition-all duration-300 -z-10"
-              style={{
-                clipPath: BRUSH_CLIP,
-                transform: 'skewX(-10deg)',
-              }}
-            />
-            <span className="text-[10px] font-black tracking-[0.25em] font-mono text-white/60 group-hover:text-white uppercase transition-colors">
-              VOLVER A LA OFICINA
-            </span>
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function AdminMainViewUiPage() {
   const navigate = useNavigate()
   const [cameraConfig, setCameraConfig] = useState<CameraState>(() => readStoredCamera())
@@ -974,11 +834,16 @@ export default function AdminMainViewUiPage() {
   const [bootProgress, setBootProgress] = useState(0)
   const [appLoaded, setAppLoaded] = useState(false)
   const [syncState, setSyncState] = useState<SyncState>('idle')
+  const [syncDataProgress, setSyncDataProgress] = useState(0)
+  const [syncVisualProgress, setSyncVisualProgress] = useState(0)
+  const [syncPhase, setSyncPhase] = useState('Inicializando consola tactica...')
+  const [preloadedDashboardData, setPreloadedDashboardData] = useState<AdminDashboardBootstrapData | null>(null)
   const [signalEnabled, setSignalEnabled] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
   const [hoveredMonitorId, setHoveredMonitorId] = useState<string | null>(null)
   const [hoveredConsole, setHoveredConsole] = useState(false)
   const [hoveredComms, setHoveredComms] = useState(false)
+  const syncRunIdRef = useRef(0)
 
   const cameraSessionRef = useRef<CameraState>({
     position: cloneVec3(cameraConfig.position),
@@ -1025,6 +890,31 @@ export default function AdminMainViewUiPage() {
   }, [syncState, viewMode])
 
   useEffect(() => {
+    if (syncState === 'idle') {
+      setSyncDataProgress(0)
+      setSyncVisualProgress(0)
+      setSyncPhase('Inicializando consola tactica...')
+      setPreloadedDashboardData(null)
+      return
+    }
+
+    if (syncState === 'ready') {
+      setSyncVisualProgress(100)
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      setSyncVisualProgress((prev) => {
+        const target = Math.min(99, syncDataProgress + ADMIN_DASHBOARD_BOOT_MAX_VISUAL_LEAD)
+        if (prev >= target) return prev
+        return Math.min(target, prev + 1)
+      })
+    }, 26)
+
+    return () => window.clearInterval(timer)
+  }, [syncDataProgress, syncState])
+
+  useEffect(() => {
     if (!toast) {
       return
     }
@@ -1056,22 +946,68 @@ export default function AdminMainViewUiPage() {
 
   const handleStartSync = useCallback(
     (presetId: string) => {
-      if (MONITOR_PRESET_IDS.has(presetId) && viewMode === 'zoom') {
-        setSyncState('syncing')
-      }
+      if (!MONITOR_PRESET_IDS.has(presetId) || viewMode !== 'zoom' || syncState !== 'idle') return
+
+      const runId = syncRunIdRef.current + 1
+      syncRunIdRef.current = runId
+      setSyncState('syncing')
+      setSyncDataProgress(0)
+      setSyncVisualProgress(0)
+      setSyncPhase('Inicializando consola tactica...')
+      setPreloadedDashboardData(null)
+
+      void (async () => {
+        const startedAt = Date.now()
+        try {
+          const data = await bootstrapAdminDashboard({
+            onProgress: ({ progress, phase }) => {
+              if (syncRunIdRef.current !== runId) return
+              setSyncDataProgress(progress)
+              setSyncPhase(phase)
+            },
+          })
+
+          const waitMs = Math.max(0, ADMIN_DASHBOARD_BOOT_MIN_MS - (Date.now() - startedAt))
+          if (waitMs > 0) {
+            await new Promise((resolve) => window.setTimeout(resolve, waitMs))
+          }
+
+          if (syncRunIdRef.current !== runId) return
+          setPreloadedDashboardData(data)
+          setSyncDataProgress(100)
+          setSyncPhase('Finalizando despliegue...')
+          setSyncState('ready')
+
+          window.setTimeout(() => {
+            if (syncRunIdRef.current !== runId) return
+            navigate('/admin-dashboard', {
+              state: {
+                bootstrappedDashboardData: data,
+              },
+            })
+          }, 420)
+        } catch {
+          if (syncRunIdRef.current !== runId) return
+          setToast('No se logro completar la sincronizacion general de modulos.')
+          setSyncState('idle')
+        }
+      })()
     },
-    [viewMode],
+    [navigate, syncState, viewMode],
   )
 
   const handleSyncComplete = useCallback(() => {
-    setSyncState('ready');
-    window.setTimeout(() => {
-      navigate('/admin-dashboard');
-    }, 420);
-  }, [navigate]);
+    if (!preloadedDashboardData) return
+    navigate('/admin-dashboard', {
+      state: {
+        bootstrappedDashboardData: preloadedDashboardData,
+      },
+    })
+  }, [navigate, preloadedDashboardData])
 
   const handleBack = useCallback(() => {
     if (syncState !== 'idle') {
+      syncRunIdRef.current += 1
       setSyncState('idle')
       return
     }
@@ -1106,10 +1042,12 @@ export default function AdminMainViewUiPage() {
 
       <AdminMainViewUiLoader />
       {isSyncing ? (
-        <SyncOverlay
-          isSyncing={isSyncing}
-          syncState={syncState}
+        <AdminSyncOverlay
+          visible={isSyncing}
+          isReady={syncState === 'ready'}
           presetName={currentPreset.name}
+          progress={Math.max(syncDataProgress, syncVisualProgress)}
+          phase={syncPhase}
           onComplete={handleSyncComplete}
           onBack={handleBack}
         />

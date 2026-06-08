@@ -1,6 +1,6 @@
 ﻿import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, useGLTF, Html, useProgress } from '@react-three/drei'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import {
   GLTF_URLS,
@@ -11,17 +11,7 @@ import {
 import type { ResourceZoomTarget } from '../constants/resourceSceneConfigs'
 import { useResourceScene } from '../hooks'
 
-function ResourceModel({
-  url,
-  position,
-  rotation = [0, 0, 0],
-  scale = 1,
-  targetSize = null,
-  onLoaded,
-  emissive = false,
-  shadows = true,
-  doubleSide = false,
-}: {
+type ResourceModelProps = {
   url: string
   position: [number, number, number]
   rotation?: [number, number, number]
@@ -31,7 +21,19 @@ function ResourceModel({
   emissive?: boolean
   shadows?: boolean
   doubleSide?: boolean
-}) {
+}
+
+const ResourceModel = memo(function ResourceModel({
+  url,
+  position,
+  rotation = [0, 0, 0],
+  scale = 1,
+  targetSize = null,
+  onLoaded,
+  emissive = false,
+  shadows = true,
+  doubleSide = false,
+}: ResourceModelProps) {
   const { scene } = useGLTF(url)
   const clonedScene = useMemo(() => scene.clone(true), [scene])
   const loadedRef = useRef(false)
@@ -95,7 +97,34 @@ function ResourceModel({
   }, [clonedScene, emissive, onLoaded, position, rotation, scale, shadows, targetSize])
 
   return <primitive object={clonedScene} />
+})
+
+function ModelPlaceholder({
+  position,
+  targetSize = 4,
+}: {
+  position: [number, number, number]
+  targetSize?: number | null
+}) {
+  const size = targetSize ?? 4
+
+  return (
+    <mesh position={[position[0], position[1] + size / 2, position[2]]}>
+      <boxGeometry args={[size, size, size]} />
+      <meshStandardMaterial color="#0b1820" transparent opacity={0.28} wireframe />
+    </mesh>
+  )
 }
+
+const LazyResourceModel = memo(function LazyResourceModel(props: ResourceModelProps) {
+  return (
+    <Suspense
+      fallback={<ModelPlaceholder position={props.position} targetSize={props.targetSize} />}
+    >
+      <ResourceModel {...props} />
+    </Suspense>
+  )
+})
 
 function ResourceLoader() {
   const { active, loaded, total, progress } = useProgress()
@@ -133,13 +162,7 @@ function ResourceLoader() {
   )
 }
 
-function SyncOverlay({
-  isSyncing,
-  onEnter,
-}: {
-  isSyncing: boolean
-  onEnter: () => void
-}) {
+function SyncOverlay({ isSyncing, onEnter }: { isSyncing: boolean; onEnter: () => void }) {
   useEffect(() => {
     if (isSyncing) onEnter()
   }, [isSyncing, onEnter])
@@ -214,7 +237,7 @@ function TargetedSpotLight({
   )
 }
 
-function ResourceSceneContent({
+const ResourceSceneContent = memo(function ResourceSceneContent({
   zoomedTarget,
   setZoomedTarget,
   setIsSyncing,
@@ -296,8 +319,8 @@ function ResourceSceneContent({
         <meshBasicMaterial attach="material" color="#22d3ee" transparent opacity={0.4} />
       </gridHelper>
 
-      <ResourceModel url={GLTF_URLS.hangar} position={[0, 0, 0]} />
-      <ResourceModel
+      <LazyResourceModel url={GLTF_URLS.hangar} position={[0, 0, 0]} />
+      <LazyResourceModel
         url={GLTF_URLS.monitoringStation}
         position={[-60, 1, -60]}
         rotation={[0, -Math.PI / 2, 0]}
@@ -305,11 +328,15 @@ function ResourceSceneContent({
       />
       <pointLight color="#00ffff" intensity={15} distance={15} decay={2} position={[-60, 5, -58]} />
 
-      <ResourceModel url={GLTF_URLS.beerBrewery} position={[-40, 0.5, 0]} rotation={[0, Math.PI, 0]} />
-      <ResourceModel url={GLTF_URLS.ford} position={[50, 0.7, -56]} targetSize={25} />
-      <ResourceModel url={GLTF_URLS.meat} position={[-70, 0.5, 1]} scale={2} />
-      <ResourceModel url={GLTF_URLS.shelf} position={[-74, 1, -60]} scale={0.2} />
-      <ResourceModel
+      <LazyResourceModel
+        url={GLTF_URLS.beerBrewery}
+        position={[-40, 0.5, 0]}
+        rotation={[0, Math.PI, 0]}
+      />
+      <LazyResourceModel url={GLTF_URLS.ford} position={[50, 0.7, -56]} targetSize={25} />
+      <LazyResourceModel url={GLTF_URLS.meat} position={[-70, 0.5, 1]} scale={2} />
+      <LazyResourceModel url={GLTF_URLS.shelf} position={[-74, 1, -60]} scale={0.2} />
+      <LazyResourceModel
         url={GLTF_URLS.forklift}
         position={[0, 0.9, -15]}
         rotation={[0, -Math.PI / 2, 0]}
@@ -317,7 +344,7 @@ function ResourceSceneContent({
         shadows={false}
       />
 
-      <ResourceModel
+      <LazyResourceModel
         url={GLTF_URLS.ceilingLamp}
         position={[-72, 20, -50]}
         rotation={[0, Math.PI * 1.5, 0]}
@@ -333,7 +360,7 @@ function ResourceSceneContent({
       />
       <TargetedSpotLight position={[-72, 19.2, -50]} targetPosition={[-72, 0, -50]} />
 
-      <ResourceModel
+      <LazyResourceModel
         url={GLTF_URLS.ceilingLamp}
         position={[-72, 20, -20]}
         rotation={[0, Math.PI * 1.5, 0]}
@@ -349,8 +376,8 @@ function ResourceSceneContent({
       />
       <TargetedSpotLight position={[-72, 19.2, -20]} targetPosition={[-72, 0, -20]} />
 
-      <ResourceModel url={GLTF_URLS.fruit} position={[-95, 1, -16]} scale={0.04} />
-      <ResourceModel
+      <LazyResourceModel url={GLTF_URLS.fruit} position={[-95, 1, -16]} scale={0.04} />
+      <LazyResourceModel
         url={GLTF_URLS.chair}
         position={[-55, 1, -50]}
         rotation={[0, THREE.MathUtils.degToRad(30), 0]}
@@ -432,14 +459,17 @@ function ResourceSceneContent({
       />
     </>
   )
-}
+})
 
 interface ResourceMainThreeSceneProps {
   onExit?: () => void
   onOpenPanel?: () => void
 }
 
-export default function ResourceMainThreeScene({ onExit, onOpenPanel }: ResourceMainThreeSceneProps) {
+export default function ResourceMainThreeScene({
+  onExit,
+  onOpenPanel,
+}: ResourceMainThreeSceneProps) {
   const {
     controlsRef,
     hoveredTarget,

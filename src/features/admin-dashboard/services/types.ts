@@ -127,3 +127,25 @@ export interface AuditRecord {
   id: number
   [key: string]: unknown
 }
+
+export interface CampAchievementProgress {
+  achievementId: number
+  name: string
+  description: string
+  metricKey: string
+  targetValue: number
+  unlockedAt: string | null
+  progressSnapshot: number | null
+  isUnlocked: boolean
+}
+
+export interface CampAchievementUnlock {
+  achievementId: number
+  name: string
+  description: string
+  icon?: string
+  points?: number
+  category?: string
+  unlockedAt: string
+  isSeen?: boolean
+}

@@ -89,7 +89,7 @@ export interface Transfer {
   actualDepartureDate?: string;
   plannedArrivalDate: string;
   actualArrivalDate?: string;
-  status: "PLANNING" | "EN_ROUTE" | "DELIVERED" | "CANCELED";
+  status: "PLANNING" | "EN_ROUTE" | "DELIVERED" | "PENDING_DEPARTURE" | "COMPLETED" | "CANCELED";
   departureApprovedBy?: string;
   arrivalApprovedBy?: string;
   rationsForTrip: number;
@@ -108,8 +108,8 @@ export interface TransferPerson {
 export interface TransferHistory {
   id: string;
   transferId: string;
-  previousStatus: "PLANNING" | "EN_ROUTE" | "DELIVERED" | "CANCELED";
-  newStatus: "PLANNING" | "EN_ROUTE" | "DELIVERED" | "CANCELED";
+  previousStatus: Transfer["status"];
+  newStatus: Transfer["status"];
   date: string;
   userId: string;
   comment?: string;

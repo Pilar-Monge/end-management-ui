@@ -8,7 +8,7 @@ export interface ApiEnvelope<T> {
 }
 
 export interface ApiErrorBody {
-  message?: string
+  message?: string | string[]
   statusCode?: number
   error?: string
 }
@@ -74,7 +74,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     }
   }
 
-  if (!(requestOptions.body instanceof FormData)) {
+  if (requestOptions.body !== undefined && !(requestOptions.body instanceof FormData)) {
     headers['Content-Type'] = headers['Content-Type'] ?? 'application/json'
   }
 
@@ -86,7 +86,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (!response.ok) {
     const errorBody = await parseErrorBody(response)
     const message = HTTP_STATUS_MESSAGES[response.status] ?? `Error de servicio (${response.status}). Intenta nuevamente.`
-    const details = errorBody?.message ?? errorBody?.error
+    const detailParts = [
+      Array.isArray(errorBody?.message) ? errorBody.message.join('; ') : errorBody?.message,
+      errorBody?.error,
+    ].filter(Boolean)
+    const details = detailParts.length > 0 ? detailParts.join(' - ') : undefined
     throw new ApiHttpError(response.status, message, details)
   }
 

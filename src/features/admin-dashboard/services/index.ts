@@ -13,6 +13,16 @@ export {
   getGeneralDashboard,
   getInventoryDashboard,
   getExpeditionsDashboard,
+  getServerTime,
+  getSystemTimeOffset,
+  advanceSystemTime,
+} from './dashboard.service'
+
+export type {
+  SystemTimeUnit,
+  SystemTimeOffset,
+  AdvanceSystemTimePayload,
+  AdvanceSystemTimeResult,
 } from './dashboard.service'
 
 export {
@@ -45,6 +55,19 @@ export {
   getUserRoleHistoryById,
 } from './security.service'
 
+export {
+  getCampAchievementsProgress,
+  getLatestCampAchievementUnlocks,
+  markCampAchievementSeen,
+} from './achievements.service'
+
+export {
+  ADMIN_DASHBOARD_BOOT_MAX_VISUAL_LEAD,
+  ADMIN_DASHBOARD_BOOT_MIN_MS,
+  INITIAL_DASHBOARD_KPI,
+  bootstrapAdminDashboard,
+} from './adminDashboardBootstrap'
+
 export type {
   AdminAdmissionRequest,
   AdminExpeditionRecord,
@@ -56,4 +79,15 @@ export type {
   InventoryDashboardPayload,
   IntercampRecord,
   InventoryMovementRecord,
+  CampAchievementProgress,
+  CampAchievementUnlock,
 } from './types'
+
+export type {
+  AdminDashboardBootstrapData,
+  AdminDashboardBootProgress,
+  DashboardKpi,
+  UiAdmission,
+  UiExpedition,
+  UiIntercampRequest,
+} from './adminDashboardBootstrap'

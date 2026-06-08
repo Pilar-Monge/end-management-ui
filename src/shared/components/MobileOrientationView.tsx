@@ -322,7 +322,7 @@ export function MobileOrientationView() {
               </>
             ) : (
               <>
-                {isRedirecting ? (
+                {showRedirecting ? (
                   <div
                     style={{
                       display: 'flex',

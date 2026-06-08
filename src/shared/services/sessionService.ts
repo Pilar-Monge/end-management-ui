@@ -1,3 +1,5 @@
+import { throttle } from '../utils/throttle'
+
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 
 const SESSION_TIMEOUT_MS = 20 * 60 * 1000
@@ -11,6 +13,7 @@ export class SessionService {
   private heartbeatInterval: number | null = null
   private listenersAttached = false
   private activityHandler = () => this.markActivity()
+  private throttledActivityHandler = throttle(() => this.markActivity(), 100)
   private onSessionExpired: (() => void) | null = null
   private onTokenRefreshed: (() => void) | null = null
 
@@ -121,9 +124,13 @@ export class SessionService {
     }
 
     if (!this.listenersAttached) {
-      const events = ['mousemove', 'mousedown', 'click', 'keydown', 'touchstart', 'scroll']
+      const events = ['mousemove', 'mousedown', 'click', 'keydown']
+      const throttledEvents = ['touchstart', 'scroll']
       events.forEach((event) => {
         document.addEventListener(event, this.activityHandler, { passive: true })
+      })
+      throttledEvents.forEach((event) => {
+        document.addEventListener(event, this.throttledActivityHandler, { passive: true })
       })
       this.listenersAttached = true
     }
@@ -137,10 +144,15 @@ export class SessionService {
     if (this.heartbeatInterval) clearInterval(this.heartbeatInterval)
 
     if (this.listenersAttached) {
-      const events = ['mousemove', 'mousedown', 'click', 'keydown', 'touchstart', 'scroll']
+      const events = ['mousemove', 'mousedown', 'click', 'keydown']
+      const throttledEvents = ['touchstart', 'scroll']
       events.forEach((event) => {
         document.removeEventListener(event, this.activityHandler)
       })
+      throttledEvents.forEach((event) => {
+        document.removeEventListener(event, this.throttledActivityHandler)
+      })
+      this.throttledActivityHandler.cancel()
       this.listenersAttached = false
     }
 

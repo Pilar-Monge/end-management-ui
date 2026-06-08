@@ -278,11 +278,10 @@ export function MainHomePage() {
       localStorage.setItem('user', JSON.stringify(normalizedUser))
       localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(response.user.campId))
 
-      const defaultRoute = getPostLoginRoute(normalizedUser.role)
-      const redirectPath =
-        normalizedUser.role === 'SYSTEM_ADMIN' && savedPath?.startsWith('/admin-dashboard')
-          ? savedPath
-          : defaultRoute
+      const redirectPath = getPostLoginRoute(normalizedUser.role, {
+        savedPath,
+        restoreSavedAdminDashboard: Boolean(sessionMessage),
+      })
       localStorage.removeItem('last_secure_path')
       navigate(redirectPath, { replace: true })
     } catch (error) {
@@ -1471,6 +1470,8 @@ export function MainHomePage() {
                     ref={bridgeVideoRef}
                     autoPlay
                     playsInline
+                    preload="metadata"
+                    poster={MEDIA_URLS.branding.background}
                     onLoadedMetadata={(e) => setBridgeVideoDuration(e.currentTarget.duration)}
                     onTimeUpdate={(e) => {
                       if (
@@ -1523,6 +1524,8 @@ export function MainHomePage() {
                     ref={mainVideoRef}
                     autoPlay
                     playsInline
+                    preload="metadata"
+                    poster={MEDIA_URLS.branding.background}
                     onCanPlay={(e) => (e.currentTarget.volume = 0.3)}
                     onTimeUpdate={(e) => {
                       if (e.currentTarget.currentTime >= 6.0) {
