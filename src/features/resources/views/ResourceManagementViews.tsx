@@ -1997,6 +1997,36 @@ function FilterDateField({
     </div>
   );
 }
+function getDefaultResourceForRole(role: string, resourceTypes: ResourceType[]): string {
+  const r = role.toLowerCase();
+  let categoryKey = "";
+  if (r.includes("médico") || r.includes("medic") || r.includes("clinico") || r.includes("clínico") || r.includes("investigador")) {
+    categoryKey = "medical";
+  } else if (r.includes("guarda") || r.includes("defensor") || r.includes("guard")) {
+    categoryKey = "defense";
+  } else if (r.includes("ing") || r.includes("parts") || r.includes("repuesto") || r.includes("scout") || r.includes("explorador") || r.includes("cazador")) {
+    categoryKey = "parts";
+  } else if (r.includes("comida") || r.includes("food") || r.includes("alimento") || r.includes("ración") || r.includes("racion")) {
+    categoryKey = "food";
+  } else if (r.includes("agua") || r.includes("water") || r.includes("h2o") || r.includes("filtrada")) {
+    categoryKey = "water";
+  } else if (r.includes("conductor") || r.includes("piloto") || r.includes("fuel") || r.includes("combustible")) {
+    categoryKey = "fuel";
+  }
+
+  if (categoryKey) {
+    const match = resourceTypes.find(rt => {
+      const name = rt.name.toLowerCase();
+      const cat = String(rt.category || "").toLowerCase();
+      const id = String(rt.id).toLowerCase();
+      return name.includes(categoryKey) || cat.includes(categoryKey) || id.includes(categoryKey);
+    });
+    if (match) return String(match.id);
+  }
+
+  return resourceTypes[0]?.id ? String(resourceTypes[0].id) : "rt-food";
+}
+
 export function ViewRecoleccionDiaria({
   camps,
   resourceTypes,
@@ -2066,7 +2096,7 @@ export function ViewRecoleccionDiaria({
     }, 4500);
   };
   const activeCampRecords = dailyCollectionRecords.filter(r => r.campId === campId);
-  const activeCampPersonnel = campPersonnel.filter(p => p.campId === campId);
+  const activeCampPersonnel = campPersonnel.filter(p => p.campId === campId && p.status !== "SICK" && p.status !== "INJURED");
   const joinedAndFilteredRecords = activeCampRecords.filter(record => {
     if (filterResourceType && record.resourceTypeId !== filterResourceType) {
       return false;
@@ -2273,10 +2303,8 @@ export function ViewRecoleccionDiaria({
                   setPersonId(e.target.value);
                   const personObj = activeCampPersonnel.find(p => p.id === e.target.value);
                   if (personObj) {
-                    const job = INITIAL_OCCUPATIONS.find(occ => occ.id === personObj.occupationId);
-                    if (job?.resource_type_id) {
-                      setResourceTypeId(job.resource_type_id);
-                    }
+                    const defaultResource = getDefaultResourceForRole(personObj.role || "", resourceTypes);
+                    setResourceTypeId(defaultResource);
                   }
                 }} 
                 className="v-select w-full text-xs font-semibold text-white"
@@ -3075,29 +3103,29 @@ export function ViewAlertasInventario({
     </SectionShell>
   );
 }
-export const ROSTER_PEOPLE = [
-  { id: "31", name: "Sgto. Marcus Vance", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "1" },
-  { id: "32", name: "Dra. Elena Rostova", role: "Médico de Emergencia de Campo", status: "ACTIVE", campId: "1" },
-  { id: "33", name: "Tte. Alex Mercer", role: "Piloto de Aeronave Quad VTOL", status: "ACTIVE", campId: "1" },
-  { id: "34", name: "Cabo John Miller", role: "Conductor de Blindado Terrestre", status: "ACTIVE", campId: "1" },
-  { id: "35", name: "Ing. Sara Connor", role: "Ingeniero", status: "ACTIVE", campId: "1" },
-  { id: "36", name: "Guarda Lara Croft", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "1" },
-  { id: "31", name: "Scout Ezio Auditore", role: "Scout Táctico", status: "ACTIVE", campId: "1" },
-  { id: "37", name: "Técnico Isaac Clarke", role: "Ingeniero", status: "ACTIVE", campId: "2" },
-  { id: "38", name: "Conductor Cole Train", role: "Conductor de Blindado Terrestre", status: "ACTIVE", campId: "2" },
-  { id: "39", name: "Dr. Gordon Freeman", role: "Médico de Emergencia de Campo", status: "ACTIVE", campId: "2" },
-  { id: "40", name: "Recluta Gary", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "2" },
-  { id: "40", name: "Scout Solid Snake", role: "Scout Táctico de Infiltración", status: "ACTIVE", campId: "2" },
-  { id: "41", name: "Cultivador Samuel", role: "Cazador / Expl.", status: "ACTIVE", campId: "3" },
-  { id: "42", name: "Piloto Fox McCloud", role: "Piloto de Aeronave Quad VTOL", status: "ACTIVE", campId: "3" },
-  { id: "43", name: "Científico Walter", role: "Investigador", status: "ACTIVE", campId: "3" },
-  { id: "44", name: "Conductor Sweet Tooth", role: "Conductor de Blindado Terrestre", status: "ACTIVE", campId: "3" },
-  { id: "41", name: "Scout Nathan Drake", role: "Scout Táctico", status: "ACTIVE", campId: "3" },
-  { id: "45", name: "Sgto. Master Chief", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "4" },
-  { id: "46", name: "Cabo Dunn", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "4" },
-  { id: "47", name: "Piloto Maverick", role: "Piloto de Aeronave Quad VTOL", status: "ACTIVE", campId: "4" },
-  { id: "48", name: "Médico Angela", role: "Médico de Emergencia de Campo", status: "ACTIVE", campId: "4" },
-  { id: "45", name: "Scout Sam Fisher", role: "Scout Táctico Nocturno", status: "ACTIVE", campId: "4" }
+export const ROSTER_PEOPLE: CampPerson[] = [
+  { id: "31", name: "Sgto. Marcus Vance", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "1", occupationId: "6" },
+  { id: "32", name: "Dra. Elena Rostova", role: "Médico de Emergencia de Campo", status: "ACTIVE", campId: "1", occupationId: "4" },
+  { id: "33", name: "Tte. Alex Mercer", role: "Piloto de Aeronave Quad VTOL", status: "ACTIVE", campId: "1", occupationId: "3" },
+  { id: "34", name: "Cabo John Miller", role: "Conductor de Blindado Terrestre", status: "ACTIVE", campId: "1", occupationId: "3" },
+  { id: "35", name: "Ing. Sara Connor", role: "Ingeniero", status: "ACTIVE", campId: "1", occupationId: "3" },
+  { id: "36", name: "Guarda Lara Croft", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "1", occupationId: "6" },
+  { id: "31", name: "Scout Ezio Auditore", role: "Scout Táctico", status: "ACTIVE", campId: "1", occupationId: "5" },
+  { id: "37", name: "Técnico Isaac Clarke", role: "Ingeniero", status: "ACTIVE", campId: "2", occupationId: "3" },
+  { id: "38", name: "Conductor Cole Train", role: "Conductor de Blindado Terrestre", status: "ACTIVE", campId: "2", occupationId: "3" },
+  { id: "39", name: "Dr. Gordon Freeman", role: "Médico de Emergencia de Campo", status: "ACTIVE", campId: "2", occupationId: "4" },
+  { id: "40", name: "Recluta Gary", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "2", occupationId: "6" },
+  { id: "40", name: "Scout Solid Snake", role: "Scout Táctico de Infiltración", status: "ACTIVE", campId: "2", occupationId: "5" },
+  { id: "41", name: "Cultivador Samuel", role: "Cazador / Expl.", status: "ACTIVE", campId: "3", occupationId: "2" },
+  { id: "42", name: "Piloto Fox McCloud", role: "Piloto de Aeronave Quad VTOL", status: "ACTIVE", campId: "3", occupationId: "3" },
+  { id: "43", name: "Científico Walter", role: "Investigador", status: "ACTIVE", campId: "3", occupationId: "4" },
+  { id: "44", name: "Conductor Sweet Tooth", role: "Conductor de Blindado Terrestre", status: "ACTIVE", campId: "3", occupationId: "3" },
+  { id: "41", name: "Scout Nathan Drake", role: "Scout Táctico", status: "ACTIVE", campId: "3", occupationId: "5" },
+  { id: "45", name: "Sgto. Master Chief", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "4", occupationId: "6" },
+  { id: "46", name: "Cabo Dunn", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "4", occupationId: "6" },
+  { id: "47", name: "Piloto Maverick", role: "Piloto de Aeronave Quad VTOL", status: "ACTIVE", campId: "4", occupationId: "3" },
+  { id: "48", name: "Médico Angela", role: "Médico de Emergencia de Campo", status: "ACTIVE", campId: "4", occupationId: "4" },
+  { id: "45", name: "Scout Sam Fisher", role: "Scout Táctico Nocturno", status: "ACTIVE", campId: "4", occupationId: "5" }
 ];
 export const SPECIALISTS_OCCUPATIONS = [
   { id: "1", name: "Water Collector" },
@@ -3135,7 +3163,7 @@ export function ViewSolicitudesIntercampamento({
   onAddResourceToRequest: (requestId: string, resourceTypeId: string, requestedAmount: number) => void;
   onDeleteRequestResource: (id: string) => void;
   onUpdateRequest: (id: string, patch: Partial<IntercampRequest>) => void;
-  onSubmitRequest?: (id: string) => void | Promise<void>;
+  onSubmitRequest?: (id: string) => Promise<boolean>;
   onAddPersonToRequest?: (detail: { requestId: string; detailType: "BY_OCCUPATION" | "SPECIFIC"; personId: string | null; occupationId: string | null; amount: number; status: "PROPOSED" | "CONFIRMED" | "REJECTED" }) => void | Promise<void>;
   onUpdateTransportStaff?: (transferId: string, transportPersonIds: string[]) => void | Promise<void>;
   campInventories: CampInventory[];
@@ -3409,16 +3437,21 @@ export function ViewSolicitudesIntercampamento({
       return;
     }
 
+    let success = false;
     if (onSubmitRequest) {
-      await onSubmitRequest(activeReqId);
+      success = await onSubmitRequest(activeReqId);
     } else {
       await onUpdateRequestStatus(activeReqId, "PENDING", currentUser.userId);
+      success = true;
     }
-    showValidationPopup(`La solicitud borrador #${activeReqId} se envió formalmente al canal de aprobación de red.`);
-    setDescription("");
-    setActiveReqId(null);
-    setWizardStep(1);
-    setActiveTab("pendientes");
+
+    if (success) {
+      showValidationPopup(`La solicitud borrador #${activeReqId} se envió formalmente al canal de aprobación de red.`);
+      setDescription("");
+      setActiveReqId(null);
+      setWizardStep(1);
+      setActiveTab("pendientes");
+    }
   };
 
   const handleCancelDraft = () => {
