@@ -5,19 +5,13 @@ import {
   AlertTriangle, 
   CheckCircle2, 
   ShieldAlert, 
-  Calendar, 
-  Info, 
-  TrendingUp, 
   Package, 
   ArrowRightLeft, 
-  Shuffle, 
-  UserCheck,
   AlertCircle,
   Trash2,
   Plus,
   FileText,
   Check,
-  X,
   ChevronRight,
   Truck,
   Users,
@@ -25,8 +19,8 @@ import {
 } from "lucide-react";
 import {
   PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  Area, AreaChart, BarChart, Bar
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Area, AreaChart
 } from "recharts";
 import type {
   Camp,
@@ -101,6 +95,57 @@ function getCampDisplayName(camps: Camp[], campId?: string | number | null) {
 
   const campIdText = String(campId);
   return camps.find(camp => String(camp.id) === campIdText)?.name || `Campamento ${campIdText}`;
+}
+
+function findResourceType(resourceTypes: ResourceType[], resourceTypeId?: string | number | null) {
+  if (resourceTypeId === undefined || resourceTypeId === null || String(resourceTypeId).trim() === "") {
+    return null;
+  }
+
+  const rawId = String(resourceTypeId);
+  const cleanId = rawId.replace(/^rt[-_]/i, "").toLowerCase();
+  return resourceTypes.find(resource => {
+    const id = String(resource.id).toLowerCase();
+    const name = resource.name.toLowerCase();
+    const category = String(resource.category ?? "").toLowerCase();
+
+    return id === rawId.toLowerCase()
+      || id === cleanId
+      || name === cleanId
+      || name.replace(/\s+/g, "-").toLowerCase() === cleanId
+      || category === cleanId;
+  }) ?? null;
+}
+
+function resourceTypeMatches(resourceTypes: ResourceType[], candidateId: string | number, expectedId?: string | number | null) {
+  if (expectedId === undefined || expectedId === null) return false;
+  if (String(candidateId) === String(expectedId)) return true;
+
+  const expected = findResourceType(resourceTypes, expectedId);
+  return expected ? String(candidateId) === String(expected.id) : false;
+}
+
+function getResourceTypeDisplayName(resourceTypes: ResourceType[], resourceTypeId?: string | number | null) {
+  if (resourceTypeId === undefined || resourceTypeId === null || String(resourceTypeId).trim() === "") {
+    return "Recurso no definido";
+  }
+
+  const rawId = String(resourceTypeId);
+  const cleanId = rawId.replace(/^rt[-_]/i, "").toLowerCase();
+  const match = findResourceType(resourceTypes, resourceTypeId);
+
+  if (match) return match.name;
+
+  return cleanId
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || rawId;
+}
+
+function getResourceTypeUnit(resourceTypes: ResourceType[], resourceTypeId?: string | number | null) {
+  const match = findResourceType(resourceTypes, resourceTypeId);
+  return match?.unitOfMeasure || "u";
 }
 
 export const currentUser = {
@@ -178,12 +223,14 @@ export function DateTimeField({
   label, 
   required, 
   value = "",
-  onChange
+  onChange,
+  minDate
 }: {
   label: string;
   required?: boolean;
   value?: string;
   onChange: (val: string) => void;
+  minDate?: Date;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -226,22 +273,37 @@ export function DateTimeField({
   const minutes = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
   const years = Array.from({ length: 7 }, (_, i) => 2024 + i);
 
+  const selectedDate = (newYr: number, newMo: number, newDy: string, newHr: string, newMin: string) =>
+    new Date(newYr, newMo, parseInt(newDy) || 1, parseInt(newHr) || 0, parseInt(newMin) || 0);
+
+  const isBeforeMinDate = (candidate: Date) =>
+    minDate ? candidate.getTime() < minDate.getTime() : false;
+
+  const isDayBeforeMinDate = (newYr: number, newMo: number, newDy: string) => {
+    if (!minDate) return false;
+    const candidateEndOfDay = new Date(newYr, newMo, parseInt(newDy) || 1, 23, 59, 59, 999);
+    return candidateEndOfDay.getTime() < minDate.getTime();
+  };
+
   const updateCombined = (newYr: number, newMo: number, newDy: string, newHr: string, newMin: string) => {
     const dObj = new Date(newYr, newMo, parseInt(newDy) || 1, parseInt(newHr) || 0, parseInt(newMin) || 0);
-    onChange(dObj.toISOString());
+    onChange(isBeforeMinDate(dObj) && minDate ? minDate.toISOString() : dObj.toISOString());
   };
 
   const handleSelectDay = (item: string) => {
+    if (isDayBeforeMinDate(year, month, item)) return;
     setDay(item);
     updateCombined(year, month, item, hour, minute);
   };
 
   const handleSelectHour = (item: string) => {
+    if (isBeforeMinDate(selectedDate(year, month, day, item, minute))) return;
     setHour(item);
     updateCombined(year, month, day, item, minute);
   };
 
   const handleSelectMinute = (item: string) => {
+    if (isBeforeMinDate(selectedDate(year, month, day, hour, item))) return;
     setMinute(item);
     updateCombined(year, month, day, hour, item);
   };
@@ -331,43 +393,58 @@ export function DateTimeField({
                   <span>LU</span><span>MA</span><span>MI</span><span>JU</span><span>VI</span><span>SA</span><span>DO</span>
                 </div>
                 <div className="dt-days">
-                  {days.map((item, index) => (
-                    <button
-                      key={`${item}-${index}`}
-                      type="button"
-                      className={item === day ? "is-active" : ""}
-                      onClick={() => handleSelectDay(item)}
-                    >
-                      {item}
-                    </button>
-                  ))}
+                  {days.map((item, index) => {
+                    const disabled = isDayBeforeMinDate(year, month, item);
+
+                    return (
+                      <button
+                        key={`${item}-${index}`}
+                        type="button"
+                        disabled={disabled}
+                        className={`${item === day ? "is-active" : ""} ${disabled ? "opacity-25 cursor-not-allowed" : ""}`}
+                        onClick={() => handleSelectDay(item)}
+                      >
+                        {item}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               <div className="dt-time-col" data-label="HORA">
-                {hours.map((item) => (
+                {hours.map((item) => {
+                  const disabled = isBeforeMinDate(selectedDate(year, month, day, item, minute));
+
+                  return (
                   <button 
                     key={`h-${item}`} 
                     type="button" 
+                    disabled={disabled}
                     className={item === hour ? "is-active" : ""} 
                     onClick={() => handleSelectHour(item)}
                   >
                     {item}
                   </button>
-                ))}
+                );
+                })}
               </div>
 
               <div className="dt-time-col" data-label="MIN">
-                {minutes.map((item) => (
+                {minutes.map((item) => {
+                  const disabled = isBeforeMinDate(selectedDate(year, month, day, hour, item));
+
+                  return (
                   <button 
                     key={`m-${item}`} 
                     type="button" 
+                    disabled={disabled}
                     className={item === minute ? "is-active" : ""} 
                     onClick={() => handleSelectMinute(item)}
                   >
                     {item}
                   </button>
-                ))}
+                );
+                })}
               </div>
             </div>
 
@@ -376,7 +453,7 @@ export function DateTimeField({
                 type="button" 
                 onClick={() => {
                   const nowStr = new Date().toISOString();
-                  onChange(nowStr);
+                  onChange(minDate && minDate.getTime() > Date.now() ? minDate.toISOString() : nowStr);
                   setOpen(false);
                 }}
               >
@@ -387,7 +464,7 @@ export function DateTimeField({
                 className="dt-today-btn" 
                 onClick={() => {
                   const nowStr = new Date().toISOString();
-                  onChange(nowStr);
+                  onChange(minDate && minDate.getTime() > Date.now() ? minDate.toISOString() : nowStr);
                   setOpen(false);
                 }}
               >
@@ -425,8 +502,6 @@ function SectionShell({
     </div>
   );
 }
-
-// ----------------- Helper text adapters -----------------
 const getResourceTypeCategoryLabel = (cat: string) => {
   const labels: Record<string, string> = {
     FOOD: "ALIMENTO",
@@ -439,10 +514,6 @@ const getResourceTypeCategoryLabel = (cat: string) => {
   };
   return labels[cat] || cat;
 };
-
-// ----------------- SUB-COMPONENTS -----------------
-
-/* 1. DASHBOARD DE INVENTARIO (REDISEÑO TÁCTICO) */
 export function ViewDashboard({
   camps,
   resourceTypes,
@@ -452,19 +523,11 @@ export function ViewDashboard({
   dailyCollectionRecords = [],
   intercampRequests = [],
   transfers = [],
-  notifications = [],
   transferPersons = [],
   occupations = [],
   occupationCoverages = [],
   requestResourceDetails = [],
   deliveredTransferResources = [],
-  onSaveCollection,
-  onAddManualMovement,
-  onAddRequest,
-  onAddNotification,
-  onMarkAsRead,
-  onResolveAlert,
-  onUpdateInventory,
   onNavigateToSub
 }: {
   camps: Camp[];
@@ -486,21 +549,16 @@ export function ViewDashboard({
   onAddRequest?: (data: Omit<IntercampRequest, "id">) => void;
   onAddNotification?: (data: Omit<OperationalNotification, "id">) => void;
   onMarkAsRead?: (id: string) => void;
-  onResolveAlert?: (id: string, resolvedBy: string) => void;
   onUpdateInventory?: (campId: string, resourceTypeId: string, currentAmount: number, minimumAlertAmount: number) => void;
   onNavigateToSub: (sub: string) => void;
 }) {
-  const activeCampId = currentUser.campId; // 'alfa'
+  const activeCampId = currentUser.campId;
   const campName = getCampDisplayName(camps, activeCampId);
-
-  // --- REFRESH STATE ---
   const [isRefreshing, setIsRefreshing] = useState(false);
   const triggerRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => setIsRefreshing(false), 800);
   };
-
-  // --- ESTIMATED UTC SYSTEM CLOCK & NEXT DAILY CYCLE COUNTDOWN ---
   const [systTime, setSystTime] = useState(new Date());
 
   useEffect(() => {
@@ -555,8 +613,6 @@ export function ViewDashboard({
   };
 
   const statusStyle = getTimerStatus(remainingMs);
-
-  // --- PAGINATION STATES FOR TABLES ---
   const [activeTab, setActiveTab] = useState<"inventario" | "alertas" | "movimientos" | "recoleccion" | "solicitudes">("inventario");
   const [pageInventario, setPageInventario] = useState(1);
   const [pageAlertas, setPageAlertas] = useState(1);
@@ -564,15 +620,8 @@ export function ViewDashboard({
   const [pageRecoleccion, setPageRecoleccion] = useState(1);
   const [pageSolicitudes, setPageSolicitudes] = useState(1);
   const pageSize = 5;
-
-  // --- NOTIFICATION DRAWER / LIST POP-OVER STATE ---
-  const [showNotificationPopup, setShowNotificationPopup] = useState(false);
-
-  // --- FILTERED DATA FOR ACTIVE CAMP (ALFA) ---
-  const activeCampInventories = campInventories.filter(item => item.campId === activeCampId);
-  const unresolvedAlerts = inventoryAlerts.filter(a => !a.resolved && a.campId === activeCampId);
-  
-  // Crossed list resource detailed info
+  const activeCampInventories = campInventories.filter(item => String(item.campId) === String(activeCampId));
+  const unresolvedAlerts = inventoryAlerts.filter(a => !a.resolved && String(a.campId) === String(activeCampId));
   const detailedResources = activeCampInventories.map(inv => {
     const type = resourceTypes.find(t => t.id === inv.resourceTypeId);
     const state = inv.currentAmount <= inv.minimumAlertAmount ? "CRÍTIICO" : "NORMAL";
@@ -582,14 +631,10 @@ export function ViewDashboard({
       state
     };
   });
-
-  // Calculate highest stocked resource item & items with 0 capacity
   const highestStockResource = detailedResources.length > 0 
     ? [...detailedResources].sort((a, b) => b.currentAmount - a.currentAmount)[0] 
     : null;
   const zeroStockResources = detailedResources.filter(r => r.currentAmount === 0);
-
-  // Categories map for Pie Chart distribution 
   const categoriesMap = detailedResources.reduce((acc, curr) => {
     const cat = curr.type?.category || "OTHER";
     acc[cat] = (acc[cat] || 0) + curr.currentAmount;
@@ -602,15 +647,10 @@ export function ViewDashboard({
   });
 
   const totalResourceStocks = resourcePieData.reduce((sum, item) => sum + item.value, 0);
-
-  // --- 7 DAYS CONSUMPTION TREND CONFIGURATION ---
-  // Calculates dynamic consumption based on DAILY_RATION, EXPEDITION_DEPARTURE, TRANSFER_SENT
   const consumptionMovements = inventoryMovements.filter(m => 
-    m.campId === activeCampId && 
+    String(m.campId) === String(activeCampId) && 
     ["DAILY_RATION", "EXPEDITION_DEPARTURE", "TRANSFER_SENT"].includes(m.movementType)
   );
-
-  // Sort movements and group by date (simulate 7 days if empty)
   const defaultDates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
@@ -618,7 +658,6 @@ export function ViewDashboard({
   });
 
   const consumptionTrendMap = consumptionMovements.reduce((acc, curr) => {
-    // Normalise date structure e.g. "2026-05-24" from "24/05" or full ISO date
     let dateStr = curr.date;
     if (curr.date.includes("/")) {
       const parts = curr.date.split(" ")[0].split("/");
@@ -631,7 +670,7 @@ export function ViewDashboard({
   }, {} as Record<string, number>);
 
   const dynamicTrendData = defaultDates.map(date => {
-    const formattedLabel = date.split("-").slice(1).reverse().join("/"); // e.g. "24/05"
+    const formattedLabel = date.split("-").slice(1).reverse().join("/");
     return {
       date: formattedLabel,
       totalConsumed: consumptionTrendMap[date] || 0
@@ -642,15 +681,6 @@ export function ViewDashboard({
   const highestConsumptionDay = dynamicTrendData.length > 0 
     ? [...dynamicTrendData].sort((a, b) => b.totalConsumed - a.totalConsumed)[0] 
     : { date: "—", totalConsumed: 0 };
-
-  // --- TIMELINE / TRASLADOS DATA ---
-  // Grabs current transfers and displays them in the tactical line design layout
-  const filteredTransfers = transfers.filter(t => {
-    const req = intercampRequests.find(r => r.id === t.requestId);
-    return req && (req.originCampId === activeCampId || req.destinationCampId === activeCampId);
-  }).slice(-5).reverse();
-
-  // Field warning list mapping alerts & pending workflows
   const fieldWarnings: string[] = [];
   unresolvedAlerts.forEach(al => {
     const type = resourceTypes.find(t => t.id === al.resourceTypeId);
@@ -662,38 +692,21 @@ export function ViewDashboard({
   transfers.filter(t => t.status === "PENDING_DEPARTURE" && intercampRequests.find(r => r.id === t.requestId)?.originCampId === activeCampId).forEach(t => {
     fieldWarnings.push(`Despacho pendiente: Traslado ${t.id} listo para la firma de despacho.`);
   });
-
-  // --- PAGINATED TABLES DATA ---
-  // 1. Camp Inventory
   const paginatedInventario = detailedResources.slice((pageInventario - 1) * pageSize, pageInventario * pageSize);
   const totalPageInventario = Math.ceil(detailedResources.length / pageSize) || 1;
-
-  // 2. Unresolved Alerts
   const paginatedAlertas = unresolvedAlerts.slice((pageAlertas - 1) * pageSize, pageAlertas * pageSize);
   const totalPageAlertas = Math.ceil(unresolvedAlerts.length / pageSize) || 1;
-
-  // 3. Movement logs for camp
-  const activeCampMovements = inventoryMovements.filter(m => m.campId === activeCampId).reverse();
+  const activeCampMovements = inventoryMovements.filter(m => String(m.campId) === String(activeCampId)).reverse();
   const paginatedMovimientos = activeCampMovements.slice((pageMovimientos - 1) * pageSize, pageMovimientos * pageSize);
   const totalPageMovimientos = Math.ceil(activeCampMovements.length / pageSize) || 1;
-
-  // 4. Daily collection
-  const activeCampCollections = dailyCollectionRecords.filter(c => c.campId === activeCampId).reverse();
+  const activeCampCollections = dailyCollectionRecords.filter(c => String(c.campId) === String(activeCampId)).reverse();
   const paginatedRecoleccion = activeCampCollections.slice((pageRecoleccion - 1) * pageSize, pageRecoleccion * pageSize);
   const totalPageRecoleccion = Math.ceil(activeCampCollections.length / pageSize) || 1;
-
-  // 5. Intercamp Requests
   const activeCampRequests = intercampRequests.filter(r => r.originCampId === activeCampId || r.destinationCampId === activeCampId).reverse();
   const paginatedSolicitudes = activeCampRequests.slice((pageSolicitudes - 1) * pageSize, pageSolicitudes * pageSize);
   const totalPageSolicitudes = Math.ceil(activeCampRequests.length / pageSize) || 1;
-
-  // --- STATISTICAL CALCULATIONS FOR LOGISTICS & OPERATIONS ---
-
-  // 1. Camp Garrison/Roster size
   const totalGarrisonCount = camps.find(c => c.id === activeCampId)?.personnelCount || 35;
-  const activeSpecialistsCount = occupationCoverages.filter(cov => cov.campId === activeCampId).reduce((s, o) => s + o.active, 0);
-
-  // 2. Incoming Pending Requests calculations (destinationCampId === currentCampId && status === 'PENDING')
+  const activeSpecialistsCount = occupationCoverages.filter(cov => String(cov.campId) === String(activeCampId)).reduce((s, o) => s + o.active, 0);
   const incomingPendingRequests = intercampRequests.filter(req => 
     req.destinationCampId === activeCampId && req.status === "PENDING"
   );
@@ -706,14 +719,10 @@ export function ViewDashboard({
   const requiresPersonnelCount = incomingPendingRequests.filter(req => 
     req.personRequirements && req.personRequirements.some(pr => pr.quantity > 0)
   ).length;
-
-  // 3. Sent Requests calculations (originCampId === currentCampId)
   const sentRequests = intercampRequests.filter(req => req.originCampId === activeCampId);
   const draftsCount = sentRequests.filter(r => r.status === "DRAFT").length;
   const pendingSentCount = sentRequests.filter(r => r.status === "PENDING").length;
   const approvedSentCount = sentRequests.filter(r => r.status === "APPROVED").length;
-
-  // 4. Active Convoys / Transfers involving active camp
   const activeTransfers = transfers.filter(t => {
     const req = intercampRequests.find(r => r.id === t.requestId);
     return req && (req.originCampId === activeCampId || req.destinationCampId === activeCampId);
@@ -730,13 +739,8 @@ export function ViewDashboard({
   const delayedTransfersCount = activeTransfers.filter(tr => 
     tr.status === "PENDING_DEPARTURE" && (tr.plannedDepartureDate < todayStr || tr.plannedArrivalDate < todayStr)
   ).length;
-
-  // 5. Logistics Risks (Bloqueos e Incidencias)
-  // Low critical resources count
   const lowResourcesCount = unresolvedAlerts.length;
-
-  // Rations Shortages in upcoming departures
-  const activeCampFoodInventory = campInventories.find(i => i.campId === activeCampId && i.resourceTypeId === "2")?.currentAmount || 0;
+  const activeCampFoodInventory = campInventories.find(i => String(i.campId) === String(activeCampId) && resourceTypeMatches(resourceTypes, i.resourceTypeId, "2"))?.currentAmount || 0;
   const upcomingDeparturesFromMyCamp = transfers.filter(t => {
     const req = intercampRequests.find(r => r.id === t.requestId);
     return req && req.originCampId === activeCampId && t.status === "PENDING_DEPARTURE" && !t.actualDepartureDate;
@@ -744,8 +748,6 @@ export function ViewDashboard({
   const totalRationsNeededForUpcoming = upcomingDeparturesFromMyCamp.reduce((sum, t) => sum + t.rationsForTrip, 0);
   const isRationsShortage = activeCampFoodInventory < totalRationsNeededForUpcoming;
   const rationsShortageBlocks = isRationsShortage ? 1 : 0;
-
-  // Resources sent bringing us below minimum warning
   const approvedOutgoingRequests = intercampRequests.filter(req => req.originCampId === activeCampId && req.status === "APPROVED");
   let sendBelowMinWarnings = 0;
   activeCampInventories.forEach(inv => {
@@ -766,8 +768,6 @@ export function ViewDashboard({
   const shrinkagesCount = deliveredTransferResources.filter(d => 
     activeTransfersIds.includes(d.transferId) && d.sentAmount > d.receivedAmount
   ).length;
-
-  // 6. Chronological feed of recent events
   const feedEvents: { id: string; date: string; text: string; category: string }[] = [];
   activeCampRequests.slice(0, 8).forEach(req => {
     const isOrigin = req.originCampId === activeCampId;
@@ -812,8 +812,6 @@ export function ViewDashboard({
   const sortedRecentFeed = [...feedEvents]
     .sort((a, b) => b.id.localeCompare(a.id))
     .slice(0, 4);
-
-  // 7. Specialists Assigned
   const confirmedPersonsCount = transferPersons.filter(tp => 
     activeTransfersIds.includes(tp.transferId) && tp.status === "CONFIRMED"
   ).length;
@@ -824,8 +822,6 @@ export function ViewDashboard({
 
   return (
     <SectionShell kicker="CENTRAL DE OPERACIONES" title="Dashboard de Recursos">
-      
-      {/* ─── ENCABEZADO TÁCTICO CON RELOJ GENERAL ─── */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 pb-4 border-b border-[#67ACA9]/15">
         <div>
           <h2 className="text-sm font-black tracking-widest text-[#69BFB7] uppercase">{campName.toUpperCase()} — CONTROL LOGÍSTICO</h2>
@@ -833,7 +829,6 @@ export function ViewDashboard({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Reloj UTC y cuenta regresiva */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm bg-black/40 border border-[#67ACA9]/20 font-mono">
             <Clock className="w-3.5 h-3.5 text-[#69BFB7] animate-pulse" />
             <div className="text-left">
@@ -851,11 +846,7 @@ export function ViewDashboard({
           </Btn>
         </div>
       </div>
-
-      {/* ─── 1. RESUMEN DEL CAMPAMENTO (Camp Summary Grid & Access Links) ─── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        
-        {/* Guarnición de Campo */}
         <div className="mission-card border border-[#67ACA9]/20 bg-[#0d1414]/90 p-4 rounded-sm hover:border-[#67ACA9]/40 transition-all flex flex-col justify-between">
           <div>
             <span className="text-[8.5px] font-mono text-zinc-400 font-bold uppercase tracking-wider block">GUARNICIÓN ACTIVA</span>
@@ -872,8 +863,6 @@ export function ViewDashboard({
             Revisar almacenes ➔
           </button>
         </div>
-
-        {/* Recursos Críticos */}
         <div className="mission-card border border-[#67ACA9]/20 bg-[#0d1414]/90 p-4 rounded-sm hover:border-[#67ACA9]/40 transition-all flex flex-col justify-between">
           <div>
             <span className="text-[8.5px] font-mono text-amber-400 font-bold uppercase tracking-wider block">SUMINISTROS CRÍTICOS</span>
@@ -894,8 +883,6 @@ export function ViewDashboard({
             REVISAR ALMACENES ➔
           </button>
         </div>
-
-        {/* Consumo Reciente */}
         <div className="mission-card border border-[#67ACA9]/20 bg-[#0d1414]/90 p-4 rounded-sm hover:border-[#67ACA9]/40 transition-all flex flex-col justify-between">
           <div>
             <span className="text-[8.5px] font-mono text-zinc-400 font-bold uppercase tracking-wider block">CONSUMO ÚLTIMOS 7 DÍAS</span>
@@ -914,8 +901,6 @@ export function ViewDashboard({
             Ver solicitudes ➔
           </button>
         </div>
-
-        {/* Cobertura Operativa */}
         <div className="mission-card border border-[#67ACA9]/20 bg-[#0d1414]/90 p-4 rounded-sm hover:border-[#67ACA9]/40 transition-all flex flex-col justify-between">
           <div>
             <span className="text-[8.5px] font-mono text-emerald-400 font-bold uppercase tracking-wider block">COBERTURA DE SEGURIDAD</span>
@@ -933,11 +918,7 @@ export function ViewDashboard({
         </div>
 
       </div>
-
-      {/* ─── 2. 3. 4. 5. GESTIÓN MÓVIL DE REQUISICIONES, TRASLADOS Y COMPENSACIONES (Bento Grid) ─── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        
-        {/* Solicitudes por Aprobar */}
         <div className="mission-card border border-amber-500/20 bg-amber-950/5 p-4 rounded-sm flex flex-col justify-between shadow-md">
           <div>
             <div className="flex justify-between items-start">
@@ -969,8 +950,6 @@ export function ViewDashboard({
             REVISAR SOLICITUDES ➔
           </button>
         </div>
-
-        {/* Solicitudes Emitidas */}
         <div className="mission-card border border-[#67ACA9]/20 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between shadow-md">
           <div>
             <span className="text-[8.5px] font-mono text-zinc-300 font-bold uppercase tracking-wider block">SOLICITUDES EMITIDAS (ORIGEN)</span>
@@ -997,8 +976,6 @@ export function ViewDashboard({
             CONTROL CENTRAL DE TRÁMITES
           </div>
         </div>
-
-        {/* Convoyes Activos */}
         <div className="mission-card border border-[#67ACA9]/20 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between shadow-md">
           <div>
             <span className="text-[8.5px] font-mono text-[#69BFB7] font-bold uppercase tracking-wider block">CONVOYES ACTIVOS</span>
@@ -1027,8 +1004,6 @@ export function ViewDashboard({
             VER TRASLADOS ➔
           </button>
         </div>
-
-        {/* Riesgo Logístico */}
         <div className="mission-card border border-red-500/25 bg-red-950/5 p-4 rounded-sm flex flex-col justify-between shadow-md">
           <div>
             <span className="text-[8.5px] font-mono text-red-300 font-bold uppercase tracking-wider block font-extrabold">RIESGO LOGÍSTICO</span>
@@ -1062,11 +1037,7 @@ export function ViewDashboard({
         </div>
 
       </div>
-
-      {/* ─── 4 MAIN CARDS GRID AS SPECIFIED ─── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 text-xs">
-        
-        {/* Card 1: Recursos en inventario */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between min-h-[290px]">
           <div>
             <div className="text-[10px] font-mono text-[#69BFB7] uppercase font-bold tracking-wider mb-2">
@@ -1076,8 +1047,6 @@ export function ViewDashboard({
               {activeCampInventories.length} 
               <span className="text-[10px] font-mono text-[#A4C2C5]/60 font-normal">items</span>
             </div>
-            
-            {/* Short statistics */}
             <div className="flex flex-col gap-1 mt-3 text-[10px] font-mono select-none">
               <div className="bg-[#67ACA9]/5 border border-[#67ACA9]/15 p-1.5 rounded-xs">
                 <span className="text-[#A4C2C5]/50 block text-[8px] uppercase">Máxima Reserva</span>
@@ -1112,8 +1081,6 @@ export function ViewDashboard({
             </div>
           </div>
         </div>
-
-        {/* Card 2: Recursos críticos */}
         <div className="mission-card border border-[#ba3838]/40 bg-red-950/10 p-4 rounded-sm flex flex-col justify-between min-h-[290px]">
           <div>
             <div className="text-[10px] font-mono text-red-400 uppercase font-bold tracking-wider mb-2 flex justify-between items-center">
@@ -1124,19 +1091,18 @@ export function ViewDashboard({
               {unresolvedAlerts.length}
               <span className="text-[10px] font-mono text-[#A4C2C5]/50 font-normal ml-1">riesgos</span>
             </div>
-
-            {/* List of critical elements */}
             <div className="flex flex-col gap-1 mt-3 max-h-24 overflow-y-auto pr-1">
               {unresolvedAlerts.map(al => {
-                const type = resourceTypes.find(t => t.id === al.resourceTypeId);
-                const inv = campInventories.find(i => i.campId === activeCampId && i.resourceTypeId === al.resourceTypeId);
+                const resourceName = getResourceTypeDisplayName(resourceTypes, al.resourceTypeId);
+                const resourceUnit = getResourceTypeUnit(resourceTypes, al.resourceTypeId);
+                const inv = campInventories.find(i => String(i.campId) === String(activeCampId) && resourceTypeMatches(resourceTypes, i.resourceTypeId, al.resourceTypeId));
                 return (
                   <div key={al.id} className="text-[9px] bg-red-950/35 border border-red-500/25 p-1 rounded-xs text-red-200 flex justify-between items-center font-mono">
                     <span className="truncate pr-1.5 flex items-center gap-1">
                       <AlertTriangle className="h-2.5 w-2.5 text-red-400 shrink-0" />
-                      <span>{type?.name || al.resourceTypeId}</span>
+                      <span>{resourceName}</span>
                     </span>
-                    <strong className="shrink-0">{inv?.currentAmount || 0} / {inv?.minimumAlertAmount || "—"} u</strong>
+                    <strong className="shrink-0">{inv?.currentAmount || 0} / {inv?.minimumAlertAmount || "—"} {resourceUnit}</strong>
                   </div>
                 );
               })}
@@ -1150,20 +1116,18 @@ export function ViewDashboard({
 
           <div className="mt-4 border-t border-red-950/30 pt-3.5 flex flex-col gap-1.5">
             <Btn variant="danger" small style={{ width: "100%" }} onClick={() => onNavigateToSub("Alertas de inventario")}>
-              Resolver Alertas →
+              Revisar alertas →
             </Btn>
             <div className="grid grid-cols-2 gap-1">
               <Btn variant="ghost" small onClick={() => onNavigateToSub("Historial de movimientos")}>
                 Abastecer
               </Btn>
-              <Btn variant="ghost" small onClick={() => onNavigateToSub("Notificaciones")}>
-                Notificar
+              <Btn variant="ghost" small onClick={() => onNavigateToSub("Inventario actual")}>
+                Inventario
               </Btn>
             </div>
           </div>
         </div>
-
-        {/* Card 3: Distribución por Categorías */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between min-h-[290px]">
           <div>
             <div className="text-[10px] font-mono text-[#69BFB7] uppercase font-bold tracking-wider mb-2">
@@ -1195,8 +1159,6 @@ export function ViewDashboard({
                 <span className="text-xs font-black text-white mt-0.5">{totalResourceStocks} u</span>
               </div>
             </div>
-
-            {/* Micro legend */}
             <div className="flex flex-wrap gap-x-2 gap-y-0.5 justify-center mt-1 text-[8.5px] font-mono max-h-16 overflow-y-auto pr-1">
               {resourcePieData.slice(0, 6).map((entry, index) => (
                 <div key={entry.name} className="flex items-center gap-1">
@@ -1214,8 +1176,6 @@ export function ViewDashboard({
             </Btn>
           </div>
         </div>
-
-        {/* Card 4: Consumo últimos 7 días */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between min-h-[290px]">
           <div>
             <div className="text-[10px] font-mono text-[#69BFB7] uppercase font-bold tracking-wider mb-2 flex justify-between items-center">
@@ -1233,8 +1193,6 @@ export function ViewDashboard({
                 <span className="text-[9px] font-black text-rose-400 truncate block">{highestConsumptionDay.date}</span>
               </div>
             </div>
-
-            {/* Shaded Area Chart representing the beautiful timeline */}
             <div className="h-28 mt-1">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={dynamicTrendData} margin={{ top: 2, right: 2, left: -32, bottom: 0 }}>
@@ -1260,11 +1218,7 @@ export function ViewDashboard({
         </div>
 
       </div>
-
-      {/* ─── 6. 7. ROSTER DE PERSONAL Y BITÁCORA EN TIEMPO REAL (Split Layout) ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        
-        {/* Especialistas y Personal de Traslado */}
         <div className="mission-card border border-[#67ACA9]/20 bg-[#0d1414]/90 p-4 rounded-sm hover:border-[#67ACA9]/30 transition-all flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-center border-b border-[#67ACA9]/10 pb-2 mb-3">
@@ -1289,12 +1243,8 @@ export function ViewDashboard({
                 <span className="text-base font-black text-[#69BFB7] leading-none mt-1 block">{inTransitPersonsCount}</span>
               </div>
             </div>
-
-
-
-            {/* Compact lists of coverage */}
             <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
-              {occupationCoverages.filter(cov => cov.campId === activeCampId).map(cov => {
+              {occupationCoverages.filter(cov => String(cov.campId) === String(activeCampId)).map(cov => {
                 const occName = occupations.find(o => o.id === cov.occupationId)?.name || cov.occupationId;
                 const percent = cov.required > 0 ? Math.round((cov.active / cov.required) * 100) : 100;
                 return (
@@ -1321,8 +1271,6 @@ export function ViewDashboard({
             </button>
           </div>
         </div>
-
-        {/* Historial Operativo Reciente */}
         <div className="mission-card border border-[#67ACA9]/20 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between hover:border-[#67ACA9]/30 transition-all">
           <div>
             <div className="flex justify-between items-center border-b border-[#67ACA9]/10 pb-2 mb-3">
@@ -1368,15 +1316,11 @@ export function ViewDashboard({
         </div>
 
       </div>
-
-      {/* ─── TABS WITH ALL 5 LOGISTICAL TABLES ─── */}
       <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm shadow-lg mb-8">
         <span className="text-[10px] font-mono text-[#69BFB7] uppercase tracking-[3px] block mb-2">Centro de Fiscalización de Datos</span>
         <h2 className="text-base font-black text-white uppercase tracking-tight mb-4 border-b border-[#67ACA9]/10 pb-2.5">
           TABLAS DE CONTROL DE CAMPAMENTO ({campName.toUpperCase()})
         </h2>
-
-        {/* Tab Selector Buttons */}
         <div className="flex flex-wrap gap-1.5 mb-5 border-b border-[#67ACA9]/10 pb-3">
           <button
             type="button"
@@ -1414,8 +1358,6 @@ export function ViewDashboard({
             5. Trámites Intercampamento ({activeCampRequests.length})
           </button>
         </div>
-
-        {/* Tab 1: CAMP INVENTORY TABLE */}
         {activeTab === "inventario" && (
           <div className="flex flex-col gap-3">
             <div className="v-table-wrap overflow-x-auto">
@@ -1465,8 +1407,6 @@ export function ViewDashboard({
                 </tbody>
               </table>
             </div>
-            
-            {/* Pagination controls */}
             <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-2 py-1 select-none">
               <span>Registros {((pageInventario - 1) * pageSize) + 1} - {Math.min(pageInventario * pageSize, detailedResources.length)} de {detailedResources.length}</span>
               <div className="flex gap-1">
@@ -1477,8 +1417,6 @@ export function ViewDashboard({
             </div>
           </div>
         )}
-
-        {/* Tab 2: UNRESOLVED ALERTS */}
         {activeTab === "alertas" && (
           <div className="flex flex-col gap-3">
             <div className="v-table-wrap overflow-x-auto">
@@ -1495,30 +1433,23 @@ export function ViewDashboard({
                 </thead>
                 <tbody>
                   {paginatedAlertas.map(al => {
-                    const type = resourceTypes.find(t => t.id === al.resourceTypeId);
+                    const resourceName = getResourceTypeDisplayName(resourceTypes, al.resourceTypeId);
+                    const resourceUnit = getResourceTypeUnit(resourceTypes, al.resourceTypeId);
                     return (
                       <tr key={al.id} className="hover:bg-white/5 transition-colors">
                         <td className="font-mono font-bold text-rose-300">#{al.id}</td>
-                        <td className="font-bold text-white">{type?.name || al.resourceTypeId}</td>
-                        <td className="font-mono font-bold text-[#69BFB7]">{al.amountAtAlertGeneration} {type?.unitOfMeasure}</td>
+                        <td className="font-bold text-white">{resourceName}</td>
+                        <td className="font-mono font-bold text-[#69BFB7]">{al.amountAtAlertGeneration} {resourceUnit}</td>
                         <td className="font-mono text-[10px]">{al.alertDate}</td>
                         <td>
                           <span className="inline-block text-[8px] font-black tracking-wider uppercase px-2 py-0.5 rounded-sm border bg-[#ba3838]/25 text-[#fca5a5] border-red-500 animate-pulse">
-                            SIN RESOLVER
+                            BAJO MÍNIMO
                           </span>
                         </td>
                         <td className="text-right">
                           <div className="flex inline-flex gap-1">
-                            {onResolveAlert && (
-                              <Btn variant="success" small onClick={() => {
-                                onResolveAlert(al.id, currentUser.userId);
-                                alert("Alerta resuelta satisfactoriamente.");
-                              }}>
-                                ✓ Resolver Alerta
-                              </Btn>
-                            )}
-                            <Btn variant="ghost" small onClick={() => onNavigateToSub("Notificaciones")}>
-                              Notificar
+                            <Btn variant="ghost" small onClick={() => onNavigateToSub("Inventario actual")}>
+                              Ver inventario
                             </Btn>
                           </div>
                         </td>
@@ -1546,8 +1477,6 @@ export function ViewDashboard({
             )}
           </div>
         )}
-
-        {/* Tab 3: MOVEMENT LOGS */}
         {activeTab === "movimientos" && (
           <div className="flex flex-col gap-3">
             <div className="v-table-wrap overflow-x-auto">
@@ -1607,8 +1536,6 @@ export function ViewDashboard({
             )}
           </div>
         )}
-
-        {/* Tab 4: DAILY COLLECTION */}
         {activeTab === "recoleccion" && (
           <div className="flex flex-col gap-3">
             <div className="v-table-wrap overflow-x-auto">
@@ -1666,8 +1593,6 @@ export function ViewDashboard({
             )}
           </div>
         )}
-
-        {/* Tab 5: INTERCAMP REQUESTS */}
         {activeTab === "solicitudes" && (
           <div className="flex flex-col gap-3">
             <div className="v-table-wrap overflow-x-auto">
@@ -1744,14 +1669,11 @@ export function ViewDashboard({
     </SectionShell>
   );
 }
-
-/* 2. INVENTARIO DEL CAMPAMENTO */
 export function ViewInventarioCampamento({
   camps,
   resourceTypes,
   campInventories,
-  onUpdateInventory,
-  onAddInventory
+  onUpdateInventory
 }: {
   camps: Camp[];
   resourceTypes: ResourceType[];
@@ -1799,7 +1721,6 @@ export function ViewInventarioCampamento({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Tabla de existencias - Full Width */}
         <div className="lg:col-span-12 flex flex-col gap-3">
           {activeCampsite && (
             <div className="p-3 bg-black/45 border border-[#67ACA9]/10 rounded-sm text-xs">
@@ -2075,17 +1996,13 @@ function FilterDateField({
     </div>
   );
 }
-
-/* 3. RECOLECCION DIARIA */
 export function ViewRecoleccionDiaria({
   camps,
   resourceTypes,
   dailyCollectionRecords,
   campPersonnel,
-  setCampPersonnel,
   onSaveRecord,
-  onAdjustRecord,
-  onDeleteRecord
+  onAdjustRecord
 }: {
   camps: Camp[];
   resourceTypes: ResourceType[];
@@ -2096,34 +2013,22 @@ export function ViewRecoleccionDiaria({
   onAdjustRecord: (id: string, actualAmount: number, reason: string) => void;
   onDeleteRecord: (id: string) => void;
 }) {
-  const campId = currentUser.campId; // 'alfa'
+  const campId = currentUser.campId;
   const activeCampName = camps.find(c => c.id === campId)?.name || "Base Alfa";
   const recordedBy = "Operario #" + currentUser.userId;
-
-  // New Record Form States
   const [personId, setPersonId] = useState("");
   const [resourceTypeId, setResourceTypeId] = useState(resourceTypes[0]?.id || "2");
   const [expectedAmount, setExpectedAmount] = useState("");
   const [actualAmount, setActualAmount] = useState("");
   const [differenceReason, setDifferenceReason] = useState("Carga operativa ordinaria");
-
-  // Filter & Search states
   const [searchTerm, setSearchTerm] = useState("");
   const [filterResourceType, setFilterResourceType] = useState("");
   const [filterDate, setFilterDate] = useState("");
-
-  // Adjustment Modal States
   const [adjustingId, setAdjustingId] = useState<string | null>(null);
   const [adjustVal, setAdjustVal] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
-
-  // UI Toast / Feedback States
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "warning">("success");
-
-
-
-  // Reset new record form
   const resetCreateForm = () => {
     setPersonId("");
     setResourceTypeId(resourceTypes[0]?.id || "2");
@@ -2159,53 +2064,31 @@ export function ViewRecoleccionDiaria({
       setFeedbackMsg(null);
     }, 4500);
   };
-
-  // 1. Filter Daily Collection Records for current camp
   const activeCampRecords = dailyCollectionRecords.filter(r => r.campId === campId);
-
-  // 2. Filter Active Camp Roster
   const activeCampPersonnel = campPersonnel.filter(p => p.campId === campId);
-
-  // 3. Perform Union & Search
   const joinedAndFilteredRecords = activeCampRecords.filter(record => {
-    // Exact Resource Filter
     if (filterResourceType && record.resourceTypeId !== filterResourceType) {
       return false;
     }
-    // Date filter
     if (filterDate && record.date !== filterDate) {
       return false;
     }
 
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
-
-    // Match Record ID
     const matchesRecordId = record.id.toLowerCase().includes(term);
-
-    // Match Person ID
     const matchesPersonId = record.personId.toLowerCase().includes(term);
-
-    // Match Person Name (joined from campPersonnel)
     const personObj = campPersonnel.find(p => p.id === record.personId);
     const matchesPersonName = personObj ? personObj.name.toLowerCase().includes(term) : false;
-
-    // Match Resource Name (joined from resourceTypes)
     const rtObj = resourceTypes.find(rt => rt.id === record.resourceTypeId);
     const matchesResourceName = rtObj ? rtObj.name.toLowerCase().includes(term) : false;
-
-    // Match Date
     const matchesDate = record.date.includes(term);
 
     return matchesRecordId || matchesPersonId || matchesPersonName || matchesResourceName || matchesDate;
   });
-
-  // Calculate stats for current camp collection
   const totalExpected = joinedAndFilteredRecords.reduce((sum, r) => sum + r.expectedAmount, 0);
   const totalActual = joinedAndFilteredRecords.reduce((sum, r) => sum + r.actualAmount, 0);
   const netDiscrepancy = totalActual - totalExpected;
-
-  // Handle Create Daily Collection Record
   const handleCreateRecord = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -2219,8 +2102,6 @@ export function ViewRecoleccionDiaria({
       triggerToast("Persona seleccionada inválida.", "warning");
       return;
     }
-
-    // Rules constraint
     if (selectedPersonObj.status !== "ACTIVE") {
       triggerToast(`No se permite registrar recolección para personal en estado ${selectedPersonObj.status}.`, "warning");
       return;
@@ -2242,8 +2123,6 @@ export function ViewRecoleccionDiaria({
       triggerToast("Por favor escriba una descripción o motivo.", "warning");
       return;
     }
-
-    // Call prop to save record
     onSaveRecord({
       campId,
       personId,
@@ -2259,15 +2138,11 @@ export function ViewRecoleccionDiaria({
     triggerToast("Registro de recolección guardado. Se actualizó el inventario local.");
     resetCreateForm();
   };
-
-  // Handle Adjustment Execution with validations
   const handleConfirmAdjustment = () => {
     if (!adjustingId) return;
 
     const record = dailyCollectionRecords.find(r => r.id === adjustingId);
     if (!record) return;
-
-    // Reject adjusting records of other camps
     if (record.campId !== campId) {
       triggerToast("No se autoriza modificar registros de otros campamentos.", "warning");
       return;
@@ -2278,8 +2153,6 @@ export function ViewRecoleccionDiaria({
       triggerToast("La ficha de personal asociada no existe.", "warning");
       return;
     }
-
-    // Ensure status is ACTIVE
     if (selectedPersonObj.status !== "ACTIVE") {
       triggerToast(`No se permite ajustar registros de personas con estado actual: ${selectedPersonObj.status}.`, "warning");
       return;
@@ -2290,8 +2163,6 @@ export function ViewRecoleccionDiaria({
       triggerToast("La cantidad real debe ser un número decimal >= 0.", "warning");
       return;
     }
-
-    // Validate if flag is incomplete/under extraction
     if (newVal < record.expectedAmount && !adjustReason.trim()) {
       triggerToast("Para un ajuste por incumplimiento (menor a lo esperado), la justificación es obligatoria.", "warning");
       return;
@@ -2301,20 +2172,12 @@ export function ViewRecoleccionDiaria({
       triggerToast("Debe describir el motivo técnico para registrar este ajuste.", "warning");
       return;
     }
-
-    // Success audit executing
     onAdjustRecord(adjustingId, newVal, adjustReason.trim());
-
-    // Trigger Popup notification
     triggerToast("Ajuste de recolección aplicado con éxito. Se actualizó el inventario y diario de movimientos.");
     setAdjustingId(null);
     setAdjustVal("");
     setAdjustReason("");
   };
-
-
-
-  // Helper Row Color Calculator
   const getDiscrepancyStyle = (expected: number, actual: number) => {
     const diff = actual - expected;
     if (diff === 0) {
@@ -2331,8 +2194,6 @@ export function ViewRecoleccionDiaria({
       kicker="FISCALIZACIÓN DE PRODUCCIÓN" 
       title={`Ajuste de Recolección Diaria — ${activeCampName.toUpperCase()}`}
     >
-      
-      {/* Dynamic Alert Toasts */}
       {feedbackMsg && (
         <div className={`fixed bottom-5 right-5 z-50 p-4 rounded-sm border shadow-2xl flex items-center gap-3 transition-all duration-300 transform translate-y-0 max-w-md animate-bounce ${
           feedbackType === 'success' 
@@ -2351,11 +2212,7 @@ export function ViewRecoleccionDiaria({
           <button onClick={() => setFeedbackMsg(null)} className="ml-auto text-[#A4C2C5]/50 hover:text-white transition-colors text-[10px] font-bold">×</button>
         </div>
       )}
-
-      {/* Roster & Search Toolbars GRID */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 mb-5 select-none">
-        
-        {/* Search controls */}
         <div className="xl:col-span-12 bg-[#0d1414]/90 border border-[#67ACA9]/20 p-3 rounded-sm flex flex-col md:flex-row gap-3 items-center justify-between">
           <div className="w-full md:w-2/5 flex flex-col gap-1">
             <span className="text-[9px] font-mono font-bold text-[#69BFB7] uppercase tracking-wider">Criterio de búsqueda (Persona, ID, Recurso)</span>
@@ -2399,14 +2256,8 @@ export function ViewRecoleccionDiaria({
           )}
         </div>
       </div>
-
-      {/* Main Grid: Forms and Table */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        
-        {/* Left Side: Create Form */}
         <div className="lg:col-span-4 flex flex-col gap-4">
-          
-          {/* New Part Form */}
           <form onSubmit={handleCreateRecord} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col gap-3">
             <div className="text-xs font-black text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-2 flex items-center gap-1.5">
               <Plus className="w-4 h-4 text-emerald-400" />
@@ -2421,7 +2272,6 @@ export function ViewRecoleccionDiaria({
                   setPersonId(e.target.value);
                   const personObj = activeCampPersonnel.find(p => p.id === e.target.value);
                   if (personObj) {
-                    // Pre-fill resource type standard to their job
                     const job = INITIAL_OCCUPATIONS.find(occ => occ.id === personObj.occupationId);
                     if (job?.resource_type_id) {
                       setResourceTypeId(job.resource_type_id);
@@ -2505,11 +2355,7 @@ export function ViewRecoleccionDiaria({
             </Btn>
           </form>
         </div>
-
-        {/* Right Side: Roster and Table Logs */}
         <div className="lg:col-span-8 flex flex-col gap-4">
-          
-          {/* Table list */}
           <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between">
             <div>
               <div className="flex justify-between items-center border-b border-[#67ACA9]/10 pb-2 mb-3">
@@ -2521,8 +2367,6 @@ export function ViewRecoleccionDiaria({
                   {joinedAndFilteredRecords.length} registros filtrados
                 </span>
               </div>
-
-              {/* Stats Bar */}
               <div className="grid grid-cols-3 gap-2 bg-black/30 p-2 rounded-xs mb-3 text-center border border-zinc-805 font-mono text-[10px]">
                 <div>
                   <span className="text-[#A4C2C5]/60 block">SUMATORIA ESPERADA</span>
@@ -2569,54 +2413,35 @@ export function ViewRecoleccionDiaria({
 
                       return (
                         <tr key={record.id} className="hover:bg-[#67ACA9]/5 transition-all text-[11px]">
-                          {/* ID */}
                           <td className="font-mono font-bold text-white">#{record.id}</td>
-                          
-                          {/* PERSONA */}
                           <td>
                             <div className="flex flex-col">
                               <span className="text-white font-medium text-[11.5px]">{personObj?.name || record.personId}</span>
                               <span className="text-[8px] font-mono text-zinc-500 uppercase">Ficha: {record.personId}</span>
                             </div>
                           </td>
-                          
-                          {/* RESOURCE */}
                           <td className="font-bold text-white uppercase text-[10px]">
                             {resourceObj?.name || record.resourceTypeId}
                           </td>
-
-                          {/* FECHA */}
                           <td className="font-mono text-[10px] text-[#A4C2C5]/80">{record.date}</td>
-                          
-                          {/* EXPECTED */}
                           <td className="text-right font-mono text-[#A4C2C5]/80 text-[11px]">
                             {record.expectedAmount.toFixed(2)}
                           </td>
-                          
-                          {/* ACTUAL */}
                           <td className="text-right font-mono font-bold text-white text-[11px]">
                             {record.actualAmount.toFixed(2)}
                           </td>
-                          
-                          {/* DIFF */}
                           <td className={`text-right font-mono font-extrabold ${disc.text}`}>
                             {diff > 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2)}
                             <div className="text-[8px] text-zinc-500 font-normal">{disc.label}</div>
                           </td>
-
-                          {/* ESTADO DE PERSONA */}
                           <td>
                             <span className={`inline-block px-1.5 py-0.5 text-[8.5px] font-black font-mono border rounded-xs uppercase tracking-tighter ${personStatusProps.className}`}>
                               {personStatusProps.label}
                             </span>
                           </td>
-                          
-                          {/* MOTIVO */}
                           <td className="italic text-[#A4C2C5]/70 text-[10.5px] max-w-[140px] truncate" title={record.differenceReason}>
                             {record.differenceReason || "—"}
                           </td>
-                          
-                          {/* ACTIONS */}
                           <td className="text-right">
                             {personIsActive ? (
                               <Btn 
@@ -2652,8 +2477,6 @@ export function ViewRecoleccionDiaria({
               </div>
             </div>
           </div>
-
-          {/* Direct Adjustment Floating Overlay Card */}
           {adjustingId && (() => {
             const currentRecord = dailyCollectionRecords.find(r => r.id === adjustingId);
             const personObj = campPersonnel.find(p => p?.id === currentRecord?.personId);
@@ -2704,8 +2527,6 @@ export function ViewRecoleccionDiaria({
                     <span className="text-amber-400 font-extrabold">{currentRecord.actualAmount.toFixed(2)} {resourceObj?.unitOfMeasure}</span>
                   </div>
                 </div>
-
-                {/* Interactive Dynamic impact notice */}
                 {adjustVal !== "" && !isNaN(Number(adjustVal)) && (
                   <div className="p-2 border border-blue-500/25 bg-blue-950/10 rounded-xs mb-3 text-[10px] font-mono text-blue-200">
                     <span className="font-extrabold uppercase block mb-0.5">ANÁLISIS DE IMPACTO DE INVENTARIO ACTUAL</span>
@@ -2760,14 +2581,11 @@ export function ViewRecoleccionDiaria({
     </SectionShell>
   );
 }
-
-/* 4. MOVIMIENTOS DE INVENTARIO */
 export function ViewMovimientosInventario({
   camps,
   resourceTypes,
   inventoryMovements,
-  onAddManualMovement,
-  onDeleteMovement
+  onAddManualMovement
 }: {
   camps: Camp[];
   resourceTypes: ResourceType[];
@@ -2781,8 +2599,6 @@ export function ViewMovimientosInventario({
   const [movementType, setMovementType] = useState<InventoryMovement["movementType"]>("MANUAL_ADJUSTMENT");
   const [description, setDescription] = useState("");
   const recordedBy = currentUser.userId;
-
-  // Filter Tabs State for "Historial de recursos"
   const [activeTab, setActiveTab] = useState<"Todos" | "Expediciones" | "Recolección diaria" | "Ajustes">("Todos");
 
   const filteredMovements = inventoryMovements.filter(mv => {
@@ -2820,16 +2636,12 @@ export function ViewMovimientosInventario({
   return (
     <SectionShell kicker="AUDITORÍA DE STOCK" title="Historial de recursos">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        
-        {/* Audit Movements Log List */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-12 flex flex-col justify-between">
           <div>
             <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-2 flex justify-between items-center">
               <span>Registro de Operaciones de Inventario</span>
               <span className="text-[9px] text-[#A4C2C5]/50 font-mono italic">Auditoría Habilitada</span>
             </div>
-
-            {/* TAB CONTROLS */}
             <div className="flex flex-wrap gap-1 mb-3 border-b border-[#67ACA9]/20 pb-2">
               {(["Todos", "Expediciones", "Recolección diaria", "Ajustes"] as const).map(tab => (
                 <button
@@ -2864,8 +2676,6 @@ export function ViewMovimientosInventario({
                   {filteredMovements.slice().reverse().map(mv => {
                     const camp = camps.find(c => c.id === mv.campId);
                     const rt = resourceTypes.find(t => t.id === mv.resourceTypeId);
-                    
-                    // Outflows get minus sign (-), inflows get plus (+)
                     const isOutflow = [
                       "DAILY_RATION", 
                       "EXPEDITION_DEPARTURE", 
@@ -2913,15 +2723,12 @@ export function ViewMovimientosInventario({
     </SectionShell>
   );
 }
-
-/* 5. ALERTAS DE INVENTARIO */
 export function ViewAlertasInventario({
   camps,
   resourceTypes,
   inventoryAlerts,
   campInventories,
   inventoryMovements,
-  onResolveAlert,
   onNavigateToSub
 }: {
   camps: Camp[];
@@ -2929,12 +2736,11 @@ export function ViewAlertasInventario({
   inventoryAlerts: InventoryAlert[];
   campInventories: CampInventory[];
   inventoryMovements: InventoryMovement[];
-  onResolveAlert: (id: string, resolvedBy: string) => void;
   onNavigateToSub: (sub: string) => void;
 }) {
-  const resolver = currentUser.userId;
+  const activeCampId = currentUser.campId;
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
-  const [filterType, setFilterType] = useState<"ACTIVAS" | "RESUELTAS" | "TODAS">("ACTIVAS");
+  const [filterType, setFilterType] = useState<"ACTIVAS" | "TODAS">("ACTIVAS");
 
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "warning">("success");
@@ -2947,25 +2753,29 @@ export function ViewAlertasInventario({
     }, 4500);
   };
 
-  const filteredAlerts = inventoryAlerts.filter(alert => {
+  const scopedAlerts = inventoryAlerts.filter(alert => String(alert.campId) === String(activeCampId));
+  const filteredAlerts = scopedAlerts.filter(alert => {
     if (filterType === "TODAS") return true;
     if (filterType === "ACTIVAS") return !alert.resolved;
-    if (filterType === "RESUELTAS") return alert.resolved;
     return true;
   });
 
-  // Automatically select the first visible alert as default if none selected or the selected one is filtered out
-  const activeSelectedId = selectedAlertId || (filteredAlerts.length > 0 ? filteredAlerts[0].id : null);
-  const selectedAlert = inventoryAlerts.find(a => a.id === activeSelectedId);
+  const selectedAlert = scopedAlerts.find(a => a.id === selectedAlertId) ?? filteredAlerts[0];
+  const activeSelectedId = selectedAlert?.id ?? null;
 
-  // Cross-reference data for selected alert
-  const selectedRt = selectedAlert ? resourceTypes.find(t => t.id === selectedAlert.resourceTypeId) : null;
-  const selectedInv = selectedAlert ? campInventories.find(inv => inv.campId === selectedAlert.campId && inv.resourceTypeId === selectedAlert.resourceTypeId) : null;
+  const selectedInv = selectedAlert ? campInventories.find(inv =>
+    String(inv.campId) === String(selectedAlert.campId)
+      && resourceTypeMatches(resourceTypes, inv.resourceTypeId, selectedAlert.resourceTypeId)
+  ) : null;
+  const selectedResourceName = selectedAlert ? getResourceTypeDisplayName(resourceTypes, selectedAlert.resourceTypeId) : "";
+  const selectedResourceUnit = selectedAlert ? getResourceTypeUnit(resourceTypes, selectedAlert.resourceTypeId) : "u";
 
-  // Find recent movements that affected this resource type in this camp (cause of alert)
   const relatedMovements = selectedAlert
     ? inventoryMovements
-        .filter(m => m.campId === selectedAlert.campId && m.resourceTypeId === selectedAlert.resourceTypeId)
+        .filter(m =>
+          String(m.campId) === String(selectedAlert.campId)
+            && resourceTypeMatches(resourceTypes, m.resourceTypeId, selectedAlert.resourceTypeId)
+        )
         .slice(-5)
         .reverse()
     : [];
@@ -2973,19 +2783,20 @@ export function ViewAlertasInventario({
   const getAlertStatusInfo = (alert: InventoryAlert) => {
     if (alert.resolved) {
       return {
-        label: "RESUELTO",
+        label: "NORMALIZADO",
         badgeClass: "border-emerald-500/30 text-emerald-400 bg-emerald-950/25",
         textClass: "text-emerald-400",
         isCritical: false
       };
     }
 
-    // Find custom current amounts to decide if CRITICAL or LOW
-    const inv = campInventories.find(i => i.campId === alert.campId && i.resourceTypeId === alert.resourceTypeId);
+    const inv = campInventories.find(i =>
+      String(i.campId) === String(alert.campId)
+        && resourceTypeMatches(resourceTypes, i.resourceTypeId, alert.resourceTypeId)
+    );
     const actual = inv ? inv.currentAmount : alert.amountAtAlertGeneration;
     const minVal = inv ? inv.minimumAlertAmount : Math.round(alert.amountAtAlertGeneration * 1.5) || 10;
 
-    // If stock is <= 50% of the minimum warning limit
     if (actual <= 0.5 * minVal) {
       return {
         label: "CRÍTICO",
@@ -3006,21 +2817,17 @@ export function ViewAlertasInventario({
   return (
     <SectionShell kicker="MONITOREO DE ALARMAS DE RIESGO DE STOCK" title="Alertas de inventario">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        
-        {/* LIST OF ACTIVE RISKS (LEFT PANE) */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-7 flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-[#67ACA9]/10 pb-2 mb-1">
             <span className="text-xs font-bold text-[#69BFB7] uppercase tracking-wider">Tablero de Control de Riesgos Activos</span>
-            
-            {/* Quick states tab filters */}
             <div className="flex gap-1">
-              {(["ACTIVAS", "RESUELTAS", "TODAS"] as const).map(tab => (
+              {(["ACTIVAS", "TODAS"] as const).map(tab => (
                 <button
                   key={tab}
                   type="button"
                   onClick={() => {
                     setFilterType(tab);
-                    setSelectedAlertId(null); // Reset select so it picks new active default
+                    setSelectedAlertId(null);
                   }}
                   className={`px-2 py-0.5 text-[9px] uppercase font-bold border transition-all cursor-pointer ${
                     filterType === tab
@@ -3049,13 +2856,16 @@ export function ViewAlertasInventario({
               <tbody>
                 {filteredAlerts.map(alert => {
                   const camp = camps.find(c => c.id === alert.campId);
-                  const rt = resourceTypes.find(t => t.id === alert.resourceTypeId);
-                  const inv = campInventories.find(i => i.campId === alert.campId && i.resourceTypeId === alert.resourceTypeId);
-                  
+                  const inv = campInventories.find(i =>
+                    String(i.campId) === String(alert.campId)
+                      && resourceTypeMatches(resourceTypes, i.resourceTypeId, alert.resourceTypeId)
+                  );
                   const actualStock = inv ? inv.currentAmount : alert.amountAtAlertGeneration;
                   const minimumAlert = inv ? inv.minimumAlertAmount : Math.round(alert.amountAtAlertGeneration * 1.5) || 10;
                   const stateInfo = getAlertStatusInfo(alert);
                   const isCurSel = alert.id === activeSelectedId;
+                  const resourceName = getResourceTypeDisplayName(resourceTypes, alert.resourceTypeId);
+                  const resourceUnit = getResourceTypeUnit(resourceTypes, alert.resourceTypeId);
 
                   return (
                     <tr 
@@ -3069,15 +2879,15 @@ export function ViewAlertasInventario({
                     >
                       <td>
                         <div className="flex flex-col">
-                          <span className="text-[#69BFB7] font-semibold">{rt?.name || alert.resourceTypeId}</span>
+                          <span className="text-[#69BFB7] font-semibold">{resourceName}</span>
                           <span className="text-[8px] text-zinc-500 font-mono uppercase">{camp?.name || alert.campId}</span>
                         </div>
                       </td>
                       <td className="font-mono text-right font-semibold text-white">
-                        {actualStock} {rt?.unitOfMeasure}
+                        {actualStock} {resourceUnit}
                       </td>
                       <td className="font-mono text-right text-zinc-400">
-                        {minimumAlert} {rt?.unitOfMeasure}
+                        {minimumAlert} {resourceUnit}
                       </td>
                       <td>
                         <span className={`inline-block px-1.5 py-0.5 rounded-xs text-[8px] font-bold uppercase border ${stateInfo.badgeClass}`}>
@@ -3094,18 +2904,6 @@ export function ViewAlertasInventario({
                           >
                             Detalle
                           </Btn>
-                          {!alert.resolved && (
-                            <Btn 
-                              small 
-                              variant="success" 
-                              onClick={() => {
-                                onResolveAlert(alert.id, resolver);
-                                triggerToast(`Alerta de ${rt?.name || alert.resourceTypeId} resuelta con éxito.`);
-                              }}
-                            >
-                              Resolver
-                            </Btn>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -3123,8 +2921,6 @@ export function ViewAlertasInventario({
             </table>
           </div>
         </div>
-
-        {/* DETAILED ALERT ANALYSER (RIGHT PANE) */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-5 flex flex-col gap-4">
           <div className="text-xs font-bold text-amber-500 uppercase border-b border-[#67ACA9]/10 pb-1.5 flex justify-between items-center">
             <span>Análisis de Alerta y Enlaces de Causa</span>
@@ -3133,14 +2929,12 @@ export function ViewAlertasInventario({
 
           {selectedAlert ? (
             <div className="flex flex-col gap-4 text-xs">
-              
-              {/* Core Detail Grid */}
               <div className="bg-[#121c1c]/50 p-3 border border-[#67ACA9]/15 rounded-sm flex flex-col gap-2.5">
                 <div className="flex justify-between items-center border-b border-[#67ACA9]/10 pb-2">
                   <div className="flex flex-col">
                     <span className="text-[10px] text-zinc-500 uppercase font-mono">Recurso Monitoreado</span>
                     <span className="text-sm font-black text-white leading-tight uppercase">
-                      {selectedRt?.name || selectedAlert.resourceTypeId}
+                      {selectedResourceName}
                     </span>
                   </div>
                   <span className={`px-2 py-0.5 rounded-sm text-[9px] font-black tracking-tight border uppercase ${getAlertStatusInfo(selectedAlert).badgeClass}`}>
@@ -3160,23 +2954,23 @@ export function ViewAlertasInventario({
                   <div>
                     <span className="text-[8.5px] text-zinc-500 uppercase font-mono block">Valor en Alerta</span>
                     <span className="text-amber-300 font-mono font-bold leading-none block mt-0.5">
-                      {selectedAlert.amountAtAlertGeneration} {selectedRt?.unitOfMeasure}
+                      {selectedAlert.amountAtAlertGeneration} {selectedResourceUnit}
                     </span>
                   </div>
                   <div>
                     <span className="text-[8.5px] text-zinc-500 uppercase font-mono block">Mínimo Permitido</span>
                     <span className="text-red-400 font-mono font-bold leading-none block mt-0.5">
-                      {selectedInv ? selectedInv.minimumAlertAmount : Math.round(selectedAlert.amountAtAlertGeneration * 1.5)} {selectedRt?.unitOfMeasure}
+                      {selectedInv ? selectedInv.minimumAlertAmount : Math.round(selectedAlert.amountAtAlertGeneration * 1.5)} {selectedResourceUnit}
                     </span>
                   </div>
                 </div>
 
                 <div className="border-t border-[#67ACA9]/10 pt-2.5 mt-1 flex flex-col gap-1 text-[10px]">
                   <div className="flex justify-between items-center">
-                    <span className="text-[#A4C2C5]/60 font-medium">Resolución:</span>
+                    <span className="text-[#A4C2C5]/60 font-medium">Estado de stock:</span>
                     <span className="font-mono text-white text-[9.5px]">
                       {selectedAlert.resolved ? (
-                        <span className="text-emerald-400 font-bold">Resuelto por {selectedAlert.resolvedBy || "Sistema"}</span>
+                        <span className="text-emerald-400 font-bold">Stock normalizado</span>
                       ) : (
                         <span className="text-rose-400 font-bold">Pendiente de regularización</span>
                       )}
@@ -3194,8 +2988,6 @@ export function ViewAlertasInventario({
                   </div>
                 </div>
               </div>
-
-              {/* ACTION LINKS BLOCK */}
               <div className="flex flex-col gap-1.5 border-t border-[#67ACA9]/10 pt-3">
                 <span className="text-[9.5px] font-bold text-zinc-400 uppercase font-mono block mb-1">Acciones Rápidas</span>
                 <div className="grid grid-cols-2 gap-2">
@@ -3212,29 +3004,12 @@ export function ViewAlertasInventario({
                     </span>
                   </Btn>
 
-                  {!selectedAlert.resolved ? (
-                    <Btn 
-                      variant="success" 
-                      onClick={() => {
-                        onResolveAlert(selectedAlert.id, resolver);
-                        triggerToast(`Alerta de ${selectedRt?.name || selectedAlert.resourceTypeId} resuelta con éxito.`);
-                      }}
-                    >
-                      <span className="flex items-center justify-center gap-1 font-mono text-[9px] uppercase px-1 py-0.5">
-                        <Check className="h-3.5 w-3.5 shrink-0" />
-                        Resolver alerta
-                      </span>
-                    </Btn>
-                  ) : (
-                    <div className="border border-green-500/20 bg-green-950/10 text-emerald-400 rounded-xs text-[9.5px] font-mono uppercase font-black text-center py-1.5 select-none flex items-center justify-center gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Activo Resuelto
-                    </div>
-                  )}
+                  <div className="border border-amber-500/20 bg-amber-950/10 text-amber-300 rounded-xs text-[9.5px] font-mono uppercase font-black text-center py-1.5 select-none flex items-center justify-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Requiere regularizar stock
+                  </div>
                 </div>
               </div>
-
-              {/* TIMELINE OF RESOURCE CAUSE MOVEMENT (ENLACE DE ALERTA HACIA MOVIMIENTOS) */}
               <div className="border-t border-[#67ACA9]/10 pt-3">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-[9.5px] font-bold text-zinc-400 uppercase font-mono">Bitácora de Tráficos del Recurso</span>
@@ -3299,10 +3074,7 @@ export function ViewAlertasInventario({
     </SectionShell>
   );
 }
-
-/* 6. SOLICITUDES INTERCAMPAMENTO */
 export const ROSTER_PEOPLE = [
-  // Alfa
   { id: "31", name: "Sgto. Marcus Vance", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "1" },
   { id: "32", name: "Dra. Elena Rostova", role: "Médico de Emergencia de Campo", status: "ACTIVE", campId: "1" },
   { id: "33", name: "Tte. Alex Mercer", role: "Piloto de Aeronave Quad VTOL", status: "ACTIVE", campId: "1" },
@@ -3310,27 +3082,22 @@ export const ROSTER_PEOPLE = [
   { id: "35", name: "Ing. Sara Connor", role: "Ingeniero", status: "ACTIVE", campId: "1" },
   { id: "36", name: "Guarda Lara Croft", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "1" },
   { id: "31", name: "Scout Ezio Auditore", role: "Scout Táctico", status: "ACTIVE", campId: "1" },
-  // Bravo
   { id: "37", name: "Técnico Isaac Clarke", role: "Ingeniero", status: "ACTIVE", campId: "2" },
   { id: "38", name: "Conductor Cole Train", role: "Conductor de Blindado Terrestre", status: "ACTIVE", campId: "2" },
   { id: "39", name: "Dr. Gordon Freeman", role: "Médico de Emergencia de Campo", status: "ACTIVE", campId: "2" },
   { id: "40", name: "Recluta Gary", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "2" },
   { id: "40", name: "Scout Solid Snake", role: "Scout Táctico de Infiltración", status: "ACTIVE", campId: "2" },
-  // Charlie
   { id: "41", name: "Cultivador Samuel", role: "Cazador / Expl.", status: "ACTIVE", campId: "3" },
   { id: "42", name: "Piloto Fox McCloud", role: "Piloto de Aeronave Quad VTOL", status: "ACTIVE", campId: "3" },
   { id: "43", name: "Científico Walter", role: "Investigador", status: "ACTIVE", campId: "3" },
   { id: "44", name: "Conductor Sweet Tooth", role: "Conductor de Blindado Terrestre", status: "ACTIVE", campId: "3" },
   { id: "41", name: "Scout Nathan Drake", role: "Scout Táctico", status: "ACTIVE", campId: "3" },
-  // Delta
   { id: "45", name: "Sgto. Master Chief", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "4" },
   { id: "46", name: "Cabo Dunn", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "4" },
   { id: "47", name: "Piloto Maverick", role: "Piloto de Aeronave Quad VTOL", status: "ACTIVE", campId: "4" },
   { id: "48", name: "Médico Angela", role: "Médico de Emergencia de Campo", status: "ACTIVE", campId: "4" },
   { id: "45", name: "Scout Sam Fisher", role: "Scout Táctico Nocturno", status: "ACTIVE", campId: "4" }
 ];
-
-// Static list/mapping for specialists occupations accessible globally
 export const SPECIALISTS_OCCUPATIONS = [
   { id: "1", name: "Water Collector" },
   { id: "2", name: "Food Gatherer" },
@@ -3352,14 +3119,11 @@ export function ViewSolicitudesIntercampamento({
   onUpdateRequest,
   onSubmitRequest,
   onAddPersonToRequest,
-  onUpdateTransportStaff,
   campInventories,
-  setCampInventories,
   transfers,
-  setTransfers,
   transferPersons,
-  setTransferPersons,
-  transferHistories
+  transferHistories,
+  serverNow
 }: {
   camps: Camp[];
   resourceTypes: ResourceType[];
@@ -3380,87 +3144,50 @@ export function ViewSolicitudesIntercampamento({
   transferPersons: TransferPerson[];
   setTransferPersons: React.Dispatch<React.SetStateAction<TransferPerson[]>>;
   transferHistories: TransferHistory[];
+  serverNow?: Date;
 }) {
   const [activeTab, setActiveTab] = useState<"emitir" | "mis-solicitudes" | "pendientes">("emitir");
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
-
-  // Detail viewer states
   const [viewingReqId, setViewingReqId] = useState<string | null>(null);
   const [viewingTransferId, setViewingTransferId] = useState<string | null>(null);
-
-  // Evaluating request prep states
   const [evaluatingReqId, setEvaluatingReqId] = useState<string | null>(null);
   const [assignedScoutId, setAssignedScoutId] = useState<string>("");
   const [additionalPersonIds, setAdditionalPersonIds] = useState<string[]>([]);
   const [searchPersonTerm, setSearchPersonTerm] = useState("");
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [validationPopup, setValidationPopup] = useState<string | null>(null);
 
   const selectedOperPersonIds = [assignedScoutId, ...additionalPersonIds].filter(Boolean);
-
-  // New request draft fields
   const [originCampId, setOriginCampId] = useState(currentUser.campId);
   const [destinationCampId, setDestinationCampId] = useState(() => camps.find(camp => camp.id !== currentUser.campId)?.id || "2");
   const [description, setDescription] = useState("");
-  const [plannedDepartureDate, setPlannedDepartureDate] = useState("2026-05-20");
-  const [plannedArrivalDate, setPlannedArrivalDate] = useState("2026-05-21");
+  const [plannedDepartureDate, setPlannedDepartureDate] = useState(() => new Date((serverNow ?? new Date()).getTime() + 60 * 60 * 1000).toISOString());
+  const [plannedArrivalDate, setPlannedArrivalDate] = useState(() => new Date((serverNow ?? new Date()).getTime() + 25 * 60 * 60 * 1000).toISOString());
 
-  // Selected state for active draft request
+  useEffect(() => {
+    if (!serverNow) return;
+
+    const currentDeparture = new Date(plannedDepartureDate);
+    if (!Number.isNaN(currentDeparture.getTime()) && currentDeparture.getTime() >= serverNow.getTime()) {
+      return;
+    }
+
+    setPlannedDepartureDate(new Date(serverNow.getTime() + 60 * 60 * 1000).toISOString());
+    setPlannedArrivalDate(new Date(serverNow.getTime() + 25 * 60 * 60 * 1000).toISOString());
+  }, [serverNow]);
   const [activeReqId, setActiveReqId] = useState<string | null>(null);
-
-  // Details fields for Step 2
   const [resourceTypeId, setResourceTypeId] = useState("2");
   const [qty, setQty] = useState("");
 
   const [occupationId, setOccupationId] = useState("6");
   const [personQty, setPersonQty] = useState("");
-
-  // Filter requests
   const pendingRequests = intercampRequests.filter(r => r.status === "PENDING");
-  const historicalRequests = intercampRequests.filter(r => r.status !== "DRAFT");
-
   const selectedRequest = intercampRequests.find(r => r.id === activeReqId);
   const currentDetails = requestResourceDetails.filter(d => d.requestId === activeReqId);
-
-  // ====== METRICS & EVALUATION COMPUTATIONS FOR MODAL FLOW ======
   const evaluatingRequest = intercampRequests.find(r => r.id === evaluatingReqId);
   const evaluatingDetails = evaluatingRequest ? requestResourceDetails.filter(d => d.requestId === evaluatingRequest.id) : [];
   const evaluatingOriginCampName = evaluatingRequest ? getCampDisplayName(camps, evaluatingRequest.originCampId) : "Campamento no definido";
   const evaluatingDestinationCampName = evaluatingRequest ? getCampDisplayName(camps, evaluatingRequest.destinationCampId) : "Campamento no definido";
-
-  // 2. Resource levels validation
-  const resourceValidations = evaluatingRequest ? evaluatingDetails.map(d => {
-    const type = resourceTypes.find(t => t.id === d.resourceTypeId);
-    const inv = campInventories.find(i => i.campId === evaluatingRequest.destinationCampId && i.resourceTypeId === d.resourceTypeId);
-    const currentAmount = inv ? inv.currentAmount : 0;
-    const minimumAlert = inv ? inv.minimumAlertAmount : 0;
-    const resultAmount = currentAmount - d.requestedAmount;
-
-    let status = "Disponible";
-    let statusColor = "text-emerald-400";
-    if (currentAmount < d.requestedAmount) {
-      status = "Insuficiente";
-      statusColor = "text-rose-400 font-bold animate-pulse";
-    } else if (resultAmount < minimumAlert) {
-      status = "Bajo mínimo";
-      statusColor = "text-amber-400 font-bold";
-    }
-
-    return {
-      id: d.id,
-      name: type?.name || d.resourceTypeId,
-      unit: type?.unitOfMeasure || "u",
-      requested: d.requestedAmount,
-      current: currentAmount,
-      minimum: minimumAlert,
-      result: resultAmount,
-      status,
-      statusColor
-    };
-  }) : [];
-
-  const someResourceFails = resourceValidations.some(v => v.status === "Insuficiente" || v.status === "Bajo mínimo");
-
-  // 3. Personas solicitadas
   const reqPeopleCoverages = evaluatingRequest ? (evaluatingRequest.personRequirements || []).map(pr => {
     const occ = SPECIALISTS_OCCUPATIONS.find(o => o.id === pr.occupationId);
     const matches = ROSTER_PEOPLE.filter(p => p.campId === evaluatingRequest.destinationCampId && p.role.toLowerCase().includes((occ?.name || pr.occupationId).toLowerCase().slice(0, 8)));
@@ -3475,14 +3202,7 @@ export function ViewSolicitudesIntercampamento({
       statusColor: covered ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"
     };
   }) : [];
-
-  // 4. Personal operativo
   const destinationCampPeople = evaluatingRequest ? ROSTER_PEOPLE.filter(p => p.campId === evaluatingRequest.destinationCampId) : [];
-  const filteredSearchPeople = destinationCampPeople.filter(p => {
-    const term = searchPersonTerm.toLowerCase();
-    return p.name.toLowerCase().includes(term) || p.id.toLowerCase().includes(term) || p.role.toLowerCase().includes(term);
-  });
-
   const isPersonAssignedToActiveTransferIdx = (personId: string) => {
     return transferPersons.some(tp => {
       if (tp.personId !== personId) return false;
@@ -3490,10 +3210,6 @@ export function ViewSolicitudesIntercampamento({
       return t ? t.status === "PENDING_DEPARTURE" : false;
     });
   };
-
-  const selectedPeopleObjects = ROSTER_PEOPLE.filter(p => selectedOperPersonIds.includes(p.id));
-
-  // 5. Raciones calculations
   const personnelCount = selectedOperPersonIds.length;
   const requestedPeopleCount = evaluatingRequest ? (evaluatingRequest.personRequirements || []).reduce((sum, item) => sum + item.quantity, 0) : 0;
   const totalTravelers = personnelCount + requestedPeopleCount;
@@ -3509,7 +3225,7 @@ export function ViewSolicitudesIntercampamento({
   }
   if (computedDiffDays <= 0) computedDiffDays = 1;
 
-  const RATION_FACTOR = 2; // Ración estándar mínima
+  const RATION_FACTOR = 2;
   const rationsRequired = totalTravelers * computedDiffDays * RATION_FACTOR;
 
   const foodInvObj = evaluatingRequest ? campInventories.find(i => i.campId === evaluatingRequest.destinationCampId && i.resourceTypeId === "2") : null;
@@ -3519,8 +3235,6 @@ export function ViewSolicitudesIntercampamento({
   const reqFoodDetail = evaluatingDetails.find(d => d.resourceTypeId === "2");
   const foodAmtRequested = reqFoodDetail ? reqFoodDetail.requestedAmount : 0;
   const resultingFoodAmount = foodInventoryCurrent - foodAmtRequested - rationsRequired;
-
-  // Dynamic validation messages array
   const validationErrors: string[] = [];
   if (evaluatingRequest) {
     if (!assignedScoutId) {
@@ -3544,21 +3258,22 @@ export function ViewSolicitudesIntercampamento({
   const hasValidationError = validationErrors.length > 0;
   const canApprove = !hasValidationError;
 
+  const showValidationPopup = (message: string) => {
+    setValidationPopup(message);
+    window.setTimeout(() => setValidationPopup(null), 4200);
+  };
+
   const handleFinalApprove = async () => {
     if (!evaluatingRequest) return;
     if (hasValidationError) {
-      alert("No se cumplen los requisitos operacionales:\n" + validationErrors.join("\n"));
+      showValidationPopup("No se cumplen los requisitos operacionales: " + validationErrors.join(" / "));
       return;
     }
 
     await onUpdateRequestStatus(evaluatingRequest.id, "APPROVED", currentUser.userId, selectedOperPersonIds);
-
-    // Cerrar modal
     setEvaluatingReqId(null);
     setAssignedScoutId("");
     setAdditionalPersonIds([]);
-    
-    // Popup éxito
     setShowSuccessToast(true);
     setTimeout(() => {
       setShowSuccessToast(false);
@@ -3568,11 +3283,30 @@ export function ViewSolicitudesIntercampamento({
   const handleCreateDraft = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!description.trim()) {
-      alert("Por favor ingrese una motivación o descripción válida.");
+      showValidationPopup("Ingrese una motivación o descripción válida.");
       return;
     }
     if (originCampId === destinationCampId) {
-      alert("El campamento origen debe ser distinto al destino.");
+      showValidationPopup("El campamento origen debe ser distinto al destino.");
+      return;
+    }
+
+    const departureDate = new Date(plannedDepartureDate);
+    const arrivalDate = new Date(plannedArrivalDate);
+    const currentServerTime = serverNow ?? new Date();
+
+    if (Number.isNaN(departureDate.getTime()) || Number.isNaN(arrivalDate.getTime())) {
+      showValidationPopup("Seleccione fechas y horas planificadas válidas para salida y llegada.");
+      return;
+    }
+
+    if (departureDate.getTime() < currentServerTime.getTime()) {
+      showValidationPopup("La salida planificada no puede ser anterior a la fecha y hora actual del servidor.");
+      return;
+    }
+
+    if (arrivalDate.getTime() < departureDate.getTime()) {
+      showValidationPopup("La llegada planificada no puede ser anterior a la salida planificada.");
       return;
     }
 
@@ -3593,7 +3327,7 @@ export function ViewSolicitudesIntercampamento({
       setActiveReqId(draftId);
       setWizardStep(2);
     } else {
-      alert("Hubo un error al crear la solicitud de borrador.");
+      showValidationPopup("Hubo un error al crear la solicitud de borrador.");
     }
   };
 
@@ -3601,7 +3335,7 @@ export function ViewSolicitudesIntercampamento({
     if (!activeReqId || !selectedRequest) return;
     const count = parseInt(personQty, 10);
     if (!personQty || isNaN(count) || count <= 0) {
-      alert("Ingrese una cantidad válida de personal.");
+      showValidationPopup("Ingrese una cantidad válida de personal.");
       return;
     }
 
@@ -3642,10 +3376,8 @@ export function ViewSolicitudesIntercampamento({
 
   const handleSendRequest = async () => {
     if (!activeReqId) return;
-    
-    // Validate we've added at least one resource or person
     if (currentDetails.length === 0 && (!selectedRequest || !selectedRequest.personRequirements || selectedRequest.personRequirements.length === 0)) {
-      alert("Debe agregar al menos un recurso o requerimiento de personal para poder enviar la solicitud.");
+      showValidationPopup("Debe agregar al menos un recurso o requerimiento de personal para poder enviar la solicitud.");
       return;
     }
 
@@ -3654,9 +3386,7 @@ export function ViewSolicitudesIntercampamento({
     } else {
       await onUpdateRequestStatus(activeReqId, "PENDING", currentUser.userId);
     }
-    alert(`La solicitud borrador #${activeReqId} se ha enviado formalmente al canal de aprobación de red.`);
-    
-    // Reset state & switch tab
+    showValidationPopup(`La solicitud borrador #${activeReqId} se envió formalmente al canal de aprobación de red.`);
     setDescription("");
     setActiveReqId(null);
     setWizardStep(1);
@@ -3670,14 +3400,12 @@ export function ViewSolicitudesIntercampamento({
       setActiveReqId(null);
       setWizardStep(1);
       setDescription("");
-      alert("Borrador cancelado correctamente.");
+      showValidationPopup("Borrador cancelado correctamente.");
     }
   };
 
   return (
     <SectionShell kicker="COORDINACIÓN LOGÍSTICA SUCURSAL" title="Solicitudes de Reabastecimiento Intercampamento">
-      
-      {/* TACTICAL SUB-NAV TABS */}
       <div className="flex gap-2.5 mb-5 border-b border-[#67ACA9]/20 pb-3">
         <button
           onClick={() => setActiveTab("emitir")}
@@ -3717,14 +3445,8 @@ export function ViewSolicitudesIntercampamento({
       </div>
 
       <div>
-        
-        {/* ======================================================== */}
-        {/* MODE 1: EMITIR NUEVA SOLICITUD                           */}
-        {/* ======================================================== */}
         {activeTab === "emitir" && (
           <div className="grid grid-cols-1 gap-5">
-            
-            {/* STEP PROGRESS WIDGET */}
             <div className="flex items-center gap-2 bg-black/40 border border-[#67ACA9]/15 p-2 rounded-xs">
               <div className="flex items-center gap-1.5">
                 <span className={`h-5 w-5 rounded-full flex items-center justify-center font-bold font-mono text-[10px] ${wizardStep === 1 ? 'bg-[#69BFB7] text-black font-black' : 'bg-[#67ACA9]/20 text-[#A4C2C5]'}`}>1</span>
@@ -3743,8 +3465,6 @@ export function ViewSolicitudesIntercampamento({
                 </div>
               )}
             </div>
-
-            {/* STEP 1: CABECERA FORM */}
             {wizardStep === 1 && (
               <div className="flex flex-col gap-6">
                 <form onSubmit={handleCreateDraft} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/95 p-5 rounded-sm flex flex-col gap-4">
@@ -3777,11 +3497,13 @@ export function ViewSolicitudesIntercampamento({
                       label="Salida Táctica Estimada"
                       value={plannedDepartureDate}
                       onChange={setPlannedDepartureDate}
+                      minDate={serverNow ?? new Date()}
                     />
                     <DateTimeField 
                       label="Llegada Proyectada"
                       value={plannedArrivalDate}
                       onChange={setPlannedArrivalDate}
+                      minDate={new Date(Math.max((serverNow ?? new Date()).getTime(), new Date(plannedDepartureDate).getTime()))}
                     />
                   </div>
 
@@ -3809,8 +3531,6 @@ export function ViewSolicitudesIntercampamento({
                     </Btn>
                   </div>
                 </form>
-
-                {/* BOARD OF DRAFTS */}
                 {intercampRequests.filter(r => r.status === "DRAFT").length > 0 && (
                   <div className="mission-card border border-[#67ACA9]/20 bg-[#0d1414]/95 p-4 rounded-sm flex flex-col gap-3">
                     <div className="text-xs font-bold text-amber-400 uppercase border-b border-[#67ACA9]/10 pb-1.5">
@@ -3866,12 +3586,8 @@ export function ViewSolicitudesIntercampamento({
                 )}
               </div>
             )}
-
-            {/* STEP 2: DETAILS OF RESOURCES & PERSONNEL */}
             {wizardStep === 2 && activeReqId && selectedRequest && (
               <div className="flex flex-col gap-5">
-                
-                {/* DRAFT PREVIEW BOX */}
                 <div className="p-4 bg-emerald-950/10 border border-emerald-500/20 rounded-xs text-[11px] grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <span className="text-[#A4C2C5]/50 block font-mono uppercase text-[9px]">Ruta de Transferencia:</span>
@@ -3888,8 +3604,6 @@ export function ViewSolicitudesIntercampamento({
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  
-                  {/* EDIT SUB-PANEL A: RESOURCES DETAILS */}
                   <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/95 p-4 rounded-sm flex flex-col gap-3">
                     <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 flex items-center justify-between">
                       <span>A) Recursos Vinculados a la Solicitud</span>
@@ -3911,7 +3625,7 @@ export function ViewSolicitudesIntercampamento({
                         <Btn small variant="primary" style={{ width: "100%", padding: "8px" }} onClick={() => {
                           const quantityNum = Number(qty);
                           if (isNaN(quantityNum) || quantityNum <= 0) {
-                            alert("Por favor ingrese una cantidad numérica mayor a 0.");
+                            showValidationPopup("Ingrese una cantidad numérica mayor a 0.");
                             return;
                           }
                           onAddResourceToRequest(selectedRequest.id, resourceTypeId, quantityNum);
@@ -3961,8 +3675,6 @@ export function ViewSolicitudesIntercampamento({
                       </table>
                     </div>
                   </div>
-
-                  {/* EDIT SUB-PANEL B: PERSONNEL DEPLOYMENT */}
                   <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/95 p-4 rounded-sm flex flex-col gap-3">
                     <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 flex items-center justify-between">
                       <span>B) Personal de Apoyo / Escolta Solicitado</span>
@@ -4028,8 +3740,6 @@ export function ViewSolicitudesIntercampamento({
                   </div>
 
                 </div>
-
-                {/* BOTTOM COMPREHENSIVE ACTIONS AND BACKEND CONFIRMATION */}
                 <div className="mt-2.5 p-4 bg-teal-950/20 border border-[#67ACA9]/25 rounded-sm flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex flex-col text-xs max-w-lg">
                     <span className="text-[#69BFB7] uppercase font-black tracking-wide text-[10.5px]">Finalizar Solicitud de Enlace Regional</span>
@@ -4058,10 +3768,6 @@ export function ViewSolicitudesIntercampamento({
 
           </div>
         )}
-
-        {/* ======================================================== */}
-        {/* MODE 1.5: MIS SOLICITUDES (EMITENTE SUCURSAL)            */}
-        {/* ======================================================== */}
         {activeTab === "mis-solicitudes" && (
           <div className="flex flex-col gap-4 animate-fade-in text-xs">
             <div className="bg-[#0b1213] border border-[#67ACA9]/20 rounded p-4 shadow-xl">
@@ -4167,7 +3873,7 @@ export function ViewSolicitudesIntercampamento({
                                         onClick={() => {
                                           const matchingTr = transfers.find(t => t.requestId === req.id);
                                           if (matchingTr) setViewingTransferId(matchingTr.id);
-                                          else alert("El traslado está en proceso de programación por logística.");
+                                          else showValidationPopup("El traslado está en proceso de programación por logística.");
                                         }}
                                         className="px-2 py-1 text-[10px] font-bold text-emerald-400 hover:text-white bg-emerald-950/20 hover:bg-emerald-900/40 rounded border border-emerald-900 cursor-pointer"
                                       >
@@ -4192,10 +3898,6 @@ export function ViewSolicitudesIntercampamento({
             </div>
           </div>
         )}
-
-        {/* ======================================================== */}
-        {/* MODE 2: SOLICITUDES PENDIENTES / POR APROBAR            */}
-        {/* ======================================================== */}
         {activeTab === "pendientes" && (
           <div className="flex flex-col gap-4">
             
@@ -4231,8 +3933,6 @@ export function ViewSolicitudesIntercampamento({
                         <span className="text-[#69BFB7] font-bold font-mono text-[9px] block uppercase">Justificación:</span>
                         <span className="italic text-[#A4C2C5]/90">"{req.description}"</span>
                       </div>
-
-                      {/* Resources required detailed breakdown */}
                       <div className="border-t border-[#67ACA9]/10 pt-2 flex flex-col gap-1.5">
                         <span className="text-[#A4C2C5]/60 font-mono text-[9px] uppercase font-bold block">Recursos Demandados:</span>
                         
@@ -4251,8 +3951,6 @@ export function ViewSolicitudesIntercampamento({
                           )}
                         </div>
                       </div>
-
-                      {/* Personal needed */}
                       <div className="border-t border-[#67ACA9]/10 pt-2 flex flex-col gap-1.5">
                         <span className="text-[#A4C2C5]/60 font-mono text-[9px] uppercase font-bold block">Personal Escolta Requerido:</span>
 
@@ -4307,16 +4005,25 @@ export function ViewSolicitudesIntercampamento({
         )}
 
       </div>
-
-      {/* SUCCESS TOAST ALERT SUB-SYSTEM */}
       {showSuccessToast && (
         <div className="fixed top-5 right-5 z-50 bg-[#0d1414] border-2 border-emerald-400 text-emerald-100 px-4 py-3 rounded-md shadow-[0_0_20px_rgba(52,211,153,0.3)] font-mono text-[11px] font-bold flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 text-emerald-400" />
           <span>✓ Solicitud aprobada y traslado programado con éxito.</span>
         </div>
       )}
-
-      {/* DETAILED EVALUATION PREPARATION SIDE FLOW / MODAL */}
+      {validationPopup && (
+        <div className="fixed top-5 right-5 z-50 bg-[#171007] border-2 border-amber-400 text-amber-100 px-4 py-3 rounded-md shadow-[0_0_20px_rgba(251,191,36,0.22)] font-mono text-[11px] font-bold flex items-start gap-2 max-w-sm">
+          <AlertTriangle className="h-4 w-4 text-amber-300 mt-0.5 shrink-0" />
+          <span className="leading-normal">{validationPopup}</span>
+          <button
+            type="button"
+            onClick={() => setValidationPopup(null)}
+            className="ml-2 text-amber-200/60 hover:text-white text-base leading-none"
+          >
+            ×
+          </button>
+        </div>
+      )}
       {evaluatingReqId && evaluatingRequest && (
         (() => {
           const candidateScouts = destinationCampPeople.filter(p => p.role.toLowerCase().includes("scout") || p.name.toLowerCase().includes("scout"));
@@ -4326,8 +4033,6 @@ export function ViewSolicitudesIntercampamento({
           return (
             <div className="fixed inset-0 z-50 bg-[#000505]/95 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
               <div className="w-full max-w-md bg-[#0b1213] border border-[#67ACA9]/30 rounded-md p-5 flex flex-col gap-3.5 text-gray-100 max-h-[95vh] overflow-y-auto shadow-2xl relative font-sans text-xs">
-                
-                {/* Header */}
                 <div className="flex justify-between items-center border-b border-[#67ACA9]/20 pb-2.5">
                   <div className="flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
@@ -4343,11 +4048,7 @@ export function ViewSolicitudesIntercampamento({
                     ✕
                   </button>
                 </div>
-
-                {/* Content info */}
                 <div className="flex flex-col gap-3 font-sans text-xs text-slate-300">
-                  
-                  {/* General details layout */}
                   <div className="grid grid-cols-2 bg-black/35 p-2.5 rounded border border-cyan-950 gap-2">
                     <div>
                       <span className="text-[10px] uppercase text-[#A4C2C5]/50 block">ID Solicitud</span>
@@ -4358,8 +4059,6 @@ export function ViewSolicitudesIntercampamento({
                       <span className="font-bold text-cyan-300 uppercase block">{evaluatingDestinationCampName} ➔ {evaluatingOriginCampName}</span>
                     </div>
                   </div>
-
-                  {/* Cargo / Requirements list */}
                   <div className="grid grid-cols-2 gap-3 bg-black/15 p-2.5 rounded border border-gray-900/60">
                     <div>
                       <span className="text-[10px] uppercase text-[#A4C2C5]/60 font-bold block mb-1">Recursos Demandados:</span>
@@ -4390,8 +4089,6 @@ export function ViewSolicitudesIntercampamento({
                       </ul>
                     </div>
                   </div>
-
-                  {/* INPUT 1: SCOUT ASSIGNMENT (dropdown) */}
                   <div className="flex flex-col gap-1">
                     <span className="text-[#A4C2C5]/70 font-bold uppercase tracking-wider text-[10px]">
                       1. Asignar Scout Principal (Obligatorio *)
@@ -4412,8 +4109,6 @@ export function ViewSolicitudesIntercampamento({
                       })}
                     </select>
                   </div>
-
-                  {/* INPUT 2: ADDITIONAL WORKERS */}
                   <div className="flex flex-col gap-1">
                     <div className="flex justify-between items-center">
                       <span className="text-[#A4C2C5]/70 font-bold uppercase tracking-wider text-[10px]">
@@ -4421,8 +4116,6 @@ export function ViewSolicitudesIntercampamento({
                       </span>
                       <span className="text-[9px] text-[#69BFB7] font-mono">({additionalPersonIds.length} seleccionados)</span>
                     </div>
-
-                    {/* Search field */}
                     <div className="relative mb-1">
                       <input
                         type="text"
@@ -4470,8 +4163,6 @@ export function ViewSolicitudesIntercampamento({
                       )}
                     </div>
                   </div>
-
-                  {/* RATIONS & FOOD LEVEL PREVIEW CARD */}
                   <div className="bg-[#111e1c]/45 border border-[#52c2b3]/20 p-2.5 rounded-sm flex flex-col gap-1">
                     <span className="text-[#69BFB7] font-bold uppercase tracking-wider text-[10px] block">
                       3. Proyección de Raciones del Viaje
@@ -4492,8 +4183,6 @@ export function ViewSolicitudesIntercampamento({
                       </div>
                     )}
                   </div>
-
-                  {/* VALIDATION WARNINGS */}
                   {validationErrors.length > 0 && (
                     <div className="bg-rose-950/25 border border-rose-800/35 p-2 rounded text-[11px] text-rose-300">
                       <span className="font-bold uppercase tracking-wider block mb-0.5">Restricciones encontradas:</span>
@@ -4506,8 +4195,6 @@ export function ViewSolicitudesIntercampamento({
                   )}
 
                 </div>
-
-                {/* Actions */}
                 <div className="flex justify-end gap-2 border-t border-[#67ACA9]/25 pt-3 mt-1">
                   <button 
                     onClick={() => { setEvaluatingReqId(null); setAssignedScoutId(""); setAdditionalPersonIds([]); }}
@@ -4533,8 +4220,6 @@ export function ViewSolicitudesIntercampamento({
           );
         })()
       )}
-
-      {/* VIEW DETAILS POPUP FOR AN EMITTED REQUEST */}
       {viewingReqId && (() => {
         const req = intercampRequests.find(r => r.id === viewingReqId);
         if (!req) return null;
@@ -4613,8 +4298,6 @@ export function ViewSolicitudesIntercampamento({
           </div>
         );
       })()}
-
-      {/* VIEW TRANSFER STATUS OVERLAY */}
       {viewingTransferId && (() => {
         const transfer = transfers.find(t => t.id === viewingTransferId);
         if (!transfer) return null;
@@ -4709,28 +4392,13 @@ export function ViewSolicitudesIntercampamento({
     </SectionShell>
   );
 }
-
-/* 7. TRASLADOS */
 export function ViewTraslados({
   camps,
-  resourceTypes,
   intercampRequests,
-  requestResourceDetails,
   transfers,
-  setTransfers,
   transferPersons,
-  setTransferPersons,
-  transferHistories,
-  setTransferHistories,
-  campInventories,
-  setCampInventories,
-  deliveredTransferResources,
-  onAddTransfer,
   onUpdateTransferStatus,
-  onAddPersonToTransfer,
-  onUpdatePersonStatus,
   onAddHistoryEntry,
-  onSaveDelivery,
   onUpdateTransportStaff
 }: {
   camps: Camp[];
@@ -4754,9 +4422,8 @@ export function ViewTraslados({
   onSaveDelivery: (data: Omit<DeliveredTransferResource, "id">) => void;
   onUpdateTransportStaff?: (transferId: string, transportPersonIds: string[]) => void | Promise<void>;
 }) {
-  const RATION_FACTOR = 2; // inline constant for calculating rations
+  const RATION_FACTOR = 2;
   const [subFilterTab, setSubFilterTab] = useState<"por_preparar" | "solicitados" | "en_transito" | "cerrados">("por_preparar");
-  const [viewingDetailTransferId, setViewingDetailTransferId] = useState<string | null>(null);
   
   const displayedTransfers = transfers.filter(t => {
     const req = intercampRequests.find(r => r.id === t.requestId);
@@ -4776,12 +4443,8 @@ export function ViewTraslados({
     }
     return true;
   });
-  
-  // Custom Success Toasts / Notifications
   const [toastMsg, setToastMsg] = useState("");
   const [showToast, setShowToast] = useState(false);
-
-  // Modal State for Edit Manifest
   const [editingTransferId, setEditingTransferId] = useState<string | null>(null);
   const [modalScoutId, setModalScoutId] = useState("");
   const [modalAdditionalIds, setModalAdditionalIds] = useState<string[]>([]);
@@ -4792,24 +4455,16 @@ export function ViewTraslados({
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };
-
-  // Travel Days calculation
   const getTravelDays = (t: Transfer) => {
     const dep = new Date(t.plannedDepartureDate);
     const arr = new Date(t.plannedArrivalDate);
     if (isNaN(dep.getTime()) || isNaN(arr.getTime())) return 1;
     return Math.max(1, Math.ceil((arr.getTime() - dep.getTime()) / (1000 * 60 * 60 * 24)));
   };
-
-  // Open Edit Modals
   const handleOpenEditModal = (tId: string) => {
     setEditingTransferId(tId);
     setValidationErrors([]);
-    
-    // Loaded assigned people from state
     const assigned = transferPersons.filter(tp => tp.transferId === tId);
-    
-    // Find who of the assigned is a Scout inside ROSTER_PEOPLE
     const scoutAssigned = assigned.find(tp => {
       const person = ROSTER_PEOPLE.find(p => p.id === tp.personId);
       return person && (person.role.toLowerCase().includes("scout") || person.name.toLowerCase().includes("scout"));
@@ -4823,16 +4478,12 @@ export function ViewTraslados({
       setModalAdditionalIds(assigned.map(tp => tp.personId));
     }
   };
-
-  // Save Operatives Manifest to transferPersons
   const handleSaveManifest = async () => {
     if (!editingTransferId) return;
 
     const transfer = transfers.find(t => t.id === editingTransferId);
     const request = intercampRequests.find(r => r.id === transfer?.requestId);
     if (!transfer || !request) return;
-
-    // Direct and precise validations
     const errors: string[] = [];
     if (!modalScoutId) {
       errors.push("Debe asignar obligatoriamente un Scout activo.");
@@ -4842,8 +4493,6 @@ export function ViewTraslados({
     if (selectedScoutObj && selectedScoutObj.status !== "ACTIVE") {
       errors.push("El Scout seleccionado debe estar en estado ACTIVO.");
     }
-
-    // Check duplicates
     if (modalAdditionalIds.includes(modalScoutId)) {
       errors.push("El Scout principal no puede ser agregado también como personal adicional.");
     }
@@ -4852,8 +4501,6 @@ export function ViewTraslados({
     if (uniqueAdditionals.length !== modalAdditionalIds.length) {
       errors.push("No se permiten entradas duplicadas en el personal operativo.");
     }
-
-    // Verify if anyone is occupied in other transfers
     const isPersonOccupiedInOtherActiveTransfer = (pId: string) => {
       return transfers.some(t => {
         if (t.id === editingTransferId) return false;
@@ -4902,8 +4549,6 @@ export function ViewTraslados({
     setEditingTransferId(null);
     displayToast("¡Manifiesto de traslado modificado correctamente!");
   };
-
-  // CANCEL TRANSPORT (Restores resources to Provider Camp inventory)
   const handleCancelTransfer = (trId: string) => {
     const transfer = transfers.find(t => t.id === trId);
     const request = intercampRequests.find(r => r.id === transfer?.requestId);
@@ -4920,16 +4565,12 @@ export function ViewTraslados({
 
   return (
     <SectionShell kicker="Logística de Traslados" title="Control Unificado de Convoys">
-      
-      {/* Dynamic Alert Messages */}
       {showToast && (
         <div className="fixed top-24 right-5 z-50 bg-[#0c1e1c] border border-cyan-400 text-[#5ff7ea] text-xs font-bold px-4 py-2.5 rounded shadow-lg shadow-black/80 animate-fade-in flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
           <span>{toastMsg}</span>
         </div>
       )}
-
-      {/* TABS HEADER FOR SUB-FILTERS */}
       <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-6 border-b border-[#67ACA9]/10 pb-3 mt-1">
         <button
           onClick={() => setSubFilterTab("por_preparar")}
@@ -5039,13 +4680,6 @@ export function ViewTraslados({
                       <td className="py-3 text-right">
                         <div className="flex gap-1.5 justify-end font-sans">
                           
-                          <button
-                            onClick={() => setViewingDetailTransferId(t.id)}
-                            className="px-2 py-1 text-[10px] font-bold text-cyan-400 hover:text-white bg-[#0e2124] hover:bg-cyan-900/40 rounded border border-cyan-800/40 cursor-pointer transition-all font-sans"
-                          >
-                            Ver detalle
-                          </button>
-
                           {subFilterTab === "por_preparar" && t.status === "PENDING_DEPARTURE" && (
                             <>
                               <button
@@ -5083,23 +4717,15 @@ export function ViewTraslados({
           </div>
         </div>
       </div>
-
-
-
-      {/* DETAILED MANIFEST EDITING MODAL */}
       {editingTransferId && (
         (() => {
           const selectedTransferObj = transfers.find(t => t.id === editingTransferId);
           const requestObj = intercampRequests.find(r => r.id === selectedTransferObj?.requestId);
           const originCampName = getCampDisplayName(camps, requestObj?.originCampId);
           const destCampName = getCampDisplayName(camps, requestObj?.destinationCampId);
-
-          // Candidate workers belonging to provider camp (destinationCampId of request)
           const providerCampPeople = ROSTER_PEOPLE.filter(p => p.campId === requestObj?.destinationCampId);
           const candidateScouts = providerCampPeople.filter(p => p.role.toLowerCase().includes("scout") || p.name.toLowerCase().includes("scout"));
           const candidateAdditional = providerCampPeople;
-
-          // Helper to check if a person is in another active transfer
           const isPersonInOtherActiveTransfer = (pId: string) => {
             return transfers.some(t => {
               if (t.id === editingTransferId) return false;
@@ -5111,8 +4737,6 @@ export function ViewTraslados({
           return (
             <div className="fixed inset-0 z-50 bg-[#000505]/95 backdrop-blur-md flex items-center justify-center p-4">
               <div className="w-full max-w-md bg-[#0b1213] border border-[#67ACA9]/30 rounded-md p-5 flex flex-col gap-3.5 text-gray-100 max-h-[92vh] overflow-y-auto shadow-2xl relative font-sans text-xs">
-                
-                {/* Header */}
                 <div className="flex justify-between items-center border-b border-[#67ACA9]/20 pb-2.5">
                   <div className="flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
@@ -5128,8 +4752,6 @@ export function ViewTraslados({
                     ✕
                   </button>
                 </div>
-
-                {/* Transfer Info */}
                 <div className="bg-black/35 p-2.5 rounded border border-cyan-950 text-[11px] flex justify-between gap-2">
                   <div>
                     <span className="text-[#A4C2C5]/50 block uppercase text-[10px]">Identificador Convoy</span>
@@ -5140,8 +4762,6 @@ export function ViewTraslados({
                     <span className="font-bold text-cyan-300 uppercase block">{destCampName} ➔ {originCampName}</span>
                   </div>
                 </div>
-
-                {/* A) Personas Solicitadas por Oficio (Read-only) */}
                 <div className="bg-black/25 p-2.5 rounded border border-[#67ACA9]/10 flex flex-col gap-1.5 font-sans">
                   <span className="text-amber-400 font-extrabold uppercase tracking-wide text-[9px]">
                     A) Personal Solicitado en el Oficio (Demanda del Origen)
@@ -5161,8 +4781,6 @@ export function ViewTraslados({
                     )}
                   </div>
                 </div>
-
-                {/* B) Scout selection */}
                 <div className="flex flex-col gap-1 bg-black/25 p-2.5 rounded border border-[#67ACA9]/10">
                   <span className="text-emerald-400 font-extrabold uppercase tracking-wider text-[9px]">
                     B) Scout obligatorio (Conductor/Escolta Principal *)
@@ -5183,8 +4801,6 @@ export function ViewTraslados({
                     })}
                   </select>
                 </div>
-
-                {/* C) Additional workers checkboxes / list */}
                 <div className="flex flex-col gap-1 bg-black/25 p-2.5 rounded border border-[#67ACA9]/10">
                   <span className="text-blue-400 font-extrabold uppercase tracking-wider text-[9px]">
                     C) Otros operativos opcionales (Agregados por gusto)
@@ -5224,8 +4840,6 @@ export function ViewTraslados({
                     )}
                   </div>
                 </div>
-
-                {/* Validation Errors banner */}
                 {validationErrors.length > 0 && (
                   <div className="bg-rose-950/25 border border-rose-850/40 p-2.5 rounded text-[11px] text-rose-300">
                     <span className="font-bold uppercase tracking-wider block mb-1">Restricciones de Manifiesto Faltantes:</span>
@@ -5236,8 +4850,6 @@ export function ViewTraslados({
                     </ul>
                   </div>
                 )}
-
-                {/* Actions */}
                 <div className="flex justify-end gap-2 border-t border-cyan-950 pt-3">
                   <button
                     onClick={() => setEditingTransferId(null)}
@@ -5261,7 +4873,7 @@ export function ViewTraslados({
 
     </SectionShell>
   );
-}/* 8. RECURSOS DE EXPEDICIONES */
+}
 export function ViewRecursosExpediciones({
   resourceTypes,
   expeditionsResources,
@@ -5318,8 +4930,6 @@ export function ViewRecursosExpediciones({
     </SectionShell>
   );
 }
-
-/* 9. RECURSOS ENTREGADOS DE TRASLADO */
 export function ViewRecursosEntregados({
   transfers,
   resourceTypes,
@@ -5357,8 +4967,6 @@ export function ViewRecursosEntregados({
   return (
     <SectionShell kicker="VERIFICACIÓN COLECTIVA" title="Recursos Entregados y Discrepancias de Traslado">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        
-        {/* Form */}
         <form onSubmit={handleSave} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-3 rounded-sm lg:col-span-4 flex flex-col gap-3">
           <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-1">Registrar Control de Entrega</div>
 
@@ -5397,8 +5005,6 @@ export function ViewRecursosEntregados({
 
           <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>📊 Archivar Comprobante de Arribo</Btn>
         </form>
-
-        {/* List data */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
           <div className="text-xs font-bold text-emerald-400 uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-2">Comprobantes de Entrega en Destino</div>
 
@@ -5447,8 +5053,6 @@ export function ViewRecursosEntregados({
     </SectionShell>
   );
 }
-
-/* 10. INVENTARIO ACTUAL */
 export function ViewTiposDeRecurso({
   resourceTypes,
   campInventories,
@@ -5467,7 +5071,7 @@ export function ViewTiposDeRecurso({
   const [adjustMinVal, setAdjustMinVal] = useState("");
   const [successToastMsgs, setSuccessToastMsgs] = useState<string[]>([]);
 
-  const activeCampId = currentUser.campId; // 'alfa'
+  const activeCampId = currentUser.campId;
 
   const triggerSuccessAlert = (msg: string) => {
     setSuccessToastMsgs(prev => [...prev, msg]);
@@ -5502,8 +5106,6 @@ export function ViewTiposDeRecurso({
   return (
     <SectionShell kicker="CENTRAL DE OPERACIONES" title="Inventario actual de recursos">
       <div className="flex flex-col gap-5">
-        
-        {/* Floating Success Popups Container */}
         {successToastMsgs.length > 0 && (
           <div className="fixed bottom-5 right-5 z-[1000] flex flex-col gap-2 max-w-sm pointer-events-none">
             {successToastMsgs.map((msg, index) => (
@@ -5526,13 +5128,9 @@ export function ViewTiposDeRecurso({
             ))}
           </div>
         )}
-
-        {/* FILTERS & SEARCH BAR */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             <span className="text-[10px] font-mono text-[#69BFB7] uppercase tracking-[2px] font-bold">Filtros Tácticos:</span>
-            
-            {/* Local Search Input */}
             <input
               type="text"
               className="v-input py-1 px-2.5 text-xs w-full md:w-[220px]"
@@ -5540,8 +5138,6 @@ export function ViewTiposDeRecurso({
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
-
-            {/* Category Filter */}
             <select
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
@@ -5562,11 +5158,7 @@ export function ViewTiposDeRecurso({
             Recursos coincidentes: <strong className="text-white font-mono">{filteredTypes.length}</strong>
           </div>
         </div>
-
-        {/* LIST & DETAIL SPLIT GRID */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          
-          {/* Main Table */}
           <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
             <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 flex justify-between items-center">
               <span>Existencias en Campamento Activo</span>
@@ -5651,11 +5243,7 @@ export function ViewTiposDeRecurso({
               </table>
             </div>
           </div>
-
-          {/* Side Info Panel / Detail View */}
           <div className="lg:col-span-4 flex flex-col gap-4">
-            
-            {/* DETAIL CARD */}
             {detailResourceType && (
               <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col gap-3 relative animate-fadeIn">
                 <button
@@ -5668,8 +5256,6 @@ export function ViewTiposDeRecurso({
                 <h3 className="text-sm font-black text-white uppercase border-b border-[#67ACA9]/15 pb-1.5 mt-1">
                   {detailResourceType.name}
                 </h3>
-
-                {/* Inventory Snapshot */}
                 {(() => {
                   const { currentAmount, minimumAlertAmount, statusLabel, isCritical, isWarning } = getInventoryDetails(detailResourceType.id);
                   return (
@@ -5730,8 +5316,6 @@ export function ViewTiposDeRecurso({
                 </Btn>
               </div>
             )}
-
-            {/* ADJUST CARD */}
             {adjustResourceType && (
               <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col gap-3 relative animate-fadeIn">
                 <button
@@ -5744,8 +5328,6 @@ export function ViewTiposDeRecurso({
                 <h3 className="text-sm font-black text-white uppercase border-b border-[#67ACA9]/15 pb-1.5 mt-1">
                   {adjustResourceType.name}
                 </h3>
-
-                {/* Details snapshot */}
                 {(() => {
                   const { currentAmount } = getInventoryDetails(adjustResourceType.id);
                   return (
@@ -5759,8 +5341,6 @@ export function ViewTiposDeRecurso({
                     </div>
                   );
                 })()}
-
-                {/* Form to update the minimum */}
                 <div className="flex flex-col gap-2 font-mono text-xs">
                   <label className="flex flex-col gap-1">
                     <span className="text-zinc-500 text-[9px] uppercase">MÍNIMO REQUERIDO DE ALERTA:</span>
@@ -5793,8 +5373,6 @@ export function ViewTiposDeRecurso({
 
                         const { currentAmount } = getInventoryDetails(adjustResourceType.id);
                         onUpdateInventory(activeCampId, adjustResourceType.id, currentAmount, minNum);
-                        
-                        // Notify user with popup
                         triggerSuccessAlert(`Se modificó el mínimo de seguridad de "${adjustResourceType.name}" a ${minNum} ${adjustResourceType.unitOfMeasure} correctamente.`);
                         setAdjustResourceType(null);
                       }}
@@ -5820,8 +5398,6 @@ export function ViewTiposDeRecurso({
     </SectionShell>
   );
 }
-
-/* 11. CAMPAMENTOS */
 export function ViewCampamentos({
   camps
 }: {
@@ -5858,8 +5434,6 @@ export function ViewCampamentos({
     </SectionShell>
   );
 }
-
-/* 12. OFICIOS Y COBERTURA COLECTIVA */
 export function ViewOficiosCobertura({
   occupations,
   resourceTypes
@@ -5870,8 +5444,6 @@ export function ViewOficiosCobertura({
   return (
     <SectionShell kicker="DICCIONARIO OPERACIONAL DE CAMPAÑA" title="Glosario Oficial de Ocupaciones y Tipos de Recursos">
       <div className="flex flex-col gap-8">
-        
-        {/* TABLA 1: OCUPACIONES */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-5 rounded-sm flex flex-col gap-3">
           <div className="flex items-center justify-between border-b border-[#67ACA9]/20 pb-2.5">
             <div className="flex items-center gap-2">
@@ -5933,8 +5505,6 @@ export function ViewOficiosCobertura({
             </table>
           </div>
         </div>
-
-        {/* TABLA 2: RECURSOS */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-5 rounded-sm flex flex-col gap-3">
           <div className="flex items-center justify-between border-b border-[#67ACA9]/20 pb-2.5">
             <div className="flex items-center gap-2">
@@ -5987,8 +5557,6 @@ export function ViewOficiosCobertura({
     </SectionShell>
   );
 }
-
-/* 13. NOTIFICACIONES OPERACIONALES */
 export function ViewNotificaciones({
   camps,
   notifications,
@@ -6045,8 +5613,6 @@ export function ViewNotificaciones({
   return (
     <SectionShell kicker="MENSAJERÍA TÁCTICA" title="Notificaciones Operativas y Boletas de Guardia">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        
-        {/* Create notify */}
         <form onSubmit={handleSubmit} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-3 rounded-sm lg:col-span-4 flex flex-col gap-3">
           <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-1">Escribir Notificación de Red</div>
 
@@ -6122,8 +5688,6 @@ export function ViewNotificaciones({
 
           <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Trasmitir Notificación</Btn>
         </form>
-
-        {/* Existing notification items list */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
           <div className="text-xs font-bold text-amber-300 uppercase border-b border-[#67ACA9]/10 pb-1.5">Muro de Comunicados Actuales</div>
 
@@ -6161,8 +5725,6 @@ export function ViewNotificaciones({
     </SectionShell>
   );
 }
-
-/* 14. DETALLE DE RECURSOS SOLICITADOS */
 export function ViewDetalleRecursosSolicitados({
   intercampRequests,
   resourceTypes,
@@ -6232,8 +5794,6 @@ export function ViewDetalleRecursosSolicitados({
   return (
     <SectionShell kicker="CONTROL DETALLADO DE SUMINISTROS" title="Detalle de Recursos Solicitados">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        
-        {/* Adición de Detalles */}
         <form onSubmit={handleCreate} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-4 flex flex-col gap-3 h-fit">
           <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-1">Agregar Recurso a Solicitud</div>
 
@@ -6272,8 +5832,6 @@ export function ViewDetalleRecursosSolicitados({
 
           <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Agregar Recurso</Btn>
         </form>
-
-        {/* Lista de Detalles de recursos solicitados */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
           <div className="text-xs font-bold text-amber-300 uppercase border-b border-[#67ACA9]/10 pb-1.5">Lista de Suministros Pedidos</div>
 
@@ -6339,8 +5897,6 @@ export function ViewDetalleRecursosSolicitados({
     </SectionShell>
   );
 }
-
-/* 15. PERSONAS EN TRASLADO */
 export function ViewPersonasEnTraslado({
   transfers,
   transferPersons,
@@ -6405,8 +5961,6 @@ export function ViewPersonasEnTraslado({
   return (
     <SectionShell kicker="COORDINACIÓN DE PERSONAL DE RUTA" title="Personas vinculadas a Traslado">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        
-        {/* Vínculo de Personal */}
         <form onSubmit={handleCreate} className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-4 flex flex-col gap-3 h-fit">
           <div className="text-xs font-bold text-[#69BFB7] uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-1">Registrar Persona en Convoy</div>
 
@@ -6433,8 +5987,6 @@ export function ViewPersonasEnTraslado({
 
           <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Añadir Escolta de Convoy</Btn>
         </form>
-
-        {/* Lista de Personal en traslado */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
           <div className="text-xs font-bold text-amber-300 uppercase border-b border-[#67ACA9]/10 pb-1.5">Personal del Sindicato Asignado</div>
 
@@ -6513,8 +6065,6 @@ export function ViewPersonasEnTraslado({
     </SectionShell>
   );
 }
-
-/* 16. HISTORIAL DE TRASLADO */
 export function ViewHistorialDeTraslado({
   transfers,
   transferHistories,
@@ -6537,15 +6087,11 @@ export function ViewHistorialDeTraslado({
   const [filterType, setFilterType] = useState<"ALL" | "REQUESTS" | "TRANSFERS" | "PENDING" | "APPROVED" | "COMPLETED">("ALL");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedKeyId, setSelectedKeyId] = useState<string | null>(null);
-
-  // Form states for manual registration tool
   const [formTransferId, setFormTransferId] = useState("");
   const [previousStatus, setPreviousStatus] = useState<Transfer["status"]>("PENDING_DEPARTURE");
   const [newStatus, setNewStatus] = useState<Transfer["status"]>("COMPLETED");
   const [comment, setComment] = useState("");
   const [userId, setUserId] = useState("3");
-
-  // Load and merge unified data
   const unifiedItems: {
     keyId: string;
     type: "Solicitud" | "Traslado";
@@ -6559,8 +6105,6 @@ export function ViewHistorialDeTraslado({
     responsible: string;
     rawObject: any;
   }[] = [];
-
-  // 1. Process requests (excluding DRAFT)
   intercampRequests.filter(r => r.status !== "DRAFT").forEach(req => {
     unifiedItems.push({
       keyId: `req-${req.id}`,
@@ -6571,20 +6115,16 @@ export function ViewHistorialDeTraslado({
       status: req.status,
       plannedDepartureDate: req.plannedDepartureDate,
       plannedArrivalDate: req.plannedArrivalDate,
-      dateEvent: req.plannedDepartureDate, // Approximating date of response/incident
+      dateEvent: req.plannedDepartureDate,
       responsible: req.respondedBy || req.createdBy || "Sistema",
       rawObject: req
     });
   });
-
-  // 2. Process Transfers
   transfers.forEach(tr => {
     const assocReq = intercampRequests.find(r => r.id === tr.requestId);
     const origin = assocReq ? assocReq.originCampId : "Desc.";
     const dest = assocReq ? assocReq.destinationCampId : "Desc.";
     const resp = assocReq ? (assocReq.respondedBy || assocReq.createdBy) : "Sistema";
-
-    // Grab timestamp of last history entry or approximate it
     const hist = transferHistories.filter(h => h.transferId === tr.id);
     const lastHistDate = hist.length > 0 ? hist[hist.length - 1].date : "Planeado";
 
@@ -6602,16 +6142,12 @@ export function ViewHistorialDeTraslado({
       rawObject: tr
     });
   });
-
-  // Sort unified items descendingly by numeric representation
   unifiedItems.sort((a, b) => {
     const idA = parseInt(a.origId.replace(/\D/g, '')) || 0;
     const idB = parseInt(b.origId.replace(/\D/g, '')) || 0;
     if (idB !== idA) return idB - idA;
     return b.origId.localeCompare(a.origId);
   });
-
-  // Unique status badge mapping
   const getStatusDisplay = (status: string, type: "Solicitud" | "Traslado") => {
     if (type === "Solicitud") {
       switch (status) {
@@ -6630,10 +6166,7 @@ export function ViewHistorialDeTraslado({
       }
     }
   };
-
-  // Perform search and filter
   const filteredUnifiedItems = unifiedItems.filter(item => {
-    // Search
     const term = searchTerm.toLowerCase();
     const originCampName = getCampDisplayName(camps, item.originCampId);
     const destCampName = getCampDisplayName(camps, item.destinationCampId);
@@ -6647,8 +6180,6 @@ export function ViewHistorialDeTraslado({
       item.type.toLowerCase().includes(term);
 
     if (!matchesSearch) return false;
-
-    // Filters
     if (filterType === "ALL") return true;
     if (filterType === "REQUESTS") return item.type === "Solicitud";
     if (filterType === "TRANSFERS") return item.type === "Traslado";
@@ -6673,8 +6204,6 @@ export function ViewHistorialDeTraslado({
   }, [filterType, searchTerm]);
 
   const activeItem = filteredUnifiedItems.find(item => item.keyId === selectedKeyId) || paginatedUnifiedItems[0] || filteredUnifiedItems[0];
-
-  // Resolve matching request and optional transfers
   let activeRequest: IntercampRequest | null = null;
   let activeTransfer: Transfer | null = null;
 
@@ -6687,14 +6216,10 @@ export function ViewHistorialDeTraslado({
       activeRequest = intercampRequests.find(r => r.id === activeTransfer!.requestId) || null;
     }
   }
-
-  // Pre-fill log entry form based on currently selected Active Transfer
   useEffect(() => {
     if (activeTransfer) {
       setFormTransferId(activeTransfer.id);
       setPreviousStatus(activeTransfer.status);
-      
-      // Auto elect suitable next step
       if (activeTransfer.status === "PENDING_DEPARTURE") {
         setNewStatus("COMPLETED");
       } else {
@@ -6704,8 +6229,6 @@ export function ViewHistorialDeTraslado({
       setFormTransferId("");
     }
   }, [activeTransfer]);
-
-  // Form handle create log event
   const handleCreateLog = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTransferId || !previousStatus || !newStatus || !userId) {
@@ -6731,8 +6254,6 @@ export function ViewHistorialDeTraslado({
 
   return (
     <SectionShell kicker="CONTROL AUDITORÍA Y BITÁCORA" title="Historial Logístico">
-      
-      {/* ─── FILTERS AND SEARCH COMPONENT ─── */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 mb-5 bg-[#0d1414]/90 p-3 border border-[#67ACA9]/20 rounded-xs">
         <div className="flex flex-wrap gap-1.5">
           {([
@@ -6765,11 +6286,7 @@ export function ViewHistorialDeTraslado({
           className="bg-black/50 border border-[#67ACA9]/25 px-3 py-1.5 text-[10.5px] text-white focus:outline-none focus:border-cyan-400 placeholder-[#A4C2C5]/30 rounded-xs w-full md:w-72 font-mono"
         />
       </div>
-
-      {/* ─── SPLIT EXPLORER WORKSPACE ─── */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
-        
-        {/* LEFT COMPONENT: UNIFIED LEDGER TABLE */}
         <div className="xl:col-span-7 flex flex-col gap-3">
           <div className="mission-card border border-[#67ACA9]/25 bg-[#0d1414]/95 p-4 rounded-sm">
             <div className="text-[10px] font-black text-amber-300 uppercase tracking-widest border-b border-[#67ACA9]/10 pb-1.5 mb-3 flex justify-between items-center bg-black/10 px-2 py-1 rounded-sm">
@@ -6888,12 +6405,8 @@ export function ViewHistorialDeTraslado({
             )}
           </div>
         </div>
-
-        {/* RIGHT COMPONENT: COMPLETE EXPEDIENTE / DOSSIER COMPILATION PANEL */}
         <div className="xl:col-span-5 flex flex-col gap-4">
           <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/95 p-4 rounded-sm flex flex-col gap-4">
-            
-            {/* Header info */}
             <div className="border-b border-[#67ACA9]/15 pb-2.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[9.5px] font-mono tracking-wider text-[#69BFB7] font-extrabold uppercase">Expediente de Enlace Logístico</span>
@@ -6906,8 +6419,6 @@ export function ViewHistorialDeTraslado({
                 <span>EXPEDIENTE: {activeItem.type} #{activeItem.origId}</span>
               </h3>
             </div>
-
-            {/* SECTION 1: THE PRIMARY REQUEST DOSSIER */}
             {activeRequest ? (
               <div className="bg-black/35 border border-[#67ACA9]/10 p-3 rounded-xs flex flex-col gap-2.5">
                 <div className="flex items-center justify-between border-b border-[#67ACA9]/10 pb-1.5">
@@ -6950,8 +6461,6 @@ export function ViewHistorialDeTraslado({
                     </blockquote>
                   </div>
                 )}
-
-                {/* Suministros Pedidos */}
                 <div>
                   <span className="text-[9px] text-zinc-500 block font-mono mb-1">Recursos Planificados:</span>
                   <div className="flex flex-col gap-1 bg-[#0d1414]/90 p-2 border border-[#67ACA9]/10 rounded-xs">
@@ -6972,8 +6481,6 @@ export function ViewHistorialDeTraslado({
                     )}
                   </div>
                 </div>
-
-                {/* Escoltas */}
                 {activeRequest.personRequirements && activeRequest.personRequirements.length > 0 && (
                   <div>
                     <span className="text-[9px] text-zinc-500 block font-mono mb-1">Guarnición de Escolta:</span>
@@ -6997,8 +6504,6 @@ export function ViewHistorialDeTraslado({
                 Ninguna solicitud base hallada para este expediente.
               </div>
             )}
-
-            {/* SECTION 2: DERIVED EXECUTION / DISPATCHED TRANSFER */}
             {activeTransfer ? (
               <div className="bg-black/35 border border-amber-900/15 p-3 rounded-xs flex flex-col gap-2.5">
                 <div className="flex items-center justify-between border-b border-amber-500/10 pb-1.5">
@@ -7032,8 +6537,6 @@ export function ViewHistorialDeTraslado({
                     <span className="text-[#A4C2C5] font-mono leading-tight">{activeTransfer.plannedArrivalDate}</span>
                   </div>
                 </div>
-
-                {/* ─── SECTION 3: TRANSIT TIMELINE EVENTS ─── */}
                 <div className="border-t border-amber-500/10 pt-2 pb-1.5">
                   <h5 className="text-[9px] font-mono text-zinc-400 uppercase tracking-wider mb-2 flex items-center justify-between">
                     <span>3. Bitácora de Sucesos de Tránsito</span>
@@ -7057,8 +6560,6 @@ export function ViewHistorialDeTraslado({
                     )}
                   </div>
                 </div>
-
-                {/* FORM PANEL TO REGISTER STATUS EVENTS */}
                 <form onSubmit={handleCreateLog} className="border-t border-[#67ACA9]/20 pt-3 mt-2 flex flex-col gap-2 bg-black/25 p-2 rounded-xs">
                   <span className="text-[9.5px] font-black uppercase text-amber-400 block tracking-widest font-mono">Registrar Evento de Tránsito (Ruta)</span>
                   
@@ -7138,15 +6639,10 @@ export function ViewHistorialDeTraslado({
     </SectionShell>
   );
 }
-
-/* 17. VIEW PERSONAL DASHBOARD (DASHBOARD GLOBAL DE PERSONAL Y RECURSOS) */
 export function ViewPersonalDashboard({
   camps,
-  resourceTypes,
   campInventories,
-  inventoryAlerts,
   inventoryMovements,
-  notifications,
   occupationCoverages,
   onNavigateToSub
 }: {
@@ -7159,18 +6655,13 @@ export function ViewPersonalDashboard({
   occupationCoverages: OccupationCoverage[];
   onNavigateToSub: (sub: string) => void;
 }) {
-  const activeCampId = currentUser.campId; // 'alfa'
-  const campName = getCampDisplayName(camps, activeCampId);
-
-  // --- REFRESH STATE ---
+  const activeCampId = currentUser.campId;
   const [isRefreshing, setIsRefreshing] = useState(false);
   const triggerRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => setIsRefreshing(false), 800);
   };
-
-  // --- LOCAL MUTABLE STATS FOR LIVELY INTERACTIVITY ---
-  const [localExpeditions, setLocalExpeditions] = useState({
+  const [localExpeditions] = useState({
     PLANNED: 2,
     IN_PROGRESS: 1,
     DELAYED: 0,
@@ -7181,31 +6672,12 @@ export function ViewPersonalDashboard({
 
   const [simulatedEfectivos, setSimulatedEfectivos] = useState(0);
 
-  const handleSimulateMission = () => {
-    if (localExpeditions.PLANNED > 0) {
-      setLocalExpeditions(prev => ({
-        ...prev,
-        PLANNED: prev.PLANNED - 1,
-        IN_PROGRESS: prev.IN_PROGRESS + 1
-      }));
-    } else {
-      setLocalExpeditions(prev => ({
-        ...prev,
-        PLANNED: prev.PLANNED + 1
-      }));
-    }
-  };
-
   const handleAddSpecialistLocal = () => {
     setSimulatedEfectivos(prev => prev + 1);
   };
-
-  // --- CALCULATE DYNAMIC VALUES WITH SYSTEM FALLBACKS ---
   const baseGarrisonCount = camps.find(c => c.id === activeCampId)?.personnelCount || 35;
   const totalGarrison = baseGarrisonCount + simulatedEfectivos;
   const criticalStockCount = campInventories.filter(ci => ci.campId === activeCampId && ci.currentAmount <= ci.minimumAlertAmount).length;
-  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
-
   const activeAlphaCoverages = occupationCoverages.filter(cov => cov.campId === activeCampId);
   const totalRequired = activeAlphaCoverages.reduce((sum, cov) => sum + cov.required, 0) || 14;
   const totalActive = activeAlphaCoverages.reduce((sum, cov) => sum + cov.active, 0) + simulatedEfectivos;
@@ -7217,8 +6689,6 @@ export function ViewPersonalDashboard({
     { name: "Conductores", value: 3 },
     { name: "Médicos", value: 1 }
   ];
-
-  // --- 7 DAYS CONSUMPTION TREND CONFIGURATION FOR CHART ---
   const consumptionMovements = inventoryMovements.filter(m => 
     m.campId === activeCampId && 
     ["DAILY_RATION", "EXPEDITION_DEPARTURE", "TRANSFER_SENT"].includes(m.movementType)
@@ -7243,8 +6713,7 @@ export function ViewPersonalDashboard({
   }, {} as Record<string, number>);
 
   const trendData = defaultDates.map(date => {
-    const formattedLabel = date.split("-").slice(1).reverse().join("/"); // e.g. "24/05"
-    // Use the dynamic consumption or simulate realistic tactical values if it lists 0
+    const formattedLabel = date.split("-").slice(1).reverse().join("/");
     const realVal = consumptionTrendMap[date] || 0;
     return {
       date: formattedLabel,
@@ -7257,12 +6726,9 @@ export function ViewPersonalDashboard({
       
       <div className="flex justify-between items-center mb-1">
         <h2 className="text-sm font-black tracking-widest text-[#69BFB7] uppercase">Gobernanza y Personal Base</h2>
-        <Btn onClick={triggerRefresh}>Sincronizar personal</Btn>
+        <Btn onClick={triggerRefresh}>{isRefreshing ? "Sincronizando..." : "Sincronizar personal"}</Btn>
       </div>
-
-      {/* ─── KPI BENTO-CARD GRID ─── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 text-xs">
-        {/* Card 1: Garrison / Efectivos */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between min-h-[140px]">
           <div>
             <div className="text-[10px] font-mono text-[#69BFB7] uppercase font-bold tracking-wider mb-2">
@@ -7284,8 +6750,6 @@ export function ViewPersonalDashboard({
             AÑADIR REFUERZO LOCAL
           </button>
         </div>
-
-        {/* Card 2: Suministros Críticos */}
         <div className="mission-card border border-[#ba3838]/40 bg-red-950/10 p-4 rounded-sm flex flex-col justify-between min-h-[140px]">
           <div>
             <div className="text-[10px] font-mono text-crimson uppercase font-bold tracking-wider mb-2">
@@ -7307,8 +6771,6 @@ export function ViewPersonalDashboard({
             REVISAR ALMACENES →
           </button>
         </div>
-
-        {/* Card 3: Distribución de Especialistas */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between min-h-[140px]">
           <div>
             <div className="text-[9.5px] font-mono text-[#69BFB7] uppercase font-bold tracking-wider mb-1 flex justify-between items-center">
@@ -7340,8 +6802,6 @@ export function ViewPersonalDashboard({
                 <span className="text-[10px] font-black text-white">{SPECIALISTS_PIE_DATA.reduce((sum, item) => sum + item.value, 0)}</span>
               </div>
             </div>
-
-            {/* Micro legend */}
             <div className="flex flex-wrap gap-x-1.5 justify-center text-[7.5px] font-mono leading-none mt-1">
               {SPECIALISTS_PIE_DATA.map((entry, index) => (
                 <div key={entry.name} className="flex items-center gap-0.5 whitespace-nowrap">
@@ -7353,8 +6813,6 @@ export function ViewPersonalDashboard({
             </div>
           </div>
         </div>
-
-        {/* Card 4: Deployment Efficiency */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between min-h-[140px]">
           <div>
             <div className="text-[10px] font-mono text-[#69BFB7] uppercase font-bold tracking-wider mb-2">
@@ -7377,11 +6835,7 @@ export function ViewPersonalDashboard({
           </button>
         </div>
       </div>
-
-      {/* ─── DOCK DOUBLE COLUMN ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
-        
-        {/* LEFT COLUMN: DIGITAL EXPEDITIONS PANEL */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-6 flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-center border-b border-[#67ACA9]/10 pb-2 mb-3">
@@ -7420,8 +6874,6 @@ export function ViewPersonalDashboard({
             </div>
           </div>
         </div>
-
-        {/* RIGHT COLUMN: RECHARTS CONSUMPTION TRENDS */}
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-6 flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-center border-b border-[#67ACA9]/10 pb-2 mb-3">
@@ -7452,8 +6904,6 @@ export function ViewPersonalDashboard({
           </div>
         </div>
       </div>
-
-      {/* ─── GUARDIANS / SPECIALIST DETAILS TABLE ─── */}
       <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm">
         <div className="flex justify-between items-center border-b border-[#67ACA9]/10 pb-3 mb-4 flex-wrap gap-2">
           <div>

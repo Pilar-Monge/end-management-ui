@@ -14,7 +14,6 @@ import type {
   Transfer,
   TransferPerson,
   TransferHistory,
-  ExpeditionResource,
   DeliveredTransferResource,
   Occupation,
   OccupationCoverage,
@@ -30,7 +29,6 @@ import {
   INITIAL_REQUEST_RESOURCE_DETAILS,
   INITIAL_TRANSFERS,
   INITIAL_TRANSFER_PERSONS,
-  INITIAL_EXPEDITIONS_RESOURCES,
   INITIAL_DELIVERED_TRANSFER_RESOURCES,
   INITIAL_OCCUPATIONS,
   INITIAL_OCCUPATION_COVERAGES,
@@ -156,6 +154,11 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     return () => clearInterval(syncInterval);
   }, []);
 
+  const getCurrentServerTime = () => {
+    const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
+    return new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs);
+  };
+
 
   const [resourceTypes, setResourceTypesState] = useState<ResourceType[]>(INITIAL_RESOURCE_TYPES);
   const [campInventories, setCampInventories] = useState<CampInventory[]>([]);
@@ -164,10 +167,8 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   const [inventoryAlerts, setInventoryAlerts] = useState<InventoryAlert[]>(INITIAL_ALERTS);
   const [intercampRequests, setIntercampRequests] = useState<IntercampRequest[]>(INITIAL_INTERCAMP_REQUESTS);
   const [requestResourceDetails, setRequestResourceDetails] = useState<RequestResourceDetail[]>(INITIAL_REQUEST_RESOURCE_DETAILS);
-  const [requestPersonDetails, setRequestPersonDetails] = useState<RequestPersonDetail[]>([]);
   const [transfers, setTransfers] = useState<Transfer[]>(INITIAL_TRANSFERS);
   const [transferPersons, setTransferPersons] = useState<TransferPerson[]>(INITIAL_TRANSFER_PERSONS);
-  const [expeditionsResources, setExpeditionsResources] = useState<ExpeditionResource[]>(INITIAL_EXPEDITIONS_RESOURCES);
   const [deliveredTransferResources, setDeliveredTransferResources] = useState<DeliveredTransferResource[]>(INITIAL_DELIVERED_TRANSFER_RESOURCES);
   const [occupations, setOccupationsState] = useState<Occupation[]>(INITIAL_OCCUPATIONS);
   const [occupationCoverages, setOccupationCoverages] = useState<OccupationCoverage[]>(INITIAL_OCCUPATION_COVERAGES);
@@ -203,11 +204,9 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       resourceApi.listInventoryAlerts(),
       resourceApi.listIntercampRequests(),
       resourceApi.listRequestResourceDetails(),
-      resourceApi.listRequestPersonDetails(),
       resourceApi.listTransfers(),
       resourceApi.listTransferPersons(),
       resourceApi.listTransferHistory(),
-      resourceApi.listExpeditionResources(),
       resourceApi.listDeliveredTransferResources(),
       resourceApi.listOccupationCoverage(),
       resourceApi.listNotifications(),
@@ -224,11 +223,9 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       alertsResult,
       requestsResult,
       detailsResult,
-      personDetailsResult,
       transfersResult,
       transferPersonsResult,
       transferHistoryResult,
-      expeditionResourcesResult,
       deliveredResourcesResult,
       coverageResult,
       notificationsResult,
@@ -244,11 +241,9 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     if (alertsResult.status === "fulfilled") applyList(alertsResult.value, setInventoryAlerts);
     if (requestsResult.status === "fulfilled") applyList(requestsResult.value, setIntercampRequests);
     if (detailsResult.status === "fulfilled") applyList(detailsResult.value, setRequestResourceDetails);
-    if (personDetailsResult.status === "fulfilled") setRequestPersonDetails(personDetailsResult.value);
     if (transfersResult.status === "fulfilled") applyList(transfersResult.value, setTransfers);
     if (transferPersonsResult.status === "fulfilled") applyList(transferPersonsResult.value, setTransferPersons);
     if (transferHistoryResult.status === "fulfilled") applyList(transferHistoryResult.value, setTransferHistories);
-    if (expeditionResourcesResult.status === "fulfilled") applyList(expeditionResourcesResult.value, setExpeditionsResources);
     if (deliveredResourcesResult.status === "fulfilled") applyList(deliveredResourcesResult.value, setDeliveredTransferResources);
     if (coverageResult.status === "fulfilled") applyList(coverageResult.value, setOccupationCoverages);
     if (notificationsResult.status === "fulfilled") applyList(notificationsResult.value, setNotifications);
@@ -398,25 +393,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     );
   };
 
-  const handleResolveAlert = async (id: string, resolvedBy: string) => {
-    try {
-      await resourceApi.resolveInventoryAlert(id, resolvedBy);
-      await fetchAllSystemData();
-      return;
-    } catch (error) {
-      console.warn("Could not resolve inventory alert.", error);
-      alert("No se pudo resolver la alerta en la API. Se marcará solo en pantalla.");
-    }
-
-    setInventoryAlerts(prev =>
-      prev.map(a =>
-        a.id === id
-          ? { ...a, resolved: true, resolutionDate: new Date().toLocaleTimeString("es-ES") + " UTC", resolvedBy }
-          : a
-      )
-    );
-  };
-
   const handleAddRequest = async (data: Omit<IntercampRequest, "id">): Promise<string | null> => {
     try {
       const created = await resourceApi.createIntercampRequest(data);
@@ -491,24 +467,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       showRequestError("No se pudo agregar el detalle de persona en la API.", error);
     }
 
-    const record: RequestPersonDetail = {
-      ...detail,
-      id: `pdet-${Date.now().toString().slice(-4)}`,
-    };
-    setRequestPersonDetails(prev => [...prev, record]);
-  };
-
-  const handleDeleteRequestPerson = async (id: string) => {
-    try {
-      await resourceApi.deleteRequestPersonDetail(id);
-      await fetchAllSystemData();
-      return;
-    } catch (error) {
-      console.warn("Could not delete request person detail.", error);
-      alert("No se pudo eliminar el detalle de persona en la API. Se quitará solo en pantalla.");
-    }
-
-    setRequestPersonDetails(prev => prev.filter(d => d.id !== id));
   };
 
   const handleDeleteRequestResource = async (id: string) => {
@@ -630,20 +588,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     );
   };
 
-  const handleSaveExpeditionResource = async (data: Omit<ExpeditionResource, "id">) => {
-    try {
-      await resourceApi.createExpeditionResource(data);
-      await fetchAllSystemData();
-      return;
-    } catch (error) {
-      console.warn("Could not save expedition resource.", error);
-      alert("No se pudo guardar el recurso de expedición en la API. Se agregará solo en pantalla.");
-    }
-
-    const record: ExpeditionResource = { ...data, id: `er-${Date.now().toString().slice(-4)}` };
-    setExpeditionsResources(prev => [...prev, record]);
-  };
-
   const handleSaveDelivery = async (data: Omit<DeliveredTransferResource, "id">) => {
     try {
       await resourceApi.createDeliveredTransferResource(data);
@@ -656,16 +600,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
 
     const record: DeliveredTransferResource = { ...data, id: `dl-${Date.now().toString().slice(-4)}` };
     setDeliveredTransferResources(prev => [...prev, record]);
-  };
-
-  const handleAutoAssign = (campId: string, occupationId: string) => {
-    setOccupationCoverages(prev =>
-      prev.map(cov =>
-        cov.campId === campId && cov.occupationId === occupationId
-          ? { ...cov, active: cov.active + 1 }
-          : cov
-      )
-    );
   };
 
   const handleAddNotification = async (data: Omit<OperationalNotification, "id">) => {
@@ -760,7 +694,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             onAddRequest={handleAddRequest}
             onAddNotification={handleAddNotification}
             onMarkAsRead={handleMarkAsRead}
-            onResolveAlert={handleResolveAlert}
             onUpdateInventory={handleUpdateInventory}
             onNavigateToSub={handleInnerNavigation}
           />
@@ -811,7 +744,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             inventoryAlerts={inventoryAlerts}
             campInventories={campInventories}
             inventoryMovements={inventoryMovements}
-            onResolveAlert={handleResolveAlert}
             onNavigateToSub={handleInnerNavigation}
           />
         );
@@ -839,6 +771,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             transferPersons={transferPersons}
             setTransferPersons={setTransferPersons}
             transferHistories={transferHistories}
+            serverNow={getCurrentServerTime()}
           />
         );
       case "Traslados":
@@ -943,19 +876,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     }
   };
 
-
-  const adapterMapResources = campInventories.map((ci, index) => {
-    const rt = resourceTypes.find(t => t.id === ci.resourceTypeId);
-    return {
-      id: `${ci.campId}-${ci.resourceTypeId}`,
-      category: (rt ? rt.name : ci.resourceTypeId) as any,
-      depot: (camps.find(c => c.id === ci.campId)?.name || ci.campId) as any,
-      amount: ci.currentAmount,
-      unit: rt ? rt.unitOfMeasure : "u",
-      threshold: ci.minimumAlertAmount
-    };
-  });
-
   return (
     <div className="game-screen-layout text-[#A4C2C5]">
       <div className="holo-grid" />
@@ -978,7 +898,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       {hasEntered && (
         <TopHud 
           onLogout={handleLogout} 
-          activeNav={activeNav} 
           onVolver={() => {
             if (activeNav) {
               handleNavClick("mapa");
@@ -1102,12 +1021,10 @@ function getStoredHudUser() {
 
 const TopHud = memo(function TopHud({ 
   onLogout, 
-  activeNav, 
   onVolver,
   globalTimeState
 }: { 
   onLogout: () => void; 
-  activeNav: string | null; 
   onVolver: () => void;
   globalTimeState: {
     baseServerTime: Date;
@@ -1273,14 +1190,6 @@ function BottomDock({ activeDock, onSelect }: { activeDock: string; onSelect: (i
   );
 }
 
-function SupportLink() {
-  return (
-    <button className="support-link" type="button">
-      <span className="btn-text"><span>?</span> ROBUST</span>
-    </button>
-  );
-}
-
 function SettingsHint() {
   return null;
 }
@@ -1331,20 +1240,6 @@ function TruckIcon() {
       <circle cx="8" cy="22" r="3" />
       <circle cx="20" cy="22" r="3" />
     </IconSvg>
-  );
-}
-
-function GearIcon() {
-  return (
-    <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
-      <path
-        d="M12 8.2A3.8 3.8 0 1 0 12 15.8 3.8 3.8 0 0 0 12 8.2Zm8.5 4.6v-1.6l-2.3-.8a6.8 6.8 0 0 0-.7-1.6l1-2.2-1.1-1.1-2.2 1a7 7 0 0 0-1.6-.7L12.8 3h-1.6l-.8 2.3a7 7 0 0 0-1.6.7l-2.2-1-1.1 1.1 1 2.2a6.8 6.8 0 0 0-.7 1.6l-2.3.8v1.6l2.3.8c.2.6.4 1.1.7 1.6l-1 2.2 1.1 1.1 2.2-1c.5.3 1 .5 1.6.7l.8 2.3h1.6l.8-2.3c.6-.2 1.1-.4 1.6-.7l2.2 1 1.1-1.1-1-2.2c.3-.5.5-1 .7-1.6l2.3-.8Z"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    </svg>
   );
 }
 
