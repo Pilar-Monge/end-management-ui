@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { 
   Clock, 
@@ -1555,7 +1555,7 @@ export function ViewDashboard({
                 <tbody>
                   {paginatedRecoleccion.map(c => {
                     const rt = resourceTypes.find(t => t.id === c.resourceTypeId);
-                    const diff = c.actualAmount - c.expectedAmount;
+                    const diff = Number(c.actualAmount) - Number(c.expectedAmount);
                     
                     return (
                       <tr key={c.id} className="hover:bg-white/5 transition-colors">
@@ -2076,8 +2076,8 @@ export function ViewRecoleccionDiaria({
 
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
-    const matchesRecordId = record.id.toLowerCase().includes(term);
-    const matchesPersonId = record.personId.toLowerCase().includes(term);
+    const matchesRecordId = String(record.id).toLowerCase().includes(term);
+    const matchesPersonId = String(record.personId).toLowerCase().includes(term);
     const personObj = campPersonnel.find(p => p.id === record.personId);
     const matchesPersonName = personObj ? personObj.name.toLowerCase().includes(term) : false;
     const rtObj = resourceTypes.find(rt => rt.id === record.resourceTypeId);
@@ -2086,8 +2086,8 @@ export function ViewRecoleccionDiaria({
 
     return matchesRecordId || matchesPersonId || matchesPersonName || matchesResourceName || matchesDate;
   });
-  const totalExpected = joinedAndFilteredRecords.reduce((sum, r) => sum + r.expectedAmount, 0);
-  const totalActual = joinedAndFilteredRecords.reduce((sum, r) => sum + r.actualAmount, 0);
+  const totalExpected = joinedAndFilteredRecords.reduce((sum, r) => sum + Number(r.expectedAmount), 0);
+  const totalActual = joinedAndFilteredRecords.reduce((sum, r) => sum + Number(r.actualAmount), 0);
   const netDiscrepancy = totalActual - totalExpected;
   const handleCreateRecord = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2163,7 +2163,7 @@ export function ViewRecoleccionDiaria({
       triggerToast("La cantidad real debe ser un número decimal >= 0.", "warning");
       return;
     }
-    if (newVal < record.expectedAmount && !adjustReason.trim()) {
+    if (newVal < Number(record.expectedAmount) && !adjustReason.trim()) {
       triggerToast("Para un ajuste por incumplimiento (menor a lo esperado), la justificación es obligatoria.", "warning");
       return;
     }
@@ -2405,10 +2405,10 @@ export function ViewRecoleccionDiaria({
                       const personObj = campPersonnel.find(p => p.id === record.personId);
                       const resourceObj = resourceTypes.find(rt => rt.id === record.resourceTypeId);
                       
-                      const diff = record.actualAmount - record.expectedAmount;
-                      const disc = getDiscrepancyStyle(record.expectedAmount, record.actualAmount);
+                      const diff = Number(record.actualAmount) - Number(record.expectedAmount);
+                      const disc = getDiscrepancyStyle(Number(record.expectedAmount), Number(record.actualAmount));
                       
-                      const personStatusProps = getPersonStatusBadge(record.personId);
+                      const personStatusProps = getPersonStatusBadge(String(record.personId));
                       const personIsActive = personObj?.status === "ACTIVE";
 
                       return (
@@ -2425,10 +2425,10 @@ export function ViewRecoleccionDiaria({
                           </td>
                           <td className="font-mono text-[10px] text-[#A4C2C5]/80">{record.date}</td>
                           <td className="text-right font-mono text-[#A4C2C5]/80 text-[11px]">
-                            {record.expectedAmount.toFixed(2)}
+                            {Number(record.expectedAmount).toFixed(2)}
                           </td>
                           <td className="text-right font-mono font-bold text-white text-[11px]">
-                            {record.actualAmount.toFixed(2)}
+                            {Number(record.actualAmount).toFixed(2)}
                           </td>
                           <td className={`text-right font-mono font-extrabold ${disc.text}`}>
                             {diff > 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2)}
@@ -2448,9 +2448,9 @@ export function ViewRecoleccionDiaria({
                                 small 
                                 variant="warning" 
                                 onClick={() => {
-                                  setAdjustingId(record.id);
+                                  setAdjustingId(String(record.id));
                                   setAdjustVal(record.actualAmount.toString());
-                                  setAdjustReason(record.differenceReason);
+                                  setAdjustReason(record.differenceReason || "");
                                 }}
                               >
                                 Ajustar recolección
@@ -2520,18 +2520,18 @@ export function ViewRecoleccionDiaria({
                 <div className="grid grid-cols-2 gap-3 bg-zinc-950/20 p-2 border border-zinc-850 rounded-xs mb-3 text-center text-[10.5px] font-mono">
                   <div>
                     <span className="text-zinc-500 block uppercase">Proyección Esperada</span>
-                    <span className="text-zinc-200 font-extrabold">{currentRecord.expectedAmount.toFixed(2)} {resourceObj?.unitOfMeasure}</span>
+                    <span className="text-zinc-200 font-extrabold">{Number(currentRecord.expectedAmount).toFixed(2)} {resourceObj?.unitOfMeasure}</span>
                   </div>
                   <div>
                     <span className="text-zinc-500 block uppercase">Registrado Anterior</span>
-                    <span className="text-amber-400 font-extrabold">{currentRecord.actualAmount.toFixed(2)} {resourceObj?.unitOfMeasure}</span>
+                    <span className="text-amber-400 font-extrabold">{Number(currentRecord.actualAmount).toFixed(2)} {resourceObj?.unitOfMeasure}</span>
                   </div>
                 </div>
                 {adjustVal !== "" && !isNaN(Number(adjustVal)) && (
                   <div className="p-2 border border-blue-500/25 bg-blue-950/10 rounded-xs mb-3 text-[10px] font-mono text-blue-200">
                     <span className="font-extrabold uppercase block mb-0.5">ANÁLISIS DE IMPACTO DE INVENTARIO ACTUAL</span>
                     El ajuste de {Number(adjustVal).toFixed(2)} produce una variación de {" "}
-                    <strong>{(Number(adjustVal) - currentRecord.actualAmount).toFixed(2)} {resourceObj?.unitOfMeasure}</strong>. {" "}
+                    <strong>{(Number(adjustVal) - Number(currentRecord.actualAmount)).toFixed(2)} {resourceObj?.unitOfMeasure}</strong>. {" "}
                     El stock total de <strong>{resourceObj?.name}</strong> se verá modificado correspondientemente en Almacén.
                   </div>
                 )}
@@ -3158,9 +3158,27 @@ export function ViewSolicitudesIntercampamento({
   const [validationPopup, setValidationPopup] = useState<string | null>(null);
 
   const selectedOperPersonIds = [assignedScoutId, ...additionalPersonIds].filter(Boolean);
+  const availableCamps = camps && camps.length > 1 ? camps : [
+    { id: "1", name: "Alpha Bunker" },
+    { id: "2", name: "Sierra Base" },
+    { id: "3", name: "Delta Refuge" },
+    { id: "4", name: "Omega Fortress" },
+    { id: "5", name: "Echo Outpost" }
+  ];
+
   const [originCampId, setOriginCampId] = useState(currentUser.campId);
-  const [destinationCampId, setDestinationCampId] = useState(() => camps.find(camp => camp.id !== currentUser.campId)?.id || "2");
+  const [destinationCampId, setDestinationCampId] = useState(() => availableCamps.find(camp => String(camp.id) !== String(currentUser.campId))?.id || "2");
   const [description, setDescription] = useState("");
+
+  useEffect(() => {
+    if (availableCamps.length > 0 && String(destinationCampId) === String(currentUser.campId)) {
+      const firstValidCamp = availableCamps.find(camp => String(camp.id) !== String(currentUser.campId));
+      if (firstValidCamp) {
+        setDestinationCampId(String(firstValidCamp.id));
+      }
+    }
+  }, [availableCamps, currentUser.campId, destinationCampId]);
+
   const [plannedDepartureDate, setPlannedDepartureDate] = useState(() => new Date((serverNow ?? new Date()).getTime() + 60 * 60 * 1000).toISOString());
   const [plannedArrivalDate, setPlannedArrivalDate] = useState(() => new Date((serverNow ?? new Date()).getTime() + 25 * 60 * 60 * 1000).toISOString());
 
@@ -3474,19 +3492,19 @@ export function ViewSolicitudesIntercampamento({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <label className="v-field flex flex-col gap-1.5">
-                      <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Campamento Proveedor *</span>
-                      <select value={originCampId} onChange={e => setOriginCampId(e.target.value)} className="v-select">
-                        {camps.map(c => (
-                          <option key={c.id} value={c.id}>{c.name} {c.id === currentUser.campId ? "(Propio)" : ""}</option>
+                      <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Campamento Origen *</span>
+                      <select value={originCampId} disabled className="v-select bg-black/25 text-[#A4C2C5]/60 cursor-not-allowed">
+                        {availableCamps.filter(c => String(c.id) === String(currentUser.campId)).map(c => (
+                          <option key={c.id} value={c.id}>{c.name} (Propio)</option>
                         ))}
                       </select>
                     </label>
 
                     <label className="v-field flex flex-col gap-1.5">
-                      <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Campamento Destino (Recibe) *</span>
+                      <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Campamento Destino *</span>
                       <select value={destinationCampId} onChange={e => setDestinationCampId(e.target.value)} className="v-select">
-                        {camps.map(c => (
-                          <option key={c.id} value={c.id}>{c.name} {c.id === currentUser.campId ? "(Propio)" : ""}</option>
+                        {availableCamps.filter(c => String(c.id) !== String(currentUser.campId)).map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
                       </select>
                     </label>
@@ -5181,7 +5199,7 @@ export function ViewTiposDeRecurso({
                 </thead>
                 <tbody>
                   {filteredTypes.map(rt => {
-                    const { currentAmount, minimumAlertAmount, statusLabel, isCritical, isWarning } = getInventoryDetails(rt.id);
+                    const { currentAmount, minimumAlertAmount, statusLabel, isCritical, isWarning } = getInventoryDetails(String(rt.id));
                     return (
                       <tr key={rt.id} className="hover:bg-cyan-950/10">
                         <td className="font-mono text-white text-[9px]">{rt.id}</td>
@@ -5257,7 +5275,7 @@ export function ViewTiposDeRecurso({
                   {detailResourceType.name}
                 </h3>
                 {(() => {
-                  const { currentAmount, minimumAlertAmount, statusLabel, isCritical, isWarning } = getInventoryDetails(detailResourceType.id);
+                  const { currentAmount, minimumAlertAmount, statusLabel, isCritical, isWarning } = getInventoryDetails(String(detailResourceType.id));
                   return (
                     <div className="bg-[#0b1212] border border-[#67ACA9]/15 p-2.5 rounded-sm flex flex-col gap-2 font-mono text-[10px]">
                       <div className="text-[9px] text-[#69BFB7]/70 uppercase tracking-wider font-bold">Estado del recurso</div>
@@ -5329,7 +5347,7 @@ export function ViewTiposDeRecurso({
                   {adjustResourceType.name}
                 </h3>
                 {(() => {
-                  const { currentAmount } = getInventoryDetails(adjustResourceType.id);
+                  const { currentAmount } = getInventoryDetails(String(adjustResourceType.id));
                   return (
                     <div className="bg-black/35 p-2.5 rounded-sm border border-[#67ACA9]/10 text-xs text-[#A4C2C5]/90 leading-relaxed font-mono">
                       <div className="flex justify-between items-center mb-1">
@@ -5371,8 +5389,8 @@ export function ViewTiposDeRecurso({
                           return;
                         }
 
-                        const { currentAmount } = getInventoryDetails(adjustResourceType.id);
-                        onUpdateInventory(activeCampId, adjustResourceType.id, currentAmount, minNum);
+                        const { currentAmount } = getInventoryDetails(String(adjustResourceType.id));
+                        onUpdateInventory(activeCampId, String(adjustResourceType.id), currentAmount, minNum);
                         triggerSuccessAlert(`Se modificó el mínimo de seguridad de "${adjustResourceType.name}" a ${minNum} ${adjustResourceType.unitOfMeasure} correctamente.`);
                         setAdjustResourceType(null);
                       }}
@@ -5619,7 +5637,7 @@ export function ViewNotificaciones({
           <div className="flex flex-col gap-1 text-xs">
             <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Campamento Origen (Emisor)</span>
             <span className="v-input bg-black/20 text-[#69BFB7] border border-[#67ACA9]/10 select-none flex items-center px-2 py-1.5 h-[34px] font-bold rounded-sm">
-              Base Alfa (Propio)
+              {camps.find(c => String(c.id) === String(campId))?.name || `Campamento ${campId}`} (Propio)
             </span>
           </div>
 
@@ -5686,7 +5704,7 @@ export function ViewNotificaciones({
             <textarea value={message} onChange={e => setMessage(e.target.value)} className="v-input min-h-12" placeholder="Escribir detalles del envío o anomalías..." />
           </label>
 
-          <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Trasmitir Notificación</Btn>
+          <Btn type="submit" variant="primary" style={{ width: "100%", padding: "8px" }}>Transmitir Notificación</Btn>
         </form>
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
           <div className="text-xs font-bold text-amber-300 uppercase border-b border-[#67ACA9]/10 pb-1.5">Muro de Comunicados Actuales</div>
