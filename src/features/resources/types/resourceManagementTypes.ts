@@ -1,4 +1,4 @@
-﻿
+
 export interface Camp {
   id: string;
   name: string;
@@ -122,6 +122,7 @@ export interface CampPerson {
   campId: string;
   status: "ACTIVE" | "SICK" | "INJURED" | "OUTSIDE_CAMP" | "ON_EXPEDITION" | string;
   occupationId: string;
+  role?: string;
 }
 
 export interface TransferHistory {
