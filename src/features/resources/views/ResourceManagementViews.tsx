@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { 
-  Clock, 
-  AlertTriangle, 
-  CheckCircle2, 
-  ShieldAlert, 
-  Package, 
-  ArrowRightLeft, 
+import {
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  ShieldAlert,
+  Package,
+  ArrowRightLeft,
   AlertCircle,
   Trash2,
   Plus,
@@ -79,7 +79,7 @@ function readStoredCurrentUser() {
         campId = String(parsedCampId);
         break;
       }
-    } catch {}
+    } catch { }
   }
 
   if (selectedCampIdRaw && selectedCampIdRaw.trim()) {
@@ -150,7 +150,12 @@ function getResourceTypeUnit(resourceTypes: ResourceType[], resourceTypeId?: str
 }
 
 export const currentUser = {
-  ...readStoredCurrentUser(),
+  get userId() {
+    return readStoredCurrentUser().userId;
+  },
+  get campId() {
+    return readStoredCurrentUser().campId;
+  },
   rol: "RESOURCE_MANAGEMENT" as const
 };
 
@@ -171,8 +176,8 @@ export function Btn({
   disabled?: boolean;
   type?: "button" | "submit" | "reset";
 }) {
-  const base = small 
-    ? "px-1.5 py-0.5 text-[10px]" 
+  const base = small
+    ? "px-1.5 py-0.5 text-[10px]"
     : "px-3 py-1.5 text-[11.5px] lg:text-[13px]";
   const colors = {
     primary: "bg-[#67ACA9] text-white hover:bg-[#69BFB7]",
@@ -220,9 +225,9 @@ export function StatusIndicator({ status }: { status: "EXCELENTE" | "ESTABLE" | 
   );
 }
 
-export function DateTimeField({ 
-  label, 
-  required, 
+export function DateTimeField({
+  label,
+  required,
   value = "",
   onChange,
   minDate
@@ -266,8 +271,8 @@ export function DateTimeField({
   ];
 
   const days = [
-    "26", "27", "28", "29", "30", "31", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", 
-    "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", 
+    "26", "27", "28", "29", "30", "31", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+    "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23",
     "24", "25", "26", "27", "28", "29", "30", "1", "2", "3", "4", "5", "6"
   ];
   const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
@@ -355,11 +360,11 @@ export function DateTimeField({
           <div className="dt-backdrop" onClick={() => setOpen(false)} />
           <div
             className="dt-popover font-mono text-[#f0fafa]"
-            style={{ 
-              position: "fixed", 
-              top: "50%", 
-              left: "50%", 
-              transform: "translate(-50%, -50%)", 
+            style={{
+              position: "fixed",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
               width: 500,
               maxWidth: "95vw"
             }}
@@ -371,9 +376,9 @@ export function DateTimeField({
                 <button type="button" className="dt-nav-btn" onClick={nextMonth}>›</button>
               </div>
               <div className="dt-head-right">
-                <select 
-                  className="dt-year-select" 
-                  value={year} 
+                <select
+                  className="dt-year-select"
+                  value={year}
                   onChange={(e) => {
                     const y = Number(e.target.value);
                     setYear(y);
@@ -417,16 +422,16 @@ export function DateTimeField({
                   const disabled = isBeforeMinDate(selectedDate(year, month, day, item, minute));
 
                   return (
-                  <button 
-                    key={`h-${item}`} 
-                    type="button" 
-                    disabled={disabled}
-                    className={item === hour ? "is-active" : ""} 
-                    onClick={() => handleSelectHour(item)}
-                  >
-                    {item}
-                  </button>
-                );
+                    <button
+                      key={`h-${item}`}
+                      type="button"
+                      disabled={disabled}
+                      className={item === hour ? "is-active" : ""}
+                      onClick={() => handleSelectHour(item)}
+                    >
+                      {item}
+                    </button>
+                  );
                 })}
               </div>
 
@@ -435,23 +440,23 @@ export function DateTimeField({
                   const disabled = isBeforeMinDate(selectedDate(year, month, day, hour, item));
 
                   return (
-                  <button 
-                    key={`m-${item}`} 
-                    type="button" 
-                    disabled={disabled}
-                    className={item === minute ? "is-active" : ""} 
-                    onClick={() => handleSelectMinute(item)}
-                  >
-                    {item}
-                  </button>
-                );
+                    <button
+                      key={`m-${item}`}
+                      type="button"
+                      disabled={disabled}
+                      className={item === minute ? "is-active" : ""}
+                      onClick={() => handleSelectMinute(item)}
+                    >
+                      {item}
+                    </button>
+                  );
                 })}
               </div>
             </div>
 
             <div className="dt-actions">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => {
                   const nowStr = new Date().toISOString();
                   onChange(minDate && minDate.getTime() > Date.now() ? minDate.toISOString() : nowStr);
@@ -460,9 +465,9 @@ export function DateTimeField({
               >
                 REINICIAR
               </button>
-              <button 
-                type="button" 
-                className="dt-today-btn" 
+              <button
+                type="button"
+                className="dt-today-btn"
                 onClick={() => {
                   const nowStr = new Date().toISOString();
                   onChange(minDate && minDate.getTime() > Date.now() ? minDate.toISOString() : nowStr);
@@ -596,19 +601,19 @@ export function ViewDashboard({
     const hours = ms / 3600000;
     const minutes = ms / 60000;
     if (hours > 2) {
-      return { 
-        label: "Ciclo diario pendiente", 
-        color: "border-[#67ACA9]/20 text-emerald-300 bg-emerald-950/20" 
+      return {
+        label: "Ciclo diario pendiente",
+        color: "border-[#67ACA9]/20 text-emerald-300 bg-emerald-950/20"
       };
     } else if (minutes > 5) {
-      return { 
-        label: "La recolección diaria está próxima", 
-        color: "border-amber-500/30 text-amber-300 bg-amber-950/25 animate-pulse" 
+      return {
+        label: "La recolección diaria está próxima",
+        color: "border-amber-500/30 text-amber-300 bg-amber-950/25 animate-pulse"
       };
     } else {
-      return { 
-        label: "El ciclo diario está por ejecutarse", 
-        color: "border-rose-500/40 text-rose-300 bg-rose-950/40 animate-pulse font-black" 
+      return {
+        label: "El ciclo diario está por ejecutarse",
+        color: "border-rose-500/40 text-rose-300 bg-rose-950/40 animate-pulse font-black"
       };
     }
   };
@@ -632,8 +637,8 @@ export function ViewDashboard({
       state
     };
   });
-  const highestStockResource = detailedResources.length > 0 
-    ? [...detailedResources].sort((a, b) => b.currentAmount - a.currentAmount)[0] 
+  const highestStockResource = detailedResources.length > 0
+    ? [...detailedResources].sort((a, b) => b.currentAmount - a.currentAmount)[0]
     : null;
   const zeroStockResources = detailedResources.filter(r => r.currentAmount === 0);
   const categoriesMap = detailedResources.reduce((acc, curr) => {
@@ -648,8 +653,8 @@ export function ViewDashboard({
   });
 
   const totalResourceStocks = resourcePieData.reduce((sum, item) => sum + item.value, 0);
-  const consumptionMovements = inventoryMovements.filter(m => 
-    String(m.campId) === String(activeCampId) && 
+  const consumptionMovements = inventoryMovements.filter(m =>
+    String(m.campId) === String(activeCampId) &&
     ["DAILY_RATION", "EXPEDITION_DEPARTURE", "TRANSFER_SENT"].includes(m.movementType)
   );
   const defaultDates = Array.from({ length: 7 }, (_, i) => {
@@ -679,8 +684,8 @@ export function ViewDashboard({
   });
 
   const totalConsumed7Days = dynamicTrendData.reduce((sum, item) => sum + item.totalConsumed, 0);
-  const highestConsumptionDay = dynamicTrendData.length > 0 
-    ? [...dynamicTrendData].sort((a, b) => b.totalConsumed - a.totalConsumed)[0] 
+  const highestConsumptionDay = dynamicTrendData.length > 0
+    ? [...dynamicTrendData].sort((a, b) => b.totalConsumed - a.totalConsumed)[0]
     : { date: "—", totalConsumed: 0 };
   const fieldWarnings: string[] = [];
   unresolvedAlerts.forEach(al => {
@@ -708,16 +713,16 @@ export function ViewDashboard({
   const totalPageSolicitudes = Math.ceil(activeCampRequests.length / pageSize) || 1;
   const totalGarrisonCount = camps.find(c => c.id === activeCampId)?.personnelCount || 35;
   const activeSpecialistsCount = occupationCoverages.filter(cov => String(cov.campId) === String(activeCampId)).reduce((s, o) => s + o.active, 0);
-  const incomingPendingRequests = intercampRequests.filter(req => 
+  const incomingPendingRequests = intercampRequests.filter(req =>
     req.destinationCampId === activeCampId && req.status === "PENDING"
   );
   const pendingRequestsCount = incomingPendingRequests.length;
 
-  const requiresResourcesCount = incomingPendingRequests.filter(req => 
+  const requiresResourcesCount = incomingPendingRequests.filter(req =>
     requestResourceDetails.some(d => d.requestId === req.id && d.requestedAmount > 0)
   ).length;
 
-  const requiresPersonnelCount = incomingPendingRequests.filter(req => 
+  const requiresPersonnelCount = incomingPendingRequests.filter(req =>
     req.personRequirements && req.personRequirements.some(pr => pr.quantity > 0)
   ).length;
   const sentRequests = intercampRequests.filter(req => req.originCampId === activeCampId);
@@ -731,13 +736,13 @@ export function ViewDashboard({
   const activeTransfersIds = activeTransfers.map(tr => tr.id);
 
   const preparedTransfersCount = activeTransfers.filter(tr => tr.status === "PENDING_DEPARTURE" && !tr.actualDepartureDate).length;
-  const inTransitTransfersCount = activeTransfers.filter(tr => 
+  const inTransitTransfersCount = activeTransfers.filter(tr =>
     (tr.status === "PENDING_DEPARTURE" && tr.actualDepartureDate && !tr.actualArrivalDate) ||
     transferPersons.some(tp => tp.transferId === tr.id && tp.status === "IN_TRANSIT")
   ).length;
 
   const todayStr = systTime.toISOString().split("T")[0];
-  const delayedTransfersCount = activeTransfers.filter(tr => 
+  const delayedTransfersCount = activeTransfers.filter(tr =>
     tr.status === "PENDING_DEPARTURE" && (tr.plannedDepartureDate < todayStr || tr.plannedArrivalDate < todayStr)
   ).length;
   const lowResourcesCount = unresolvedAlerts.length;
@@ -766,7 +771,7 @@ export function ViewDashboard({
   });
 
   const totalLogisticalBlocks = lowResourcesCount + rationsShortageBlocks + sendBelowMinWarnings;
-  const shrinkagesCount = deliveredTransferResources.filter(d => 
+  const shrinkagesCount = deliveredTransferResources.filter(d =>
     activeTransfersIds.includes(d.transferId) && d.sentAmount > d.receivedAmount
   ).length;
   const feedEvents: { id: string; date: string; text: string; category: string }[] = [];
@@ -813,11 +818,11 @@ export function ViewDashboard({
   const sortedRecentFeed = [...feedEvents]
     .sort((a, b) => b.id.localeCompare(a.id))
     .slice(0, 4);
-  const confirmedPersonsCount = transferPersons.filter(tp => 
+  const confirmedPersonsCount = transferPersons.filter(tp =>
     activeTransfersIds.includes(tp.transferId) && tp.status === "CONFIRMED"
   ).length;
-  
-  const inTransitPersonsCount = transferPersons.filter(tp => 
+
+  const inTransitPersonsCount = transferPersons.filter(tp =>
     activeTransfersIds.includes(tp.transferId) && tp.status === "IN_TRANSIT"
   ).length;
 
@@ -857,8 +862,8 @@ export function ViewDashboard({
             </div>
             <p className="text-[10px] text-zinc-400 mt-1">Garrison con {activeSpecialistsCount} especialistas asignados.</p>
           </div>
-          <button 
-            onClick={() => onNavigateToSub("Inventario actual")} 
+          <button
+            onClick={() => onNavigateToSub("Inventario actual")}
             className="text-[9.5px] font-mono font-bold text-[#69BFB7] hover:text-white transition-all text-left mt-3 uppercase tracking-wider flex items-center gap-1 cursor-pointer"
           >
             Revisar almacenes ➔
@@ -877,8 +882,8 @@ export function ViewDashboard({
             </div>
             <p className="text-[10px] text-zinc-400 mt-1">Materias primas y raciones bajo el mínimo de seguridad permitido.</p>
           </div>
-          <button 
-            onClick={() => onNavigateToSub("Alertas de inventario")} 
+          <button
+            onClick={() => onNavigateToSub("Alertas de inventario")}
             className="text-[9.5px] font-mono font-bold text-[#69BFB7] hover:text-white transition-all text-left mt-3 uppercase tracking-wider flex items-center gap-1 cursor-pointer"
           >
             REVISAR ALMACENES ➔
@@ -895,8 +900,8 @@ export function ViewDashboard({
             </div>
             <p className="text-[10px] text-zinc-400 mt-1">Mermas y entregas históricas registradas en bitácora.</p>
           </div>
-          <button 
-            onClick={() => onNavigateToSub("Solicitudes intercampamento")} 
+          <button
+            onClick={() => onNavigateToSub("Solicitudes intercampamento")}
             className="text-[9.5px] font-mono font-bold text-[#69BFB7] hover:text-white transition-all text-left mt-3 uppercase tracking-wider flex items-center gap-1 cursor-pointer"
           >
             Ver solicitudes ➔
@@ -926,7 +931,7 @@ export function ViewDashboard({
               <span className="text-[8.5px] font-mono text-amber-300 font-bold uppercase tracking-wider font-extrabold">SOLICITUDES POR APROBAR</span>
               <span className="px-1.5 py-0.5 rounded-sm bg-amber-500/20 text-amber-300 font-mono text-[9px] font-black">{pendingRequestsCount}</span>
             </div>
-            
+
             <div className="mt-3 space-y-1.5">
               <div className="flex justify-between items-center text-[10px] text-zinc-300 bg-black/25 p-1 rounded-xs">
                 <span>Campamentos Destino (Tú)</span>
@@ -943,7 +948,7 @@ export function ViewDashboard({
             </div>
           </div>
 
-          <button 
+          <button
             type="button"
             onClick={() => onNavigateToSub("Solicitudes intercampamento")}
             className="w-full mt-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-mono text-[10px] font-black uppercase rounded-xs transition-colors tracking-wider text-center cursor-pointer"
@@ -954,7 +959,7 @@ export function ViewDashboard({
         <div className="mission-card border border-[#67ACA9]/20 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between shadow-md">
           <div>
             <span className="text-[8.5px] font-mono text-zinc-300 font-bold uppercase tracking-wider block">SOLICITUDES EMITIDAS (ORIGEN)</span>
-            
+
             <div className="mt-3 space-y-2">
               <div className="flex justify-between items-center border-b border-[#67ACA9]/10 pb-1">
                 <span className="text-[10px] text-zinc-400">Total en Borradores (DRAFT)</span>
@@ -980,7 +985,7 @@ export function ViewDashboard({
         <div className="mission-card border border-[#67ACA9]/20 bg-[#0d1414]/90 p-4 rounded-sm flex flex-col justify-between shadow-md">
           <div>
             <span className="text-[8.5px] font-mono text-[#69BFB7] font-bold uppercase tracking-wider block">CONVOYES ACTIVOS</span>
-            
+
             <div className="mt-3 space-y-1.5">
               <div className="flex justify-between items-center text-[10px] text-zinc-300 bg-black/25 p-1 rounded-xs">
                 <span>Preparados / Listos</span>
@@ -997,7 +1002,7 @@ export function ViewDashboard({
             </div>
           </div>
 
-          <button 
+          <button
             type="button"
             onClick={() => onNavigateToSub("Traslados")}
             className="w-full mt-4 py-2 bg-[#67ACA9]/10 hover:bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-[#69BFB7] font-mono text-[10px] font-black uppercase rounded-xs transition-colors tracking-wider text-center cursor-pointer"
@@ -1008,7 +1013,7 @@ export function ViewDashboard({
         <div className="mission-card border border-red-500/25 bg-red-950/5 p-4 rounded-sm flex flex-col justify-between shadow-md">
           <div>
             <span className="text-[8.5px] font-mono text-red-300 font-bold uppercase tracking-wider block font-extrabold">RIESGO LOGÍSTICO</span>
-            
+
             <div className="mt-3 space-y-2">
               <div className="flex justify-between items-center p-1 bg-red-950/30 rounded-xs">
                 <div className="flex items-center gap-1.5 text-[10px] text-[#A4C2C5]">
@@ -1045,7 +1050,7 @@ export function ViewDashboard({
               Recursos en inventario
             </div>
             <div className="v-kpi-value text-3xl font-black text-white tracking-tight flex items-baseline gap-1">
-              {activeCampInventories.length} 
+              {activeCampInventories.length}
               <span className="text-[10px] font-mono text-[#A4C2C5]/60 font-normal">items</span>
             </div>
             <div className="flex flex-col gap-1 mt-3 text-[10px] font-mono select-none">
@@ -1060,8 +1065,8 @@ export function ViewDashboard({
               <div className="bg-red-950/20 border border-red-500/20 p-1.5 rounded-xs mt-1">
                 <span className="text-red-300/60 block text-[8px] uppercase">Agotado (Existencias 0)</span>
                 <strong className="text-red-200 block text-[10px]">
-                  {zeroStockResources.length > 0 
-                    ? zeroStockResources.map(r => r.type?.name).join(", ") 
+                  {zeroStockResources.length > 0
+                    ? zeroStockResources.map(r => r.type?.name).join(", ")
                     : "Ningún insumo en cero"}
                 </strong>
               </div>
@@ -1134,7 +1139,7 @@ export function ViewDashboard({
             <div className="text-[10px] font-mono text-[#69BFB7] uppercase font-bold tracking-wider mb-2">
               Distribución de Inventario
             </div>
-            
+
             <div className="h-32 w-full flex items-center justify-center relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -1183,7 +1188,7 @@ export function ViewDashboard({
               <span>Consumo últimos 7 días</span>
               <span className="text-[8px] font-mono text-[#A4C2C5]/50">(Raciones, etc)</span>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-1 mb-1.5 bg-[#67ACA9]/5 p-1 border border-[#67ACA9]/10 rounded-xs text-[8.5px] font-mono">
               <div>
                 <span className="text-[#A4C2C5]/50 block text-[7px] uppercase">Ración Total</span>
@@ -1199,8 +1204,8 @@ export function ViewDashboard({
                 <AreaChart data={dynamicTrendData} margin={{ top: 2, right: 2, left: -32, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorTrendDashboard" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#69BFB7" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#69BFB7" stopOpacity={0.0}/>
+                      <stop offset="5%" stopColor="#69BFB7" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#69BFB7" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
@@ -1382,11 +1387,10 @@ export function ViewDashboard({
                         <span className="font-bold text-[#A4C2C5]/70">{getResourceTypeCategoryLabel(inv.type?.category || "OTHER")}</span>
                       </td>
                       <td>
-                        <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 border rounded-xs ${
-                          inv.currentAmount <= inv.minimumAlertAmount 
-                            ? "bg-red-950/40 text-red-300 border-red-500/40 animate-pulse" 
+                        <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 border rounded-xs ${inv.currentAmount <= inv.minimumAlertAmount
+                            ? "bg-red-950/40 text-red-300 border-red-500/40 animate-pulse"
                             : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30"
-                        }`}>
+                          }`}>
                           {inv.currentAmount <= inv.minimumAlertAmount ? "CRÍTICO" : "NORMAL"}
                         </span>
                       </td>
@@ -1557,7 +1561,7 @@ export function ViewDashboard({
                   {paginatedRecoleccion.map(c => {
                     const rt = resourceTypes.find(t => t.id === c.resourceTypeId);
                     const diff = Number(c.actualAmount) - Number(c.expectedAmount);
-                    
+
                     return (
                       <tr key={c.id} className="hover:bg-white/5 transition-colors">
                         <td className="font-mono text-xs">{c.date}</td>
@@ -1619,19 +1623,17 @@ export function ViewDashboard({
                       <tr key={r.id} className="hover:bg-white/5 transition-colors">
                         <td className="font-mono font-bold text-white">#{r.id}</td>
                         <td>
-                          <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 border rounded-xs ${
-                            isOrigin ? "bg-blue-950/20 text-blue-300 border-blue-500/25" : "bg-purple-950/20 text-purple-300 border-purple-500/25"
-                          }`}>
+                          <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 border rounded-xs ${isOrigin ? "bg-blue-950/20 text-blue-300 border-blue-500/25" : "bg-purple-950/20 text-purple-300 border-purple-500/25"
+                            }`}>
                             {isOrigin ? "SALIENTE (Creada)" : "ENTRANTE (Recibida)"}
                           </span>
                         </td>
                         <td className="font-bold text-white uppercase">{originName} ➔ {destName}</td>
                         <td>
-                          <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 border rounded-xs ${
-                            r.status === "APPROVED" ? "bg-emerald-950/40 text-emerald-300 border-emerald-500/30" :
-                            r.status === "REJECTED" ? "bg-red-950/40 text-red-300 border-red-500/30" :
-                            "bg-amber-950/40 text-amber-300 border-amber-500/25"
-                          }`}>
+                          <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 border rounded-xs ${r.status === "APPROVED" ? "bg-emerald-950/40 text-emerald-300 border-emerald-500/30" :
+                              r.status === "REJECTED" ? "bg-red-950/40 text-red-300 border-red-500/30" :
+                                "bg-amber-950/40 text-amber-300 border-amber-500/25"
+                            }`}>
                             {r.status}
                           </span>
                         </td>
@@ -1849,8 +1851,8 @@ function FilterDateField({
   ];
 
   const days = [
-    "26", "27", "28", "29", "30", "31", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", 
-    "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", 
+    "26", "27", "28", "29", "30", "31", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+    "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23",
     "24", "25", "26", "27", "28", "29", "30", "1", "2", "3", "4", "5", "6"
   ];
   const years = Array.from({ length: 7 }, (_, i) => 2024 + i);
@@ -1913,11 +1915,11 @@ function FilterDateField({
           <div className="dt-backdrop" onClick={() => setOpen(false)} />
           <div
             className="dt-popover font-mono text-[#f0fafa]"
-            style={{ 
-              position: "fixed", 
-              top: "50%", 
-              left: "50%", 
-              transform: "translate(-50%, -50%)", 
+            style={{
+              position: "fixed",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
               width: 320,
               maxWidth: "95vw",
               zIndex: 9999
@@ -1930,9 +1932,9 @@ function FilterDateField({
                 <button type="button" className="dt-nav-btn" onClick={nextMonth}>›</button>
               </div>
               <div className="dt-head-right">
-                <select 
-                  className="dt-year-select" 
-                  value={year} 
+                <select
+                  className="dt-year-select"
+                  value={year}
                   onChange={(e) => {
                     const y = Number(e.target.value);
                     setYear(y);
@@ -1968,8 +1970,8 @@ function FilterDateField({
             </div>
 
             <div className="dt-actions justify-between px-3 py-2 border-t border-[#67ACA9]/20 flex">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="text-[10px] text-zinc-400 hover:text-white"
                 onClick={() => {
                   onChange("");
@@ -1978,8 +1980,8 @@ function FilterDateField({
               >
                 LIMPIAR
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="dt-today-btn text-[10px] text-[#69BFB7] hover:text-white"
                 onClick={() => {
                   const todayStr = new Date().toISOString().split("T")[0];
@@ -2071,7 +2073,7 @@ export function ViewRecoleccionDiaria({
   const getPersonStatusBadge = (pId: string) => {
     const person = campPersonnel.find(p => p.id === pId);
     if (!person) return { label: "DESCONOCIDO", className: "bg-gray-950/40 text-gray-400 border-gray-500/20" };
-    
+
     switch (person.status) {
       case "ACTIVE":
         return { label: "ACTIVO", className: "bg-emerald-950/40 text-emerald-400 border-emerald-500/30" };
@@ -2221,16 +2223,15 @@ export function ViewRecoleccionDiaria({
   };
 
   return (
-    <SectionShell 
-      kicker="FISCALIZACIÓN DE PRODUCCIÓN" 
+    <SectionShell
+      kicker="FISCALIZACIÓN DE PRODUCCIÓN"
       title={`Ajuste de Recolección Diaria — ${activeCampName.toUpperCase()}`}
     >
       {feedbackMsg && (
-        <div className={`fixed bottom-5 right-5 z-50 p-4 rounded-sm border shadow-2xl flex items-center gap-3 transition-all duration-300 transform translate-y-0 max-w-md animate-bounce ${
-          feedbackType === 'success' 
-            ? 'bg-emerald-950/95 border-emerald-500/40 text-emerald-100' 
+        <div className={`fixed bottom-5 right-5 z-50 p-4 rounded-sm border shadow-2xl flex items-center gap-3 transition-all duration-300 transform translate-y-0 max-w-md animate-bounce ${feedbackType === 'success'
+            ? 'bg-emerald-950/95 border-emerald-500/40 text-emerald-100'
             : 'bg-amber-950/95 border-amber-500/40 text-amber-100'
-        }`}>
+          }`}>
           {feedbackType === 'success' ? (
             <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
           ) : (
@@ -2247,20 +2248,20 @@ export function ViewRecoleccionDiaria({
         <div className="xl:col-span-12 bg-[#0d1414]/90 border border-[#67ACA9]/20 p-3 rounded-sm flex flex-col md:flex-row gap-3 items-center justify-between">
           <div className="w-full md:w-2/5 flex flex-col gap-1">
             <span className="text-[9px] font-mono font-bold text-[#69BFB7] uppercase tracking-wider">Criterio de búsqueda (Persona, ID, Recurso)</span>
-            <input 
-              type="text" 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)} 
-              placeholder="Buscar por Nombre, ID, Recurso o Fecha..." 
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Buscar por Nombre, ID, Recurso o Fecha..."
               className="v-input font-sans text-xs w-full"
             />
           </div>
 
           <div className="w-full md:w-3/12 flex flex-col gap-1">
             <span className="text-[9px] font-mono font-bold text-[#A4C2C5]/70 uppercase">Filtrar Recurso</span>
-            <select 
-              value={filterResourceType} 
-              onChange={e => setFilterResourceType(e.target.value)} 
+            <select
+              value={filterResourceType}
+              onChange={e => setFilterResourceType(e.target.value)}
               className="v-select text-xs"
             >
               <option value="">[ TODOS LOS RECURSOS ]</option>
@@ -2268,13 +2269,13 @@ export function ViewRecoleccionDiaria({
             </select>
           </div>
 
-          <FilterDateField 
-            value={filterDate} 
-            onChange={setFilterDate} 
+          <FilterDateField
+            value={filterDate}
+            onChange={setFilterDate}
           />
 
           {(searchTerm || filterResourceType || filterDate) && (
-            <button 
+            <button
               onClick={() => {
                 setSearchTerm("");
                 setFilterResourceType("");
@@ -2297,8 +2298,8 @@ export function ViewRecoleccionDiaria({
 
             <div className="flex flex-col gap-1 text-xs">
               <span className="v-field-label text-[#A4C2C5]/70">Persona Encargada *</span>
-              <select 
-                value={personId} 
+              <select
+                value={personId}
                 onChange={e => {
                   setPersonId(e.target.value);
                   const personObj = activeCampPersonnel.find(p => p.id === e.target.value);
@@ -2306,7 +2307,7 @@ export function ViewRecoleccionDiaria({
                     const defaultResource = getDefaultResourceForRole(personObj.role || "", resourceTypes);
                     setResourceTypeId(defaultResource);
                   }
-                }} 
+                }}
                 className="v-select w-full text-xs font-semibold text-white"
               >
                 <option value="">[ SELECCIONE ESPECIALISTA ]</option>
@@ -2343,26 +2344,26 @@ export function ViewRecoleccionDiaria({
             <div className="grid grid-cols-2 gap-2 text-xs">
               <label className="v-field flex flex-col gap-1">
                 <span className="v-field-label text-[#A4C2C5]/70">Esperado (Estimado) *</span>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   step="0.01"
-                  value={expectedAmount} 
-                  onChange={e => setExpectedAmount(e.target.value)} 
-                  className="v-input font-mono" 
-                  placeholder="0.00" 
+                  value={expectedAmount}
+                  onChange={e => setExpectedAmount(e.target.value)}
+                  className="v-input font-mono"
+                  placeholder="0.00"
                   required
                 />
               </label>
-              
+
               <label className="v-field flex flex-col gap-1">
                 <span className="v-field-label text-[#A4C2C5]/70">Capturado (Real) *</span>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   step="0.01"
-                  value={actualAmount} 
-                  onChange={e => setActualAmount(e.target.value)} 
-                  className="v-input font-mono" 
-                  placeholder="0.00" 
+                  value={actualAmount}
+                  onChange={e => setActualAmount(e.target.value)}
+                  className="v-input font-mono"
+                  placeholder="0.00"
                   required
                 />
               </label>
@@ -2370,11 +2371,11 @@ export function ViewRecoleccionDiaria({
 
             <label className="v-field flex flex-col gap-1 text-xs">
               <span className="v-field-label text-[#A4C2C5]/70">Explicación o Justificación de Desvío *</span>
-              <textarea 
-                value={differenceReason} 
-                onChange={e => setDifferenceReason(e.target.value)} 
-                className="v-input min-h-16 text-xs leading-normal" 
-                placeholder="Razón técnica del desvío o 'Sin anomalías' si coincide" 
+              <textarea
+                value={differenceReason}
+                onChange={e => setDifferenceReason(e.target.value)}
+                className="v-input min-h-16 text-xs leading-normal"
+                placeholder="Razón técnica del desvío o 'Sin anomalías' si coincide"
                 required
               />
             </label>
@@ -2433,10 +2434,10 @@ export function ViewRecoleccionDiaria({
                     {joinedAndFilteredRecords.map(record => {
                       const personObj = campPersonnel.find(p => p.id === record.personId);
                       const resourceObj = resourceTypes.find(rt => rt.id === record.resourceTypeId);
-                      
+
                       const diff = Number(record.actualAmount) - Number(record.expectedAmount);
                       const disc = getDiscrepancyStyle(Number(record.expectedAmount), Number(record.actualAmount));
-                      
+
                       const personStatusProps = getPersonStatusBadge(String(record.personId));
                       const personIsActive = personObj?.status === "ACTIVE";
 
@@ -2473,9 +2474,9 @@ export function ViewRecoleccionDiaria({
                           </td>
                           <td className="text-right">
                             {personIsActive ? (
-                              <Btn 
-                                small 
-                                variant="warning" 
+                              <Btn
+                                small
+                                variant="warning"
                                 onClick={() => {
                                   setAdjustingId(String(record.id));
                                   setAdjustVal(record.actualAmount.toString());
@@ -2519,8 +2520,8 @@ export function ViewRecoleccionDiaria({
                     <ShieldAlert className="w-4 h-4 text-amber-400" />
                     AJUSTAR REGISTRO DE RECOLECCIÓN (#{currentRecord.id})
                   </div>
-                  <button 
-                    onClick={() => setAdjustingId(null)} 
+                  <button
+                    onClick={() => setAdjustingId(null)}
                     className="text-zinc-500 hover:text-white font-extrabold text-sm"
                   >
                     ×
@@ -2568,24 +2569,24 @@ export function ViewRecoleccionDiaria({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-xs">
                   <label className="flex flex-col gap-1">
                     <span className="v-field-label text-amber-200 font-bold uppercase tracking-wide">Nueva Cantidad Extraída Real *</span>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       step="0.1"
-                      value={adjustVal} 
-                      onChange={e => setAdjustVal(e.target.value)} 
-                      className="v-input font-mono !py-1 text-center font-bold text-white text-sm" 
-                      placeholder="0.00" 
+                      value={adjustVal}
+                      onChange={e => setAdjustVal(e.target.value)}
+                      className="v-input font-mono !py-1 text-center font-bold text-white text-sm"
+                      placeholder="0.00"
                       required
                     />
                   </label>
                   <label className="flex flex-col gap-1">
                     <span className="v-field-label text-amber-200 font-bold uppercase tracking-wide">Motivo o Justificación del Ajuste *</span>
-                    <input 
-                      type="text" 
-                      value={adjustReason} 
-                      onChange={e => setAdjustReason(e.target.value)} 
-                      className="v-input !py-1 text-xs text-white" 
-                      placeholder="Detallar causa técnica o desvío de recolección" 
+                    <input
+                      type="text"
+                      value={adjustReason}
+                      onChange={e => setAdjustReason(e.target.value)}
+                      className="v-input !py-1 text-xs text-white"
+                      placeholder="Detallar causa técnica o desvío de recolección"
                       required
                     />
                   </label>
@@ -2677,11 +2678,10 @@ export function ViewMovimientosInventario({
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
-                  className={`px-3 py-1 text-[10px] uppercase font-bold border transition-colors cursor-pointer ${
-                    activeTab === tab
+                  className={`px-3 py-1 text-[10px] uppercase font-bold border transition-colors cursor-pointer ${activeTab === tab
                       ? "border-[#69BFB7] text-white bg-[#69BFB7]/15 font-black"
                       : "border-[#67ACA9]/10 text-[#A4C2C5]/60 hover:text-white hover:bg-[#67ACA9]/5"
-                  }`}
+                    }`}
                 >
                   {tab}
                 </button>
@@ -2706,16 +2706,16 @@ export function ViewMovimientosInventario({
                     const camp = camps.find(c => c.id === mv.campId);
                     const rt = resourceTypes.find(t => t.id === mv.resourceTypeId);
                     const isOutflow = [
-                      "DAILY_RATION", 
-                      "EXPEDITION_DEPARTURE", 
+                      "DAILY_RATION",
+                      "EXPEDITION_DEPARTURE",
                       "TRANSFER_SENT"
-                    ].includes(mv.movementType) || 
-                    (mv.movementType === "MANUAL_ADJUSTMENT" && (
-                      mv.description.includes("-") || 
-                      mv.description.toLowerCase().includes("ajuste de recolección #45") || 
-                      mv.description.toLowerCase().includes("ajuste aplicado") || 
-                      mv.amount < 0
-                    ));
+                    ].includes(mv.movementType) ||
+                      (mv.movementType === "MANUAL_ADJUSTMENT" && (
+                        mv.description.includes("-") ||
+                        mv.description.toLowerCase().includes("ajuste de recolección #45") ||
+                        mv.description.toLowerCase().includes("ajuste aplicado") ||
+                        mv.amount < 0
+                      ));
 
                     return (
                       <tr key={mv.id} className="hover:bg-rose-950/5">
@@ -2794,19 +2794,19 @@ export function ViewAlertasInventario({
 
   const selectedInv = selectedAlert ? campInventories.find(inv =>
     String(inv.campId) === String(selectedAlert.campId)
-      && resourceTypeMatches(resourceTypes, inv.resourceTypeId, selectedAlert.resourceTypeId)
+    && resourceTypeMatches(resourceTypes, inv.resourceTypeId, selectedAlert.resourceTypeId)
   ) : null;
   const selectedResourceName = selectedAlert ? getResourceTypeDisplayName(resourceTypes, selectedAlert.resourceTypeId) : "";
   const selectedResourceUnit = selectedAlert ? getResourceTypeUnit(resourceTypes, selectedAlert.resourceTypeId) : "u";
 
   const relatedMovements = selectedAlert
     ? inventoryMovements
-        .filter(m =>
-          String(m.campId) === String(selectedAlert.campId)
-            && resourceTypeMatches(resourceTypes, m.resourceTypeId, selectedAlert.resourceTypeId)
-        )
-        .slice(-5)
-        .reverse()
+      .filter(m =>
+        String(m.campId) === String(selectedAlert.campId)
+        && resourceTypeMatches(resourceTypes, m.resourceTypeId, selectedAlert.resourceTypeId)
+      )
+      .slice(-5)
+      .reverse()
     : [];
 
   const getAlertStatusInfo = (alert: InventoryAlert) => {
@@ -2821,7 +2821,7 @@ export function ViewAlertasInventario({
 
     const inv = campInventories.find(i =>
       String(i.campId) === String(alert.campId)
-        && resourceTypeMatches(resourceTypes, i.resourceTypeId, alert.resourceTypeId)
+      && resourceTypeMatches(resourceTypes, i.resourceTypeId, alert.resourceTypeId)
     );
     const actual = inv ? inv.currentAmount : alert.amountAtAlertGeneration;
     const minVal = inv ? inv.minimumAlertAmount : Math.round(alert.amountAtAlertGeneration * 1.5) || 10;
@@ -2858,11 +2858,10 @@ export function ViewAlertasInventario({
                     setFilterType(tab);
                     setSelectedAlertId(null);
                   }}
-                  className={`px-2 py-0.5 text-[9px] uppercase font-bold border transition-all cursor-pointer ${
-                    filterType === tab
+                  className={`px-2 py-0.5 text-[9px] uppercase font-bold border transition-all cursor-pointer ${filterType === tab
                       ? "border-[#69BFB7] text-white bg-[#69BFB7]/15 font-black"
                       : "border-[#67ACA9]/10 text-[#A4C2C5]/50 hover:text-white"
-                  }`}
+                    }`}
                 >
                   {tab}
                 </button>
@@ -2887,7 +2886,7 @@ export function ViewAlertasInventario({
                   const camp = camps.find(c => c.id === alert.campId);
                   const inv = campInventories.find(i =>
                     String(i.campId) === String(alert.campId)
-                      && resourceTypeMatches(resourceTypes, i.resourceTypeId, alert.resourceTypeId)
+                    && resourceTypeMatches(resourceTypes, i.resourceTypeId, alert.resourceTypeId)
                   );
                   const actualStock = inv ? inv.currentAmount : alert.amountAtAlertGeneration;
                   const minimumAlert = inv ? inv.minimumAlertAmount : Math.round(alert.amountAtAlertGeneration * 1.5) || 10;
@@ -2897,14 +2896,13 @@ export function ViewAlertasInventario({
                   const resourceUnit = getResourceTypeUnit(resourceTypes, alert.resourceTypeId);
 
                   return (
-                    <tr 
-                      key={alert.id} 
+                    <tr
+                      key={alert.id}
                       onClick={() => setSelectedAlertId(alert.id)}
-                      className={`cursor-pointer transition-all ${
-                        isCurSel 
-                          ? "bg-[#69BFB7]/10 border-l-2 border-l-[#69BFB7]" 
+                      className={`cursor-pointer transition-all ${isCurSel
+                          ? "bg-[#69BFB7]/10 border-l-2 border-l-[#69BFB7]"
                           : "hover:bg-cyan-950/10"
-                      }`}
+                        }`}
                     >
                       <td>
                         <div className="flex flex-col">
@@ -2926,9 +2924,9 @@ export function ViewAlertasInventario({
                       <td className="font-mono text-zinc-500 text-[9px]">{alert.alertDate}</td>
                       <td className="text-right">
                         <div className="flex gap-1 justify-end" onClick={e => e.stopPropagation()}>
-                          <Btn 
-                            small 
-                            variant={isCurSel ? "primary" : "ghost"} 
+                          <Btn
+                            small
+                            variant={isCurSel ? "primary" : "ghost"}
                             onClick={() => setSelectedAlertId(alert.id)}
                           >
                             Detalle
@@ -3020,8 +3018,8 @@ export function ViewAlertasInventario({
               <div className="flex flex-col gap-1.5 border-t border-[#67ACA9]/10 pt-3">
                 <span className="text-[9.5px] font-bold text-zinc-400 uppercase font-mono block mb-1">Acciones Rápidas</span>
                 <div className="grid grid-cols-2 gap-2">
-                  <Btn 
-                    variant="ghost" 
+                  <Btn
+                    variant="ghost"
                     onClick={() => {
                       onNavigateToSub("Inventario actual");
                       triggerToast(`Redirigiendo a existencias de campamento...`);
@@ -3048,8 +3046,8 @@ export function ViewAlertasInventario({
                 <div className="flex flex-col gap-1.5 max-h-[160px] overflow-y-auto pr-1">
                   {relatedMovements.map(m => {
                     const isOutflow = [
-                      "DAILY_RATION", 
-                      "EXPEDITION_DEPARTURE", 
+                      "DAILY_RATION",
+                      "EXPEDITION_DEPARTURE",
                       "TRANSFER_SENT"
                     ].includes(m.movementType) || m.amount < 0;
 
@@ -3091,11 +3089,10 @@ export function ViewAlertasInventario({
       </div>
 
       {feedbackMsg && (
-        <div className={`fixed bottom-4 right-4 z-50 p-3 rounded-xs border shadow-lg max-w-sm flex items-start gap-2.5 text-xs text-white ${
-          feedbackType === 'success' 
-            ? 'bg-cyan-950 border-[#67ACA9]/40 text-[#A4C2C5]' 
+        <div className={`fixed bottom-4 right-4 z-50 p-3 rounded-xs border shadow-lg max-w-sm flex items-start gap-2.5 text-xs text-white ${feedbackType === 'success'
+            ? 'bg-cyan-950 border-[#67ACA9]/40 text-[#A4C2C5]'
             : 'bg-rose-950 border-rose-500/40 text-rose-200'
-        }`}>
+          }`}>
           {feedbackType === 'success' ? <Check className="h-4 w-4 mt-0.5 text-emerald-400 shrink-0" /> : <AlertTriangle className="h-4 w-4 mt-0.5 text-rose-400 shrink-0" />}
           <span className="mt-0.5 leading-normal">{feedbackMsg}</span>
         </div>
@@ -3489,11 +3486,10 @@ export function ViewSolicitudesIntercampamento({
       <div className="flex gap-2.5 mb-5 border-b border-[#67ACA9]/20 pb-3">
         <button
           onClick={() => setActiveTab("emitir")}
-          className={`px-4 py-2 text-[10px] sm:text-[11px] font-black uppercase tracking-wider border rounded-xs transition-colors flex items-center gap-1.5 ${
-            activeTab === "emitir"
+          className={`px-4 py-2 text-[10px] sm:text-[11px] font-black uppercase tracking-wider border rounded-xs transition-colors flex items-center gap-1.5 ${activeTab === "emitir"
               ? "bg-[#67ACA9]/15 border-[#69BFB7] text-[#69BFB7] shadow-md shadow-[#69BFB7]/5"
               : "bg-black/35 border-[#67ACA9]/15 text-[#A4C2C5]/60 hover:text-white"
-          }`}
+            }`}
         >
           <Plus className="h-3 w-3" />
           <span>Nueva Solicitud</span>
@@ -3501,11 +3497,10 @@ export function ViewSolicitudesIntercampamento({
 
         <button
           onClick={() => setActiveTab("mis-solicitudes")}
-          className={`px-4 py-2 text-[10px] sm:text-[11px] font-black uppercase tracking-wider border rounded-xs transition-colors flex items-center gap-1.5 ${
-            activeTab === "mis-solicitudes"
+          className={`px-4 py-2 text-[10px] sm:text-[11px] font-black uppercase tracking-wider border rounded-xs transition-colors flex items-center gap-1.5 ${activeTab === "mis-solicitudes"
               ? "bg-[#67ACA9]/15 border-[#69BFB7] text-[#69BFB7] shadow-md shadow-[#69BFB7]/5"
               : "bg-black/35 border-[#67ACA9]/15 text-[#A4C2C5]/60 hover:text-white"
-          }`}
+            }`}
         >
           <FileText className="h-3 w-3" />
           <span>Mis Solicitudes ({intercampRequests.filter(r => r.originCampId === currentUser.campId && r.status !== "CANCELED").length})</span>
@@ -3513,11 +3508,10 @@ export function ViewSolicitudesIntercampamento({
 
         <button
           onClick={() => setActiveTab("pendientes")}
-          className={`px-4 py-2 text-[10px] sm:text-[11px] font-black uppercase tracking-wider border rounded-xs transition-colors flex items-center gap-1.5 ${
-            activeTab === "pendientes"
+          className={`px-4 py-2 text-[10px] sm:text-[11px] font-black uppercase tracking-wider border rounded-xs transition-colors flex items-center gap-1.5 ${activeTab === "pendientes"
               ? "bg-amber-950/20 border-amber-500 text-amber-400 shadow-md shadow-amber-500/5"
               : "bg-black/35 border-[#67ACA9]/15 text-[#A4C2C5]/60 hover:text-white"
-          }`}
+            }`}
         >
           <AlertCircle className="h-3 w-3" />
           <span>Solicitudes por Aprobar ({pendingRequests.filter(r => r.destinationCampId === currentUser.campId).length})</span>
@@ -3573,13 +3567,13 @@ export function ViewSolicitudesIntercampamento({
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                    <DateTimeField 
+                    <DateTimeField
                       label="Salida Táctica Estimada"
                       value={plannedDepartureDate}
                       onChange={setPlannedDepartureDate}
                       minDate={serverNow ?? new Date()}
                     />
-                    <DateTimeField 
+                    <DateTimeField
                       label="Llegada Proyectada"
                       value={plannedArrivalDate}
                       onChange={setPlannedArrivalDate}
@@ -3596,12 +3590,12 @@ export function ViewSolicitudesIntercampamento({
 
                   <label className="v-field flex flex-col gap-1.5 text-xs">
                     <span className="v-field-label text-[#A4C2C5]/70">Motivación y Justificación de Recursos *</span>
-                    <input 
-                      type="text" 
-                      value={description} 
-                      onChange={e => setDescription(e.target.value)} 
-                      className="v-input" 
-                      placeholder="e.g. Descenso crítico en stock de municiones y ración seca" 
+                    <input
+                      type="text"
+                      value={description}
+                      onChange={e => setDescription(e.target.value)}
+                      className="v-input"
+                      placeholder="e.g. Descenso crítico en stock de municiones y ración seca"
                     />
                   </label>
 
@@ -3692,16 +3686,16 @@ export function ViewSolicitudesIntercampamento({
 
                     <div className="flex flex-col gap-2 mb-2">
                       <div className="flex gap-2">
-                        <input 
-                          type="text" 
-                          placeholder="Buscar recurso..." 
-                          value={resourceSearch} 
-                          onChange={e => setResourceSearch(e.target.value)} 
+                        <input
+                          type="text"
+                          placeholder="Buscar recurso..."
+                          value={resourceSearch}
+                          onChange={e => setResourceSearch(e.target.value)}
                           className="v-input py-1 text-xs w-full"
                         />
                         {resourceSearch && (
-                          <button 
-                            onClick={() => setResourceSearch("")} 
+                          <button
+                            onClick={() => setResourceSearch("")}
                             className="text-xs text-zinc-400 hover:text-white font-mono px-2 transition-colors"
                           >
                             Limpiar
@@ -3711,7 +3705,7 @@ export function ViewSolicitudesIntercampamento({
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1 select-none">
                         {resourceTypes
-                          .filter(rt => 
+                          .filter(rt =>
                             rt.name.toLowerCase().includes(resourceSearch.toLowerCase()) ||
                             String(rt.category || "").toLowerCase().includes(resourceSearch.toLowerCase())
                           )
@@ -3719,21 +3713,20 @@ export function ViewSolicitudesIntercampamento({
                             const alreadyAdded = currentDetails.find(d => d.resourceTypeId === rt.id);
                             const value = localQtys[rt.id] || "";
                             const hasChanged = alreadyAdded && String(alreadyAdded.requestedAmount) !== value;
-                            
+
                             let categoryColor = "border-zinc-500/30 text-zinc-400";
                             if (rt.category === "FOOD") categoryColor = "border-emerald-500/20 text-emerald-400 bg-emerald-950/20";
                             else if (rt.category === "WATER") categoryColor = "border-blue-500/20 text-blue-400 bg-blue-950/20";
                             else if (rt.category === "MEDICAL") categoryColor = "border-rose-500/20 text-rose-400 bg-rose-950/20";
                             else if (rt.category === "DEFENSE" || rt.category === "AMMUNITION") categoryColor = "border-amber-500/20 text-amber-400 bg-amber-950/20";
-                            
+
                             return (
-                              <div 
-                                key={rt.id} 
-                                className={`p-2 border rounded-xs flex flex-col justify-between gap-1 transition-all duration-200 ${
-                                  alreadyAdded 
-                                    ? "bg-[#67ACA9]/5 border-[#69BFB7]/40 shadow-sm shadow-[#69BFB7]/5" 
+                              <div
+                                key={rt.id}
+                                className={`p-2 border rounded-xs flex flex-col justify-between gap-1 transition-all duration-200 ${alreadyAdded
+                                    ? "bg-[#67ACA9]/5 border-[#69BFB7]/40 shadow-sm shadow-[#69BFB7]/5"
                                     : "bg-[#0d1414]/40 border-[#67ACA9]/10 hover:border-[#67ACA9]/30"
-                                }`}
+                                  }`}
                               >
                                 <div className="flex justify-between items-start gap-1">
                                   <div className="flex flex-col">
@@ -3746,21 +3739,21 @@ export function ViewSolicitudesIntercampamento({
                                 </div>
 
                                 <div className="flex items-center gap-1.5 mt-1">
-                                  <input 
-                                    type="number" 
-                                    value={value} 
+                                  <input
+                                    type="number"
+                                    value={value}
                                     onChange={e => {
                                       const val = e.target.value;
                                       setLocalQtys(prev => ({ ...prev, [rt.id]: val }));
-                                    }} 
-                                    className="v-input py-0.5 text-center text-xs font-mono w-16 h-[26px] bg-black/45" 
+                                    }}
+                                    className="v-input py-0.5 text-center text-xs font-mono w-16 h-[26px] bg-black/45"
                                     placeholder="0"
                                   />
 
                                   {alreadyAdded ? (
                                     <div className="flex gap-1 items-center ml-auto">
                                       {hasChanged && (
-                                        <button 
+                                        <button
                                           onClick={() => {
                                             const numVal = Number(value);
                                             if (isNaN(numVal) || numVal <= 0) {
@@ -3775,7 +3768,7 @@ export function ViewSolicitudesIntercampamento({
                                           ✓ Guardar
                                         </button>
                                       )}
-                                      <button 
+                                      <button
                                         onClick={() => onDeleteRequestResource(alreadyAdded.id)}
                                         className="p-1 h-[26px] w-[26px] border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 rounded-xs flex items-center justify-center transition-all"
                                         title="Quitar de la solicitud"
@@ -3784,7 +3777,7 @@ export function ViewSolicitudesIntercampamento({
                                       </button>
                                     </div>
                                   ) : (
-                                    <button 
+                                    <button
                                       onClick={() => {
                                         const numVal = Number(value || "10");
                                         if (isNaN(numVal) || numVal <= 0) {
@@ -3824,7 +3817,7 @@ export function ViewSolicitudesIntercampamento({
                                 <td className="font-mono text-[#A4C2C5]/50">{type?.unitOfMeasure || "u"}</td>
                                 <td className="text-right font-black text-cyan-300">{det.requestedAmount}</td>
                                 <td className="text-center">
-                                  <button 
+                                  <button
                                     className="text-rose-400 hover:text-red-300 hover:scale-110 transition-transform p-1"
                                     onClick={() => onDeleteRequestResource(det.id)}
                                     title="Quitar Recurso"
@@ -3887,7 +3880,7 @@ export function ViewSolicitudesIntercampamento({
                                 <td className="font-bold text-white">{occName}</td>
                                 <td className="text-right font-black text-amber-300 font-mono">{pr.quantity} efectivos</td>
                                 <td className="text-center">
-                                  <button 
+                                  <button
                                     className="text-rose-400 hover:text-red-300 hover:scale-110 transition-transform p-1"
                                     onClick={() => handleRemovePerson(pr.occupationId)}
                                     title="Quitar Requerimiento de Personal"
@@ -3916,14 +3909,14 @@ export function ViewSolicitudesIntercampamento({
                       El borrador se registrará formalmente. Al presionar "Confirmar y Enviar", la solicitud cambiará su estado a <strong>PENDING (Pendiente)</strong> para su revisión administrativa e ínter-enlaces del sistema.
                     </p>
                   </div>
-                  
+
                   <div className="flex gap-2 shrink-0">
                     <Btn variant="danger" onClick={handleCancelDraft} style={{ padding: "10px 18px" }}>
                       ✕ Descartar Borrador
                     </Btn>
-                    <Btn 
-                      variant="success" 
-                      onClick={handleSendRequest} 
+                    <Btn
+                      variant="success"
+                      onClick={handleSendRequest}
                       style={{ padding: "10px 24px", display: "inline-flex", alignItems: "center", gap: "6px" }}
                       disabled={currentDetails.length === 0 && (!selectedRequest.personRequirements || selectedRequest.personRequirements.length === 0)}
                     >
@@ -3985,15 +3978,14 @@ export function ViewSolicitudesIntercampamento({
                               </span>
                             </td>
                             <td className="py-3">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                                req.status === "APPROVED" 
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${req.status === "APPROVED"
                                   ? "bg-emerald-950/40 text-emerald-300 border-emerald-500/30"
                                   : req.status === "REJECTED"
-                                  ? "bg-rose-950/40 text-rose-300 border-rose-500/30"
-                                  : req.status === "PENDING"
-                                  ? "bg-amber-950/40 text-amber-300 border-amber-500/30 animate-pulse"
-                                  : "bg-zinc-950/40 text-zinc-400 border-zinc-700/30"
-                              }`}>
+                                    ? "bg-rose-950/40 text-rose-300 border-rose-500/30"
+                                    : req.status === "PENDING"
+                                      ? "bg-amber-950/40 text-amber-300 border-amber-500/30 animate-pulse"
+                                      : "bg-zinc-950/40 text-zinc-400 border-zinc-700/30"
+                                }`}>
                                 {req.status === "DRAFT" ? "Borrador" : req.status === "PENDING" ? "Pendiente" : req.status === "APPROVED" ? "Aprobado" : "Rechazado"}
                               </span>
                             </td>
@@ -4070,7 +4062,7 @@ export function ViewSolicitudesIntercampamento({
         )}
         {activeTab === "pendientes" && (
           <div className="flex flex-col gap-4">
-            
+
             <div className="bg-[#0b1213] border border-[#67ACA9]/15 p-4 rounded-xs">
               <h3 className="font-extrabold uppercase font-mono text-[#69BFB7] text-xs">Evaluación de Solicitudes Entrantes</h3>
               <p className="text-[11px] text-[#A4C2C5]/85 mt-1 leading-relaxed">
@@ -4087,7 +4079,7 @@ export function ViewSolicitudesIntercampamento({
 
                   return (
                     <div key={req.id} className="mission-card border border-amber-500/30 bg-[#0d1414]/95 p-4 rounded-sm flex flex-col gap-3 relative overflow-hidden">
-                      
+
                       <div className="absolute top-0 right-0 bg-amber-500/20 text-amber-400 text-[8px] font-mono font-bold tracking-widest px-2.5 py-0.5 rounded-bl-sm uppercase border-l border-b border-amber-500/30 animate-pulse">
                         Por Evaluar
                       </div>
@@ -4105,7 +4097,7 @@ export function ViewSolicitudesIntercampamento({
                       </div>
                       <div className="border-t border-[#67ACA9]/10 pt-2 flex flex-col gap-1.5">
                         <span className="text-[#A4C2C5]/60 font-mono text-[9px] uppercase font-bold block">Recursos Demandados:</span>
-                        
+
                         <div className="flex flex-col gap-1">
                           {reqDetails.map(d => {
                             const type = resourceTypes.find(t => t.id === d.resourceTypeId);
@@ -4200,17 +4192,17 @@ export function ViewSolicitudesIntercampamento({
           const scoutsToSelect = candidateScouts.length > 0 ? candidateScouts : destinationCampPeople;
           const additionalCandidates = destinationCampPeople.filter(p => p.id !== assignedScoutId);
 
-          return (
+          return createPortal(
             <div className="fixed inset-0 z-50 bg-[#000505]/95 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
-              <div className="w-full max-w-md bg-[#0b1213] border border-[#67ACA9]/30 rounded-md p-5 flex flex-col gap-3.5 text-gray-100 max-h-[95vh] overflow-y-auto shadow-2xl relative font-sans text-xs">
-                <div className="flex justify-between items-center border-b border-[#67ACA9]/20 pb-2.5">
+              <div className="w-full max-w-sm bg-[#0b1213] border border-[#67ACA9]/30 rounded-md p-4 flex flex-col gap-2.5 text-gray-100 max-h-[90vh] overflow-y-auto shadow-2xl relative font-sans text-xs">
+                <div className="flex justify-between items-center border-b border-[#67ACA9]/20 pb-2">
                   <div className="flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
                     <span className="text-xs font-black uppercase tracking-wider text-amber-400 font-sans">
                       Evaluación Operacional y Asignación de Roster
                     </span>
                   </div>
-                  <button 
+                  <button
                     onClick={() => { setEvaluatingReqId(null); setAssignedScoutId(""); setAdditionalPersonIds([]); }}
                     className="text-gray-400 hover:text-white text-xs transition-colors p-1 cursor-pointer font-sans"
                     title="Cerrar"
@@ -4218,8 +4210,8 @@ export function ViewSolicitudesIntercampamento({
                     ✕
                   </button>
                 </div>
-                <div className="flex flex-col gap-3 font-sans text-xs text-slate-300">
-                  <div className="grid grid-cols-2 bg-black/35 p-2.5 rounded border border-cyan-950 gap-2">
+                <div className="flex flex-col gap-2.5 font-sans text-xs text-slate-300">
+                  <div className="grid grid-cols-2 bg-black/35 p-2 rounded border border-cyan-950 gap-2">
                     <div>
                       <span className="text-[10px] uppercase text-[#A4C2C5]/50 block">ID Solicitud</span>
                       <strong className="text-white font-mono">#{evaluatingRequest.id}</strong>
@@ -4229,9 +4221,9 @@ export function ViewSolicitudesIntercampamento({
                       <span className="font-bold text-cyan-300 uppercase block">{evaluatingDestinationCampName} ➔ {evaluatingOriginCampName}</span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 bg-black/15 p-2.5 rounded border border-gray-900/60">
+                  <div className="grid grid-cols-2 gap-2 bg-black/15 p-2 rounded border border-gray-900/60">
                     <div>
-                      <span className="text-[10px] uppercase text-[#A4C2C5]/60 font-bold block mb-1">Recursos Demandados:</span>
+                      <span className="text-[10px] uppercase text-[#A4C2C5]/60 font-bold block mb-0.5">Recursos Demandados:</span>
                       <ul className="list-disc pl-4 text-[11px] font-semibold text-white space-y-0.5">
                         {evaluatingDetails.map(d => {
                           const type = resourceTypes.find(t => t.id === d.resourceTypeId);
@@ -4245,7 +4237,7 @@ export function ViewSolicitudesIntercampamento({
                       </ul>
                     </div>
                     <div>
-                      <span className="text-[10px] uppercase text-[#A4C2C5]/60 font-bold block mb-1">Especialidades Requeridas:</span>
+                      <span className="text-[10px] uppercase text-[#A4C2C5]/60 font-bold block mb-0.5">Especialidades Requeridas:</span>
                       <ul className="list-disc pl-4 text-[11px] font-semibold text-white space-y-0.5">
                         {(evaluatingRequest.personRequirements || []).map(pr => {
                           const name = SPECIALISTS_OCCUPATIONS.find(o => o.id === pr.occupationId)?.name || pr.occupationId;
@@ -4286,7 +4278,7 @@ export function ViewSolicitudesIntercampamento({
                       </span>
                       <span className="text-[9px] text-[#69BFB7] font-mono">({additionalPersonIds.length} seleccionados)</span>
                     </div>
-                    <div className="relative mb-1">
+                    <div className="relative mb-0.5">
                       <input
                         type="text"
                         placeholder="Filtrar por nombre o especialidad..."
@@ -4295,8 +4287,8 @@ export function ViewSolicitudesIntercampamento({
                         className="w-full bg-[#121c1e] text-white p-1.5 border border-cyan-950 rounded text-[11px] placeholder-zinc-600"
                       />
                     </div>
-                    
-                    <div className="bg-[#121c1e] border border-cyan-950 rounded p-2 max-h-[110px] overflow-y-auto flex flex-col gap-1.5">
+
+                    <div className="bg-[#121c1e] border border-cyan-950 rounded p-1.5 max-h-[95px] overflow-y-auto flex flex-col gap-1.5">
                       {additionalCandidates.filter(p => {
                         const term = searchPersonTerm.toLowerCase();
                         return p.name.toLowerCase().includes(term) || p.role.toLowerCase().includes(term);
@@ -4305,7 +4297,7 @@ export function ViewSolicitudesIntercampamento({
                         const occupied = isPersonAssignedToActiveTransferIdx(p.id);
 
                         return (
-                          <label key={p.id} className="flex items-center justify-between bg-black/25 p-1.5 rounded border border-gray-950 hover:bg-black/40 hover:border-cyan-900/40 transition-colors cursor-pointer">
+                          <label key={p.id} className="flex items-center justify-between bg-black/25 p-1 rounded border border-gray-950 hover:bg-black/40 hover:border-cyan-900/40 transition-colors cursor-pointer">
                             <div className="flex items-center gap-2">
                               <input
                                 type="checkbox"
@@ -4333,28 +4325,28 @@ export function ViewSolicitudesIntercampamento({
                       )}
                     </div>
                   </div>
-                  <div className="bg-[#111e1c]/45 border border-[#52c2b3]/20 p-2.5 rounded-sm flex flex-col gap-1">
+                  <div className="bg-[#111e1c]/45 border border-[#52c2b3]/20 p-2 rounded-sm flex flex-col gap-1">
                     <span className="text-[#69BFB7] font-bold uppercase tracking-wider text-[10px] block">
                       3. Proyección de Raciones del Viaje
                     </span>
-                    <div className="grid grid-cols-2 text-[11px] gap-x-4 gap-y-1 mt-1 font-mono">
+                    <div className="grid grid-cols-2 text-[11px] gap-x-4 gap-y-0.5 mt-0.5 font-mono">
                       <div>Días de viaje: <strong className="text-white">{computedDiffDays} d</strong></div>
                       <div>Efectivos en tránsito: <strong className="text-white">{totalTravelers} (Req + Ops)</strong></div>
                       <div>Stock en Proveedor: <strong className={foodInventoryCurrent >= rationsRequired ? "text-emerald-400" : "text-rose-400 font-bold"}>{foodInventoryCurrent} u</strong></div>
                       <div>Raciones requeridas: <strong className="text-amber-400">{rationsRequired} u</strong></div>
                     </div>
                     {resultingFoodAmount >= 0 ? (
-                      <div className="text-[10px] text-emerald-400 font-semibold mt-1">
+                      <div className="text-[10px] text-emerald-400 font-semibold mt-0.5">
                         ✓ Raciones suficientes. Stock remanente proyectado: {resultingFoodAmount} u.
                       </div>
                     ) : (
-                      <div className="text-[10px] text-rose-400 font-bold mt-1">
+                      <div className="text-[10px] text-rose-400 font-bold mt-0.5">
                         ⚠ Almacén de comida insuficiente para abastecer a la comitiva. Falta: {Math.abs(resultingFoodAmount)} u.
                       </div>
                     )}
                   </div>
                   {validationErrors.length > 0 && (
-                    <div className="bg-rose-950/25 border border-rose-800/35 p-2 rounded text-[11px] text-rose-300">
+                    <div className="bg-rose-950/25 border border-rose-800/35 p-1.5 rounded text-[11px] text-rose-300">
                       <span className="font-bold uppercase tracking-wider block mb-0.5">Restricciones encontradas:</span>
                       <ul className="list-disc pl-4 space-y-0.2">
                         {validationErrors.map((err, i) => (
@@ -4365,28 +4357,28 @@ export function ViewSolicitudesIntercampamento({
                   )}
 
                 </div>
-                <div className="flex justify-end gap-2 border-t border-[#67ACA9]/25 pt-3 mt-1">
-                  <button 
+                <div className="flex justify-end gap-2 border-t border-[#67ACA9]/25 pt-2 mt-1">
+                  <button
                     onClick={() => { setEvaluatingReqId(null); setAssignedScoutId(""); setAdditionalPersonIds([]); }}
                     className="px-3 py-1.5 text-xs text-slate-300 hover:text-white bg-[#1a2426] hover:bg-slate-800 rounded border border-gray-700 transition-all cursor-pointer font-sans font-bold"
                   >
                     Cerrar
                   </button>
-                  <button 
+                  <button
                     onClick={handleFinalApprove}
                     disabled={!canApprove}
-                    className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded shadow-md transition-all font-sans cursor-pointer ${
-                      canApprove 
+                    className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded shadow-md transition-all font-sans cursor-pointer ${canApprove
                         ? "bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400"
                         : "bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed"
-                    }`}
+                      }`}
                   >
                     Aprobar y Crear Traslado
                   </button>
                 </div>
 
               </div>
-            </div>
+            </div>,
+            document.body
           );
         })()
       )}
@@ -4396,8 +4388,8 @@ export function ViewSolicitudesIntercampamento({
         const originCampName = getCampDisplayName(camps, req.originCampId);
         const destinationCampName = getCampDisplayName(camps, req.destinationCampId);
         const details = requestResourceDetails.filter(d => d.requestId === req.id);
-        
-        return (
+
+        return createPortal(
           <div className="fixed inset-0 z-50 bg-[#000505]/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
             <div className="w-full max-w-sm bg-[#0b1213] border border-[#67ACA9]/30 rounded-md p-5 flex flex-col gap-4 text-gray-100 max-h-[90vh] overflow-y-auto shadow-2xl relative font-sans text-xs">
               <div className="flex justify-between items-center border-b border-[#67ACA9]/20 pb-2.5">
@@ -4426,8 +4418,8 @@ export function ViewSolicitudesIntercampamento({
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-[11px] font-mono leading-relaxed p-1.5 font-sans">
-                <div>Salida Planificada:<br/><strong className="text-white">{req.plannedDepartureDate}</strong></div>
-                <div>Llegada Planificada:<br/><strong className="text-white">{req.plannedArrivalDate}</strong></div>
+                <div>Salida Planificada:<br /><strong className="text-white">{req.plannedDepartureDate}</strong></div>
+                <div>Llegada Planificada:<br /><strong className="text-white">{req.plannedArrivalDate}</strong></div>
               </div>
 
               <div className="border-t border-[#67ACA9]/10 pt-2 flex flex-col gap-1">
@@ -4465,7 +4457,8 @@ export function ViewSolicitudesIntercampamento({
                 </Btn>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         );
       })()}
       {viewingTransferId && (() => {
@@ -4477,7 +4470,7 @@ export function ViewSolicitudesIntercampamento({
         const crew = transferPersons.filter(tp => tp.transferId === transfer.id);
         const hist = transferHistories.filter(h => h.transferId === transfer.id);
 
-        return (
+        return createPortal(
           <div className="fixed inset-0 z-50 bg-[#000505]/95 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
             <div className="w-full max-w-sm bg-[#0b1213] border border-[#67ACA9]/30 rounded-md p-5 flex flex-col gap-4 text-gray-100 max-h-[90vh] overflow-y-auto shadow-2xl relative font-sans text-xs">
               <div className="flex justify-between items-center border-b border-[#67ACA9]/20 pb-2.5">
@@ -4504,14 +4497,14 @@ export function ViewSolicitudesIntercampamento({
               </div>
 
               <div className="flex justify-between items-center bg-black/15 p-2 rounded">
-                 <div>
-                   <span className="text-[9px] uppercase text-[#A4C2C5]/60 block font-sans">Trayecto</span>
-                   <strong className="text-white font-sans uppercase text-[11.5px] font-bold">{destinationCampName} ➔ {originCampName}</strong>
-                 </div>
-                 <div className="text-right">
-                   <span className="text-[9px] uppercase text-[#A4C2C5]/60 block font-sans">Solicitud de Origen</span>
-                   <span className="text-cyan-300 font-mono text-[11px]">#{transfer.requestId}</span>
-                 </div>
+                <div>
+                  <span className="text-[9px] uppercase text-[#A4C2C5]/60 block font-sans">Trayecto</span>
+                  <strong className="text-white font-sans uppercase text-[11.5px] font-bold">{destinationCampName} ➔ {originCampName}</strong>
+                </div>
+                <div className="text-right">
+                  <span className="text-[9px] uppercase text-[#A4C2C5]/60 block font-sans">Solicitud de Origen</span>
+                  <span className="text-cyan-300 font-mono text-[11px]">#{transfer.requestId}</span>
+                </div>
               </div>
 
               <div className="flex flex-col gap-1">
@@ -4555,7 +4548,8 @@ export function ViewSolicitudesIntercampamento({
                 </Btn>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         );
       })()}
 
@@ -4594,7 +4588,7 @@ export function ViewTraslados({
 }) {
   const RATION_FACTOR = 2;
   const [subFilterTab, setSubFilterTab] = useState<"por_preparar" | "solicitados" | "en_transito" | "cerrados">("por_preparar");
-  
+
   const displayedTransfers = transfers.filter(t => {
     const req = intercampRequests.find(r => r.id === t.requestId);
     if (!req) return false;
@@ -4658,7 +4652,7 @@ export function ViewTraslados({
     if (!modalScoutId) {
       errors.push("Debe asignar obligatoriamente un Scout activo.");
     }
-    
+
     const selectedScoutObj = ROSTER_PEOPLE.find(p => p.id === modalScoutId);
     if (selectedScoutObj && selectedScoutObj.status !== "ACTIVE") {
       errors.push("El Scout seleccionado debe estar en estado ACTIVO.");
@@ -4744,44 +4738,40 @@ export function ViewTraslados({
       <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-6 border-b border-[#67ACA9]/10 pb-3 mt-1">
         <button
           onClick={() => setSubFilterTab("por_preparar")}
-          className={`px-2.5 sm:px-4 py-1.5 sm:py-2 font-bold uppercase tracking-wider rounded-md border cursor-pointer transition-all text-[10px] sm:text-xs ${
-            subFilterTab === "por_preparar"
+          className={`px-2.5 sm:px-4 py-1.5 sm:py-2 font-bold uppercase tracking-wider rounded-md border cursor-pointer transition-all text-[10px] sm:text-xs ${subFilterTab === "por_preparar"
               ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-900/10"
               : "bg-black/30 border-gray-800 text-slate-400 hover:text-white"
-          }`}
+            }`}
         >
           <Briefcase className="h-3 w-3 sm:h-3.5 sm:w-3.5 inline mr-1 text-amber-400" />
           Por preparar ({transfers.filter(t => { const req = intercampRequests.find(r => r.id === t.requestId); return req?.destinationCampId === currentUser.campId && t.status === "PENDING_DEPARTURE"; }).length})
         </button>
         <button
           onClick={() => setSubFilterTab("solicitados")}
-          className={`px-2.5 sm:px-4 py-1.5 sm:py-2 font-bold uppercase tracking-wider rounded-md border cursor-pointer transition-all text-[10px] sm:text-xs ${
-            subFilterTab === "solicitados"
+          className={`px-2.5 sm:px-4 py-1.5 sm:py-2 font-bold uppercase tracking-wider rounded-md border cursor-pointer transition-all text-[10px] sm:text-xs ${subFilterTab === "solicitados"
               ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-900/10"
               : "bg-black/30 border-gray-800 text-slate-400 hover:text-white"
-          }`}
+            }`}
         >
           <ArrowRightLeft className="h-3 w-3 sm:h-3.5 sm:w-3.5 inline mr-1 text-cyan-400" />
           Solicitados por mi campamento ({transfers.filter(t => { const req = intercampRequests.find(r => r.id === t.requestId); return req?.originCampId === currentUser.campId; }).length})
         </button>
         <button
           onClick={() => setSubFilterTab("en_transito")}
-          className={`px-2.5 sm:px-4 py-1.5 sm:py-2 font-bold uppercase tracking-wider rounded-md border cursor-pointer transition-all text-[10px] sm:text-xs ${
-            subFilterTab === "en_transito"
+          className={`px-2.5 sm:px-4 py-1.5 sm:py-2 font-bold uppercase tracking-wider rounded-md border cursor-pointer transition-all text-[10px] sm:text-xs ${subFilterTab === "en_transito"
               ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-900/10"
               : "bg-black/30 border-gray-800 text-slate-400 hover:text-white"
-          }`}
+            }`}
         >
           <Truck className="h-3 w-3 sm:h-3.5 sm:w-3.5 inline mr-1 text-cyan-300" />
           En tránsito ({transfers.filter(t => t.status === "IN_TRANSIT").length})
         </button>
         <button
           onClick={() => setSubFilterTab("cerrados")}
-          className={`px-2.5 sm:px-4 py-1.5 sm:py-2 font-bold uppercase tracking-wider rounded-md border cursor-pointer transition-all text-[10px] sm:text-xs ${
-            subFilterTab === "cerrados"
+          className={`px-2.5 sm:px-4 py-1.5 sm:py-2 font-bold uppercase tracking-wider rounded-md border cursor-pointer transition-all text-[10px] sm:text-xs ${subFilterTab === "cerrados"
               ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-900/10"
               : "bg-black/30 border-gray-800 text-slate-400 hover:text-white"
-          }`}
+            }`}
         >
           <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 inline mr-1 text-emerald-400" />
           Cerrados ({transfers.filter(t => t.status === "COMPLETED" || t.status === "CANCELED").length})
@@ -4825,22 +4815,21 @@ export function ViewTraslados({
                       <td className="py-3 font-mono font-bold text-white">{t.id}</td>
                       <td className="py-3 font-mono">#{t.requestId}</td>
                       <td className="py-3 uppercase font-semibold font-sans text-xs">
-                        <span className="text-rose-400">{destinationCampName}</span> 
+                        <span className="text-rose-400">{destinationCampName}</span>
                         <span className="text-slate-500 font-normal mx-1.5 font-mono">➔</span>
                         <span className="text-emerald-400">{originCampName}</span>
                       </td>
                       <td className="py-3 font-mono">{t.plannedDepartureDate}</td>
                       <td className="py-3 font-mono">{t.plannedArrivalDate}</td>
                       <td className="py-3 font-sans">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                          t.status === "COMPLETED" 
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${t.status === "COMPLETED"
                             ? "bg-emerald-950/40 text-emerald-300 border-emerald-500/30"
                             : t.status === "CANCELED"
-                            ? "bg-rose-950/40 text-rose-300 border-rose-500/30"
-                            : t.status === "IN_TRANSIT"
-                            ? "bg-cyan-950/40 text-cyan-300 border-cyan-500/30 font-bold"
-                            : "bg-amber-950/40 text-amber-300 border-amber-500/30"
-                        }`}>
+                              ? "bg-rose-950/40 text-rose-300 border-rose-500/30"
+                              : t.status === "IN_TRANSIT"
+                                ? "bg-cyan-950/40 text-cyan-300 border-cyan-500/30 font-bold"
+                                : "bg-amber-950/40 text-amber-300 border-amber-500/30"
+                          }`}>
                           {t.status === "PENDING_DEPARTURE" ? "Pendiente" : t.status === "IN_TRANSIT" ? "En Tránsito" : t.status === "COMPLETED" ? "Completado" : "Cancelado"}
                         </span>
                       </td>
@@ -4849,7 +4838,7 @@ export function ViewTraslados({
                       </td>
                       <td className="py-3 text-right">
                         <div className="flex gap-1.5 justify-end font-sans">
-                          
+
                           {subFilterTab === "por_preparar" && t.status === "PENDING_DEPARTURE" && (
                             <>
                               <button
@@ -4904,7 +4893,7 @@ export function ViewTraslados({
             });
           };
 
-          return (
+          return createPortal(
             <div className="fixed inset-0 z-50 bg-[#000505]/95 backdrop-blur-md flex items-center justify-center p-4">
               <div className="w-full max-w-md bg-[#0b1213] border border-[#67ACA9]/30 rounded-md p-5 flex flex-col gap-3.5 text-gray-100 max-h-[92vh] overflow-y-auto shadow-2xl relative font-sans text-xs">
                 <div className="flex justify-between items-center border-b border-[#67ACA9]/20 pb-2.5">
@@ -4975,7 +4964,7 @@ export function ViewTraslados({
                   <span className="text-blue-400 font-extrabold uppercase tracking-wider text-[9px]">
                     C) Otros operativos opcionales (Agregados por gusto)
                   </span>
-                  
+
                   <div className="bg-[#121c1e] border border-cyan-950 rounded p-2 max-h-36 overflow-y-auto flex flex-col gap-1.5">
                     {candidateAdditional.filter(p => p.id !== modalScoutId).map(p => {
                       const isChecked = modalAdditionalIds.includes(p.id);
@@ -5036,7 +5025,8 @@ export function ViewTraslados({
                 </div>
 
               </div>
-            </div>
+            </div>,
+            document.body
           );
         })()
       )}
@@ -5173,7 +5163,7 @@ export function ViewRecursosEntregados({
             <input type="text" value={recordedBy} onChange={e => setRecordedBy(e.target.value)} className="v-input" />
           </label>
 
-          <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>📊 Archivar Comprobante de Arribo</Btn>
+          <Btn variant="primary" onClick={() => { }} style={{ width: "100%", padding: "8px" }}>📊 Archivar Comprobante de Arribo</Btn>
         </form>
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
           <div className="text-xs font-bold text-emerald-400 uppercase border-b border-[#67ACA9]/10 pb-1.5 mb-2">Comprobantes de Entrega en Destino</div>
@@ -5267,8 +5257,8 @@ export function ViewTiposDeRecurso({
   };
 
   const filteredTypes = resourceTypes.filter(rt => {
-    const matchesSearch = rt.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (rt.description && rt.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesSearch = rt.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (rt.description && rt.description.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCat = selectedCategory === "ALL" || rt.category === selectedCategory;
     return matchesSearch && matchesCat;
   });
@@ -5279,8 +5269,8 @@ export function ViewTiposDeRecurso({
         {successToastMsgs.length > 0 && (
           <div className="fixed bottom-5 right-5 z-[1000] flex flex-col gap-2 max-w-sm pointer-events-none">
             {successToastMsgs.map((msg, index) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className="pointer-events-auto flex items-start gap-2.5 bg-[#0a1816]/95 border-2 border-emerald-400 px-4 py-3 rounded-sm shadow-2xl text-xs text-white uppercase font-mono tracking-wide animate-slideIn"
               >
                 <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
@@ -5288,7 +5278,7 @@ export function ViewTiposDeRecurso({
                   <strong className="block text-emerald-400 text-[10px] font-black uppercase mb-1">¡OPERACIÓN EXITOSA!</strong>
                   <span>{msg}</span>
                 </div>
-                <button 
+                <button
                   className="ml-auto text-zinc-500 hover:text-white pl-2"
                   onClick={() => setSuccessToastMsgs(prev => prev.filter((_, idx) => idx !== index))}
                 >
@@ -5371,13 +5361,12 @@ export function ViewTiposDeRecurso({
                           {minimumAlertAmount} {rt.unitOfMeasure}
                         </td>
                         <td className="text-center">
-                          <span className={`inline-flex items-center gap-1 font-mono text-[9px] font-black tracking-wider px-2 py-0.5 rounded-sm border ${
-                            isCritical 
-                              ? 'bg-rose-950/55 text-rose-400 border-rose-500/20' 
-                              : isWarning 
-                                ? 'bg-amber-950/55 text-amber-400 border-amber-500/20' 
+                          <span className={`inline-flex items-center gap-1 font-mono text-[9px] font-black tracking-wider px-2 py-0.5 rounded-sm border ${isCritical
+                              ? 'bg-rose-950/55 text-rose-400 border-rose-500/20'
+                              : isWarning
+                                ? 'bg-amber-950/55 text-amber-400 border-amber-500/20'
                                 : 'bg-emerald-950/55 text-emerald-400 border-emerald-500/20'
-                          }`}>
+                            }`}>
                             <span className={`h-1.5 w-1.5 rounded-full ${isCritical ? 'bg-rose-400 animate-pulse' : isWarning ? 'bg-amber-400' : 'bg-emerald-400'}`} />
                             {statusLabel}
                           </span>
@@ -5443,13 +5432,12 @@ export function ViewTiposDeRecurso({
                       </div>
                       <div className="mt-1 flex items-center justify-between border-t border-[#67ACA9]/10 pt-1.5">
                         <span className="text-zinc-500">ESTADO OPERATIVO:</span>
-                        <span className={`inline-flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-sm border ${
-                          isCritical 
-                            ? 'bg-rose-950/55 text-rose-400 border-rose-500/20' 
-                            : isWarning 
-                              ? 'bg-amber-950/55 text-amber-400 border-amber-500/20' 
+                        <span className={`inline-flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-sm border ${isCritical
+                            ? 'bg-rose-950/55 text-rose-400 border-rose-500/20'
+                            : isWarning
+                              ? 'bg-amber-950/55 text-amber-400 border-amber-500/20'
                               : 'bg-emerald-950/55 text-emerald-400 border-emerald-500/20'
-                        }`}>
+                          }`}>
                           {statusLabel}
                         </span>
                       </div>
@@ -5477,8 +5465,8 @@ export function ViewTiposDeRecurso({
                   </div>
                 </div>
 
-                <Btn 
-                  variant="ghost" 
+                <Btn
+                  variant="ghost"
                   style={{ width: "100%", marginTop: "6px" }}
                   onClick={() => setDetailResourceType(null)}
                 >
@@ -5524,15 +5512,15 @@ export function ViewTiposDeRecurso({
                   </label>
 
                   <div className="flex gap-2 mt-1.5">
-                    <Btn 
-                      variant="ghost" 
+                    <Btn
+                      variant="ghost"
                       style={{ flex: 1 }}
                       onClick={() => setAdjustResourceType(null)}
                     >
                       ✕ Cancelar
                     </Btn>
-                    <Btn 
-                      variant="primary" 
+                    <Btn
+                      variant="primary"
                       style={{ flex: 1.5 }}
                       onClick={() => {
                         const minNum = Number(adjustMinVal);
@@ -5650,11 +5638,10 @@ export function ViewOficiosCobertura({
                       <td className="py-2.5 px-4 font-black text-white text-[11px] tracking-tight">{occ.name}</td>
                       <td className="py-2.5 px-4 text-[10.5px] text-[#A4C2C5]/90 font-sans leading-relaxed">{occ.description}</td>
                       <td className="py-2.5 px-4 text-center font-mono">
-                        <span className={`text-[10.5px] font-black ${
-                          occ.collects_resources 
-                            ? "text-emerald-400" 
+                        <span className={`text-[10.5px] font-black ${occ.collects_resources
+                            ? "text-emerald-400"
                             : "text-rose-400"
-                        }`}>
+                          }`}>
                           {occ.collects_resources ? "t" : "f"}
                         </span>
                       </td>
@@ -5991,16 +5978,16 @@ export function ViewDetalleRecursosSolicitados({
 
           <label className="v-field flex flex-col gap-0.5 text-xs">
             <span className="v-field-label text-[#A4C2C5]/70 font-bold">Cantidad Solicitada *</span>
-            <input 
-              type="text" 
-              value={requestedAmount} 
-              onChange={e => setRequestedAmount(e.target.value)} 
-              className="v-input font-mono" 
-              placeholder="e.g. 50.00" 
+            <input
+              type="text"
+              value={requestedAmount}
+              onChange={e => setRequestedAmount(e.target.value)}
+              className="v-input font-mono"
+              placeholder="e.g. 50.00"
             />
           </label>
 
-          <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Agregar Recurso</Btn>
+          <Btn variant="primary" onClick={() => { }} style={{ width: "100%", padding: "8px" }}>Agregar Recurso</Btn>
         </form>
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
           <div className="text-xs font-bold text-amber-300 uppercase border-b border-[#67ACA9]/10 pb-1.5">Lista de Suministros Pedidos</div>
@@ -6029,11 +6016,11 @@ export function ViewDetalleRecursosSolicitados({
                       <td>{det.requestedAmount} {rt?.unitOfMeasure}</td>
                       <td className="font-bold">
                         {isEditing ? (
-                          <input 
-                            type="text" 
-                            className="v-input py-0.5 px-1 max-w-[80px]" 
-                            value={approvedAmount} 
-                            onChange={e => setApprovedAmount(e.target.value)} 
+                          <input
+                            type="text"
+                            className="v-input py-0.5 px-1 max-w-[80px]"
+                            value={approvedAmount}
+                            onChange={e => setApprovedAmount(e.target.value)}
                             placeholder="Monto"
                           />
                         ) : (
@@ -6146,16 +6133,16 @@ export function ViewPersonasEnTraslado({
 
           <label className="v-field flex flex-col gap-1 text-xs">
             <span className="v-field-label text-[#A4C2C5]/70 font-semibold">Código o ID de Persona *</span>
-            <input 
-              type="text" 
-              value={personId} 
-              onChange={e => setPersonId(e.target.value)} 
-              className="v-input" 
-              placeholder="e.g. p-soldier1" 
+            <input
+              type="text"
+              value={personId}
+              onChange={e => setPersonId(e.target.value)}
+              className="v-input"
+              placeholder="e.g. p-soldier1"
             />
           </label>
 
-          <Btn variant="primary" onClick={() => {}} style={{ width: "100%", padding: "8px" }}>Añadir Escolta de Convoy</Btn>
+          <Btn variant="primary" onClick={() => { }} style={{ width: "100%", padding: "8px" }}>Añadir Escolta de Convoy</Btn>
         </form>
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-8 flex flex-col gap-3">
           <div className="text-xs font-bold text-amber-300 uppercase border-b border-[#67ACA9]/10 pb-1.5">Personal del Sindicato Asignado</div>
@@ -6342,7 +6329,7 @@ export function ViewHistorialDeTraslado({
     const destCampName = getCampDisplayName(camps, item.destinationCampId);
     const statusDisp = getStatusDisplay(item.status, item.type).text;
 
-    const matchesSearch = 
+    const matchesSearch =
       item.origId.toLowerCase().includes(term) ||
       originCampName.toLowerCase().includes(term) ||
       destCampName.toLowerCase().includes(term) ||
@@ -6437,18 +6424,17 @@ export function ViewHistorialDeTraslado({
             <button
               key={f.id}
               onClick={() => setFilterType(f.id)}
-              className={`px-3 py-1.5 text-[9.5px] uppercase tracking-wider font-extrabold border rounded-xs transition-colors ${
-                filterType === f.id
+              className={`px-3 py-1.5 text-[9.5px] uppercase tracking-wider font-extrabold border rounded-xs transition-colors ${filterType === f.id
                   ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-sm"
                   : "bg-black/35 border-transparent text-[#A4C2C5]/60 hover:text-white"
-              }`}
+                }`}
             >
               {f.label}
             </button>
           ))}
         </div>
 
-        <input 
+        <input
           type="text"
           placeholder="Buscar (ID, campamento, estado)..."
           value={searchTerm}
@@ -6490,21 +6476,19 @@ export function ViewHistorialDeTraslado({
                     const statusObj = getStatusDisplay(item.status, item.type);
 
                     return (
-                      <tr 
-                        key={item.keyId} 
+                      <tr
+                        key={item.keyId}
                         onClick={() => setSelectedKeyId(item.keyId)}
-                        className={`cursor-pointer transition-colors leading-normal text-[10.5px] ${
-                          isSelected 
-                            ? "bg-[#67ACA9]/15 hover:bg-[#67ACA9]/20 border-l border-cyan-400 font-medium" 
+                        className={`cursor-pointer transition-colors leading-normal text-[10.5px] ${isSelected
+                            ? "bg-[#67ACA9]/15 hover:bg-[#67ACA9]/20 border-l border-cyan-400 font-medium"
                             : "hover:bg-[#67ACA9]/5 border-b border-[#67ACA9]/5"
-                        }`}
+                          }`}
                       >
                         <td className="py-2.5 px-1.5">
-                          <span className={`px-1.5 py-0.5 rounded-xs font-mono font-black text-[8px] tracking-wider uppercase border ${
-                            item.type === "Solicitud" 
-                              ? "bg-cyan-950/20 text-cyan-400 border-cyan-500/20" 
+                          <span className={`px-1.5 py-0.5 rounded-xs font-mono font-black text-[8px] tracking-wider uppercase border ${item.type === "Solicitud"
+                              ? "bg-cyan-950/20 text-cyan-400 border-cyan-500/20"
                               : "bg-purple-950/20 text-purple-300 border-purple-500/20"
-                          }`}>
+                            }`}>
                             {item.type}
                           </span>
                         </td>
@@ -6526,11 +6510,10 @@ export function ViewHistorialDeTraslado({
                               e.stopPropagation();
                               setSelectedKeyId(item.keyId);
                             }}
-                            className={`px-2 py-0.5 rounded-xs font-black uppercase text-[8.5px] tracking-wider transition-all border ${
-                              isSelected 
-                                ? "bg-cyan-400 text-black border-cyan-400" 
+                            className={`px-2 py-0.5 rounded-xs font-black uppercase text-[8.5px] tracking-wider transition-all border ${isSelected
+                                ? "bg-cyan-400 text-black border-cyan-400"
                                 : "bg-black/40 text-cyan-300 border-cyan-400/25 hover:bg-cyan-400 hover:text-black"
-                            }`}
+                              }`}
                           >
                             Detalle
                           </button>
@@ -6732,13 +6715,13 @@ export function ViewHistorialDeTraslado({
                 </div>
                 <form onSubmit={handleCreateLog} className="border-t border-[#67ACA9]/20 pt-3 mt-2 flex flex-col gap-2 bg-black/25 p-2 rounded-xs">
                   <span className="text-[9.5px] font-black uppercase text-amber-400 block tracking-widest font-mono">Registrar Evento de Tránsito (Ruta)</span>
-                  
+
                   <div className="grid grid-cols-2 gap-1.5">
                     <label className="flex flex-col gap-0.5 text-[9px]">
                       <span className="text-[#A4C2C5]/60 font-semibold uppercase">Estado Anterior *</span>
-                      <select 
-                        value={previousStatus} 
-                        onChange={e => setPreviousStatus(e.target.value as any)} 
+                      <select
+                        value={previousStatus}
+                        onChange={e => setPreviousStatus(e.target.value as any)}
                         className="bg-black border border-[#67ACA9]/30 text-[9px] text-[#69BFB7] p-1 rounded-sm focus:outline-none"
                       >
                         <option value="PENDING_DEPARTURE">PENDING_DEPARTURE</option>
@@ -6748,9 +6731,9 @@ export function ViewHistorialDeTraslado({
                     </label>
                     <label className="flex flex-col gap-0.5 text-[9px]">
                       <span className="text-[#A4C2C5]/60 font-semibold uppercase">Nuevo Estado *</span>
-                      <select 
-                        value={newStatus} 
-                        onChange={e => setNewStatus(e.target.value as any)} 
+                      <select
+                        value={newStatus}
+                        onChange={e => setNewStatus(e.target.value as any)}
                         className="bg-black border border-[#67ACA9]/30 text-[9px] text-amber-300 p-1 rounded-sm focus:outline-none"
                       >
                         <option value="PENDING_DEPARTURE">PENDING_DEPARTURE</option>
@@ -6763,29 +6746,29 @@ export function ViewHistorialDeTraslado({
                   <div className="grid grid-cols-3 gap-1.5">
                     <label className="flex flex-col gap-0.5 text-[9px] col-span-1">
                       <span className="text-[#A4C2C5]/60 font-medium">Registrador *</span>
-                      <input 
-                        type="text" 
-                        value={userId} 
-                        onChange={e => setUserId(e.target.value)} 
-                        className="bg-black border border-[#67ACA9]/30 px-1.5 py-0.5 text-[9.5px] text-white rounded-sm font-mono focus:outline-none focus:border-cyan-400" 
+                      <input
+                        type="text"
+                        value={userId}
+                        onChange={e => setUserId(e.target.value)}
+                        className="bg-black border border-[#67ACA9]/30 px-1.5 py-0.5 text-[9.5px] text-white rounded-sm font-mono focus:outline-none focus:border-cyan-400"
                         placeholder="ID"
                       />
                     </label>
                     <label className="flex flex-col gap-0.5 text-[9px] col-span-2">
                       <span className="text-[#A4C2C5]/60 font-medium">Comentario / Reporte de Hito *</span>
-                      <input 
-                        type="text" 
-                        value={comment} 
-                        onChange={e => setComment(e.target.value)} 
-                        className="bg-black border border-[#67ACA9]/30 px-1.5 py-0.5 text-[9.5px] text-[#A4C2C5] rounded-sm focus:outline-none focus:border-cyan-400 placeholder-[#A4C2C5]/20" 
+                      <input
+                        type="text"
+                        value={comment}
+                        onChange={e => setComment(e.target.value)}
+                        className="bg-black border border-[#67ACA9]/30 px-1.5 py-0.5 text-[9.5px] text-[#A4C2C5] rounded-sm focus:outline-none focus:border-cyan-400 placeholder-[#A4C2C5]/20"
                         placeholder="e.g. Convoy partió a ruta segura"
                         required
                       />
                     </label>
                   </div>
 
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     className="px-2 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-[9px] uppercase tracking-wider rounded-xs transition-colors mt-1"
                   >
                     Publicar Evento a la Bitácora
@@ -6859,8 +6842,8 @@ export function ViewPersonalDashboard({
     { name: "Conductores", value: 3 },
     { name: "Médicos", value: 1 }
   ];
-  const consumptionMovements = inventoryMovements.filter(m => 
-    m.campId === activeCampId && 
+  const consumptionMovements = inventoryMovements.filter(m =>
+    m.campId === activeCampId &&
     ["DAILY_RATION", "EXPEDITION_DEPARTURE", "TRANSFER_SENT"].includes(m.movementType)
   );
 
@@ -6893,7 +6876,7 @@ export function ViewPersonalDashboard({
 
   return (
     <SectionShell kicker="PERSONAL Y COBERTURAS" title="Dashboard Global de Personal">
-      
+
       <div className="flex justify-between items-center mb-1">
         <h2 className="text-sm font-black tracking-widest text-[#69BFB7] uppercase">Gobernanza y Personal Base</h2>
         <Btn onClick={triggerRefresh}>{isRefreshing ? "Sincronizando..." : "Sincronizar personal"}</Btn>
@@ -6912,7 +6895,7 @@ export function ViewPersonalDashboard({
               BASE ALFA CENTRALIZADA
             </div>
           </div>
-          <button 
+          <button
             type="button"
             onClick={handleAddSpecialistLocal}
             className="text-[10px] font-mono text-[#69BFB7] hover:underline uppercase text-left w-fit cursor-pointer font-bold mt-3"
@@ -6933,7 +6916,7 @@ export function ViewPersonalDashboard({
               Bajo umbral de resguardo
             </div>
           </div>
-          <button 
+          <button
             type="button"
             onClick={() => onNavigateToSub("Inventario actual")}
             className="text-[10px] font-mono text-[#69BFB7] hover:underline uppercase text-left w-fit cursor-pointer font-bold mt-3"
@@ -6947,7 +6930,7 @@ export function ViewPersonalDashboard({
               <span>Especialistas Activos</span>
               <span className="h-1 w-1 rounded-full bg-[#10b981] animate-ping inline-block" />
             </div>
-            
+
             <div className="h-16 w-full flex items-center justify-center relative select-none">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -6996,7 +6979,7 @@ export function ViewPersonalDashboard({
               Personal vs Requerido
             </div>
           </div>
-          <button 
+          <button
             type="button"
             onClick={() => onNavigateToSub("Glosario")}
             className="text-[10px] font-mono text-[#69BFB7] hover:underline uppercase text-left w-fit cursor-pointer font-bold mt-3"
@@ -7056,8 +7039,8 @@ export function ViewPersonalDashboard({
                 <AreaChart data={trendData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradientTrendPersonal" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={CHART_THEME.teal} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={CHART_THEME.teal} stopOpacity={0}/>
+                      <stop offset="5%" stopColor={CHART_THEME.teal} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={CHART_THEME.teal} stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
@@ -7080,7 +7063,7 @@ export function ViewPersonalDashboard({
             <span className="text-[8.5px] font-mono text-[#69BFB7] font-bold uppercase tracking-wider block">CONTROL CAPACIDAD</span>
             <h3 className="text-xs font-bold text-white uppercase mt-0.5">Nóminas de Especialistas en Base Alfa</h3>
           </div>
-          
+
           <Btn small onClick={() => onNavigateToSub("Glosario")}>
             Ver Glosario de Oficios
           </Btn>
