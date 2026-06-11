@@ -429,12 +429,8 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     } catch (error) {
       console.warn("Could not create intercamp request.", error);
       showRequestError("No se pudo crear la solicitud en la API.", error);
+      return null;
     }
-
-    const record: IntercampRequest = { ...data, id: `req-${Date.now().toString().slice(-4)}` };
-    setIntercampRequests(prev => [...prev, record]);
-    showRequestSuccess("Borrador de solicitud intercampamento creado correctamente.");
-    return record.id;
   };
 
   const handleSubmitIntercampRequest = async (id: string): Promise<boolean> => {
@@ -474,15 +470,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       console.warn("Could not create request resource detail.", error);
       showRequestError("No se pudo agregar el recurso solicitado en la API.", error);
     }
-
-    const record: RequestResourceDetail = {
-      id: `det-${Date.now().toString().slice(-4)}`,
-      requestId,
-      resourceTypeId,
-      requestedAmount,
-      approvedAmount: requestedAmount
-    };
-    setRequestResourceDetails(prev => [...prev, record]);
   };
 
   const handleAddPersonToRequest = async (detail: Omit<RequestPersonDetail, "id">) => {
