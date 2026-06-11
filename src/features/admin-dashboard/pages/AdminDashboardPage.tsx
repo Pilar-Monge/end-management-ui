@@ -5241,7 +5241,7 @@ function BottomDock({ activeDock, onSelect }: { activeDock: AdminSectionId; onSe
 
 function SettingsHint({ onOpen }: { onOpen: () => void }) {
   return (
-    <button className="settings-hint" type="button" onClick={onOpen}>
+    <button className="settings-hint admin-settings-hint" type="button" onClick={onOpen}>
       <span className="btn-text">
         Admin <GearIcon />
       </span>
