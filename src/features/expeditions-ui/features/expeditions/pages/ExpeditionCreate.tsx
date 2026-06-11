@@ -232,28 +232,22 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
     };
   });
 
-  // Try loading authenticated user
+  // Try loading authenticated user from the HttpOnly cookie-backed session.
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      fetch("/api/auth/me", {
-        headers: {
-          Authorization: `Bearer ${token}`
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Auth failed");
+        return res.json();
+      })
+      .then((payload) => {
+        const data = payload?.data ?? payload;
+        if (data && data.id) {
+          setCurrentUser(data);
         }
       })
-        .then((res) => {
-          if (!res.ok) throw new Error("Auth failed");
-          return res.json();
-        })
-        .then((data) => {
-          if (data && data.id) {
-            setCurrentUser(data);
-          }
-        })
-        .catch((err) => {
-          console.warn("Backend auth failed in ExpeditionCreate, using fallback user:", err);
-        });
-    }
+      .catch((err) => {
+        console.warn("Backend auth failed in ExpeditionCreate, using fallback user:", err);
+      });
   }, []);
 
   // Synchronize selectedcamp/lat/lng to current user's camp

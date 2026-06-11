@@ -12,6 +12,7 @@ import { RegistrarRecursos } from "./features/expeditions/pages/RegistrarRecurso
 import { PersonasView } from "./views/ExpedicionesViews";
 import { AdventuresView } from "./features/expeditions/pages/Adventures";
 import { ProfileView } from "./features/expeditions/pages/Profile";
+import { logoutCurrentSession } from "../../shared/services/sessionProfile";
 
 function Placeholder({ section, sub }: { section: string; sub: string }) {
   return (
@@ -80,28 +81,22 @@ export default function App() {
     return stored ? parseInt(stored) : 1;
   });
 
-  // Try to load auth user
+  // Try to load auth user from the HttpOnly cookie-backed session.
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      fetch("/api/auth/me", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Auth failed");
+        return res.json();
       })
-        .then((res) => {
-          if (!res.ok) throw new Error("Auth failed");
-          return res.json();
-        })
-        .then((data) => {
-          if (data && data.id) {
-            setCurrentUser(data);
-          }
-        })
-        .catch((err) => {
-          console.warn("Backend auth unavailable, staying with fallbackUser:", err);
-        });
-    }
+      .then((payload) => {
+        const data = payload?.data ?? payload;
+        if (data && data.id) {
+          setCurrentUser(data);
+        }
+      })
+      .catch((err) => {
+        console.warn("Backend auth unavailable, staying with fallbackUser:", err);
+      });
   }, []);
 
   // Simulate loading
@@ -149,8 +144,8 @@ export default function App() {
     setActiveSub("Información Personal");
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
+  const handleLogout = async () => {
+    await logoutCurrentSession();
     setHasEntered(false);
     setShowLoading(true);
   };

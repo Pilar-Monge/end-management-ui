@@ -17,17 +17,9 @@ export class SessionService {
   private onSessionExpired: (() => void) | null = null
   private onTokenRefreshed: (() => void) | null = null
 
-  private getToken(): string | null {
-    return localStorage.getItem('token') ?? localStorage.getItem('accessToken')
-  }
-
-  private saveToken(token: string): void {
-    localStorage.setItem('token', token)
-    localStorage.setItem('accessToken', token)
-    window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
-  }
-
   private clearSession(): void {
+    localStorage.removeItem('token')
+    localStorage.removeItem('accessToken')
     localStorage.removeItem('user')
     localStorage.removeItem('admin_settings_v2')
     window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))

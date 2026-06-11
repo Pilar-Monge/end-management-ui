@@ -4,6 +4,13 @@ import LoginPage from './features/login/pages/LoginPage'
 import { MobileOrientationView } from './shared/components/MobileOrientationView'
 import { FullscreenButton } from './shared/components/FullscreenButton'
 import { useSessionManager } from './shared/hooks'
+import {
+  clearCachedSession,
+  readCachedSessionUser,
+  refreshCachedSessionUser,
+  type CachedSessionUser,
+} from './shared/services/sessionProfile'
+import { normalizeUserRole } from './shared/services/postLoginRouting'
 
 const MainAppPage = lazy(() => import('./app/layout/MainAppPage'))
 const AdmissionPage = lazy(() => import('./features/admission').then((m) => ({ default: m.AdmissionPage })))
@@ -51,30 +58,6 @@ const routeFallback = (
 
 const withSuspense = (node: ReactNode) => <Suspense fallback={routeFallback}>{node}</Suspense>
 
-function getSessionToken(): string | null {
-  return localStorage.getItem('user')
-}
-
-function normalizeRole(role: string | null | undefined): string {
-  const normalized = (role ?? '').trim().toUpperCase()
-  if (normalized === 'GESTION_RECURSOS') return 'RESOURCE_MANAGEMENT'
-  if (normalized === 'ENCARGADO_VIAJES') return 'TRAVEL_MANAGER'
-  if (normalized === 'TRABAJADOR') return 'WORKER'
-  return normalized
-}
-
-function getCurrentUserRole(): string | null {
-  const rawUser = localStorage.getItem('user')
-  if (!rawUser) return null
-
-  try {
-    const parsed = JSON.parse(rawUser) as { role?: string; rol?: string }
-    return normalizeRole(parsed.role ?? parsed.rol)
-  } catch {
-    return null
-  }
-}
-
 function ProtectedRoute({
   children,
   allowedRoles,
@@ -83,9 +66,35 @@ function ProtectedRoute({
   allowedRoles?: string[]
 }) {
   const location = useLocation()
-  const token = getSessionToken()
+  const [sessionUser, setSessionUser] = useState<CachedSessionUser | null>(() => readCachedSessionUser())
+  const [isVerifyingSession, setIsVerifyingSession] = useState(true)
 
-  if (!token) {
+  useEffect(() => {
+    let cancelled = false
+
+    setIsVerifyingSession(true)
+    refreshCachedSessionUser(true)
+      .then((user) => {
+        if (!cancelled) setSessionUser(user)
+      })
+      .catch(() => {
+        clearCachedSession(true)
+        if (!cancelled) setSessionUser(null)
+      })
+      .finally(() => {
+        if (!cancelled) setIsVerifyingSession(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [location.pathname])
+
+  if (isVerifyingSession) {
+    return routeFallback
+  }
+
+  if (!sessionUser) {
     return (
       <Navigate
         to="/main-homepage"
@@ -99,8 +108,8 @@ function ProtectedRoute({
   }
 
   if (allowedRoles && allowedRoles.length > 0) {
-    const userRole = getCurrentUserRole()
-    const normalizedAllowedRoles = allowedRoles.map((role) => normalizeRole(role))
+    const userRole = normalizeUserRole(sessionUser.role ?? sessionUser.rol)
+    const normalizedAllowedRoles = allowedRoles.map((role) => normalizeUserRole(role))
     if (!userRole || !normalizedAllowedRoles.includes(userRole)) {
       return <Navigate to="/app" replace state={{ unauthorized: true, from: location.pathname }} />
     }
@@ -315,7 +324,14 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/worker-main-view" element={withSuspense(<WorkerMainViewPage />)} />
+        <Route
+          path="/worker-main-view"
+          element={
+            <ProtectedRoute allowedRoles={['SYSTEM_ADMIN', 'RESOURCE_MANAGEMENT', 'TRAVEL_MANAGER', 'WORKER']}>
+              {withSuspense(<WorkerMainViewPage />)}
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/dashboard"
           element={

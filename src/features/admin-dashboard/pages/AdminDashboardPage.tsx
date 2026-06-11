@@ -49,6 +49,7 @@ import {
 import type { MappedCampPoint } from "../expeditions/types";
 import { AdminSyncOverlay } from "../components/AdminSyncOverlay";
 import { SESSION_TOKEN_CHANGED_EVENT } from "../../../shared/services/sessionService";
+import { logoutCurrentSession } from "../../../shared/services/sessionProfile";
 import { ApiHttpError, apiRequest } from "../../../shared/services/httpClient";
 import { getErrorMessage } from "../../../shared/services/errorMessages";
 import { PopupMessage } from "../../../shared/components/PopupMessage";
@@ -1012,6 +1013,7 @@ export default function AdminDashboardPage() {
         delete nextUser.lastName2;
         delete nextUser.displayName;
         localStorage.setItem("user", JSON.stringify(nextUser));
+        window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT));
       } catch {
         // Ignore malformed cached user; runtime state already came from backend.
       }
@@ -1319,12 +1321,8 @@ export default function AdminDashboardPage() {
     setActiveSub(navItem.subOptions[0]);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("user");
-    localStorage.removeItem("admin_settings_v2");
-    window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT));
+  const handleLogout = async () => {
+    await logoutCurrentSession();
     navigate("/");
   };
 
@@ -2759,7 +2757,7 @@ const PopulationModule = memo(function PopulationModule({
       accountStatus: person.accountStatus ?? "ACTIVE",
     });
 
-    if (editMode && systemUserId !== null) {
+    if (systemUserId !== null) {
       fetchSystemUserById(systemUserId)
         .then((systemUser) => {
           setEditableSystemUserId(systemUser.id);
@@ -3733,8 +3731,8 @@ const PopulationModule = memo(function PopulationModule({
                           <small>{selectedPerson.occupation?.description ?? "Sin descripción de operaciones registrada."}</small>
                         </div>
                         <div><span>Identificación</span><strong>{selectedPerson.identificationNumber || "No registrada"}</strong></div>
-                        <div><span>Cuenta</span><strong>{normalizeAccountStatus(selectedPerson.accountStatus)}</strong></div>
-                        <div><span>Rol de sistema</span><strong>{selectedPerson.accountRole ?? "WORKER"}</strong></div>
+                        <div><span>Cuenta</span><strong>{editableSystemUserSnapshot ? normalizeAccountStatus(editableSystemUserSnapshot.status) : normalizeAccountStatus(selectedPerson.accountStatus)}</strong></div>
+                        <div><span>Rol de sistema</span><strong>{editableSystemUserSnapshot ? editableSystemUserSnapshot.role : (selectedPerson.accountRole ?? "WORKER")}</strong></div>
                       </div>
 
                       {achievementIds.length > 0 && (
@@ -4290,6 +4288,7 @@ const SettingsModule = memo(function SettingsModule({
             updated.personId = uploadedPersonId;
           }
           localStorage.setItem("user", JSON.stringify(updated));
+          window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT));
         } catch {
           // Ignore malformed cached user
         }

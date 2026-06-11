@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { loginRequest } from '../../login/services/authApi'
 import { normalizeUserRole, getPostLoginRoute } from '../../../shared/services/postLoginRouting'
 import { getErrorMessage } from '../../../shared/services/errorMessages'
-import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
+import { saveCachedSessionUser } from '../../../shared/services/sessionProfile'
 import type { LoginErrors, LoginForm } from '../../login/types'
 
 interface UseMainAuthFlowReturn {
@@ -75,17 +75,11 @@ export function useMainAuthFlow(): UseMainAuthFlowReturn {
           ...response.user,
           role: normalizeUserRole(response.user.rol),
         }
-        const token = response.token ?? response.accessToken
         const savedPath = localStorage.getItem('last_secure_path')
 
-        if (token) {
-          localStorage.setItem('token', token)
-          localStorage.setItem('accessToken', token)
-        }
-        window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
-        localStorage.setItem('user', JSON.stringify(normalizedUser))
         localStorage.removeItem('admin_settings_v2')
         localStorage.setItem('last_selected_camp_id', String(response.user.campId))
+        saveCachedSessionUser(normalizedUser)
 
         const sessionMessage = (window.history.state?.usr as { sessionMessage?: string } | undefined)?.sessionMessage
         const redirectPath = getPostLoginRoute(normalizedUser.role, {

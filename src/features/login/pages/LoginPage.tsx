@@ -5,11 +5,11 @@ import { ApocInput } from '../components/ApocInput'
 import { LandingGhosts } from '../components/LandingGhosts'
 import { HudCorners, Scanlines } from '../components/BackgroundEffects'
 import { loginRequest } from '../services/authApi'
-import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
 import { getPostLoginRoute, normalizeUserRole } from '../../../shared/services/postLoginRouting'
 import { getErrorMessage } from '../../../shared/services/errorMessages'
 import { useAuthState } from '../../../shared/context/AuthContext'
 import { PopupMessage } from '../../../shared/components/PopupMessage'
+import { saveCachedSessionUser } from '../../../shared/services/sessionProfile'
 import type { LoginErrors, LoginForm } from '../types'
 
 const LAST_SELECTED_CAMP_ID_KEY = 'last_selected_camp_id'
@@ -91,17 +91,11 @@ export default function LoginPage() {
         campId: response.user.campId,
         status: response.user.status,
       }
-      const token = response.token ?? response.accessToken
       const savedPath = localStorage.getItem('last_secure_path')
 
-      if (token) {
-        localStorage.setItem('token', token)
-        localStorage.setItem('accessToken', token)
-      }
-      localStorage.setItem('user', JSON.stringify(normalizedUser))
       localStorage.removeItem('admin_settings_v2')
       localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(response.user.campId))
-      window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
+      saveCachedSessionUser(normalizedUser)
 
       const redirectPath = getPostLoginRoute(normalizedUser.role, {
         savedPath,

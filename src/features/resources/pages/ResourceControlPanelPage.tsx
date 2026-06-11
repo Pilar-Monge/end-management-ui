@@ -2,7 +2,7 @@
 import "./resource-control-panel.css";
 import { memo, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { SESSION_TOKEN_CHANGED_EVENT } from "../../../shared/services/sessionService";
+import { logoutCurrentSession } from "../../../shared/services/sessionProfile";
 import type {
   Camp,
   ResourceType,
@@ -318,11 +318,8 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     }, 150);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('user');
-    window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT));
+  const handleLogout = async () => {
+    await logoutCurrentSession();
     navigate('/main-homepage', { state: { initialAppState: 'explore' } });
   };
 

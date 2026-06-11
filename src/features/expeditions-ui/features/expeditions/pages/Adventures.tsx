@@ -310,28 +310,22 @@ export function AdventuresView({ onNavigate }: { onNavigate?: (sub: string, id?:
 
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Synchronize active user from real backend if token exists
+  // Synchronize active user from the HttpOnly cookie-backed session.
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      fetch("/api/auth/me", {
-        headers: {
-          Authorization: `Bearer ${token}`
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Auth failed");
+        return res.json();
+      })
+      .then((payload) => {
+        const data = payload?.data ?? payload;
+        if (data && data.id) {
+          setCurrentUser(data);
         }
       })
-        .then((res) => {
-          if (!res.ok) throw new Error("Auth failed");
-          return res.json();
-        })
-        .then((data) => {
-          if (data && data.id) {
-            setCurrentUser(data);
-          }
-        })
-        .catch((err) => {
-          console.warn("Backend auth failed in AdventuresView, using fallback user:", err);
-        });
-    }
+      .catch((err) => {
+        console.warn("Backend auth failed in AdventuresView, using fallback user:", err);
+      });
   }, []);
 
   const isAdmin = currentUser.role === "SYSTEM_ADMIN";

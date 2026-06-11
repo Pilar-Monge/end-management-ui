@@ -15,7 +15,7 @@ import type { LucideIcon } from 'lucide-react'
 import { AudioLines, ChevronLeft, LogOut } from 'lucide-react'
 import * as THREE from 'three'
 import './admin-main-view-ui.css'
-import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
+import { logoutCurrentSession } from '../../../shared/services/sessionProfile'
 import { AdminSyncOverlay } from '../../admin-dashboard/components/AdminSyncOverlay'
 import {
   ADMIN_DASHBOARD_BOOT_MAX_VISUAL_LEAD,
@@ -1103,12 +1103,8 @@ export default function AdminMainViewUiPage() {
               accent="rose"
               icon={LogOut}
               label="Cerrar sesiÃ³n"
-              onClick={() => {
-                window.localStorage.removeItem('token')
-                window.localStorage.removeItem('accessToken')
-                window.localStorage.removeItem('user')
-                window.localStorage.removeItem('admin_settings_v2')
-                window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
+              onClick={async () => {
+                await logoutCurrentSession()
                 navigate('/')
               }}
             />

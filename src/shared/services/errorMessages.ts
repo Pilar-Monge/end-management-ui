@@ -40,6 +40,10 @@ export function getErrorMessage(error: unknown, context: string, fallback?: stri
     if (normalized.includes('timeout') || normalized.includes('timed out')) {
       return 'La solicitud tardo demasiado. Intenta nuevamente.'
     }
+
+    if (error.message && error.message.trim() && error.message !== 'Error') {
+      return error.message.trim()
+    }
   }
 
   return fallback ?? CONTEXT_DEFAULT_MESSAGES[context] ?? 'Ocurrio un error inesperado.'

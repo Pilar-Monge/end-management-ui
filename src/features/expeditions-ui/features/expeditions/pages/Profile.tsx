@@ -78,19 +78,16 @@ export function ProfileView() {
   const fetchNotifications = async () => {
     setLoading(true);
     setError(null);
-    const token = localStorage.getItem("token");
     
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
       
       const response = await fetch("/api/notifications", {
         method: "GET",
         headers,
+        credentials: "include",
       });
       
       if (response.ok) {
@@ -119,20 +116,16 @@ export function ProfileView() {
   }, []);
 
   const handleMarkAsRead = async (id: number) => {
-    const token = localStorage.getItem("token");
-    
     if (!isMockMode) {
       try {
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
         };
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
         
         await fetch(`/api/notifications/${id}`, {
           method: "PUT",
           headers,
+          credentials: "include",
           body: JSON.stringify({ isRead: true })
         });
       } catch (err) {
@@ -146,20 +139,16 @@ export function ProfileView() {
   };
 
   const handleDeleteNotification = async (id: number) => {
-    const token = localStorage.getItem("token");
-    
     if (!isMockMode) {
       try {
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
         };
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
         
         await fetch(`/api/notifications/${id}`, {
           method: "DELETE",
-          headers
+          headers,
+          credentials: "include",
         });
       } catch (err) {
         console.error("Failed to delete notification on backend:", err);
