@@ -1,44 +1,100 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   MOCK_PEOPLE_CARDS,
-  MOCK_RESOURCES_CONSUMED,
   StatusBadge,
   Btn,
   MissionShell,
   MissionStack,
   ExpeditionFlow,
 } from "../components/SharedLayout";
-import { getExpeditions, assignPersonToExpedition } from "../utils/expeditionsStore";
 import type { DBExpedition } from "../utils/expeditionsStore";
+import {
+  createExpeditionParticipant,
+  getCurrentExpeditionUser,
+  getExpeditionResourceSummary,
+  getUiExpedition,
+  listAvailablePeople,
+  listExpeditionParticipants,
+  type ExpeditionParticipant,
+  type ExpeditionPerson,
+  type ExpeditionResourceSummary,
+} from "../../../services/expeditionsUi.service";
 
 interface ExpeditionDetailProps {
   expeditionId?: number;
   onNavigate?: (sub: string, id?: number) => void;
 }
 
+function flowStatus(status: string): "PLANIFICADA" | "ACTIVA" | "COMPLETADA" | "CANCELADA" {
+  if (status === "COMPLETED" || status === "RETURNED_AFTER_LOST") return "COMPLETADA";
+  if (status === "CANCELED") return "CANCELADA";
+  if (status === "PLANNED") return "PLANIFICADA";
+  return "ACTIVA";
+}
+
+function displayPerson(personId: number, people: ExpeditionPerson[]) {
+  const real = people.find((person) => person.id === personId);
+  const mock = MOCK_PEOPLE_CARDS.find((person) => person.id === personId);
+  return {
+    id: personId,
+    name: real?.fullName ?? mock?.name ?? `Persona ${personId}`,
+    role: real?.role ?? mock?.role ?? "Operador de campo",
+    status: real?.status ?? mock?.status ?? "ACTIVE",
+    img: real?.img || mock?.img || `https://i.pravatar.cc/150?u=${personId}`,
+  };
+}
+
 export function ExpeditionDetail({ expeditionId, onNavigate }: ExpeditionDetailProps) {
   const [activeTab, setActiveTab] = useState<"detalles" | "participantes" | "recursos">("detalles");
-  const [expeditions, setExpeditions] = useState<DBExpedition[]>([]);
-  const [selectedAddPerson, setSelectedAddPerson] = useState<number>(MOCK_PEOPLE_CARDS[0].id);
+  const [expedition, setExpedition] = useState<DBExpedition | null>(null);
+  const [participants, setParticipants] = useState<ExpeditionParticipant[]>([]);
+  const [availablePeople, setAvailablePeople] = useState<ExpeditionPerson[]>([]);
+  const [resources, setResources] = useState<ExpeditionResourceSummary>({ consumed: [], obtained: [] });
+  const [selectedAddPerson, setSelectedAddPerson] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setExpeditions(getExpeditions());
-  }, [expeditionId, activeTab]);
+  const loadDetail = async () => {
+    if (!expeditionId) return;
+    setLoading(true);
+    try {
+      setError(null);
+      const [loadedExpedition, loadedParticipants, loadedResources, user] = await Promise.all([
+        getUiExpedition(expeditionId),
+        listExpeditionParticipants(expeditionId),
+        getExpeditionResourceSummary(expeditionId),
+        getCurrentExpeditionUser(),
+      ]);
+      const loadedPeople = await listAvailablePeople(user.campId);
 
-  const reloadStore = () => {
-    setExpeditions(getExpeditions());
+      setExpedition(loadedExpedition);
+      setParticipants(loadedParticipants);
+      setResources(loadedResources);
+      setAvailablePeople(loadedPeople);
+
+      const assignedIds = loadedParticipants.map((participant) => participant.personId);
+      const firstAvailable = loadedPeople.find((person) => !assignedIds.includes(person.id));
+      setSelectedAddPerson(firstAvailable?.id ?? 0);
+    } catch (loadError) {
+      console.error("Error loading expedition detail:", loadError);
+      setError("No se pudo cargar la expedicion desde el backend.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const exp = expeditions.find(e => e.id === expeditionId) || expeditions[0] || getExpeditions()[0];
+  useEffect(() => {
+    loadDetail();
+  }, [expeditionId]);
 
-  if (!exp) {
+  if (!expedition) {
     return (
-      <MissionShell kicker="Bitácora de misión" title="Expedición no encontrada">
+      <MissionShell kicker="Bitacora de mision" title="Expedicion no encontrada">
         <MissionStack>
           <div className="mission-card py-10 text-center text-[#A4C2C5]/50 italic">
-            No se encontraron expediciones activas.
+            {loading ? "Sincronizando expediente tactico..." : error ?? "No se encontraron expediciones activas."}
             <div className="mt-4">
-              <Btn variant="primary" onClick={() => onNavigate?.("Lanzar Misión")}>Planificar Nueva Misión</Btn>
+              <Btn variant="primary" onClick={() => onNavigate?.("Lanzar Mision")}>Planificar Nueva Mision</Btn>
             </div>
           </div>
         </MissionStack>
@@ -46,42 +102,36 @@ export function ExpeditionDetail({ expeditionId, onNavigate }: ExpeditionDetailP
     );
   }
 
-  // Get dynamic participants based on selected personnel
-  const participantIds = exp.assignedPersonnelIds || [];
-  const assignedPeople = MOCK_PEOPLE_CARDS.filter(p => participantIds.includes(p.id));
+  const participantIds = participants.map((participant) => participant.personId);
+  const assignedPeople = participantIds.map((personId) => displayPerson(personId, availablePeople));
+  const availableToAssign = availablePeople.filter(
+    (person) => person.status === "ACTIVE" && !participantIds.includes(person.id),
+  );
 
-  // Options for adding campers to this expedition
-  const availableToAssign = MOCK_PEOPLE_CARDS.filter(p => !participantIds.includes(p.id) && p.status === "ACTIVE");
-
-  const handleAddPerson = () => {
+  const handleAddPerson = async () => {
     if (!selectedAddPerson) return;
-    assignPersonToExpedition(selectedAddPerson, exp.id);
-    reloadStore();
-    // Auto reset to first available if any
-    const updatedExp = getExpeditions().find(e => e.id === exp.id);
-    const updatedIds = updatedExp?.assignedPersonnelIds || [];
-    const rem = MOCK_PEOPLE_CARDS.filter(p => !updatedIds.includes(p.id) && p.status === "ACTIVE");
-    if (rem.length > 0) {
-      setSelectedAddPerson(rem[0].id);
-    }
+    await createExpeditionParticipant({ expeditionId: expedition.id, personId: selectedAddPerson });
+    await loadDetail();
   };
 
   return (
-    <MissionShell kicker="Bitácora de misión" title={exp.name}>
+    <MissionShell kicker="Bitacora de mision" title={expedition.name}>
       <MissionStack>
         <div className="mission-card mission-card-wide">
           <div className="mission-header-row">
             <div>
-              <Btn small variant="ghost" onClick={() => onNavigate?.("Archivo Histórico")}>← Volver al listado</Btn>
-              <h2 className="mission-inline-title">📍 {exp.name} <span>#{exp.id}00</span></h2>
+              <Btn small variant="ghost" onClick={() => onNavigate?.("Archivo Historico")}>{"<-"} Volver al listado</Btn>
+              <h2 className="mission-inline-title">{expedition.name} <span>#{expedition.id}00</span></h2>
               <div className="flex gap-2 mt-1">
-                <StatusBadge status={exp.status} />
-                <span className="text-[10px] text-[#67ACA9]/60 uppercase font-bold self-center">Objetivo: {exp.objective || "Reconocimiento de zona"}</span>
+                <StatusBadge status={expedition.status} />
+                <span className="text-[10px] text-[#67ACA9]/60 uppercase font-bold self-center">
+                  Objetivo: {expedition.objective || "Reconocimiento de zona"}
+                </span>
               </div>
             </div>
           </div>
           <div className="mt-5">
-            <ExpeditionFlow current={exp.status === "COMPLETED" || exp.status === "COMPLETADA" ? "COMPLETADA" : exp.status === "CANCELED" || exp.status === "CANCELADA" ? "CANCELADA" : exp.status === "PLANNED" || exp.status === "PLANIFICADA" ? "PLANIFICADA" : "ACTIVA"} />
+            <ExpeditionFlow current={flowStatus(expedition.status)} />
           </div>
         </div>
 
@@ -97,35 +147,34 @@ export function ExpeditionDetail({ expeditionId, onNavigate }: ExpeditionDetailP
               <div className="mission-card">
                 <div className="mission-card-title">Cronograma</div>
                 <div className="flex flex-col gap-2 text-[11px]">
-                  <div className="flex justify-between border-b border-[#67ACA9]/10 pb-1"><span>Partida planeada:</span> <span className="text-[#A4C2C5]">{exp.departure}</span></div>
-                  <div className="flex justify-between border-b border-[#67ACA9]/10 pb-1"><span>Retorno planeado:</span> <span className="text-[#A4C2C5]">{exp.returnDate}</span></div>
-                  <div className="flex justify-between border-b border-[#67ACA9]/10 pb-1"><span>Partida real:</span> <span className="text-[#69BFB7]">{exp.departure} (Eficiencia 98%)</span></div>
-                  <div className="flex justify-between border-b border-[#67ACA9]/10 pb-1"><span>Duración Planeada:</span> <span className="text-[#A4C2C5]">45 Horas útiles</span></div>
-                  <div className="flex justify-between font-bold"><span>Contingencia militar:</span> <span className="text-amber-400">{exp.extraUsed}/{exp.extraDays} días usados ⏱️</span></div>
+                  <div className="flex justify-between border-b border-[#67ACA9]/10 pb-1"><span>Partida planeada:</span> <span className="text-[#A4C2C5]">{expedition.departure}</span></div>
+                  <div className="flex justify-between border-b border-[#67ACA9]/10 pb-1"><span>Retorno planeado:</span> <span className="text-[#A4C2C5]">{expedition.returnDate}</span></div>
+                  <div className="flex justify-between border-b border-[#67ACA9]/10 pb-1"><span>Dias extra usados:</span> <span className="text-amber-400">{expedition.extraUsed}/{expedition.extraDays}</span></div>
+                  <div className="flex justify-between font-bold"><span>Estado logistico:</span> <span className="text-[#69BFB7]">{expedition.status.replace("_", " ")}</span></div>
                 </div>
               </div>
               <div className="mission-card">
-                <div className="mission-card-title">Ubicación y Satélite</div>
+                <div className="mission-card-title">Ubicacion y Satelite</div>
                 <div className="flex flex-col gap-3">
-                  <p className="text-[11px] text-[#A4C2C5]">{exp.dest}.</p>
+                  <p className="text-[11px] text-[#A4C2C5]">{expedition.dest}.</p>
                   <div className="p-2 bg-black/30 border border-[#67ACA9]/20 rounded-sm font-mono text-[9px] text-[#69BFB7]">
-                    Coordenadas: LAT: {exp.lat} | LNG: {exp.lng}
+                    Coordenadas: LAT: {expedition.lat} | LNG: {expedition.lng}
                   </div>
                   <div className="flex gap-2">
-                    <Btn small variant="ghost" onClick={() => navigator.clipboard.writeText(`LAT: ${exp.lat}, LNG: ${exp.lng}`)}>Copiar Coords</Btn>
+                    <Btn small variant="ghost" onClick={() => navigator.clipboard.writeText(`LAT: ${expedition.lat}, LNG: ${expedition.lng}`)}>Copiar Coords</Btn>
                     <Btn small variant="ghost" onClick={() => onNavigate?.("Analizador Satelital")}>Ver en Mapa Satelital</Btn>
                   </div>
                 </div>
               </div>
             </div>
             <div className="mission-card mission-summary-card">
-              <div className="mission-card-title">Resumen de Misión</div>
+              <div className="mission-card-title">Resumen de Mision</div>
               <div className="mission-summary-list">
                 <div><span>Participantes</span><strong>{assignedPeople.length}</strong></div>
-                <div><span>Suministros</span><strong>{exp.resources}</strong></div>
-                <div><span>Estado Logístico</span><strong>{exp.status.replace("_", " ")}</strong></div>
-                <div><span>Riesgo inicial</span><strong className="text-amber-400 font-bold">{exp.danger || "Medio"}</strong></div>
-                <div><span>Clima estimado</span><strong>{exp.climate || "Templado"}</strong></div>
+                <div><span>Suministros</span><strong>{expedition.resources}</strong></div>
+                <div><span>Estado Logistico</span><strong>{expedition.status.replace("_", " ")}</strong></div>
+                <div><span>Riesgo inicial</span><strong className="text-amber-400 font-bold">{expedition.danger || "Medio"}</strong></div>
+                <div><span>Clima estimado</span><strong>{expedition.climate || "No registrado"}</strong></div>
                 <div><span>Zonaje satelital</span><strong className="text-[#69BFB7]">Activo</strong></div>
               </div>
             </div>
@@ -148,21 +197,21 @@ export function ExpeditionDetail({ expeditionId, onNavigate }: ExpeditionDetailP
                     </tr>
                   </thead>
                   <tbody>
-                    {assignedPeople.map(p => (
-                      <tr key={p.id}>
+                    {assignedPeople.map(person => (
+                      <tr key={person.id}>
                         <td>
-                          <img src={p.img} alt={p.name} className="w-7 h-7 rounded-full object-cover border border-[#67ACA9]/20" referrerPolicy="no-referrer" />
+                          <img src={person.img} alt={person.name} className="w-7 h-7 rounded-full object-cover border border-[#67ACA9]/20" referrerPolicy="no-referrer" />
                         </td>
-                        <td className="font-bold text-[#f0fafa]">{p.name}</td>
-                        <td className="text-[#A4C2C5]">{p.role}</td>
+                        <td className="font-bold text-[#f0fafa]">{person.name}</td>
+                        <td className="text-[#A4C2C5]">{person.role}</td>
                         <td className="text-[#69BFB7] font-semibold uppercase text-[10px]">Especialista de Campo</td>
-                        <td><StatusBadge status="ACTIVE" /></td>
+                        <td><StatusBadge status={person.status} /></td>
                       </tr>
                     ))}
                     {assignedPeople.length === 0 && (
                       <tr>
                         <td colSpan={5} className="text-center py-6 text-xs text-[#A4C2C5]/50 italic">
-                          No hay personal asignado a esta expedición todavía.
+                          No hay personal asignado a esta expedicion todavia.
                         </td>
                       </tr>
                     )}
@@ -170,8 +219,8 @@ export function ExpeditionDetail({ expeditionId, onNavigate }: ExpeditionDetailP
                 </table>
               </div>
             </div>
-            
-            {availableToAssign.length > 0 && (
+
+            {availableToAssign.length > 0 && expedition.status === "PLANNED" && (
               <div className="mission-card mission-card-wide">
                 <div className="mission-card-title">Asignar Operador Adicional</div>
                 <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
@@ -179,19 +228,19 @@ export function ExpeditionDetail({ expeditionId, onNavigate }: ExpeditionDetailP
                     <label className="text-[10px] font-mono tracking-wider text-[#69BFB7] uppercase block mb-1">
                       Personal Disponible
                     </label>
-                    <select 
+                    <select
                       className="w-full bg-[#020706] border border-[#67ACA9]/30 rounded-sm p-1.5 text-xs text-[#A4C2C5]"
                       value={selectedAddPerson}
-                      onChange={(e) => setSelectedAddPerson(Number(e.target.value))}
+                      onChange={(event) => setSelectedAddPerson(Number(event.target.value))}
                     >
-                      {availableToAssign.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.role})
+                      {availableToAssign.map(person => (
+                        <option key={person.id} value={person.id}>
+                          {person.fullName} ({person.role})
                         </option>
                       ))}
                     </select>
                   </div>
-                  <Btn variant="primary" onClick={handleAddPerson}>Confirmar Asignación</Btn>
+                  <Btn variant="primary" onClick={handleAddPerson}>Confirmar Asignacion</Btn>
                 </div>
               </div>
             )}
@@ -201,7 +250,7 @@ export function ExpeditionDetail({ expeditionId, onNavigate }: ExpeditionDetailP
         {activeTab === "recursos" && (
           <>
             <div className="mission-card mission-card-wide">
-              <div className="mission-card-title">Recursos Consumidos Estimados</div>
+              <div className="mission-card-title">Recursos Consumidos</div>
               <div className="v-table-wrap">
                 <table className="v-table">
                   <thead>
@@ -209,20 +258,19 @@ export function ExpeditionDetail({ expeditionId, onNavigate }: ExpeditionDetailP
                       <th>Recurso</th>
                       <th>Cantidad</th>
                       <th>Unidad</th>
-                      <th>Fecha Registro</th>
-                      <th>Registrado por</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {MOCK_RESOURCES_CONSUMED.map((r, i) => (
-                      <tr key={i}>
-                        <td className="font-bold">{r.type}</td>
-                        <td>{r.amount}</td>
-                        <td className="text-[#A4C2C5]">{r.unit}</td>
-                        <td>{r.date}</td>
-                        <td>{r.user}</td>
+                    {resources.consumed.map((resource) => (
+                      <tr key={resource.resourceTypeId}>
+                        <td className="font-bold">{resource.resourceTypeName}</td>
+                        <td>{resource.amount}</td>
+                        <td className="text-[#A4C2C5]">{resource.unit}</td>
                       </tr>
                     ))}
+                    {resources.consumed.length === 0 && (
+                      <tr><td colSpan={3} className="text-center py-6 text-xs text-[#A4C2C5]/50 italic">Sin recursos consumidos registrados.</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -235,20 +283,20 @@ export function ExpeditionDetail({ expeditionId, onNavigate }: ExpeditionDetailP
                     <tr>
                       <th>Recurso recuperado</th>
                       <th>Cantidad aprox.</th>
-                      <th>Categoría de Suministro</th>
+                      <th>Unidad</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td className="font-bold text-[#f0fafa]">Plantas medicinales silvestres</td>
-                      <td>25.50 kg</td>
-                      <td><StatusBadge status="MEDICAL" /></td>
-                    </tr>
-                    <tr>
-                      <td className="font-bold text-[#f0fafa]">Piezas de chatarra reciclada</td>
-                      <td>12.00 Unidades</td>
-                      <td><StatusBadge status="OTHER" /></td>
-                    </tr>
+                    {resources.obtained.map((resource) => (
+                      <tr key={resource.resourceTypeId}>
+                        <td className="font-bold text-[#f0fafa]">{resource.resourceTypeName}</td>
+                        <td>{resource.amount}</td>
+                        <td>{resource.unit}</td>
+                      </tr>
+                    ))}
+                    {resources.obtained.length === 0 && (
+                      <tr><td colSpan={3} className="text-center py-6 text-xs text-[#A4C2C5]/50 italic">Sin recursos obtenidos registrados.</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>

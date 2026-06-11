@@ -11,8 +11,8 @@ import {
   MissionStack,
   FilterChip
 } from "../components/SharedLayout";
-import { getExpeditions } from "../utils/expeditionsStore";
 import type { DBExpedition } from "../utils/expeditionsStore";
+import { listUiExpeditions } from "../../../services/expeditionsUi.service";
 
 // Realistic baseline representing historic curve flow matching the user's gorgeous screen curves exactly!
 const REALISTIC_MONTHLY_DATA = [
@@ -51,7 +51,18 @@ export function ExpeditionDashboard({ onNavigate }: ExpeditionDashboardProps) {
   const [expeditions, setExpeditions] = useState<DBExpedition[]>([]);
 
   useEffect(() => {
-    setExpeditions(getExpeditions());
+    let mounted = true;
+    listUiExpeditions()
+      .then((data) => {
+        if (mounted) setExpeditions(data);
+      })
+      .catch((error) => {
+        console.error("Error loading backend expedition dashboard:", error);
+        if (mounted) setExpeditions([]);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Compute dynamic KPI metrics integrated with the historic pre-seeded amounts shown in the picture
@@ -61,13 +72,12 @@ export function ExpeditionDashboard({ onNavigate }: ExpeditionDashboardProps) {
   const realCompleted = expeditions.filter(e => e.status === "COMPLETED" || e.status === "COMPLETADA").length;
   const realCanceled = expeditions.filter(e => e.status === "CANCELED" || e.status === "CANCELADA").length;
 
-  // Add baseline matching user's image metrics
-  const countInProgress = 5 + realInProgress;
-  const countPlanned = 8 + realPlanned;
-  const countDelayed = 3 + realDelayed;
-  const countCompleted = 24 + realCompleted;
-  const countCanceled = 2 + realCanceled;
-  const countActiveExp = countInProgress; // 5 active as shown on the screen
+  const countInProgress = realInProgress;
+  const countPlanned = realPlanned;
+  const countDelayed = realDelayed;
+  const countCompleted = realCompleted;
+  const countCanceled = realCanceled;
+  const countActiveExp = countInProgress + countDelayed;
 
   // Data for the distribution donut pie chart
   const STATUS_PIE_DATA = [

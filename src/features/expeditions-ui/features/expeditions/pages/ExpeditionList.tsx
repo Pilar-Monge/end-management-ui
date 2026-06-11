@@ -5,8 +5,8 @@ import {
   MissionShell,
   MissionStack
 } from "../components/SharedLayout";
-import { getExpeditions } from "../utils/expeditionsStore";
 import type { DBExpedition } from "../utils/expeditionsStore";
+import { listUiExpeditions } from "../../../services/expeditionsUi.service";
 
 interface ExpeditionListProps {
   onNavigate?: (sub: string, id?: number) => void;
@@ -20,7 +20,18 @@ export function ExpeditionList({ onNavigate }: ExpeditionListProps) {
   const ITEMS_PER_PAGE = 8;
 
   useEffect(() => {
-    setExpeditions(getExpeditions());
+    let mounted = true;
+    listUiExpeditions()
+      .then((data) => {
+        if (mounted) setExpeditions(data);
+      })
+      .catch((error) => {
+        console.error("Error loading backend expeditions:", error);
+        if (mounted) setExpeditions([]);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {

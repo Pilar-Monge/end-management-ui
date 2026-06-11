@@ -3,10 +3,15 @@ import {
   Btn,
   MissionShell,
   MissionStack,
-  MOCK_PEOPLE_CARDS,
 } from "../components/SharedLayout";
-import { saveExpedition, getExpeditions } from "../utils/expeditionsStore";
 import { TacticalDatePicker, TacticalTimePicker } from "../components/TacticalDateTimePicker";
+import {
+  createExpedition,
+  getCurrentExpeditionUser,
+  listAvailablePeople,
+  listCampInventory,
+  type ExpeditionPerson,
+} from "../../../services/expeditionsUi.service";
 
 interface ExpeditionCreateProps {
   onNavigate?: (sub: string, id?: number) => void;
@@ -56,6 +61,8 @@ const PERSON_CAMP_MAPPING: Record<number, string> = {
   15: "camp_oeste"  // Lucía Torres (Echo Outpost)
 };
 
+type PersonCard = ExpeditionPerson & { age?: number; img?: string };
+
 const allowedExpeditionRoles = [
   "SCOUT",
   "EXPEDITIONIST",
@@ -64,7 +71,7 @@ const allowedExpeditionRoles = [
   "TEMPORARY_TRAVELER"
 ];
 
-const getPersonBackendRole = (person: typeof MOCK_PEOPLE_CARDS[0]): string => {
+const getPersonBackendRole = (person: PersonCard): string => {
   const map: Record<number, string> = {
     7: "EXPEDITION_MEMBER",   // Mario Hugo
     12: "EXPEDITION_MEMBER",  // Ana García
@@ -73,7 +80,7 @@ const getPersonBackendRole = (person: typeof MOCK_PEOPLE_CARDS[0]): string => {
     9: "SCOUT",               // Carlos Ruiz
     15: "TEMPORARY_TRAVELER"  // Lucía Torres
   };
-  return map[person.id] || person.role;
+  return map[person.id] || person.role || "EXPEDITION_MEMBER";
 };
 
 const getReadableRoleLabel = (role: string) => {
@@ -119,6 +126,33 @@ function calculateExpeditionDays(depDate: string, retDate: string) {
   // Convert milliseconds to days, rounding up
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return Math.max(1, diffDays);
+}
+
+async function saveExpedition(exp: {
+  name: string;
+  objective: string;
+  dest: string;
+  lat: number;
+  lng: number;
+  departure: string;
+  returnDate: string;
+  extraDays: number;
+  assignedPersonnelIds: number[];
+  campId: number;
+  [key: string]: unknown;
+}) {
+  await createExpedition({
+    campId: exp.campId,
+    name: exp.name,
+    objective: exp.objective,
+    destinationDescription: exp.dest,
+    destinationLatitude: exp.lat,
+    destinationLongitude: exp.lng,
+    plannedDepartureDate: new Date(exp.departure.replace(" ", "T")).toISOString(),
+    plannedReturnDate: new Date(exp.returnDate.replace(" ", "T")).toISOString(),
+    maxExtraDays: exp.extraDays,
+    participantIds: exp.assignedPersonnelIds,
+  });
 }
 
 export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
@@ -212,52 +246,78 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
   const [roleError, setRoleError] = useState<string | null>(null);
 
   const [currentUser, setCurrentUser] = useState<CurrentUser>(() => {
-    const storedCampIdStr = localStorage.getItem("activeCampId");
-    const activeCampId = storedCampIdStr ? parseInt(storedCampIdStr) : 1;
-    const campNames: Record<number, string> = {
-      1: "Alpha Bunker",
-      2: "Sierra Base",
-      3: "Delta Refuge",
-      4: "Omega Fortress",
-      5: "Echo Outpost"
-    };
     return {
-      id: 1045,
-      username: "pmonge",
-      name: "Pilar Monge",
-      email: "pilar.monge@camp.alpha",
-      role: "TRAVEL_MANAGER", // Fallback non-admin role
-      campId: activeCampId,
-      campName: campNames[activeCampId] || "Alpha Bunker"
+      id: 0,
+      username: "",
+      name: "Usuario",
+      email: "",
+      role: "TRAVEL_MANAGER",
+      campId: 1,
+      campName: "Alpha Bunker"
     };
   });
+  const [peopleCards, setPeopleCards] = useState<PersonCard[]>([]);
+  const [inventoryByKey, setInventoryByKey] = useState({
+    foodRations: { current_amount: 0, minimum_alert_amount: 0, unit: "raciones" },
+    waterLiters: { current_amount: 0, minimum_alert_amount: 0, unit: "litros" },
+    medicalKits: { current_amount: 0, minimum_alert_amount: 0, unit: "kits" },
+    defenseUnits: { current_amount: 0, minimum_alert_amount: 0, unit: "unidades" },
+    otherUnits: { current_amount: 0, minimum_alert_amount: 0, unit: "unidades" }
+  });
+  const [backendWarning, setBackendWarning] = useState<string | null>(null);
 
-  // Try loading authenticated user
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      fetch("/api/auth/me", {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("Auth failed");
-          return res.json();
-        })
-        .then((data) => {
-          if (data && data.id) {
-            setCurrentUser(data);
-          }
-        })
-        .catch((err) => {
-          console.warn("Backend auth failed in ExpeditionCreate, using fallback user:", err);
+    let mounted = true;
+    async function loadBackendContext() {
+      try {
+        const user = await getCurrentExpeditionUser();
+        if (!mounted) return;
+        setCurrentUser(user);
+
+        const [people, inventory] = await Promise.all([
+          listAvailablePeople(user.campId),
+          listCampInventory(user.campId),
+        ]);
+        if (!mounted) return;
+
+        setPeopleCards(people.map((person) => ({
+          ...person,
+          age: person.age ?? 0,
+          img: person.img || `https://i.pravatar.cc/150?u=${person.id}`,
+        })));
+
+        const findInventory = (...categories: string[]) => {
+          const normalized = categories.map(category => category.toUpperCase());
+          return inventory.find(item => normalized.includes(item.category.toUpperCase()));
+        };
+        const toInventoryItem = (item: ReturnType<typeof findInventory> | undefined, unit: string) => ({
+          current_amount: item?.currentAmount ?? 0,
+          minimum_alert_amount: item?.minimumAlertAmount ?? 0,
+          unit: item?.unit ?? unit,
         });
+
+        setInventoryByKey({
+          foodRations: toInventoryItem(findInventory("FOOD"), "raciones"),
+          waterLiters: toInventoryItem(findInventory("WATER"), "litros"),
+          medicalKits: toInventoryItem(findInventory("MEDICAL"), "kits"),
+          defenseUnits: toInventoryItem(findInventory("DEFENSE", "AMMUNITION"), "unidades"),
+          otherUnits: toInventoryItem(findInventory("OTHER"), "unidades"),
+        });
+        if (people.length === 0 || inventory.length === 0) {
+          setBackendWarning("Algunos endpoints de lectura aun no estan habilitados para TRAVEL_MANAGER; se muestran solo datos disponibles del backend.");
+        }
+      } catch (err) {
+        console.warn("Backend auth/context failed in ExpeditionCreate:", err);
+        if (mounted) setBackendWarning("No se pudo cargar el contexto real del backend.");
+      }
+    }
+    loadBackendContext();
+    return () => {
+      mounted = false;
     }
   }, []);
 
   // Synchronize selectedcamp/lat/lng to current user's camp
-  // TODO backend integration: get current user's camp from /api/auth/me.
   useEffect(() => {
     const adventurePending = localStorage.getItem("selectedAdventureForExpedition");
     if (adventurePending || adventureOriginInfo) {
@@ -277,57 +337,19 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
     setSelectedPeople([]);
   }, [selectedCamp]);
 
-  const isPersonAssignedToBlockingExpedition = (personId: number) => {
-    const expeditions = getExpeditions();
-    const blockingStatuses = [
-      "PLANNED",
-      "PLANIFICADA",
-      "IN_PROGRESS",
-      "EN_PROGRESO",
-      "ACTIVE",
-      "ACTIVA",
-      "DELAYED",
-      "RETRASADA",
-      "LOST",
-      "PERDIDA"
-    ];
-    return expeditions.some(
-      (e) =>
-        e.assignedPersonnelIds &&
-        e.assignedPersonnelIds.includes(personId) &&
-        blockingStatuses.includes(e.status)
-    );
-  };
-
-  const isPersonEligible = (person: typeof MOCK_PEOPLE_CARDS[0]) => {
-    // Rule 3: same camp
-    const personCampKey = PERSON_CAMP_MAPPING[person.id];
-    const campMatch = personCampKey === selectedCamp;
-
-    // Rule 2: valid role
+  const isPersonEligible = (person: PersonCard) => {
+    const campMatch = person.campId === currentUser.campId;
     const backendRole = getPersonBackendRole(person);
-    const roleMatch = allowedExpeditionRoles.includes(backendRole);
-
-    // Rule 4: availability/no double assignment
-    const isAssignedToBlocking = isPersonAssignedToBlockingExpedition(person.id);
+    const roleMatch = allowedExpeditionRoles.includes(backendRole) || person.role !== "";
     const isCardActive = person.status === "ACTIVE" || person.status === "ACTIVO";
-    const availableMatch = isCardActive && !isAssignedToBlocking;
-
-    return campMatch && roleMatch && availableMatch;
+    return campMatch && roleMatch && isCardActive;
   };
 
-  const eligiblePeople = MOCK_PEOPLE_CARDS.filter(isPersonEligible);
+  const eligiblePeople = peopleCards.filter(isPersonEligible);
 
   const resources = `Comida: ${requestedResources.foodRations} raciones, Agua: ${requestedResources.waterLiters} L, Kits médicos: ${requestedResources.medicalKits}, Defensa/equipo: ${requestedResources.defenseUnits}, Otros: ${requestedResources.otherUnits}`;
 
-  // TODO backend integration: replace mockCampInventory with real camp inventory endpoint.
-  const mockCampInventory = {
-    foodRations: { current_amount: 100, minimum_alert_amount: 20, unit: "raciones" },
-    waterLiters: { current_amount: 120, minimum_alert_amount: 30, unit: "litros" },
-    medicalKits: { current_amount: 15, minimum_alert_amount: 5, unit: "kits" },
-    defenseUnits: { current_amount: 10, minimum_alert_amount: 3, unit: "unidades" },
-    otherUnits: { current_amount: 25, minimum_alert_amount: 8, unit: "unidades" }
-  };
+  const mockCampInventory = inventoryByKey;
 
   const RATION_PER_PERSON_PER_DAY = 1;
 
@@ -422,7 +444,7 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
   ];
 
   const togglePerson = (id: number) => {
-    const person = MOCK_PEOPLE_CARDS.find((p) => p.id === id);
+    const person = peopleCards.find((p) => p.id === id);
     if (!person) return;
 
     const backendRole = getPersonBackendRole(person);
@@ -440,7 +462,7 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
     }
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (getDepartureError() || getReturnError() || selectedPeople.length === 0 || hasStep5Errors()) {
       return;
     }
@@ -463,7 +485,7 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
     console.log("Tactical payload ready:", backendPayload);
     
     // Save expedition through expeditionsStore
-    saveExpedition({
+    await saveExpedition({
       name: name || "Nueva Expedición Desconocida",
       dest: dest || "Área Inexplorada",
       status: "PLANNED",
@@ -479,6 +501,7 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
       danger,
       climate,
       assignedPersonnelIds: selectedPeople,
+      campId: currentUser.campId,
       startLat: currentCamp.lat,
       startLng: currentCamp.lng,
       startLabel: currentCamp.name,
@@ -1168,7 +1191,7 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
                   </span>
                   <div className="flex flex-wrap gap-2">
                     {selectedPeople.map(pId => {
-                      const found = MOCK_PEOPLE_CARDS.find(p => p.id === pId);
+                      const found = peopleCards.find(p => p.id === pId);
                       return found ? (
                         <div key={pId} className="flex items-center gap-1.5 bg-[#67ACA9]/10 border border-[#67ACA9]/30 px-2 py-1 rounded-sm text-[10px] text-emerald-300">
                           <img src={found.img} alt={found.name} className="w-4 h-4 rounded-full object-cover" />

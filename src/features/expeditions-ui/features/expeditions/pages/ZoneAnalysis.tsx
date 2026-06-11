@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { WorldMap } from "../../../components/WorldMap";
 import { Btn } from "../components/SharedLayout";
 import { Info } from "lucide-react";
-import { SurvivalApiService, getActiveCamp } from "../utils/backendConfig";
+import { SurvivalApiService, getActiveCamp, getFallbackActiveCamp } from "../utils/backendConfig";
 import type { APIExpedition } from "../utils/backendConfig";
 
 // Respaldo de expediciones locales con la distribución geográfica en países de la región (mundializado para campamentos reales)
@@ -404,7 +404,7 @@ interface ZoneAnalysisProps {
 }
 
 export function ZoneAnalysis({ onNavigate }: ZoneAnalysisProps) {
-  const [activeCamp] = useState(() => getActiveCamp());
+  const [activeCamp, setActiveCamp] = useState(() => getFallbackActiveCamp());
   const [expeditions, setExpeditions] = useState<APIExpedition[]>(() => 
     DEFAULT_LOCAL_EXPEDITIONS.map(e => ({
       ...e,
@@ -420,10 +420,12 @@ export function ZoneAnalysis({ onNavigate }: ZoneAnalysisProps) {
     async function loadData() {
       setLoading(true);
       try {
+        const resolvedCamp = await getActiveCamp();
+        setActiveCamp(resolvedCamp);
         const loaded = await SurvivalApiService.getExpeditions(DEFAULT_LOCAL_EXPEDITIONS);
         const mapped = loaded.map(e => ({
           ...e,
-          start: { lat: activeCamp.lat, lng: activeCamp.lng, label: activeCamp.campName }
+          start: { lat: resolvedCamp.lat, lng: resolvedCamp.lng, label: resolvedCamp.campName }
         }));
         setExpeditions(mapped);
       } catch (err) {
@@ -433,7 +435,7 @@ export function ZoneAnalysis({ onNavigate }: ZoneAnalysisProps) {
       }
     }
     loadData();
-  }, [activeCamp]);
+  }, []);
 
   const activeAdventures = ALL_ADVENTURE_SPOTS.filter(a => {
     const campMap: Record<string, number> = {
