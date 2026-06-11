@@ -4831,18 +4831,6 @@
     min-width: 0;
   }
 
-  .content-scroll {
-    display: flex;
-    justify-content: center;
-  }
-
-  .settings-shell {
-    height: min(58dvh, 430px) !important;
-    margin: 0 auto !important;
-    max-height: 100%;
-    width: min(74vw, 460px) !important;
-  }
-
   .settings-inner {
     padding: 30px 0 0 !important;
   }
@@ -4884,7 +4872,7 @@
     max-width: none !important;
     overflow-x: auto !important;
     overflow-y: hidden !important;
-    padding: 4px 8px 0 24px !important;
+    padding: 4px 8px 0 !important;
     width: 100% !important;
   }
 
@@ -5228,15 +5216,6 @@
 }
 
 @media (max-width: 420px) {
-  .settings-shell {
-    height: min(54dvh, 390px) !important;
-    width: min(72vw, 330px) !important;
-  }
-
-  .inner-sidebar {
-    padding-left: 20px !important;
-  }
-
   .game-hud-header .top-hud-btn .btn-text,
   .admin-ui-v2-profile-hud-btn .btn-text {
     max-width: 38vw;
@@ -5282,156 +5261,6 @@
   .dock-item.is-active {
     min-width: 40px;
     width: 40px !important;
-  }
-}
-
-@media screen and (orientation: landscape) and (max-width: 950px), screen and (orientation: landscape) and (max-height: 540px) {
-  .inner-layout {
-    gap: 8px;
-  }
-
-  .inner-sidebar {
-    flex: 0 0 230px !important;
-    max-height: 100%;
-    overflow-y: auto !important;
-    padding: 10px 8px 10px 8px !important;
-    scrollbar-width: none;
-  }
-
-  .inner-sidebar::-webkit-scrollbar {
-    display: none;
-  }
-
-  .inner-sidebar nav {
-    padding-left: 0 !important;
-  }
-
-  .inner-sidebar nav > div {
-    gap: 12px !important;
-  }
-
-  .admin-ui-v2-population {
-    gap: 8px;
-  }
-
-  .admin-ui-v2-pop-overview-band {
-    gap: 8px;
-    grid-template-columns: minmax(0, 1.45fr) minmax(180px, 0.7fr) !important;
-  }
-
-  .admin-ui-v2-pop-kpi-grid {
-    gap: 6px;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    padding: 7px;
-  }
-
-  .admin-ui-v2-pop-kpi-grid .admin-ui-v2-dashboard-metric {
-    min-height: 68px;
-    padding: 8px;
-  }
-
-  .admin-ui-v2-pop-kpi-grid .admin-ui-v2-metric-value {
-    font-size: 19px;
-  }
-
-  .admin-ui-v2-pop-kpi-grid .admin-ui-v2-metric-label,
-  .admin-ui-v2-pop-kpi-grid .admin-ui-v2-metric-detail {
-    font-size: 8px;
-    letter-spacing: 0.05em;
-  }
-
-  .admin-ui-v2-pop-density-card,
-  .admin-ui-v2-pop-stat-panel,
-  .admin-ui-v2-pop-workload-card {
-    padding: 8px;
-  }
-
-  .admin-ui-v2-pop-density-card p,
-  .admin-ui-v2-pop-workload-card p {
-    font-size: 9px;
-    line-height: 1.3;
-    margin-top: 4px;
-  }
-
-  .admin-ui-v2-pop-stats-grid {
-    gap: 8px;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-  }
-
-  .admin-ui-v2-pop-workload-card {
-    gap: 8px;
-    grid-column: 1 / -1;
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr) !important;
-  }
-
-  .admin-ui-v2-pop-demography-grid {
-    gap: 6px;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    margin-bottom: 8px;
-  }
-
-  .admin-ui-v2-pop-demography-grid > div,
-  .admin-ui-v2-pop-workload-summary > div {
-    padding: 7px;
-  }
-
-  .admin-ui-v2-pop-demography-grid strong {
-    font-size: 20px;
-    margin-top: 4px;
-  }
-
-  .admin-ui-v2-pop-density-list,
-  .admin-ui-v2-pop-alert-stack,
-  .admin-ui-v2-pop-role-bars {
-    gap: 6px;
-  }
-
-  .admin-ui-v2-pop-density-row {
-    gap: 4px;
-    padding-bottom: 6px;
-  }
-
-  .admin-ui-v2-pop-alert-row {
-    gap: 7px;
-    padding: 7px;
-  }
-
-  .admin-ui-v2-pop-alert-row strong,
-  .admin-ui-v2-pop-card-v2 h3 {
-    font-size: 10px;
-  }
-
-  .admin-ui-v2-pop-alert-row span:not(.admin-ui-v2-pill),
-  .admin-ui-v2-pop-card-v2 p,
-  .admin-ui-v2-pop-card-v2-meta-grid span {
-    font-size: 9px;
-    line-height: 1.25;
-  }
-
-  .admin-ui-v2-pop-workload-summary {
-    gap: 6px;
-    margin-top: 8px;
-  }
-
-  .admin-ui-v2-section-head {
-    font-size: 8px;
-    gap: 6px;
-    letter-spacing: 0.06em;
-    margin-bottom: 6px;
-  }
-
-  .admin-ui-v2-threat-meter {
-    padding: 7px;
-  }
-
-  .admin-ui-v2-threat-value {
-    font-size: 20px;
-    margin-bottom: 5px;
-  }
-
-  .admin-ui-v2-threat-track,
-  .admin-ui-v2-pop-meter {
-    height: 6px;
   }
 }
 
