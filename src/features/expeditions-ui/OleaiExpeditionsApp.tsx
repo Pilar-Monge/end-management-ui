@@ -12,6 +12,13 @@ import { RegistrarRecursos } from "./features/expeditions/pages/RegistrarRecurso
 import { PersonasView } from "./views/ExpedicionesViews";
 import { AdventuresView } from "./features/expeditions/pages/Adventures";
 import { ProfileView } from "./features/expeditions/pages/Profile";
+import {
+  getCurrentExpeditionUser,
+  getServerTime,
+  listExpeditionNotifications,
+  markNotificationRead,
+  type ExpeditionNotification,
+} from "./services/expeditionsUi.service";
 
 function Placeholder({ section, sub }: { section: string; sub: string }) {
   return (
@@ -75,33 +82,36 @@ export default function App() {
   const [activeNav, setActiveNav] = useState<string | null>(null);
   const [activeSub, setActiveSub] = useState<string>("");
   const [activeExpId, setActiveExpId] = useState<number | undefined>(undefined);
-  const [activeCampId, setActiveCampId] = useState<number>(() => {
-    const stored = localStorage.getItem("activeCampId");
-    return stored ? parseInt(stored) : 1;
-  });
+  const [activeCampId, setActiveCampId] = useState<number>(fallbackUser.campId);
 
-  // Try to load auth user
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      fetch("/api/auth/me", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("Auth failed");
-          return res.json();
-        })
-        .then((data) => {
-          if (data && data.id) {
-            setCurrentUser(data);
-          }
-        })
-        .catch((err) => {
-          console.warn("Backend auth unavailable, staying with fallbackUser:", err);
+    let isMounted = true;
+
+    async function loadCurrentUser() {
+      try {
+        const user = await getCurrentExpeditionUser();
+        if (!isMounted) return;
+        setCurrentUser({
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          campId: user.campId,
+          campName: user.campName,
+          photoUrl: user.photoUrl,
         });
+        setActiveCampId(user.campId);
+      } catch (err) {
+        console.warn("Backend auth unavailable, staying with fallbackUser:", err);
+      }
     }
+
+    loadCurrentUser();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Simulate loading
@@ -150,7 +160,6 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
     setHasEntered(false);
     setShowLoading(true);
   };
@@ -205,17 +214,12 @@ export default function App() {
         <div className="fixed bottom-[22px] left-[22px] z-[70] pointer-events-auto flex items-center gap-2 px-3 py-1.5 bg-[#030d0d]/90 border border-[#67ACA9]/40 rounded text-[#A4C2C5] select-none shadow-[0_0_15px_rgba(103,172,169,0.25)] font-mono text-[10px] tracking-wider uppercase">
           <span className="text-[#69BFB7] font-bold">⬡</span>
           <span className="tracking-widest font-black">
-            {activeCampId === 1 && "Alpha Bunker"}
-            {activeCampId === 2 && "Sierra Base"}
-            {activeCampId === 3 && "Delta Refuge"}
-            {activeCampId === 4 && "Omega Fortress"}
-            {activeCampId === 5 && "Echo Outpost"}
+            {currentUser.campName || `Campamento ${activeCampId}`}
           </span>
           <button 
             onClick={() => {
               const nextId = (activeCampId % 5) + 1;
-              localStorage.setItem("activeCampId", nextId.toString());
-              setActiveCampId(nextId);
+              setActiveCampId(currentUser.campId || nextId);
             }}
             className="ml-1 text-[#69BFB7] hover:text-[#69BFB7] px-1.5 py-0.5 hover:bg-[#67ACA9]/20 rounded border border-[#67ACA9]/40 transition-all font-mono normal-case text-[10px]"
             title="Cambiar Campamento Activo"
@@ -299,8 +303,12 @@ function TopHud({
   const [timeString, setTimeString] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+    let serverBase = new Date();
+    let clientBase = Date.now();
+
     const updateTime = () => {
-      const now = new Date();
+      const now = new Date(serverBase.getTime() + (Date.now() - clientBase));
       const yyyy = now.getFullYear();
       const mm = String(now.getMonth() + 1).padStart(2, "0");
       const dd = String(now.getDate()).padStart(2, "0");
@@ -309,9 +317,25 @@ function TopHud({
       const sec = String(now.getSeconds()).padStart(2, "0");
       setTimeString(`${yyyy}-${mm}-${dd} ${hh}:${min}:${sec}`);
     };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
+
+    async function syncServerTime() {
+      try {
+        serverBase = new Date(await getServerTime());
+        clientBase = Date.now();
+      } catch (error) {
+        console.warn("Server time unavailable, using browser clock:", error);
+        serverBase = new Date();
+        clientBase = Date.now();
+      }
+      if (!cancelled) updateTime();
+    }
+
+    syncServerTime();
+    const interval = window.setInterval(updateTime, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, []);
 
   const getInitials = (name: string) => {
@@ -413,6 +437,45 @@ function NotificationsView() {
     { id: 2, title: "Expedición Beta Finalizada", body: "La cuadrilla retornó con 12.0 unidades de material de rescate de la Zona Cero.", time: "Hace 15 minutos", severity: "normal" },
     { id: 3, title: "Actualización de Red Satelital", body: "Línea de enlace con Alpha Bunker re-sincronizada completamente. Estado de telemetría nominal.", time: "Hace 1 hora", severity: "info" }
   ];
+  const [backendNotifications, setBackendNotifications] = useState(mockNotifications);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadNotifications() {
+      try {
+        const data = await listExpeditionNotifications();
+        if (!isMounted) return;
+        setBackendNotifications(
+          data.map((notification) => ({
+            id: notification.id,
+            title: notification.title,
+            body: notification.message,
+            time: new Date(notification.createdDate).toLocaleString(),
+            severity: notification.type,
+          })),
+        );
+      } catch (error) {
+        console.warn("Notifications unavailable:", error);
+        if (isMounted) setBackendNotifications([]);
+      }
+    }
+
+    loadNotifications();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleMarkRead = async (id: number) => {
+    try {
+      await markNotificationRead(id);
+      setBackendNotifications((current) => current.filter((notification) => notification.id !== id));
+    } catch (error) {
+      console.warn("Unable to mark notification as read:", error);
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-left">
@@ -472,8 +535,13 @@ function NotificationsView() {
           </div>
 
           <div className="flex flex-col gap-3 ml-1 mt-4">
-            {mockNotifications.map(n => (
-              <div key={n.id} className="p-3 bg-black/40 border border-[#67ACA9]/20 hover:border-[#69BFB7]/50 rounded-sm relative flex flex-col gap-1.5 transition-all">
+            {backendNotifications.map(n => (
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => handleMarkRead(n.id)}
+                className="p-3 bg-black/40 border border-[#67ACA9]/20 hover:border-[#69BFB7]/50 rounded-sm relative flex flex-col gap-1.5 transition-all text-left"
+              >
                 <div className="flex items-center justify-between">
                   <span className={`font-bold uppercase tracking-wider text-[11px] ${n.severity === 'high' ? 'text-red-400 font-black' : 'text-[#69BFB7]'}`}>
                     {n.severity === 'high' ? "⚠️ " : ""}{n.title}
@@ -481,7 +549,7 @@ function NotificationsView() {
                   <span className="text-[8px] tracking-widest text-[#A4C2C5]/50 uppercase font-mono">{n.time}</span>
                 </div>
                 <p className="text-[#A4C2C5]/85 text-[10.5px] leading-relaxed font-sans text-left">{n.body}</p>
-              </div>
+              </button>
             ))}
           </div>
         </div>
