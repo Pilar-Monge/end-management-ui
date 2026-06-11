@@ -1199,6 +1199,154 @@
   }
 }
 
+@media (max-width: 640px) {
+  .expx-shell {
+    gap: 10px;
+    overflow: visible;
+  }
+
+  .expx-kpis article,
+  .expx-wizard,
+  .expx-card,
+  .expx-detail-panel,
+  .expx-list-item,
+  .expx-map-side {
+    padding: 10px;
+  }
+
+  .expx-map-layout {
+    min-height: 0;
+  }
+
+  .expx-map-canvas {
+    min-height: 300px;
+  }
+
+  .expx-map-side,
+  .expx-camp-list {
+    max-height: 260px;
+  }
+
+  .expx-map-legend2 {
+    left: 6px;
+    top: 6px;
+  }
+
+  .expx-map-legend2 span,
+  .expx-camp-row,
+  .expx-list-item p,
+  .expx-detail-objective,
+  .expx-detail-crew p,
+  .expx-summary p,
+  .expx-card p {
+    font-size: 11px;
+  }
+
+  .expx-btn,
+  .expx-btn-ghost,
+  .expx-camp-row,
+  .expx-list-button,
+  .expx-person-card,
+  .expx-selected-chip {
+    min-height: 34px;
+  }
+
+  .expx-btn,
+  .expx-btn-ghost {
+    font-size: 10px;
+    padding: 8px 10px;
+  }
+
+  .expx-detail-head,
+  .expx-profile-head,
+  .expx-profile-main,
+  .expx-actions,
+  .expx-actions > div,
+  .expx-participants-inline,
+  .expx-overlay-head,
+  .expx-person-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .expx-person-actions .expx-btn,
+  .expx-person-actions .expx-btn-ghost,
+  .expx-actions .expx-btn,
+  .expx-actions .expx-btn-ghost,
+  .expx-participants-inline .expx-btn,
+  .expx-participants-inline .expx-btn-ghost {
+    width: 100%;
+  }
+
+  .expx-timeline {
+    grid-template-columns: 1fr;
+  }
+
+  .expx-detail-map {
+    height: 160px;
+    min-height: 160px;
+  }
+
+  .expx-profile-overlay,
+  .expx-profile-overlay--photo {
+    align-items: flex-start;
+    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .expx-profile-card {
+    border-radius: 8px;
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+    padding: 10px;
+    width: calc(100vw - 16px);
+  }
+
+  .expx-profile-main h4 {
+    font-size: 18px;
+    line-height: 1.1;
+  }
+
+  .expx-profile-status {
+    margin-left: 0;
+    text-align: center;
+  }
+
+  .expx-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .expx-profile-photo-modal {
+    width: calc(100vw - 16px);
+  }
+
+  .expx-profile-photo-modal img {
+    max-height: calc(100dvh - 16px);
+    object-fit: contain;
+  }
+
+  .expx-overlay {
+    inset: 0;
+    padding: 8px;
+    position: fixed;
+    z-index: 140;
+  }
+
+  .expx-overlay-card {
+    max-height: calc(100dvh - 16px);
+    padding: 10px;
+    width: calc(100vw - 16px);
+  }
+
+  .expx-form-grid input,
+  .expx-form-grid textarea,
+  .expx-form-grid select,
+  .expx-search input {
+    font-size: 12px;
+    min-height: 36px;
+  }
+}
+
 @keyframes expxShimmer {
   to {
     transform: translateX(100%);

@@ -4773,3 +4773,494 @@
   }
 }
 
+@media (max-width: 640px) {
+  .game-screen-layout {
+    min-height: 100dvh;
+  }
+
+  .game-hud-header {
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 6px 8px 4px !important;
+  }
+
+  .game-hud-header .top-hud-btn,
+  .admin-settings-hint {
+    font-size: 9px;
+    min-height: 30px;
+    padding: 4px 8px;
+  }
+
+  .game-hud-header .top-hud-btn .btn-text,
+  .admin-ui-v2-profile-hud-btn .btn-text {
+    max-width: 42vw;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-ui-v2-profile-session-dot {
+    flex: 0 0 auto;
+  }
+
+  .admin-ui-v2-profile-popover {
+    left: 8px;
+    max-height: calc(100dvh - 58px);
+    overflow-y: auto;
+    position: fixed;
+    right: 8px;
+    top: 44px;
+    width: auto;
+  }
+
+  .admin-ui-v2-profile-popover-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .main-area {
+    bottom: 62px !important;
+    height: auto !important;
+    padding: 4px 8px 0 !important;
+    top: 44px !important;
+  }
+
+  .content-scroll,
+  .settings-shell,
+  .settings-inner {
+    min-width: 0;
+  }
+
+  .settings-inner {
+    padding: 30px 0 0 !important;
+  }
+
+  .section-header {
+    min-width: 0;
+    top: 2px !important;
+    width: 100%;
+  }
+
+  .section-title-brush {
+    font-size: 12px !important;
+    letter-spacing: 0.08em !important;
+    max-width: calc(100vw - 80px);
+    overflow: hidden;
+    padding: 3px 1.4em !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .section-title-brush::before {
+    inset: -2px -1.8em !important;
+  }
+
+  .section-title-brush::after,
+  .watermark-x {
+    display: none;
+  }
+
+  .inner-layout {
+    flex-direction: column !important;
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  .inner-sidebar {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    max-width: none !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 4px 8px 0 !important;
+    width: 100% !important;
+  }
+
+  .inner-sidebar nav {
+    height: auto !important;
+    padding: 0 !important;
+  }
+
+  .inner-sidebar nav > div {
+    flex-direction: row !important;
+    gap: 6px !important;
+    min-width: max-content;
+  }
+
+  .inner-divider {
+    display: none;
+  }
+
+  .side-button,
+  .side-button.is-active,
+  .side-button:hover {
+    flex: 0 0 auto;
+    font-size: 10px !important;
+    line-height: 1.15 !important;
+    max-width: none !important;
+    min-height: 30px !important;
+    padding: 6px 10px !important;
+    transform: none !important;
+    width: auto !important;
+  }
+
+  .side-button .btn-text {
+    font-size: 10px !important;
+    white-space: nowrap;
+  }
+
+  .inner-content,
+  .admin-ui-v2-content-wrap,
+  .admin-ui-v2-content-wrap-full {
+    margin: 0 !important;
+    padding: 8px !important;
+    width: 100% !important;
+  }
+
+  .admin-ui-v2-content {
+    gap: 10px;
+  }
+
+  .admin-ui-v2-meta,
+  .admin-ui-v2-module-card,
+  .admin-ui-v2-pop-kpi-grid,
+  .admin-ui-v2-pop-status-bar,
+  .admin-ui-v2-pop-toolbar,
+  .admin-ui-v2-pop-empty,
+  .admin-ui-v2-pop-pagination,
+  .admin-ui-v2-temp-shell {
+    padding: 10px;
+  }
+
+  .admin-ui-v2-meta-title,
+  .admin-ui-v2-command-kicker,
+  .admin-ui-v2-section-head,
+  .admin-ui-v2-muted,
+  .admin-ui-v2-pop-status-bar > span,
+  .admin-ui-v2-temp-kicker {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+  }
+
+  .admin-ui-v2-meta-sub,
+  .admin-ui-v2-command-hero h2,
+  .admin-ui-v2-module-banner h3,
+  .admin-ui-v2-temp-hero h2 {
+    font-size: 15px;
+    line-height: 1.15;
+  }
+
+  .admin-ui-v2-command-hero,
+  .admin-ui-v2-module-banner,
+  .admin-ui-v2-expedition-command,
+  .admin-ui-v2-temp-hero,
+  .admin-ui-v2-adm-head,
+  .admin-ui-v2-expedition-detail-head,
+  .admin-ui-v2-intercamp-head,
+  .admin-ui-v2-intercamp-foot,
+  .admin-ui-v2-assignment-header,
+  .admin-ui-v2-assignment-details,
+  .admin-ui-v2-tactical-history-item,
+  .admin-ui-v2-resource-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-ui-v2-grid-2,
+  .admin-ui-v2-grid-3,
+  .admin-ui-v2-grid-4,
+  .admin-ui-v2-grid-roles,
+  .admin-ui-v2-overview-band,
+  .admin-ui-v2-analytics-band,
+  .admin-ui-v2-artifacts-band,
+  .admin-ui-v2-dashboard-main-grid,
+  .admin-ui-v2-priority-layout,
+  .admin-ui-v2-cycle-layout,
+  .admin-ui-v2-cycle-signals,
+  .admin-ui-v2-pop-overview-band,
+  .admin-ui-v2-pop-stats-grid,
+  .admin-ui-v2-pop-workload-card,
+  .admin-ui-v2-pop-users-layout,
+  .admin-ui-v2-pop-demography-grid,
+  .admin-ui-v2-pop-card-v2-meta-grid,
+  .admin-ui-v2-achievement-grid,
+  .admin-ui-v2-time-control-grid,
+  .admin-ui-v2-tactical-grid,
+  .admin-ui-v2-roles-kpi,
+  .admin-ui-v2-temp-kpis,
+  .admin-ui-v2-temp-sector-grid,
+  .admin-ui-v2-temp-quick,
+  .admin-ui-v2-temp-date-grid,
+  .admin-ui-v2-expeditions-grid,
+  .admin-ui-v2-expedition-ledger,
+  .admin-ui-v2-intercamp-grid,
+  .admin-ui-v2-leaflet-console {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-ui-v2-pop-card-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .admin-ui-v2-pop-card-v2 {
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .admin-ui-v2-pop-card-v2-identity {
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+
+  .admin-ui-v2-pop-card-v2-img,
+  .admin-ui-v2-pop-card-v2-avatar-fallback {
+    height: 54px;
+    width: 54px;
+  }
+
+  .admin-ui-v2-pop-table-shell {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-ui-v2-pop-table {
+    min-width: 760px;
+  }
+
+  .admin-ui-v2-toolbar,
+  .admin-ui-v2-pop-toolbar,
+  .admin-ui-v2-pagination,
+  .admin-ui-v2-pop-pagination,
+  .admin-ui-v2-actions,
+  .admin-ui-v2-form-grid .admin-ui-v2-actions,
+  .admin-ui-v2-person-detail .admin-ui-v2-actions,
+  .admin-ui-v2-person-modal-footer,
+  .admin-ui-v2-time-actions,
+  .admin-ui-v2-pop-card-v2-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-ui-v2-pop-view-toggle {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .admin-ui-v2-pop-view-toggle button,
+  .admin-ui-v2-btn,
+  .admin-ui-v2-pop-users-layout .admin-ui-v2-btn,
+  .admin-ui-v2-person-modal .admin-ui-v2-btn,
+  .admin-ui-v2-pop-empty .admin-ui-v2-btn,
+  .admin-ui-v2-pop-card-v2-actions .admin-ui-v2-btn,
+  .admin-ui-v2-pop-status-btn,
+  .admin-ui-v2-tab-btn,
+  .admin-ui-v2-temp-nav-btn,
+  .admin-ui-v2-candidate,
+  .admin-ui-v2-candidate-pill,
+  .admin-ui-v2-temp-choice,
+  .admin-ui-v2-temp-vacancy,
+  .admin-ui-v2-leaflet-route-row {
+    font-size: 10px;
+    min-height: 34px;
+    padding: 7px 10px;
+  }
+
+  .v-input,
+  .v-select,
+  .v-textarea,
+  .admin-ui-v2-form-grid input,
+  .admin-ui-v2-form-grid select,
+  .admin-ui-v2-temp-field {
+    font-size: 12px;
+    min-height: 36px;
+    width: 100%;
+  }
+
+  .admin-ui-v2-form-grid,
+  .admin-ui-v2-person-detail,
+  .admin-ui-v2-person-modal-body,
+  .admin-ui-v2-person-modal-grid,
+  .admin-ui-v2-adm-detail {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-ui-v2-form-grid .admin-ui-v2-actions,
+  .admin-ui-v2-form-grid .admin-ui-v2-muted,
+  .admin-ui-v2-person-detail > div:nth-last-child(2),
+  .admin-ui-v2-person-detail .admin-ui-v2-actions,
+  .admin-ui-v2-person-modal-grid > div:nth-child(3) {
+    grid-column: auto !important;
+  }
+
+  .admin-ui-v2-map-shell,
+  .admin-ui-v2-map-shell .expx-map-layout,
+  .admin-ui-v2-map-shell .expx-map-canvas,
+  .admin-ui-v2-intercamp-map-console,
+  .admin-ui-v2-map-shell-leaflet,
+  .admin-ui-v2-leaflet-console,
+  .admin-ui-v2-leaflet-map {
+    min-height: 320px !important;
+  }
+
+  .admin-ui-v2-leaflet-console {
+    overflow: visible;
+  }
+
+  .admin-ui-v2-leaflet-side {
+    max-height: 260px;
+  }
+
+  .admin-ui-v2-chart {
+    height: 180px;
+  }
+
+  .admin-ui-v2-donut-wrap {
+    height: 150px;
+  }
+
+  .admin-ui-v2-modal-backdrop,
+  .admin-ui-v2-photo-preview-overlay,
+  .admin-ui-v2-achievement-unlock-overlay {
+    align-items: flex-start;
+    padding: 8px;
+  }
+
+  .admin-ui-v2-modal,
+  .admin-ui-v2-person-modal-shell {
+    gap: 10px;
+    margin: 0;
+    max-height: calc(100dvh - 16px);
+    padding: 12px;
+    width: calc(100vw - 16px);
+  }
+
+  .admin-ui-v2-modal-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .admin-ui-v2-modal-header h3,
+  .admin-ui-v2-person-modal-title h2 {
+    font-size: 14px;
+    line-height: 1.15;
+  }
+
+  .admin-ui-v2-person-modal-head {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .admin-ui-v2-person-modal-photo-panel {
+    align-items: center;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+  }
+
+  .admin-ui-v2-person-modal-avatar {
+    height: 64px;
+    width: 64px;
+  }
+
+  .admin-ui-v2-person-modal-registry,
+  .admin-ui-v2-person-modal-status {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .admin-ui-v2-photo-preview-card,
+  .admin-ui-v2-achievement-unlock-card {
+    width: calc(100vw - 16px);
+  }
+
+  .admin-ui-v2-photo-preview-card img {
+    max-height: calc(100dvh - 76px);
+    object-fit: contain;
+  }
+
+  .admin-ui-v2-settings-photo-preview {
+    height: 72px;
+    width: 72px;
+  }
+
+  .dock {
+    bottom: 8px !important;
+    gap: 5px !important;
+    left: 50% !important;
+    max-width: calc(100vw - 74px);
+    overflow-x: auto;
+    padding: 0 4px;
+    transform: translateX(-50%) !important;
+  }
+
+  .dock-item,
+  .dock-item.is-active {
+    height: 40px !important;
+    min-width: 44px;
+    width: 44px !important;
+  }
+
+  .dock-item .dock-content svg {
+    height: 22px;
+    width: 22px;
+  }
+
+  .admin-settings-hint {
+    bottom: 10px;
+    max-width: 64px;
+    overflow: hidden;
+    right: 6px;
+    z-index: 70;
+  }
+}
+
+@media (max-width: 420px) {
+  .game-hud-header .top-hud-btn .btn-text,
+  .admin-ui-v2-profile-hud-btn .btn-text {
+    max-width: 38vw;
+  }
+
+  .admin-ui-v2-content-wrap,
+  .admin-ui-v2-content-wrap-full,
+  .inner-content {
+    padding: 6px !important;
+  }
+
+  .admin-ui-v2-meta,
+  .admin-ui-v2-module-card,
+  .admin-ui-v2-pop-kpi-grid,
+  .admin-ui-v2-pop-status-bar,
+  .admin-ui-v2-pop-toolbar,
+  .admin-ui-v2-pop-empty,
+  .admin-ui-v2-pop-pagination,
+  .admin-ui-v2-temp-shell {
+    padding: 8px;
+  }
+
+  .admin-ui-v2-map-shell,
+  .admin-ui-v2-map-shell .expx-map-layout,
+  .admin-ui-v2-map-shell .expx-map-canvas,
+  .admin-ui-v2-intercamp-map-console,
+  .admin-ui-v2-map-shell-leaflet,
+  .admin-ui-v2-leaflet-console,
+  .admin-ui-v2-leaflet-map {
+    min-height: 300px !important;
+  }
+
+  .admin-ui-v2-modal,
+  .admin-ui-v2-person-modal-shell {
+    padding: 10px;
+  }
+
+  .admin-ui-v2-person-modal-photo-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .dock-item,
+  .dock-item.is-active {
+    min-width: 40px;
+    width: 40px !important;
+  }
+}
+
