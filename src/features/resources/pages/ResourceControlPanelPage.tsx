@@ -263,7 +263,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
         else if (type === "intercampRequests") applyList(val, setIntercampRequests);
         else if (type === "requestResourceDetails") applyList(val, setRequestResourceDetails);
         else if (type === "transfers") applyList(val, setTransfers);
-        else if (type === "transferPersons") applyList(val, setTransferPersons);
+        else if (type === "transferPersons") { applyList(val, setTransferPersons); enrichPeopleFromTransfers(people, val as TransferPerson[]); }
         else if (type === "transferHistory") applyList(val, setTransferHistories);
         else if (type === "deliveredTransferResources") applyList(val, setDeliveredTransferResources);
         else if (type === "occupationCoverage") applyList(val, setOccupationCoverages);
@@ -285,6 +285,26 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
 
     if (!catalogsLoaded) {
       setCatalogsLoaded(true);
+    }
+  };
+
+  const enrichPeopleFromTransfers = async (currentPeople: CampPerson[], currentTransferPersons: TransferPerson[]) => {
+    const knownIds = new Set(currentPeople.map(p => String(p.id)));
+    const unknownIds = [...new Set(
+      currentTransferPersons
+        .map(tp => String(tp.personId))
+        .filter(id => id && !knownIds.has(id))
+    )];
+    if (unknownIds.length === 0) return;
+    const fetched = await Promise.allSettled(unknownIds.map(id => resourceApi.getPersonById(id)));
+    const newPersons: CampPerson[] = fetched
+      .filter((r): r is PromiseFulfilledResult<CampPerson | null> => r.status === "fulfilled" && r.value !== null)
+      .map(r => r.value as CampPerson);
+    if (newPersons.length > 0) {
+      setPeople(prev => {
+        const existing = new Set(prev.map(p => String(p.id)));
+        return [...prev, ...newPersons.filter(p => !existing.has(String(p.id)))];
+      });
     }
   };
 

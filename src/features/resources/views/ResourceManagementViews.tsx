@@ -4517,7 +4517,7 @@ export function ViewSolicitudesIntercampamento({
                 <span className="text-[#A4C2C5]/60 font-mono text-[9px] uppercase font-bold block mb-1">Manifiesto de Comitiva Asignada ({crew.length} efectivos):</span>
                 <div className="flex flex-col gap-1.5 p-1 bg-black/25 rounded">
                   {crew.map(member => {
-                    const person = PEOPLE.find(p => p.id === member.personId);
+                    const person = PEOPLE.find(p => String(p.id) === String(member.personId));
                     const isScout = person && ((person.role ?? "").toLowerCase().includes("scout") || person.name.toLowerCase().includes("scout"));
                     return (
                       <div key={member.id} className="flex justify-between text-[11px] font-sans px-2.5 py-1 bg-black/40 border border-gray-900 rounded-sm">
@@ -4639,7 +4639,7 @@ export function ViewTraslados({
     setValidationErrors([]);
     const assigned = transferPersons.filter(tp => tp.transferId === tId);
     const scoutAssigned = assigned.find(tp => {
-      const person = PEOPLE.find(p => p.id === tp.personId);
+      const person = PEOPLE.find(p => String(p.id) === String(tp.personId));
       return person && ((person.role ?? "").toLowerCase().includes("scout") || person.name.toLowerCase().includes("scout"));
     });
 
@@ -4662,7 +4662,7 @@ export function ViewTraslados({
       errors.push("Debe asignar obligatoriamente un Scout activo.");
     }
 
-    const selectedScoutObj = PEOPLE.find(p => p.id === modalScoutId);
+    const selectedScoutObj = PEOPLE.find(p => String(p.id) === String(modalScoutId));
     if (selectedScoutObj && selectedScoutObj.status !== "ACTIVE") {
       errors.push("El Scout seleccionado debe estar en estado ACTIVO.");
     }
@@ -4687,7 +4687,7 @@ export function ViewTraslados({
     }
 
     modalAdditionalIds.forEach(id => {
-      const poObj = PEOPLE.find(p => p.id === id);
+      const poObj = PEOPLE.find(p => String(p.id) === String(id));
       if (poObj && poObj.status !== "ACTIVE") {
         errors.push(`El personal adicional ${poObj.name} debe estar ACTIVO.`);
       }
