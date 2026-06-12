@@ -5075,6 +5075,32 @@
     padding: 7px 10px;
   }
 
+  .admin-ui-v2-pop-table th:last-child,
+  .admin-ui-v2-pop-table td:last-child {
+    min-width: 164px;
+    white-space: nowrap;
+    width: 164px;
+  }
+
+  .admin-ui-v2-pop-table .admin-ui-v2-actions {
+    align-items: center !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 3px;
+    justify-content: flex-start;
+    min-width: max-content;
+  }
+
+  .admin-ui-v2-pop-table .admin-ui-v2-btn {
+    flex: 0 0 auto;
+    font-size: 7px;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    min-height: 22px;
+    padding: 2px 4px;
+    white-space: nowrap;
+  }
+
   .v-input,
   .v-select,
   .v-textarea,
@@ -5292,7 +5318,7 @@
 
   .inner-sidebar {
     --admin-sidebar-y-offset: clamp(36px, calc(34px + (100dvh - 390px) * 0.16), 78px);
-    flex: 0 0 230px !important;
+    flex: 0 0 240px !important;
     max-height: 100%;
     overflow-y: auto !important;
     padding: var(--admin-sidebar-y-offset) 8px 10px 16px !important;
@@ -5309,6 +5335,22 @@
 
   .inner-sidebar nav > div {
     gap: 12px !important;
+  }
+
+  .side-button,
+  .side-button.is-active,
+  .side-button:hover {
+    font-size: 8.8px !important;
+    line-height: 15px !important;
+    min-height: 17px !important;
+    padding: 2px 6px 2px 7px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .side-button .btn-text {
+    font-size: 8.8px !important;
+    white-space: nowrap;
   }
 
   .admin-ui-v2-population {
@@ -5571,16 +5613,33 @@
   }
 
   .admin-ui-v2-pop-table .admin-ui-v2-actions {
+    align-items: center !important;
     flex-direction: row !important;
-    flex-wrap: wrap;
+    flex-wrap: nowrap !important;
     gap: 3px;
+    justify-content: flex-start;
+    min-width: max-content;
   }
 
   .admin-ui-v2-pop-table .admin-ui-v2-btn,
   .admin-ui-v2-pop-pagination .admin-ui-v2-btn {
-    font-size: 7.5px;
-    min-height: 21px;
-    padding: 2px 5px;
+    font-size: 6.5px;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    min-height: 20px;
+    padding: 2px 3px;
+    white-space: nowrap;
+  }
+
+  .admin-ui-v2-pop-table .admin-ui-v2-btn {
+    flex: 0 0 auto;
+  }
+
+  .admin-ui-v2-pop-table th:last-child,
+  .admin-ui-v2-pop-table td:last-child {
+    min-width: 140px;
+    white-space: nowrap;
+    width: 140px;
   }
 
   .admin-ui-v2-pop-pagination .admin-ui-v2-btn {
