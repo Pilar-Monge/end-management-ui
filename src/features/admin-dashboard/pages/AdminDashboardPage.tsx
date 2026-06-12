@@ -1772,7 +1772,7 @@ function TopHud({
                 type="button"
                 onClick={() => setIsProfilePreviewOpen(false)}
               >
-                CERRAR
+                X
               </button>
               <img
                 src={profile.avatarUrl ?? undefined}
@@ -3622,7 +3622,7 @@ const PopulationModule = memo(function PopulationModule({
           <div className={`admin-ui-v2-modal ${isEditMode ? "admin-ui-v2-person-edit-modal" : "admin-ui-v2-person-modal-shell"}`} onClick={(event) => event.stopPropagation()}>
             <div className="admin-ui-v2-modal-header">
               <h3>{isEditMode ? "Editar Persona" : "Ficha de Persona"}</h3>
-              <button className="admin-ui-v2-btn" type="button" onClick={closePersonModal}>Cerrar</button>
+              <button className="admin-ui-v2-btn" type="button" onClick={closePersonModal}>X</button>
             </div>
 
             {isEditMode ? (
@@ -3753,7 +3753,7 @@ const PopulationModule = memo(function PopulationModule({
 
                   <div className="admin-ui-v2-person-modal-footer">
                     {isOwnRecord && <span className="admin-ui-v2-muted">Tu propio perfil se edita desde Configuracion.</span>}
-                    <button className="admin-ui-v2-btn" onClick={closePersonModal} type="button">Cerrar</button>
+                    <button className="admin-ui-v2-btn" onClick={closePersonModal} type="button">X</button>
                     <button className="admin-ui-v2-btn is-info" onClick={() => setIsEditMode(true)} type="button" disabled={isOwnRecord}>Editar ficha</button>
                     <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(selectedPerson.id)} type="button" disabled={isSaving || isOwnRecord}>Eliminar</button>
                   </div>
@@ -4596,7 +4596,7 @@ function AdmissionReviewModal({
       <div className="admin-ui-v2-modal" onClick={(event) => event.stopPropagation()}>
         <div className="admin-ui-v2-modal-header">
           <h3>Reporte Detallado - IA</h3>
-          <button className="admin-ui-v2-btn" type="button" onClick={onClose}>Cerrar</button>
+          <button className="admin-ui-v2-btn" type="button" onClick={onClose}>X</button>
         </div>
 
         <div className="admin-ui-v2-adm-detail">

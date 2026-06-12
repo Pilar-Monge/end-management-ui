@@ -5656,15 +5656,15 @@
   }
 
   .admin-ui-v2-modal-backdrop {
-    align-items: center;
+    align-items: flex-start;
     padding: 6px 10px;
   }
 
   .admin-ui-v2-person-modal-shell {
     gap: 4px;
-    height: min(320px, calc(100dvh - 44px));
-    max-height: calc(100dvh - 44px);
-    overflow: hidden;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
     padding: 5px 6px;
     width: min(660px, calc(100vw - 56px));
   }
@@ -5693,7 +5693,7 @@
     gap: 3px;
     grid-template-rows: auto minmax(0, 1fr) auto;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible !important;
   }
 
   .admin-ui-v2-person-modal-shell .admin-ui-v2-person-modal-head {
@@ -5713,7 +5713,7 @@
     gap: 4px;
     grid-template-columns: 66px minmax(0, 1fr) !important;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible !important;
   }
 
   .admin-ui-v2-person-modal-photo-panel {
@@ -5747,7 +5747,7 @@
   .admin-ui-v2-person-modal-info {
     gap: 3px;
     min-height: 0;
-    overflow-y: auto;
+    overflow-y: visible !important;
     padding-right: 2px;
     scrollbar-width: thin;
   }
@@ -5826,7 +5826,9 @@
   }
 
   .admin-ui-v2-person-edit-modal {
-    max-height: calc(100dvh - 12px);
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
     padding: 10px;
     width: min(820px, calc(100vw - 20px));
   }
@@ -5835,8 +5837,8 @@
     gap: 6px;
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     margin-top: 0;
-    max-height: calc(100dvh - 82px);
-    overflow-y: auto;
+    max-height: none !important;
+    overflow-y: visible !important;
     padding-right: 4px;
   }
 
