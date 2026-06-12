@@ -3156,7 +3156,7 @@ export function ViewSolicitudesIntercampamento({
   intercampRequests: IntercampRequest[];
   requestResourceDetails: RequestResourceDetail[];
   onAddRequest: (data: Omit<IntercampRequest, "id">) => IntercampRequest | string | null | Promise<IntercampRequest | string | null>;
-  onUpdateRequestStatus: (id: string, status: IntercampRequest["status"], responder: string, transportPersonIds?: string[]) => void | Promise<void>;
+  onUpdateRequestStatus: (id: string, status: IntercampRequest["status"], responder: string, transportPersonIds?: string[]) => Promise<boolean> | boolean | void | Promise<void>;
   onAddResourceToRequest: (requestId: string, resourceTypeId: string, requestedAmount: number) => void;
   onDeleteRequestResource: (id: string) => void;
   onUpdateRequest: (id: string, patch: Partial<IntercampRequest>) => void;
@@ -3342,14 +3342,16 @@ export function ViewSolicitudesIntercampamento({
       return;
     }
 
-    await onUpdateRequestStatus(evaluatingRequest.id, "APPROVED", currentUser.userId, selectedOperPersonIds);
-    setEvaluatingReqId(null);
-    setAssignedScoutId("");
-    setAdditionalPersonIds([]);
-    setShowSuccessToast(true);
-    setTimeout(() => {
-      setShowSuccessToast(false);
-    }, 4000);
+    const success = await onUpdateRequestStatus(evaluatingRequest.id, "APPROVED", currentUser.userId, selectedOperPersonIds);
+    if (success) {
+      setEvaluatingReqId(null);
+      setAssignedScoutId("");
+      setAdditionalPersonIds([]);
+      setShowSuccessToast(true);
+      setTimeout(() => {
+        setShowSuccessToast(false);
+      }, 4000);
+    }
   };
 
   const handleCreateDraft = async (e: React.FormEvent) => {

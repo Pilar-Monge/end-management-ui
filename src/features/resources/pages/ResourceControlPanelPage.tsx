@@ -446,19 +446,22 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     }
   };
 
-  const handleUpdateRequestStatus = async (id: string, status: IntercampRequest["status"], responder: string, transportPersonIds?: string[]) => {
+  const handleUpdateRequestStatus = async (id: string, status: IntercampRequest["status"], responder: string, transportPersonIds?: string[]): Promise<boolean> => {
     try {
       await resourceApi.updateIntercampRequestStatus(id, status, responder, transportPersonIds);
       await fetchAllSystemData();
-      return;
+      return true;
     } catch (error) {
       console.warn("Could not update intercamp request status.", error);
       alert("No se pudo actualizar la solicitud en la API. Se actualizará solo en pantalla.");
     }
 
-    setIntercampRequests(prev =>
-      prev.map(r => (r.id === id ? { ...r, status, responseDate: "Hoy", respondedBy: responder } : r))
-    );
+    if (status !== "APPROVED") {
+      setIntercampRequests(prev =>
+        prev.map(r => (r.id === id ? { ...r, status, responseDate: "Hoy", respondedBy: responder } : r))
+      );
+    }
+    return false;
   };
 
   const handleAddResourceToRequest = async (requestId: string, resourceTypeId: string, requestedAmount: number) => {
