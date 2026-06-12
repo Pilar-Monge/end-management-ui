@@ -446,19 +446,23 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     }
   };
 
-  const handleUpdateRequestStatus = async (id: string, status: IntercampRequest["status"], responder: string, transportPersonIds?: string[]) => {
+  const handleUpdateRequestStatus = async (id: string, status: IntercampRequest["status"], responder: string, transportPersonIds?: string[]): Promise<boolean> => {
     try {
       await resourceApi.updateIntercampRequestStatus(id, status, responder, transportPersonIds);
       await fetchAllSystemData();
-      return;
+      return true;
     } catch (error) {
       console.warn("Could not update intercamp request status.", error);
-      alert("No se pudo actualizar la solicitud en la API. Se actualizará solo en pantalla.");
+      const details = error instanceof ApiHttpError ? error.details : undefined;
+      alert(`No se pudo actualizar la solicitud en la API.\nMotivo: ${details || "Error de conexión o de validación"}`);
     }
 
-    setIntercampRequests(prev =>
-      prev.map(r => (r.id === id ? { ...r, status, responseDate: "Hoy", respondedBy: responder } : r))
-    );
+    if (status !== "APPROVED") {
+      setIntercampRequests(prev =>
+        prev.map(r => (r.id === id ? { ...r, status, responseDate: "Hoy", respondedBy: responder } : r))
+      );
+    }
+    return false;
   };
 
   const handleAddResourceToRequest = async (requestId: string, resourceTypeId: string, requestedAmount: number) => {
@@ -821,6 +825,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             setTransferPersons={setTransferPersons}
             transferHistories={transferHistories}
             serverNow={getCurrentServerTime()}
+            campPersonnel={people}
           />
         );
       case "Traslados":
@@ -859,6 +864,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
               }]);
             }}
             onSaveDelivery={handleSaveDelivery}
+            campPersonnel={people}
           />
         );
       case "Historial de traslados":
