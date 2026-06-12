@@ -453,7 +453,8 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       return true;
     } catch (error) {
       console.warn("Could not update intercamp request status.", error);
-      alert("No se pudo actualizar la solicitud en la API. Se actualizará solo en pantalla.");
+      const details = error instanceof ApiHttpError ? error.details : undefined;
+      alert(`No se pudo actualizar la solicitud en la API.\nMotivo: ${details || "Error de conexión o de validación"}`);
     }
 
     if (status !== "APPROVED") {
@@ -824,6 +825,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             setTransferPersons={setTransferPersons}
             transferHistories={transferHistories}
             serverNow={getCurrentServerTime()}
+            campPersonnel={people}
           />
         );
       case "Traslados":
@@ -862,6 +864,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
               }]);
             }}
             onSaveDelivery={handleSaveDelivery}
+            campPersonnel={people}
           />
         );
       case "Historial de traslados":

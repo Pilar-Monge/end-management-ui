@@ -671,6 +671,12 @@ export const resourceApi = {
       campId: str(item.campId ?? childId(item, "camp")),
       status: normalizePersonStatus(item.currentStatus ?? item.status ?? item.current_status),
       occupationId: str(item.occupationId ?? childId(item, "occupation")),
+      role: str(
+        item.occupationName ??
+        item.occupation_name ??
+        (item.occupation && typeof item.occupation === "object" ? (item.occupation as Record<string, unknown>).name : undefined) ??
+        ""
+      ),
     }));
   },
 
