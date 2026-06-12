@@ -5291,10 +5291,11 @@
   }
 
   .inner-sidebar {
+    --admin-sidebar-y-offset: clamp(36px, calc(34px + (100dvh - 390px) * 0.16), 78px);
     flex: 0 0 230px !important;
     max-height: 100%;
     overflow-y: auto !important;
-    padding: 10px 8px 10px 8px !important;
+    padding: var(--admin-sidebar-y-offset) 8px 10px 16px !important;
     scrollbar-width: none;
   }
 
@@ -5311,7 +5312,9 @@
   }
 
   .admin-ui-v2-population {
+    flex: 1 1 auto;
     gap: 8px;
+    min-height: 0;
   }
 
   .admin-ui-v2-pop-overview-band {
@@ -5432,6 +5435,278 @@
   .admin-ui-v2-threat-track,
   .admin-ui-v2-pop-meter {
     height: 6px;
+  }
+
+  .admin-ui-v2-pop-users-layout {
+    align-items: stretch;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 0.28fr) !important;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .admin-ui-v2-pop-users-main,
+  .admin-ui-v2-pop-side-panel {
+    gap: 8px;
+    min-height: 0;
+  }
+
+  .admin-ui-v2-pop-users-main {
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    height: 100%;
+  }
+
+  .admin-ui-v2-pop-status-bar,
+  .admin-ui-v2-pop-toolbar,
+  .admin-ui-v2-pop-pagination {
+    gap: 5px;
+    padding: 6px;
+  }
+
+  .admin-ui-v2-pop-pagination {
+    align-items: center !important;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between;
+    min-height: 34px;
+    padding: 4px 6px !important;
+  }
+
+  .admin-ui-v2-pop-pagination .admin-ui-v2-actions {
+    align-items: center !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap;
+    gap: 5px;
+  }
+
+  .admin-ui-v2-pop-pagination .admin-ui-v2-muted {
+    font-size: 8px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .admin-ui-v2-pop-status-bar > span {
+    font-size: 8px;
+    letter-spacing: 0.05em;
+    padding: 0 2px;
+  }
+
+  .admin-ui-v2-pop-status-btn,
+  .admin-ui-v2-pop-view-toggle button {
+    font-size: 8px;
+    gap: 4px;
+    min-height: 23px;
+    padding: 3px 6px;
+  }
+
+  .admin-ui-v2-pop-status-btn strong {
+    font-size: 7.5px;
+    min-width: 14px;
+    padding: 0 3px;
+  }
+
+  .admin-ui-v2-pop-toolbar .v-input,
+  .admin-ui-v2-pop-toolbar .v-select {
+    font-size: 9px;
+    min-height: 28px;
+  }
+
+  .admin-ui-v2-pop-toolbar .v-select {
+    min-width: 118px;
+  }
+
+  .admin-ui-v2-pop-view-toggle {
+    margin-left: 0;
+    padding: 2px;
+  }
+
+  .admin-ui-v2-pop-table-shell {
+    height: 100%;
+    max-height: none;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-ui-v2-pop-table {
+    min-width: 640px !important;
+  }
+
+  .admin-ui-v2-pop-table th,
+  .admin-ui-v2-pop-table td {
+    font-size: 8px;
+    padding: 5px 6px;
+    vertical-align: middle;
+  }
+
+  .admin-ui-v2-pop-table th:nth-child(2),
+  .admin-ui-v2-pop-table td:nth-child(2),
+  .admin-ui-v2-pop-table th:nth-child(6),
+  .admin-ui-v2-pop-table td:nth-child(6) {
+    display: none;
+  }
+
+  .admin-ui-v2-pop-person-cell {
+    gap: 6px;
+  }
+
+  .admin-ui-v2-pop-person-cell .admin-ui-v2-person-avatar {
+    height: 24px;
+    width: 24px;
+  }
+
+  .admin-ui-v2-pop-person-cell strong {
+    font-size: 9.5px;
+  }
+
+  .admin-ui-v2-pop-person-cell small {
+    font-size: 7.5px;
+  }
+
+  .admin-ui-v2-pop-table .admin-ui-v2-pill {
+    font-size: 7px;
+    letter-spacing: 0.04em;
+    padding: 2px 4px;
+  }
+
+  .admin-ui-v2-pop-table .admin-ui-v2-actions {
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+
+  .admin-ui-v2-pop-table .admin-ui-v2-btn,
+  .admin-ui-v2-pop-pagination .admin-ui-v2-btn {
+    font-size: 7.5px;
+    min-height: 21px;
+    padding: 2px 5px;
+  }
+
+  .admin-ui-v2-pop-pagination .admin-ui-v2-btn {
+    min-width: 42px;
+  }
+
+  .admin-ui-v2-pop-side-panel .admin-ui-v2-module-card {
+    padding: 7px;
+  }
+
+  .admin-ui-v2-pop-side-panel .admin-ui-v2-pop-density-row,
+  .admin-ui-v2-pop-side-panel .admin-ui-v2-pop-alert-row {
+    padding: 5px;
+  }
+
+  .admin-ui-v2-modal-backdrop {
+    align-items: center;
+    padding: 6px 10px;
+  }
+
+  .admin-ui-v2-person-modal-shell {
+    max-height: calc(100dvh - 12px);
+    padding: 8px;
+    width: min(760px, calc(100vw - 20px));
+  }
+
+  .admin-ui-v2-person-modal-shell .admin-ui-v2-modal-header,
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-modal-header {
+    margin-bottom: 0;
+  }
+
+  .admin-ui-v2-person-modal-shell .admin-ui-v2-modal-header h3,
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-modal-header h3 {
+    font-size: 10px;
+  }
+
+  .admin-ui-v2-person-modal-body {
+    gap: 7px;
+    grid-template-columns: 96px minmax(0, 1fr) !important;
+  }
+
+  .admin-ui-v2-person-modal-photo-panel {
+    gap: 5px;
+    padding: 6px;
+  }
+
+  .admin-ui-v2-person-modal-avatar {
+    height: 54px;
+    width: 54px;
+  }
+
+  .admin-ui-v2-person-modal-grid {
+    gap: 5px;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .admin-ui-v2-person-modal-grid > div:nth-child(3) {
+    grid-column: span 2 !important;
+  }
+
+  .admin-ui-v2-person-modal-grid > div,
+  .admin-ui-v2-person-modal-achievements,
+  .admin-ui-v2-person-modal-notes {
+    padding: 5px 6px;
+  }
+
+  .admin-ui-v2-person-modal-title h2 {
+    font-size: 13px;
+  }
+
+  .admin-ui-v2-person-modal-title p,
+  .admin-ui-v2-person-modal-grid small,
+  .admin-ui-v2-person-modal-notes p {
+    font-size: 8px;
+    line-height: 1.2;
+  }
+
+  .admin-ui-v2-person-modal-grid strong {
+    font-size: 9px;
+  }
+
+  .admin-ui-v2-person-modal-footer {
+    gap: 4px;
+    padding-top: 5px;
+  }
+
+  .admin-ui-v2-person-modal .admin-ui-v2-btn {
+    font-size: 7.5px;
+    min-height: 21px;
+    padding: 2px 6px;
+  }
+
+  .admin-ui-v2-person-edit-modal {
+    max-height: calc(100dvh - 12px);
+    padding: 10px;
+    width: min(820px, calc(100vw - 20px));
+  }
+
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-form-grid {
+    gap: 6px;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    margin-top: 0;
+    max-height: calc(100dvh - 82px);
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .admin-ui-v2-person-edit-modal .v-input,
+  .admin-ui-v2-person-edit-modal .v-select,
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-form-grid input,
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-form-grid select {
+    font-size: 9px;
+    min-height: 28px;
+  }
+
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-form-grid .admin-ui-v2-actions,
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-form-grid .admin-ui-v2-muted {
+    grid-column: 1 / -1 !important;
+  }
+
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-form-grid .admin-ui-v2-actions {
+    flex-direction: row !important;
+    gap: 6px;
+    justify-content: flex-end;
+    margin-top: 4px;
+    padding-top: 8px;
   }
 }
 

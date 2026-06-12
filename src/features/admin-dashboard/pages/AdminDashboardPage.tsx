@@ -3619,7 +3619,7 @@ const PopulationModule = memo(function PopulationModule({
 
       {selectedPerson && (
         <div className="admin-ui-v2-modal-backdrop" onClick={closePersonModal}>
-          <div className={`admin-ui-v2-modal ${isEditMode ? "" : "admin-ui-v2-person-modal-shell"}`} onClick={(event) => event.stopPropagation()}>
+          <div className={`admin-ui-v2-modal ${isEditMode ? "admin-ui-v2-person-edit-modal" : "admin-ui-v2-person-modal-shell"}`} onClick={(event) => event.stopPropagation()}>
             <div className="admin-ui-v2-modal-header">
               <h3>{isEditMode ? "Editar Persona" : "Ficha de Persona"}</h3>
               <button className="admin-ui-v2-btn" type="button" onClick={closePersonModal}>Cerrar</button>
