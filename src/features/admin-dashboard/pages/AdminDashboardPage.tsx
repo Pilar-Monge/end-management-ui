@@ -232,7 +232,7 @@ interface TempRoleAssignment {
   fromRole: string;
   tempRole: string;
   startDate: string;
-  endDate: string;
+  endDate: string | null;
   reason: string;
   status: "ACTIVA" | "FINALIZADA";
 }
@@ -394,6 +394,23 @@ function assignmentStatusFromApi(item: Record<string, unknown>): TempRoleAssignm
     return "FINALIZADA";
   }
 
+  if (normalizedStatus === "ACTIVA" || normalizedStatus === "ACTIVE") {
+    return "ACTIVA";
+  }
+
+  const endDateStr = firstStringField(item, ["endDate", "end_date", "expiresAt", "expires_at"]);
+  if (endDateStr) {
+    const endDate = parseTemporaryDate(endDateStr);
+    if (!Number.isNaN(endDate.getTime())) {
+      const now = new Date();
+      const endMidnight = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+      const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (endMidnight.getTime() < nowMidnight.getTime()) {
+        return "FINALIZADA";
+      }
+    }
+  }
+
   return "ACTIVA";
 }
 
@@ -410,8 +427,9 @@ function temporarySectorForRole(roleName: string): TemporarySector {
     ?? TEMPORARY_SECTORS[TEMPORARY_SECTORS.length - 1];
 }
 
-function parseTemporaryDate(value: string): Date {
-  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+function parseTemporaryDate(value: string | null | undefined): Date {
+  if (!value) return new Date(NaN);
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
   if (dateOnlyMatch) {
     const [, year, month, day] = dateOnlyMatch;
     return new Date(Number(year), Number(month) - 1, Number(day));
@@ -420,9 +438,12 @@ function parseTemporaryDate(value: string): Date {
   return new Date(value);
 }
 
-function temporaryAssignmentProgress(startDate: string, endDate: string): { value: number; urgent: boolean; label: string } {
+function temporaryAssignmentProgress(startDate: string, endDate: string | null | undefined): { value: number; urgent: boolean; label: string } {
+  if (!endDate) {
+    return { value: 0, urgent: false, label: "Sin límite" };
+  }
   const start = parseTemporaryDate(startDate).getTime();
-  const end = parseTemporaryDate(endDate).getTime();
+  const end = parseTemporaryDate(endDate).getTime() + 24 * 60 * 60 * 1000;
   const now = Date.now();
 
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
@@ -434,9 +455,10 @@ function temporaryAssignmentProgress(startDate: string, endDate: string): { valu
   return { value, urgent, label: `${value}% completado` };
 }
 
-function temporaryDateLabel(value: string): string {
+function temporaryDateLabel(value: string | null | undefined): string {
+  if (!value) return "Indefinida";
   const parsed = parseTemporaryDate(value);
-  if (Number.isNaN(parsed.getTime())) return "Sin fecha";
+  if (Number.isNaN(parsed.getTime())) return "Indefinida";
   return parsed.toLocaleDateString("es-CR");
 }
 
@@ -2549,8 +2571,7 @@ const PopulationModule = memo(function PopulationModule({
           ?? "Desconocido";
       const startDate = firstStringField(rawItem, ["startDate", "start_date", "assignedAt", "assigned_at", "createdAt", "created_at"])
         ?? new Date().toISOString();
-      const endDate = firstStringField(rawItem, ["endDate", "end_date", "expiresAt", "expires_at", "finishedAt", "finished_at", "revokedAt", "revoked_at"])
-        ?? startDate;
+      const endDate = firstStringField(rawItem, ["endDate", "end_date", "expiresAt", "expires_at", "finishedAt", "finished_at", "revokedAt", "revoked_at"]);
 
       mapped.push({
         id: assignmentId,
