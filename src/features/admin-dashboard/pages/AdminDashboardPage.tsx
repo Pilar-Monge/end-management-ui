@@ -49,7 +49,7 @@ import {
 import type { MappedCampPoint } from "../expeditions/types";
 import { AdminSyncOverlay } from "../components/AdminSyncOverlay";
 import { SESSION_TOKEN_CHANGED_EVENT } from "../../../shared/services/sessionService";
-import { logoutCurrentSession } from "../../../shared/services/sessionProfile";
+import { checkCurrentSessionStatus, clearCachedSession, logoutCurrentSession } from "../../../shared/services/sessionProfile";
 import { ApiHttpError, apiRequest } from "../../../shared/services/httpClient";
 import { getErrorMessage } from "../../../shared/services/errorMessages";
 import { PopupMessage } from "../../../shared/components/PopupMessage";
@@ -224,6 +224,7 @@ interface GlobalTimeState {
 }
 
 const SESSION_TIMEOUT_MS = 20 * 60 * 1000;
+const LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS = 60 * 1000;
 
 interface TempRoleAssignment {
   id: number;
@@ -861,8 +862,8 @@ function resolveAdminProfileImage(sessionUser: SessionAdminUser, matchedPerson: 
 }
 
 function formatHudDateTime(date: Date): { day: string; time: string } {
-  const day = `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
-  const time = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}`;
+  const day = `${String(date.getUTCDate()).padStart(2, "0")}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`;
+  const time = `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(date.getUTCSeconds()).padStart(2, "0")}`;
   return { day, time };
 }
 
@@ -871,6 +872,7 @@ function formatSystemDateTime(value?: string | null): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleString("es-CR", {
+    timeZone: "UTC",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -930,6 +932,8 @@ export default function AdminDashboardPage() {
     syncedAtClientMs: Date.now(),
     status: "syncing",
   });
+  const globalTimeStateRef = useRef(globalTimeState);
+  const lastSyncedGlobalTimeRef = useRef<Pick<GlobalTimeState, "baseServerTime" | "syncedAtClientMs"> | null>(null);
   const lastActivityUpdateRef = useRef(0);
   const lastActivityAtRef = useRef(Date.now());
   const bootStartedAtRef = useRef<number>(Date.now());
@@ -948,6 +952,62 @@ export default function AdminDashboardPage() {
     },
     [],
   );
+
+  const syncGlobalTimeFromServerValue = useCallback((serverTime: string) => {
+    const parsed = new Date(serverTime);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error("Invalid server time");
+    }
+
+    setGlobalTimeState({
+      baseServerTime: parsed,
+      syncedAtClientMs: Date.now(),
+      status: "synced",
+    });
+  }, []);
+
+  useEffect(() => {
+    globalTimeStateRef.current = globalTimeState;
+    if (globalTimeState.status === "synced") {
+      lastSyncedGlobalTimeRef.current = {
+        baseServerTime: globalTimeState.baseServerTime,
+        syncedAtClientMs: globalTimeState.syncedAtClientMs,
+      };
+    }
+  }, [globalTimeState]);
+
+  const redirectExpiredLogicalSession = useCallback(() => {
+    clearCachedSession(true);
+    navigate("/main-homepage", {
+      replace: true,
+      state: {
+        initialAppState: "login",
+        sessionMessage: "Sesion expirada por avance del tiempo logico. Inicia sesion para continuar.",
+      },
+    });
+  }, [navigate]);
+
+  const validateSessionAfterLogicalTimeJump = useCallback(async (nextServerTime: Date): Promise<boolean> => {
+    const previous = lastSyncedGlobalTimeRef.current;
+    if (!previous) {
+      return false;
+    }
+
+    const expectedServerTimeMs = previous.baseServerTime.getTime() + Math.max(0, Date.now() - previous.syncedAtClientMs);
+    const forwardJumpMs = nextServerTime.getTime() - expectedServerTimeMs;
+
+    if (forwardJumpMs <= LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS) {
+      return false;
+    }
+
+    const status = await checkCurrentSessionStatus();
+    if (status !== "expired") {
+      return false;
+    }
+
+    redirectExpiredLogicalSession();
+    return true;
+  }, [redirectExpiredLogicalSession]);
 
   const enqueueAchievementUnlocks = useCallback(
     (items: CampAchievementUnlock[]) => {
@@ -1253,17 +1313,12 @@ export default function AdminDashboardPage() {
         if (Number.isNaN(parsed.getTime())) {
           throw new Error("Invalid server time");
         }
-
-        setGlobalTimeState({
-          baseServerTime: parsed,
-          syncedAtClientMs: Date.now(),
-          status: "synced",
-        });
+        const sessionExpired = await validateSessionAfterLogicalTimeJump(parsed);
+        if (sessionExpired) return;
+        syncGlobalTimeFromServerValue(data.serverTime);
       } catch {
         setGlobalTimeState((prev) => ({
           ...prev,
-          baseServerTime: new Date(),
-          syncedAtClientMs: Date.now(),
           status: "error",
         }));
       }
@@ -1272,10 +1327,10 @@ export default function AdminDashboardPage() {
     void syncGlobalTime();
     const syncInterval = window.setInterval(() => {
       void syncGlobalTime();
-    }, 60000);
+    }, 10000);
 
     return () => window.clearInterval(syncInterval);
-  }, [hasEntered]);
+  }, [hasEntered, syncGlobalTimeFromServerValue, validateSessionAfterLogicalTimeJump]);
 
   useEffect(() => {
     if (activeAchievementUnlock || achievementUnlockQueue.length === 0) return;
@@ -1558,6 +1613,8 @@ export default function AdminDashboardPage() {
                         currentAdminPersonId={positiveNumber(authenticatedPerson?.id) ?? resolveSessionPersonId(sessionAdminUser, persons)}
                         onRefreshAdminProfile={() => { void refreshCurrentUserFromBackend(); }}
                         onProfilePersonUpdated={handleProfilePersonUpdated}
+                        onSystemTimeSync={syncGlobalTimeFromServerValue}
+                        onLogicalTimeAdvanced={validateSessionAfterLogicalTimeJump}
                       />
                     </div>
                   </div>
@@ -1895,6 +1952,8 @@ function ContentArea({
   currentAdminPersonId,
   onRefreshAdminProfile,
   onProfilePersonUpdated,
+  onSystemTimeSync,
+  onLogicalTimeAdvanced,
 }: {
   section: AdminSectionId;
   sub: string;
@@ -1931,6 +1990,8 @@ function ContentArea({
   currentAdminPersonId: number | null;
   onRefreshAdminProfile: () => void;
   onProfilePersonUpdated: (person: Person) => void;
+  onSystemTimeSync: (serverTime: string) => void;
+  onLogicalTimeAdvanced: (nextServerTime: Date) => Promise<boolean>;
 }) {
   const unreadNotificationsCount = useMemo(
     () => notifications.filter((item) => !item.read).length,
@@ -2138,6 +2199,8 @@ function ContentArea({
           onProfileRefresh={onRefreshAdminProfile}
           onReloadPersons={onPopulationReload}
           onProfilePersonUpdated={onProfilePersonUpdated}
+          onSystemTimeSync={onSystemTimeSync}
+          onLogicalTimeAdvanced={onLogicalTimeAdvanced}
         />
       )}
 
@@ -4073,6 +4136,8 @@ const SettingsModule = memo(function SettingsModule({
   onProfileRefresh,
   onReloadPersons,
   onProfilePersonUpdated,
+  onSystemTimeSync,
+  onLogicalTimeAdvanced,
 }: {
   sub: string;
   profile: SessionAdminUser;
@@ -4082,6 +4147,8 @@ const SettingsModule = memo(function SettingsModule({
   onProfileRefresh: () => void;
   onReloadPersons: () => Promise<void>;
   onProfilePersonUpdated: (person: Person) => void;
+  onSystemTimeSync: (serverTime: string) => void;
+  onLogicalTimeAdvanced: (nextServerTime: Date) => Promise<boolean>;
 }) {
   const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
   const ALLOWED_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
@@ -4134,12 +4201,13 @@ const SettingsModule = memo(function SettingsModule({
       ]);
       setSystemTime(serverTimeResult.serverTime);
       setTimeOffset(offsetResult);
+      onSystemTimeSync(serverTimeResult.serverTime);
     } catch (error) {
       onNotice("configuracion", "error", getErrorMessage(error, "load_dashboard"));
     } finally {
       setIsLoadingTime(false);
     }
-  }, [onNotice]);
+  }, [onNotice, onSystemTimeSync]);
 
   useEffect(() => {
     if (sub !== "Tiempo lógico") return;
@@ -4181,8 +4249,15 @@ const SettingsModule = memo(function SettingsModule({
     setAdvanceResult(null);
     try {
       const result = await advanceSystemTime({ unit, amount });
+      const parsedCurrentSystemTime = new Date(result.currentSystemTime);
+      if (!Number.isNaN(parsedCurrentSystemTime.getTime())) {
+        const sessionExpired = await onLogicalTimeAdvanced(parsedCurrentSystemTime);
+        if (sessionExpired) return;
+      }
+
       setAdvanceResult(result);
       setSystemTime(result.currentSystemTime);
+      onSystemTimeSync(result.currentSystemTime);
       setTimeOffset({
         offsetMilliseconds: result.offsetMilliseconds,
         currentSystemTime: result.currentSystemTime,
