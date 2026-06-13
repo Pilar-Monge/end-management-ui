@@ -6565,5 +6565,84 @@
   .admin-ui-v2-leaflet-side {
     max-height: 220px !important;
   }
+
+  /* --- PROFILE POPOVER LANDSCAPE MOBILE (COMPACT FLOATING CARD) --- */
+  .admin-ui-v2-profile-popover {
+    position: absolute !important;
+    top: calc(100% + 4px) !important;
+    right: 0 !important;
+    left: auto !important;
+    width: 280px !important;
+    max-height: 220px !important;
+    overflow-y: auto !important;
+    margin: 0 !important;
+    border: 1px solid rgba(103, 172, 169, 0.32) !important;
+    border-radius: 8px !important;
+    background: 
+      radial-gradient(circle at 100% 0%, rgba(72, 197, 143, 0.14), transparent 40%),
+      rgba(4, 12, 12, 0.98) !important;
+    padding: 8px !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6) !important;
+    z-index: 9999 !important;
+    scrollbar-width: thin;
+  }
+
+  .admin-ui-v2-profile-popover::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  .admin-ui-v2-profile-popover::-webkit-scrollbar-thumb {
+    background: rgba(103, 172, 169, 0.3);
+    border-radius: 999px;
+  }
+
+  .admin-ui-v2-profile-popover-head {
+    display: grid !important;
+    grid-template-columns: 32px minmax(0, 1fr) !important;
+    gap: 6px !important;
+    margin-bottom: 6px !important;
+    padding-bottom: 6px !important;
+    border-bottom: 1px solid rgba(103, 172, 169, 0.15) !important;
+  }
+
+  .admin-ui-v2-profile-popover-avatar {
+    width: 32px !important;
+    height: 32px !important;
+    border-width: 1.5px !important;
+  }
+
+  .admin-ui-v2-profile-popover-avatar.admin-ui-v2-avatar-fallback {
+    font-size: 10px !important;
+  }
+
+  .admin-ui-v2-profile-popover-head strong {
+    font-size: 10px !important;
+  }
+
+  .admin-ui-v2-profile-popover-head span {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-profile-popover-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 4px 6px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .admin-ui-v2-profile-popover-grid small {
+    font-size: 7px !important;
+  }
+
+  .admin-ui-v2-profile-popover-grid strong {
+    font-size: 8.5px !important;
+  }
+
+  .admin-ui-v2-profile-logout {
+    font-size: 8px !important;
+    min-height: 22px !important;
+    padding: 2px 4px !important;
+    margin-top: 4px !important;
+  }
 }
+
 
