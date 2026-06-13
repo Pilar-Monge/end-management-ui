@@ -235,7 +235,7 @@ export function ParticipantSelector({
                   <div className="expx-profile-head">
                     <h3>Ficha de participante</h3>
                     <button type="button" className="expx-btn-ghost" onClick={() => setSelectedProfile(null)}>
-                      Cerrar
+                      X
                     </button>
                   </div>
 
