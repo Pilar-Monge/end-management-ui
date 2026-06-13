@@ -21,6 +21,22 @@ function admissionErrorMessage(status: number, action: 'submit' | 'pending' | 'd
   return 'No se pudo completar la revision de la solicitud.'
 }
 
+async function parseResponseBody(res: Response): Promise<any> {
+  try {
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+function backendErrorMessage(data: any): string | null {
+  const message = data?.message
+  if (Array.isArray(message)) return message.join('; ')
+  if (typeof message === 'string' && message.trim()) return message.trim()
+  if (typeof data?.error === 'string' && data.error.trim()) return data.error.trim()
+  return null
+}
+
 export async function submitAdmission(
   payload: FormData | Record<string, any>,
 ): Promise<AdmissionRequest> {
@@ -31,9 +47,9 @@ export async function submitAdmission(
       body: payload,
     })
 
-    const data = await res.json()
+    const data = await parseResponseBody(res)
     if (!res.ok) {
-      throw new Error(admissionErrorMessage(res.status, 'submit'))
+      throw new Error(backendErrorMessage(data) ?? admissionErrorMessage(res.status, 'submit'))
     }
     return data.data
   }
@@ -44,9 +60,9 @@ export async function submitAdmission(
     body: JSON.stringify(payload),
   })
 
-  const data = await res.json()
+  const data = await parseResponseBody(res)
   if (!res.ok) {
-    throw new Error(admissionErrorMessage(res.status, 'submit'))
+    throw new Error(backendErrorMessage(data) ?? admissionErrorMessage(res.status, 'submit'))
   }
   return data.data
 }
@@ -56,9 +72,9 @@ export async function fetchPendingAdmissions(campId: number): Promise<AdmissionR
     credentials: 'include',
   })
 
-  const data = await res.json()
+  const data = await parseResponseBody(res)
   if (!res.ok) {
-    throw new Error(admissionErrorMessage(res.status, 'pending'))
+    throw new Error(backendErrorMessage(data) ?? admissionErrorMessage(res.status, 'pending'))
   }
   return data.data
 }
@@ -68,9 +84,9 @@ export async function fetchAdmissionRequestById(id: number): Promise<AdmissionRe
     credentials: 'include',
   })
 
-  const data = await res.json()
+  const data = await parseResponseBody(res)
   if (!res.ok) {
-    throw new Error(admissionErrorMessage(res.status, 'detail'))
+    throw new Error(backendErrorMessage(data) ?? admissionErrorMessage(res.status, 'detail'))
   }
   return data.data
 }
@@ -85,9 +101,9 @@ export async function processAdmissionWithAI(
     body: JSON.stringify(payload),
   })
 
-  const data = await res.json()
+  const data = await parseResponseBody(res)
   if (!res.ok) {
-    throw new Error(admissionErrorMessage(res.status, 'ai'))
+    throw new Error(backendErrorMessage(data) ?? admissionErrorMessage(res.status, 'ai'))
   }
   return data.data
 }
@@ -102,9 +118,9 @@ export async function reviewAdmissionRequest(
     body: JSON.stringify(payload),
   })
 
-  const data = await res.json()
+  const data = await parseResponseBody(res)
   if (!res.ok) {
-    throw new Error(admissionErrorMessage(res.status, 'review'))
+    throw new Error(backendErrorMessage(data) ?? admissionErrorMessage(res.status, 'review'))
   }
   return data.data
 }
