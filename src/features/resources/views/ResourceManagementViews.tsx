@@ -3107,22 +3107,22 @@ export const ROSTER_PEOPLE: CampPerson[] = [
   { id: "34", name: "Cabo John Miller", role: "Conductor de Blindado Terrestre", status: "ACTIVE", campId: "1", occupationId: "3" },
   { id: "35", name: "Ing. Sara Connor", role: "Ingeniero", status: "ACTIVE", campId: "1", occupationId: "3" },
   { id: "36", name: "Guarda Lara Croft", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "1", occupationId: "6" },
-  { id: "31", name: "Scout Ezio Auditore", role: "Scout Táctico", status: "ACTIVE", campId: "1", occupationId: "5" },
+  { id: "50", name: "Scout Ezio Auditore", role: "Scout Táctico", status: "ACTIVE", campId: "1", occupationId: "5" },
   { id: "37", name: "Técnico Isaac Clarke", role: "Ingeniero", status: "ACTIVE", campId: "2", occupationId: "3" },
   { id: "38", name: "Conductor Cole Train", role: "Conductor de Blindado Terrestre", status: "ACTIVE", campId: "2", occupationId: "3" },
   { id: "39", name: "Dr. Gordon Freeman", role: "Médico de Emergencia de Campo", status: "ACTIVE", campId: "2", occupationId: "4" },
   { id: "40", name: "Recluta Gary", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "2", occupationId: "6" },
-  { id: "40", name: "Scout Solid Snake", role: "Scout Táctico de Infiltración", status: "ACTIVE", campId: "2", occupationId: "5" },
+  { id: "51", name: "Scout Solid Snake", role: "Scout Táctico de Infiltración", status: "ACTIVE", campId: "2", occupationId: "5" },
   { id: "41", name: "Cultivador Samuel", role: "Cazador / Expl.", status: "ACTIVE", campId: "3", occupationId: "2" },
   { id: "42", name: "Piloto Fox McCloud", role: "Piloto de Aeronave Quad VTOL", status: "ACTIVE", campId: "3", occupationId: "3" },
   { id: "43", name: "Científico Walter", role: "Investigador", status: "ACTIVE", campId: "3", occupationId: "4" },
   { id: "44", name: "Conductor Sweet Tooth", role: "Conductor de Blindado Terrestre", status: "ACTIVE", campId: "3", occupationId: "3" },
-  { id: "41", name: "Scout Nathan Drake", role: "Scout Táctico", status: "ACTIVE", campId: "3", occupationId: "5" },
+  { id: "52", name: "Scout Nathan Drake", role: "Scout Táctico", status: "ACTIVE", campId: "3", occupationId: "5" },
   { id: "45", name: "Sgto. Master Chief", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "4", occupationId: "6" },
   { id: "46", name: "Cabo Dunn", role: "Guarda / Defensor Armado", status: "ACTIVE", campId: "4", occupationId: "6" },
   { id: "47", name: "Piloto Maverick", role: "Piloto de Aeronave Quad VTOL", status: "ACTIVE", campId: "4", occupationId: "3" },
   { id: "48", name: "Médico Angela", role: "Médico de Emergencia de Campo", status: "ACTIVE", campId: "4", occupationId: "4" },
-  { id: "45", name: "Scout Sam Fisher", role: "Scout Táctico Nocturno", status: "ACTIVE", campId: "4", occupationId: "5" }
+  { id: "53", name: "Scout Sam Fisher", role: "Scout Táctico Nocturno", status: "ACTIVE", campId: "4", occupationId: "5" }
 ];
 export const SPECIALISTS_OCCUPATIONS = [
   { id: "1", name: "Water Collector" },
@@ -3149,14 +3149,15 @@ export function ViewSolicitudesIntercampamento({
   transfers,
   transferPersons,
   transferHistories,
-  serverNow
+  serverNow,
+  campPersonnel,
 }: {
   camps: Camp[];
   resourceTypes: ResourceType[];
   intercampRequests: IntercampRequest[];
   requestResourceDetails: RequestResourceDetail[];
   onAddRequest: (data: Omit<IntercampRequest, "id">) => IntercampRequest | string | null | Promise<IntercampRequest | string | null>;
-  onUpdateRequestStatus: (id: string, status: IntercampRequest["status"], responder: string, transportPersonIds?: string[]) => void | Promise<void>;
+  onUpdateRequestStatus: (id: string, status: IntercampRequest["status"], responder: string, transportPersonIds?: string[]) => Promise<boolean> | boolean | void | Promise<void>;
   onAddResourceToRequest: (requestId: string, resourceTypeId: string, requestedAmount: number) => void;
   onDeleteRequestResource: (id: string) => void;
   onUpdateRequest: (id: string, patch: Partial<IntercampRequest>) => void;
@@ -3171,7 +3172,10 @@ export function ViewSolicitudesIntercampamento({
   setTransferPersons: React.Dispatch<React.SetStateAction<TransferPerson[]>>;
   transferHistories: TransferHistory[];
   serverNow?: Date;
+  campPersonnel?: CampPerson[];
 }) {
+  const PEOPLE = (campPersonnel && campPersonnel.length > 0) ? campPersonnel : ROSTER_PEOPLE;
+
   const [activeTab, setActiveTab] = useState<"emitir" | "mis-solicitudes" | "pendientes">("emitir");
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
   const [viewingReqId, setViewingReqId] = useState<string | null>(null);
@@ -3262,7 +3266,7 @@ export function ViewSolicitudesIntercampamento({
   const evaluatingDestinationCampName = evaluatingRequest ? getCampDisplayName(camps, evaluatingRequest.destinationCampId) : "Campamento no definido";
   const reqPeopleCoverages = evaluatingRequest ? (evaluatingRequest.personRequirements || []).map(pr => {
     const occ = SPECIALISTS_OCCUPATIONS.find(o => o.id === pr.occupationId);
-    const matches = ROSTER_PEOPLE.filter(p => p.campId === evaluatingRequest.destinationCampId && p.role.toLowerCase().includes((occ?.name || pr.occupationId).toLowerCase().slice(0, 8)));
+    const matches = PEOPLE.filter(p => String(p.campId) === String(evaluatingRequest.destinationCampId) && (p.role ?? "").toLowerCase().includes((occ?.name || pr.occupationId).toLowerCase().slice(0, 8)));
     const availableCount = matches.length;
     const covered = availableCount >= pr.quantity;
 
@@ -3274,7 +3278,7 @@ export function ViewSolicitudesIntercampamento({
       statusColor: covered ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"
     };
   }) : [];
-  const destinationCampPeople = evaluatingRequest ? ROSTER_PEOPLE.filter(p => p.campId === evaluatingRequest.destinationCampId) : [];
+  const destinationCampPeople = evaluatingRequest ? PEOPLE.filter(p => String(p.campId) === String(evaluatingRequest.destinationCampId)) : [];
   const isPersonAssignedToActiveTransferIdx = (personId: string) => {
     return transferPersons.some(tp => {
       if (tp.personId !== personId) return false;
@@ -3342,14 +3346,16 @@ export function ViewSolicitudesIntercampamento({
       return;
     }
 
-    await onUpdateRequestStatus(evaluatingRequest.id, "APPROVED", currentUser.userId, selectedOperPersonIds);
-    setEvaluatingReqId(null);
-    setAssignedScoutId("");
-    setAdditionalPersonIds([]);
-    setShowSuccessToast(true);
-    setTimeout(() => {
-      setShowSuccessToast(false);
-    }, 4000);
+    const success = await onUpdateRequestStatus(evaluatingRequest.id, "APPROVED", currentUser.userId, selectedOperPersonIds);
+    if (success) {
+      setEvaluatingReqId(null);
+      setAssignedScoutId("");
+      setAdditionalPersonIds([]);
+      setShowSuccessToast(true);
+      setTimeout(() => {
+        setShowSuccessToast(false);
+      }, 4000);
+    }
   };
 
   const handleCreateDraft = async (e: React.FormEvent) => {
@@ -4188,7 +4194,7 @@ export function ViewSolicitudesIntercampamento({
       )}
       {evaluatingReqId && evaluatingRequest && (
         (() => {
-          const candidateScouts = destinationCampPeople.filter(p => p.role.toLowerCase().includes("scout") || p.name.toLowerCase().includes("scout"));
+          const candidateScouts = destinationCampPeople.filter(p => (p.role ?? "").toLowerCase().includes("scout") || p.name.toLowerCase().includes("scout"));
           const scoutsToSelect = candidateScouts.length > 0 ? candidateScouts : destinationCampPeople;
           const additionalCandidates = destinationCampPeople.filter(p => p.id !== assignedScoutId);
 
@@ -4291,7 +4297,7 @@ export function ViewSolicitudesIntercampamento({
                     <div className="bg-[#121c1e] border border-cyan-950 rounded p-1.5 max-h-[95px] overflow-y-auto flex flex-col gap-1.5">
                       {additionalCandidates.filter(p => {
                         const term = searchPersonTerm.toLowerCase();
-                        return p.name.toLowerCase().includes(term) || p.role.toLowerCase().includes(term);
+                        return p.name.toLowerCase().includes(term) || (p.role ?? "").toLowerCase().includes(term);
                       }).map(p => {
                         const isChecked = additionalPersonIds.includes(p.id);
                         const occupied = isPersonAssignedToActiveTransferIdx(p.id);
@@ -4511,8 +4517,8 @@ export function ViewSolicitudesIntercampamento({
                 <span className="text-[#A4C2C5]/60 font-mono text-[9px] uppercase font-bold block mb-1">Manifiesto de Comitiva Asignada ({crew.length} efectivos):</span>
                 <div className="flex flex-col gap-1.5 p-1 bg-black/25 rounded">
                   {crew.map(member => {
-                    const person = ROSTER_PEOPLE.find(p => p.id === member.personId);
-                    const isScout = person && (person.role.toLowerCase().includes("scout") || person.name.toLowerCase().includes("scout"));
+                    const person = PEOPLE.find(p => String(p.id) === String(member.personId));
+                    const isScout = person && ((person.role ?? "").toLowerCase().includes("scout") || person.name.toLowerCase().includes("scout"));
                     return (
                       <div key={member.id} className="flex justify-between text-[11px] font-sans px-2.5 py-1 bg-black/40 border border-gray-900 rounded-sm">
                         <span className="text-white font-semibold">{person?.name || member.personId}</span>
@@ -4563,7 +4569,8 @@ export function ViewTraslados({
   transferPersons,
   onUpdateTransferStatus,
   onAddHistoryEntry,
-  onUpdateTransportStaff
+  onUpdateTransportStaff,
+  campPersonnel,
 }: {
   camps: Camp[];
   resourceTypes: ResourceType[];
@@ -4585,7 +4592,9 @@ export function ViewTraslados({
   onAddHistoryEntry: (data: Omit<TransferHistory, "id">) => void;
   onSaveDelivery: (data: Omit<DeliveredTransferResource, "id">) => void;
   onUpdateTransportStaff?: (transferId: string, transportPersonIds: string[]) => void | Promise<void>;
+  campPersonnel?: CampPerson[];
 }) {
+  const PEOPLE = (campPersonnel && campPersonnel.length > 0) ? campPersonnel : ROSTER_PEOPLE;
   const RATION_FACTOR = 2;
   const [subFilterTab, setSubFilterTab] = useState<"por_preparar" | "solicitados" | "en_transito" | "cerrados">("por_preparar");
 
@@ -4630,8 +4639,8 @@ export function ViewTraslados({
     setValidationErrors([]);
     const assigned = transferPersons.filter(tp => tp.transferId === tId);
     const scoutAssigned = assigned.find(tp => {
-      const person = ROSTER_PEOPLE.find(p => p.id === tp.personId);
-      return person && (person.role.toLowerCase().includes("scout") || person.name.toLowerCase().includes("scout"));
+      const person = PEOPLE.find(p => String(p.id) === String(tp.personId));
+      return person && ((person.role ?? "").toLowerCase().includes("scout") || person.name.toLowerCase().includes("scout"));
     });
 
     if (scoutAssigned) {
@@ -4653,7 +4662,7 @@ export function ViewTraslados({
       errors.push("Debe asignar obligatoriamente un Scout activo.");
     }
 
-    const selectedScoutObj = ROSTER_PEOPLE.find(p => p.id === modalScoutId);
+    const selectedScoutObj = PEOPLE.find(p => String(p.id) === String(modalScoutId));
     if (selectedScoutObj && selectedScoutObj.status !== "ACTIVE") {
       errors.push("El Scout seleccionado debe estar en estado ACTIVO.");
     }
@@ -4678,7 +4687,7 @@ export function ViewTraslados({
     }
 
     modalAdditionalIds.forEach(id => {
-      const poObj = ROSTER_PEOPLE.find(p => p.id === id);
+      const poObj = PEOPLE.find(p => String(p.id) === String(id));
       if (poObj && poObj.status !== "ACTIVE") {
         errors.push(`El personal adicional ${poObj.name} debe estar ACTIVO.`);
       }
@@ -4882,8 +4891,8 @@ export function ViewTraslados({
           const requestObj = intercampRequests.find(r => r.id === selectedTransferObj?.requestId);
           const originCampName = getCampDisplayName(camps, requestObj?.originCampId);
           const destCampName = getCampDisplayName(camps, requestObj?.destinationCampId);
-          const providerCampPeople = ROSTER_PEOPLE.filter(p => p.campId === requestObj?.destinationCampId);
-          const candidateScouts = providerCampPeople.filter(p => p.role.toLowerCase().includes("scout") || p.name.toLowerCase().includes("scout"));
+          const providerCampPeople = PEOPLE.filter(p => String(p.campId) === String(requestObj?.destinationCampId));
+          const candidateScouts = providerCampPeople.filter(p => (p.role ?? "").toLowerCase().includes("scout") || p.name.toLowerCase().includes("scout"));
           const candidateAdditional = providerCampPeople;
           const isPersonInOtherActiveTransfer = (pId: string) => {
             return transfers.some(t => {

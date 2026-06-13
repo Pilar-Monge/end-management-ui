@@ -263,7 +263,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
         else if (type === "intercampRequests") applyList(val, setIntercampRequests);
         else if (type === "requestResourceDetails") applyList(val, setRequestResourceDetails);
         else if (type === "transfers") applyList(val, setTransfers);
-        else if (type === "transferPersons") applyList(val, setTransferPersons);
+        else if (type === "transferPersons") { applyList(val, setTransferPersons); enrichPeopleFromTransfers(people, val as TransferPerson[]); }
         else if (type === "transferHistory") applyList(val, setTransferHistories);
         else if (type === "deliveredTransferResources") applyList(val, setDeliveredTransferResources);
         else if (type === "occupationCoverage") applyList(val, setOccupationCoverages);
@@ -285,6 +285,26 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
 
     if (!catalogsLoaded) {
       setCatalogsLoaded(true);
+    }
+  };
+
+  const enrichPeopleFromTransfers = async (currentPeople: CampPerson[], currentTransferPersons: TransferPerson[]) => {
+    const knownIds = new Set(currentPeople.map(p => String(p.id)));
+    const unknownIds = [...new Set(
+      currentTransferPersons
+        .map(tp => String(tp.personId))
+        .filter(id => id && !knownIds.has(id))
+    )];
+    if (unknownIds.length === 0) return;
+    const fetched = await Promise.allSettled(unknownIds.map(id => resourceApi.getPersonById(id)));
+    const newPersons: CampPerson[] = fetched
+      .filter((r): r is PromiseFulfilledResult<CampPerson | null> => r.status === "fulfilled" && r.value !== null)
+      .map(r => r.value as CampPerson);
+    if (newPersons.length > 0) {
+      setPeople(prev => {
+        const existing = new Set(prev.map(p => String(p.id)));
+        return [...prev, ...newPersons.filter(p => !existing.has(String(p.id)))];
+      });
     }
   };
 
@@ -429,12 +449,8 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     } catch (error) {
       console.warn("Could not create intercamp request.", error);
       showRequestError("No se pudo crear la solicitud en la API.", error);
+      return null;
     }
-
-    const record: IntercampRequest = { ...data, id: `req-${Date.now().toString().slice(-4)}` };
-    setIntercampRequests(prev => [...prev, record]);
-    showRequestSuccess("Borrador de solicitud intercampamento creado correctamente.");
-    return record.id;
   };
 
   const handleSubmitIntercampRequest = async (id: string): Promise<boolean> => {
@@ -450,19 +466,23 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     }
   };
 
-  const handleUpdateRequestStatus = async (id: string, status: IntercampRequest["status"], responder: string, transportPersonIds?: string[]) => {
+  const handleUpdateRequestStatus = async (id: string, status: IntercampRequest["status"], responder: string, transportPersonIds?: string[]): Promise<boolean> => {
     try {
       await resourceApi.updateIntercampRequestStatus(id, status, responder, transportPersonIds);
       await fetchAllSystemData();
-      return;
+      return true;
     } catch (error) {
       console.warn("Could not update intercamp request status.", error);
-      alert("No se pudo actualizar la solicitud en la API. Se actualizará solo en pantalla.");
+      const details = error instanceof ApiHttpError ? error.details : undefined;
+      alert(`No se pudo actualizar la solicitud en la API.\nMotivo: ${details || "Error de conexión o de validación"}`);
     }
 
-    setIntercampRequests(prev =>
-      prev.map(r => (r.id === id ? { ...r, status, responseDate: "Hoy", respondedBy: responder } : r))
-    );
+    if (status !== "APPROVED") {
+      setIntercampRequests(prev =>
+        prev.map(r => (r.id === id ? { ...r, status, responseDate: "Hoy", respondedBy: responder } : r))
+      );
+    }
+    return false;
   };
 
   const handleAddResourceToRequest = async (requestId: string, resourceTypeId: string, requestedAmount: number) => {
@@ -474,15 +494,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       console.warn("Could not create request resource detail.", error);
       showRequestError("No se pudo agregar el recurso solicitado en la API.", error);
     }
-
-    const record: RequestResourceDetail = {
-      id: `det-${Date.now().toString().slice(-4)}`,
-      requestId,
-      resourceTypeId,
-      requestedAmount,
-      approvedAmount: requestedAmount
-    };
-    setRequestResourceDetails(prev => [...prev, record]);
   };
 
   const handleAddPersonToRequest = async (detail: Omit<RequestPersonDetail, "id">) => {
@@ -834,6 +845,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             setTransferPersons={setTransferPersons}
             transferHistories={transferHistories}
             serverNow={getCurrentServerTime()}
+            campPersonnel={people}
           />
         );
       case "Traslados":
@@ -872,6 +884,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
               }]);
             }}
             onSaveDelivery={handleSaveDelivery}
+            campPersonnel={people}
           />
         );
       case "Historial de traslados":
