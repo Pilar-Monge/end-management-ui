@@ -336,13 +336,23 @@ function expeditionRouteStatus(status: UiExpedition["status"]): string {
 }
 
 function buildExpeditionRoute(expedition: UiExpedition, points: MappedCampPoint[]) {
-  const origin = points.find((point) => point.id === expedition.originCampId);
-  const destination = expedition.routePoints[0];
-  if (!origin || !destination) return null;
+  // Try to find the origin camp from points, otherwise fallback to first point in catalog, otherwise default coordinates.
+  const originCamp = points.find((point) => point.id === expedition.originCampId);
+  const startLat = originCamp ? originCamp.latitude : (points[0]?.latitude ?? 9.933);
+  const startLng = originCamp ? originCamp.longitude : (points[0]?.longitude ?? -84.083);
+  const startLabel = originCamp ? originCamp.name : (points[0]?.name ?? "Base Alfa");
+
+  // Try to find the destination routePoint, or fallback to destinationCamp in points, or second point, or default coordinates.
+  const routeDest = expedition.routePoints?.[0];
+  const destCamp = points.find((point) => point.id === expedition.destinationCampId);
+  
+  const endLat = routeDest?.latitude ?? destCamp?.latitude ?? (points[1]?.latitude ?? 19.4326);
+  const endLng = routeDest?.longitude ?? destCamp?.longitude ?? (points[1]?.longitude ?? -99.1332);
+  const endLabel = routeDest?.label ?? destCamp?.name ?? expedition.sector ?? "Sector Alfa";
 
   return {
-    start: { lat: origin.latitude, lng: origin.longitude, label: origin.name.slice(0, 14) },
-    end: { lat: destination.latitude, lng: destination.longitude, label: destination.label?.slice(0, 14) ?? expedition.sector.slice(0, 14) },
+    start: { lat: startLat, lng: startLng, label: startLabel.slice(0, 14) },
+    end: { lat: endLat, lng: endLng, label: endLabel.slice(0, 14) },
     status: expeditionRouteStatus(expedition.status),
   };
 }
@@ -3913,41 +3923,43 @@ const AdmissionsModule = memo(function AdmissionsModule({
           {activeList.length === 0 && <div className="admin-ui-v2-empty-cell">Sin solicitudes pendientes.</div>}
         </div>
       ) : (
-        <table className="v-table admin-ui-v2-table">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Profesión</th>
-              <th>Score IA</th>
-              <th>Estado</th>
-              <th>Detalle</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagedList.map((admission) => (
-              <tr key={admission.id}>
-                <td>{admission.name}</td>
-                <td>{admission.profession}</td>
-                <td>{admission.score}</td>
-                <td>
-                  <span className={`admin-ui-v2-pill ${admission.workflowStatus === "APPROVED" ? "is-ok" : admission.workflowStatus === "REJECTED" ? "is-danger" : "is-warn"}`}>
-                    {workflowStatusLabel(admission.workflowStatus)}
-                  </span>
-                </td>
-                <td>
-                  <button className="admin-ui-v2-btn" type="button" onClick={() => openAdmissionDetail(admission)}>
-                    Ver detalle
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {activeList.length === 0 && (
+        <div className="admin-ui-v2-table-wrapper">
+          <table className="v-table admin-ui-v2-table">
+            <thead>
               <tr>
-                <td colSpan={5} className="admin-ui-v2-empty-cell">Sin admisiones procesadas.</td>
+                <th>Nombre</th>
+                <th>Profesión</th>
+                <th>Score IA</th>
+                <th>Estado</th>
+                <th>Detalle</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {pagedList.map((admission) => (
+                <tr key={admission.id}>
+                  <td>{admission.name}</td>
+                  <td>{admission.profession}</td>
+                  <td>{admission.score}</td>
+                  <td>
+                    <span className={`admin-ui-v2-pill ${admission.workflowStatus === "APPROVED" ? "is-ok" : admission.workflowStatus === "REJECTED" ? "is-danger" : "is-warn"}`}>
+                      {workflowStatusLabel(admission.workflowStatus)}
+                    </span>
+                  </td>
+                  <td>
+                    <button className="admin-ui-v2-btn" type="button" onClick={() => openAdmissionDetail(admission)}>
+                      Ver detalle
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {activeList.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="admin-ui-v2-empty-cell">Sin admisiones procesadas.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <div className="admin-ui-v2-pagination">
@@ -4621,96 +4633,102 @@ function AdmissionReviewModal({
         </div>
 
         <div className="admin-ui-v2-adm-detail">
-          {admissionPhoto && (
-            <img
-              src={admissionPhoto}
-              alt={`Foto de ingreso de ${admission.name}`}
-              className="admin-ui-v2-settings-photo-preview"
-              loading="lazy"
-              decoding="async"
-              referrerPolicy="no-referrer"
-            />
-          )}
-          <div><strong>Nombre:</strong> {admission.name}</div>
-          <div><strong>Profesión:</strong> {admission.profession}</div>
-          <div><strong>Score IA:</strong> {admission.score}/100</div>
-          <div><strong>Estado:</strong> {statusLabel(admission.status)}</div>
-          <div><strong>Flujo:</strong> {workflowStatusLabel(admission.workflowStatus)}</div>
-          <div><strong>Oficio sugerido IA:</strong> {typeof admission.suggestedOccupationId === "number" ? occupations.find(([id]) => id === admission.suggestedOccupationId)?.[1] ?? `Ocupación #${admission.suggestedOccupationId}` : "No definido"}</div>
-          <div><strong>Oficio final:</strong> {typeof admission.finalOccupationId === "number" ? occupations.find(([id]) => id === admission.finalOccupationId)?.[1] ?? `Ocupación #${admission.finalOccupationId}` : "Sin asignar"}</div>
-          <div><strong>Razón:</strong> {admission.reason}</div>
-          {admission.skills.length > 0 && (
-            <div className="admin-ui-v2-adm-skills">
-              {admission.skills.map((skill) => (
-                <span key={skill} className="admin-ui-v2-pill is-info">{skill}</span>
-              ))}
+          <div className="admin-ui-v2-adm-info-section">
+            {admissionPhoto && (
+              <img
+                src={admissionPhoto}
+                alt={`Foto de ingreso de ${admission.name}`}
+                className="admin-ui-v2-settings-photo-preview"
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+              />
+            )}
+            <div className="admin-ui-v2-adm-info-grid">
+              <div><strong>Nombre:</strong> {admission.name}</div>
+              <div><strong>Profesión:</strong> {admission.profession}</div>
+              <div><strong>Score IA:</strong> {admission.score}/100</div>
+              <div><strong>Estado:</strong> {statusLabel(admission.status)}</div>
+              <div><strong>Flujo:</strong> {workflowStatusLabel(admission.workflowStatus)}</div>
+              <div><strong>Oficio sugerido IA:</strong> {typeof admission.suggestedOccupationId === "number" ? occupations.find(([id]) => id === admission.suggestedOccupationId)?.[1] ?? `Ocupación #${admission.suggestedOccupationId}` : "No definido"}</div>
+              <div><strong>Oficio final:</strong> {typeof admission.finalOccupationId === "number" ? occupations.find(([id]) => id === admission.finalOccupationId)?.[1] ?? `Ocupación #${admission.finalOccupationId}` : "Sin asignar"}</div>
+              <div><strong>Razón:</strong> {admission.reason}</div>
             </div>
-          )}
-
-          {canReviewSelected ? (
-            <>
-              <div className="admin-ui-v2-form-grid">
-                <label className="admin-ui-v2-muted">Oficio final (requerido para aprobar)</label>
-                <select
-                  className="v-select"
-                  value={reviewForm.finalOccupationId}
-                  onChange={(event) => setReviewForm((prev) => ({ ...prev, finalOccupationId: Number(event.target.value) }))}
-                >
-                  <option value={0}>Selecciona oficio final</option>
-                  {occupations.map(([id, name]) => (
-                    <option key={id} value={id}>{name}</option>
-                  ))}
-                </select>
-
-                <label className="admin-ui-v2-muted">Rol de sistema (requerido para aprobar)</label>
-                <select
-                  className="v-select"
-                  value={reviewForm.finalRole}
-                  onChange={(event) => setReviewForm((prev) => ({ ...prev, finalRole: event.target.value }))}
-                >
-                  <option value="">Selecciona rol final</option>
-                  <option value="WORKER">WORKER</option>
-                  <option value="TRAVEL_MANAGER">TRAVEL_MANAGER</option>
-                  <option value="RESOURCE_MANAGEMENT">RESOURCE_MANAGEMENT</option>
-                </select>
-
-                <label className="admin-ui-v2-muted">Motivo de rechazo (obligatorio al rechazar)</label>
-                <textarea
-                  className="v-textarea"
-                  value={reviewForm.rejectionReason}
-                  onChange={(event) => setReviewForm((prev) => ({ ...prev, rejectionReason: event.target.value }))}
-                  placeholder="Motivo documentado para auditoria"
-                />
+            {admission.skills.length > 0 && (
+              <div className="admin-ui-v2-adm-skills">
+                {admission.skills.map((skill) => (
+                  <span key={skill} className="admin-ui-v2-pill is-info">{skill}</span>
+                ))}
               </div>
+            )}
+          </div>
 
-              <div className="admin-ui-v2-actions">
-                <button
-                  className="admin-ui-v2-btn is-ok"
-                  type="button"
-                  disabled={reviewSubmitting || !reviewForm.finalOccupationId || !reviewForm.finalRole.trim()}
-                  onClick={() => void submitAdmissionReview("approved")}
-                >
-                  {reviewSubmitting ? "Procesando..." : "Aprobar admisión"}
-                </button>
-                <button
-                  className="admin-ui-v2-btn is-danger"
-                  type="button"
-                  disabled={reviewSubmitting || !reviewForm.rejectionReason.trim()}
-                  onClick={() => void submitAdmissionReview("rejected")}
-                >
-                  {reviewSubmitting ? "Procesando..." : "Rechazar"}
-                </button>
-              </div>
+          <div className="admin-ui-v2-adm-action-section">
+            {canReviewSelected ? (
+              <>
+                <div className="admin-ui-v2-form-grid">
+                  <label className="admin-ui-v2-muted">Oficio final (requerido para aprobar)</label>
+                  <select
+                    className="v-select"
+                    value={reviewForm.finalOccupationId}
+                    onChange={(event) => setReviewForm((prev) => ({ ...prev, finalOccupationId: Number(event.target.value) }))}
+                  >
+                    <option value={0}>Selecciona oficio final</option>
+                    {occupations.map(([id, name]) => (
+                      <option key={id} value={id}>{name}</option>
+                    ))}
+                  </select>
 
+                  <label className="admin-ui-v2-muted">Rol de sistema (requerido para aprobar)</label>
+                  <select
+                    className="v-select"
+                    value={reviewForm.finalRole}
+                    onChange={(event) => setReviewForm((prev) => ({ ...prev, finalRole: event.target.value }))}
+                  >
+                    <option value="">Selecciona rol final</option>
+                    <option value="WORKER">WORKER</option>
+                    <option value="TRAVEL_MANAGER">TRAVEL_MANAGER</option>
+                    <option value="RESOURCE_MANAGEMENT">RESOURCE_MANAGEMENT</option>
+                  </select>
+
+                  <label className="admin-ui-v2-muted">Motivo de rechazo (obligatorio al rechazar)</label>
+                  <textarea
+                    className="v-textarea"
+                    value={reviewForm.rejectionReason}
+                    onChange={(event) => setReviewForm((prev) => ({ ...prev, rejectionReason: event.target.value }))}
+                    placeholder="Motivo documentado para auditoria"
+                  />
+                </div>
+
+                <div className="admin-ui-v2-actions">
+                  <button
+                    className="admin-ui-v2-btn is-ok"
+                    type="button"
+                    disabled={reviewSubmitting || !reviewForm.finalOccupationId || !reviewForm.finalRole.trim()}
+                    onClick={() => void submitAdmissionReview("approved")}
+                  >
+                    {reviewSubmitting ? "Procesando..." : "Aprobar admisión"}
+                  </button>
+                  <button
+                    className="admin-ui-v2-btn is-danger"
+                    type="button"
+                    disabled={reviewSubmitting || !reviewForm.rejectionReason.trim()}
+                    onClick={() => void submitAdmissionReview("rejected")}
+                  >
+                    {reviewSubmitting ? "Procesando..." : "Rechazar"}
+                  </button>
+                </div>
+
+                <p className="admin-ui-v2-muted">
+                  Al aprobar, se crea automaticamente la persona y su cuenta de acceso.
+                </p>
+              </>
+            ) : (
               <p className="admin-ui-v2-muted">
-                Al aprobar, se crea automaticamente la persona y su cuenta de acceso.
+                Esta solicitud no esta lista para revision administrativa. Solo se puede revisar en estado PENDING_ADMIN.
               </p>
-            </>
-          ) : (
-            <p className="admin-ui-v2-muted">
-              Esta solicitud no esta lista para revision administrativa. Solo se puede revisar en estado PENDING_ADMIN.
-            </p>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -5156,7 +5174,7 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
             {visibleExpeditions.length === 0 && <div className="admin-ui-v2-empty-cell">Sin registros para esta vista.</div>}
           </div>
 
-          <div className="admin-ui-v2-module-card">
+          <div className="admin-ui-v2-module-card admin-ui-v2-expedition-detail-wrapper">
             {selectedExpedition ? (
               <div className="admin-ui-v2-expedition-detail">
                 <div className="admin-ui-v2-expedition-detail-head">
@@ -5164,7 +5182,10 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
                     <h3>{selectedExpedition.name}</h3>
                     <p>{selectedExpedition.objective}</p>
                   </div>
-                  <span className={`admin-ui-v2-pill ${expeditionPillClass(selectedExpedition.status)}`}>{selectedExpedition.status}</span>
+                  <div className="admin-ui-v2-expedition-detail-actions">
+                    <span className={`admin-ui-v2-pill ${expeditionPillClass(selectedExpedition.status)}`}>{selectedExpedition.status}</span>
+                    <button className="admin-ui-v2-btn admin-ui-v2-btn-close-detail" type="button" onClick={() => setSelectedExpeditionId(null)}>X</button>
+                  </div>
                 </div>
 
                 {selectedExpeditionRoute && (

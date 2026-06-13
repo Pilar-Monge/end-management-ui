@@ -1576,17 +1576,56 @@
   background: rgba(105, 191, 183, 0.16);
 }
 
+.admin-ui-v2-expeditions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: calc(100vh - 165px);
+  min-height: 480px;
+}
+
 .admin-ui-v2-expeditions-grid {
   display: grid;
   gap: 10px;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 
 .admin-ui-v2-expeditions-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 460px;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.admin-ui-v2-expedition-detail-wrapper {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.admin-ui-v2-expedition-resources {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-ui-v2-expedition-ledger {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.admin-ui-v2-expedition-ledger .admin-ui-v2-module-card {
+  height: 100%;
   overflow-y: auto;
 }
 
@@ -1708,6 +1747,16 @@
 .admin-ui-v2-mini-map-caption strong {
   color: #69bfb7;
   text-align: right;
+}
+
+.admin-ui-v2-expedition-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-ui-v2-btn-close-detail {
+  display: none !important;
 }
 
 .admin-ui-v2-expedition-facts {
@@ -3581,7 +3630,9 @@
 
 .admin-ui-v2-intercamp-map-console,
 .admin-ui-v2-map-shell-leaflet {
-  min-height: 520px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 
 .admin-ui-v2-leaflet-console {
@@ -3592,7 +3643,8 @@
   display: grid;
   gap: 10px;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 0.32fr);
-  min-height: 520px;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
   padding: 10px;
 }
@@ -3600,7 +3652,8 @@
 .admin-ui-v2-leaflet-map {
   background: #010304;
   border: 1px solid rgba(103, 172, 169, 0.2);
-  min-height: 500px;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
   position: relative;
 }
@@ -3618,6 +3671,8 @@
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+  height: 100%;
+  min-height: 0;
   overflow-y: auto;
   padding: 10px;
 }
@@ -3987,6 +4042,24 @@
 
   .admin-ui-v2-leaflet-console {
     grid-template-columns: 1fr;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .admin-ui-v2-expeditions,
+  .admin-ui-v2-expedition-resources {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .admin-ui-v2-leaflet-map {
+    height: 380px !important;
+    min-height: 0 !important;
+  }
+
+  .admin-ui-v2-leaflet-side {
+    height: auto !important;
+    max-height: 300px !important;
   }
 
   .admin-ui-v2-command-actions {
@@ -4038,11 +4111,13 @@
   }
 
   .admin-ui-v2-leaflet-console {
-    min-height: auto;
+    min-height: auto !important;
+    height: auto !important;
   }
 
   .admin-ui-v2-leaflet-map {
-    min-height: 360px;
+    min-height: 360px !important;
+    height: 360px !important;
   }
 
   .admin-ui-v2-expedition-command {
@@ -5139,6 +5214,8 @@
   }
 
   .admin-ui-v2-leaflet-console {
+    height: auto !important;
+    min-height: auto !important;
     overflow: visible;
   }
 
@@ -5251,6 +5328,190 @@
     right: 6px;
     z-index: 70;
   }
+
+  /* --- ADMISIONES PORTRAIT MOBILE --- */
+  .admin-ui-v2-admissions {
+    gap: 10px !important;
+  }
+
+  .admin-ui-v2-adm-card {
+    padding: 10px !important;
+  }
+
+  .admin-ui-v2-adm-name {
+    font-size: 12px !important;
+    gap: 4px !important;
+  }
+
+  .admin-ui-v2-adm-prof {
+    font-size: 9px !important;
+  }
+
+  .admin-ui-v2-adm-score {
+    font-size: 22px !important;
+  }
+
+  .admin-ui-v2-adm-reason {
+    font-size: 10px !important;
+    margin: 6px 0 !important;
+    line-height: 1.3 !important;
+  }
+
+  .admin-ui-v2-adm-skills {
+    gap: 4px !important;
+    margin-bottom: 6px !important;
+  }
+
+  .admin-ui-v2-adm-skills .admin-ui-v2-pill {
+    font-size: 8px !important;
+    padding: 2px 5px !important;
+  }
+
+  .admin-ui-v2-admissions .admin-ui-v2-actions {
+    flex-direction: row !important;
+    gap: 6px !important;
+    align-items: center !important;
+  }
+
+  .admin-ui-v2-admissions .admin-ui-v2-actions .admin-ui-v2-btn {
+    font-size: 9px !important;
+    min-height: 28px !important;
+    padding: 3px 6px !important;
+    flex: 1 !important;
+  }
+
+  .admin-ui-v2-adm-detail {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  .admin-ui-v2-adm-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .admin-ui-v2-adm-info-grid > div {
+    font-size: 11px;
+  }
+
+  .admin-ui-v2-adm-info-section img.admin-ui-v2-settings-photo-preview {
+    max-height: 120px;
+    width: 100%;
+    object-fit: cover;
+    border: 1px solid rgba(103, 172, 169, 0.22);
+  }
+
+  .admin-ui-v2-adm-action-section .admin-ui-v2-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+  }
+
+  /* --- EXPEDICIONES PORTRAIT MOBILE --- */
+  .admin-ui-v2-expeditions {
+    height: auto !important;
+    min-height: 0 !important;
+    display: block !important;
+  }
+
+  .admin-ui-v2-expedition-resources {
+    height: auto !important;
+    min-height: 0 !important;
+    display: block !important;
+  }
+
+  .admin-ui-v2-expedition-ledger {
+    height: auto !important;
+    min-height: 0 !important;
+    display: grid !important;
+  }
+
+  .admin-ui-v2-expeditions-list {
+    max-height: 220px !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .admin-ui-v2-expedition-detail-wrapper {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .admin-ui-v2-expedition-mini-map {
+    height: 160px !important;
+  }
+
+  .admin-ui-v2-expedition-mini-map .wm-dotted-container {
+    min-height: 160px !important;
+  }
+
+  .admin-ui-v2-resource-row {
+    padding: 6px 8px !important;
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-resource-row + .admin-ui-v2-resource-row {
+    margin-top: 6px !important;
+  }
+
+  .admin-ui-v2-resource-row strong,
+  .admin-ui-v2-resource-row em {
+    font-size: 11px !important;
+  }
+
+  .admin-ui-v2-resource-row span,
+  .admin-ui-v2-resource-row small {
+    font-size: 9px !important;
+    margin-top: 1px !important;
+  }
+
+  .admin-ui-v2-expedition-detail-wrapper:has(.admin-ui-v2-empty-cell) {
+    display: none !important;
+  }
+
+  .admin-ui-v2-expedition-detail-wrapper:has(.admin-ui-v2-expedition-detail) {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 150 !important;
+    background: rgba(2, 8, 8, 0.85) !important;
+    backdrop-filter: blur(4px) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 16px !important;
+    margin: 0 !important;
+  }
+
+  .admin-ui-v2-expedition-detail-wrapper:has(.admin-ui-v2-expedition-detail) > .admin-ui-v2-expedition-detail {
+    width: min(480px, 100%) !important;
+    max-height: calc(100dvh - 32px) !important;
+    overflow-y: auto !important;
+    border: 1px solid rgba(103, 172, 169, 0.35) !important;
+    background: linear-gradient(145deg, rgba(6, 14, 14, 0.98), rgba(7, 20, 20, 0.94)) !important;
+    padding: 16px !important;
+    position: relative !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+    border-radius: 4px !important;
+  }
+
+  .admin-ui-v2-btn-close-detail {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 24px !important;
+    padding: 2px 8px !important;
+    font-size: 11px !important;
+    cursor: pointer !important;
+    border: 1px solid rgba(103, 172, 169, 0.28) !important;
+    background: rgba(3, 10, 10, 0.42) !important;
+    color: #f0fafa !important;
+  }
+
+  .admin-ui-v2-btn-close-detail:hover {
+    background: rgba(105, 191, 183, 0.16) !important;
+    border-color: rgba(105, 191, 183, 0.62) !important;
+  }
 }
 
 @media (max-width: 420px) {
@@ -5293,6 +5554,7 @@
   .admin-ui-v2-leaflet-console,
   .admin-ui-v2-leaflet-map {
     min-height: 300px !important;
+    height: auto !important;
   }
 
   .admin-ui-v2-modal,
@@ -6104,6 +6366,204 @@
   .admin-ui-v2-tactical-history-item p {
     font-size: 8px !important;
     margin: 0 !important;
+  }
+
+  /* --- 7. OPTIMIZACIÓN RESPONSIVE DE ADMISIONES --- */
+  .admin-ui-v2-admissions {
+    padding: 8px !important;
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-adm-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-adm-card {
+    padding: 8px !important;
+    gap: 6px !important;
+  }
+
+  .admin-ui-v2-adm-head {
+    gap: 6px !important;
+  }
+
+  .admin-ui-v2-adm-name {
+    font-size: 11px !important;
+    gap: 4px !important;
+  }
+
+  .admin-ui-v2-adm-prof {
+    font-size: 8.5px !important;
+  }
+
+  .admin-ui-v2-adm-score {
+    font-size: 18px !important;
+  }
+
+  .admin-ui-v2-adm-reason {
+    font-size: 9px !important;
+    margin: 4px 0 !important;
+    line-height: 1.25 !important;
+  }
+
+  .admin-ui-v2-adm-skills {
+    gap: 4px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .admin-ui-v2-adm-skills .admin-ui-v2-pill {
+    font-size: 7.5px !important;
+    padding: 1px 4px !important;
+  }
+
+  .admin-ui-v2-admissions .admin-ui-v2-actions {
+    gap: 4px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+  }
+
+  .admin-ui-v2-admissions .admin-ui-v2-actions .admin-ui-v2-btn {
+    font-size: 8px !important;
+    min-height: 24px !important;
+    padding: 2px 6px !important;
+    flex: 1 !important;
+  }
+
+  /* Tabla de Historial en landscape */
+  .admin-ui-v2-table-wrapper {
+    max-height: 180px;
+    overflow-y: auto;
+    border: 1px solid rgba(103, 172, 169, 0.15);
+  }
+
+  .admin-ui-v2-table-wrapper .admin-ui-v2-table {
+    min-width: 540px !important;
+  }
+
+  .admin-ui-v2-table-wrapper th,
+  .admin-ui-v2-table-wrapper td {
+    font-size: 8.5px !important;
+    padding: 4px 6px !important;
+  }
+
+  /* --- EXPEDICIONES LANDSCAPE MOBILE --- */
+  .admin-ui-v2-expeditions {
+    height: auto !important;
+    min-height: 0 !important;
+    display: block !important;
+  }
+
+  .admin-ui-v2-expedition-resources {
+    height: auto !important;
+    min-height: 0 !important;
+    display: block !important;
+  }
+
+  .admin-ui-v2-expeditions .admin-ui-v2-grid-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .admin-ui-v2-expeditions-grid {
+    grid-template-columns: 1.1fr 0.9fr !important;
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-expeditions-list {
+    max-height: 200px !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .admin-ui-v2-expedition-detail-wrapper {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: 200px !important;
+  }
+
+  .admin-ui-v2-expedition-detail {
+    gap: 6px !important;
+  }
+
+  .admin-ui-v2-expedition-detail h3 {
+    font-size: 12px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .admin-ui-v2-expedition-detail p {
+    font-size: 9px !important;
+  }
+
+  .admin-ui-v2-expedition-mini-map {
+    height: 110px !important;
+  }
+
+  .admin-ui-v2-expedition-mini-map .wm-dotted-container {
+    min-height: 110px !important;
+  }
+
+  .admin-ui-v2-mini-map-caption {
+    padding: 4px 6px !important;
+    bottom: 4px !important;
+    left: 4px !important;
+    right: 4px !important;
+  }
+
+  .admin-ui-v2-mini-map-caption span,
+  .admin-ui-v2-mini-map-caption strong {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-expedition-facts {
+    gap: 4px !important;
+  }
+
+  .admin-ui-v2-expedition-facts div {
+    padding: 4px 6px !important;
+  }
+
+  .admin-ui-v2-expedition-facts strong,
+  .admin-ui-v2-expedition-facts span {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-expedition-facts span {
+    margin-top: 1px !important;
+  }
+
+  .admin-ui-v2-expedition-route-card {
+    padding: 6px 8px !important;
+  }
+
+  .admin-ui-v2-expedition-route-card span,
+  .admin-ui-v2-expedition-route-card p {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-expedition-route-card strong {
+    font-size: 10px !important;
+    margin: 3px 0 !important;
+  }
+
+  .admin-ui-v2-expedition-ledger {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-leaflet-console {
+    grid-template-columns: 1fr 0.4fr !important;
+    min-height: 220px !important;
+    height: 220px !important;
+  }
+
+  .admin-ui-v2-leaflet-map {
+    min-height: 220px !important;
+    height: 220px !important;
+  }
+
+  .admin-ui-v2-leaflet-side {
+    max-height: 220px !important;
   }
 }
 
