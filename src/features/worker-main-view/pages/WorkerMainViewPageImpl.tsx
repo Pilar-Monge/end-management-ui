@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
   fetchCurrentUserProfile,
+  fetchWorkerServerTime,
   fetchWorkerDailyCollectionRecord,
   fetchWorkerNotificationById,
   fetchWorkerNotifications,
@@ -20,7 +21,7 @@ import type {
   
 } from '../types'
 import { WorkerApiError } from '../services/workerMainViewApi'
-import { logoutCurrentSession } from '../../../shared/services/sessionProfile'
+import { checkCurrentSessionStatus, clearCachedSession, logoutCurrentSession } from '../../../shared/services/sessionProfile'
 import '../pages/worker-main-view.css'
 import endWorkerBg from '../assets/images/end-worker.jpg'
 
@@ -39,6 +40,14 @@ const WORKER_NAV_DATA: WorkerSection[] = [
   { id: 'notificaciones', label: 'Notificaciones', shortLabel: 'NT', icon: <NotificationIcon /> },
   { id: 'ocupaciones', label: 'Ocupaciones', shortLabel: 'OC', icon: <OccupationIcon /> },
 ]
+
+const LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS = 60 * 1000
+
+type WorkerGlobalTimeState = {
+  baseServerTime: Date
+  syncedAtClientMs: number
+  status: 'synced' | 'syncing' | 'error'
+}
 
 const WORKER_LOADING_ART = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" fill="none">
@@ -93,7 +102,13 @@ export function WorkerMainViewPage() {
   const [isLoaded, setIsLoaded] = useState(false)
   const [hasEntered, setHasEntered] = useState(false)
   const [activeSectionId, setActiveSectionId] = useState<WorkerSectionId>('recoleccion')
-  const [currentGlobalTime, setCurrentGlobalTime] = useState(() => new Date())
+  const [globalTimeState, setGlobalTimeState] = useState<WorkerGlobalTimeState>({
+    baseServerTime: new Date(),
+    syncedAtClientMs: Date.now(),
+    status: 'syncing',
+  })
+  const globalTimeStateRef = useRef(globalTimeState)
+  const lastSyncedGlobalTimeRef = useRef<Pick<WorkerGlobalTimeState, 'baseServerTime' | 'syncedAtClientMs'> | null>(null)
 
   const sessionUser = useMemo<WorkerAuthenticatedUser | null>(() => {
     const raw = localStorage.getItem('user')
@@ -115,6 +130,49 @@ export function WorkerMainViewPage() {
   const hudUser = useMemo(() => getStoredWorkerHudUser(sessionUser), [sessionUser])
 
   useEffect(() => {
+    globalTimeStateRef.current = globalTimeState
+    if (globalTimeState.status === 'synced') {
+      lastSyncedGlobalTimeRef.current = {
+        baseServerTime: globalTimeState.baseServerTime,
+        syncedAtClientMs: globalTimeState.syncedAtClientMs,
+      }
+    }
+  }, [globalTimeState])
+
+  const redirectExpiredLogicalSession = () => {
+    clearCachedSession(true)
+    navigate('/main-homepage', {
+      replace: true,
+      state: {
+        initialAppState: 'login',
+        sessionMessage: 'Sesion expirada por avance del tiempo logico. Inicia sesion para continuar.',
+      },
+    })
+  }
+
+  const validateSessionAfterLogicalTimeJump = async (nextServerTime: Date): Promise<boolean> => {
+    const previous = lastSyncedGlobalTimeRef.current
+    if (!previous) {
+      return false
+    }
+
+    const expectedServerTimeMs = previous.baseServerTime.getTime() + Math.max(0, Date.now() - previous.syncedAtClientMs)
+    const forwardJumpMs = nextServerTime.getTime() - expectedServerTimeMs
+
+    if (forwardJumpMs <= LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS) {
+      return false
+    }
+
+    const status = await checkCurrentSessionStatus()
+    if (status !== 'expired') {
+      return false
+    }
+
+    redirectExpiredLogicalSession()
+    return true
+  }
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
       setIsLoaded(true)
     }, 1500)
@@ -123,12 +181,41 @@ export function WorkerMainViewPage() {
   }, [])
 
   useEffect(() => {
-    const tickInterval = window.setInterval(() => {
-      setCurrentGlobalTime(new Date())
-    }, 1000)
+    if (!hasEntered) return
 
-    return () => window.clearInterval(tickInterval)
-  }, [])
+    const syncGlobalTime = async () => {
+      setGlobalTimeState((prev) => ({ ...prev, status: 'syncing' }))
+      try {
+        const data = await fetchWorkerServerTime()
+        const parsed = new Date(data.serverTime)
+        if (Number.isNaN(parsed.getTime())) {
+          throw new Error('Invalid server time')
+        }
+
+        const sessionExpired = await validateSessionAfterLogicalTimeJump(parsed)
+        if (sessionExpired) return
+
+        setGlobalTimeState({
+          baseServerTime: parsed,
+          syncedAtClientMs: Date.now(),
+          status: 'synced',
+        })
+      } catch (error) {
+        console.warn('Could not sync worker HUD with /system/time. Keeping previous clock state.', error)
+        setGlobalTimeState((prev) => ({
+          ...prev,
+          status: 'error',
+        }))
+      }
+    }
+
+    void syncGlobalTime()
+    const syncInterval = window.setInterval(() => {
+      void syncGlobalTime()
+    }, 10000)
+
+    return () => window.clearInterval(syncInterval)
+  }, [hasEntered])
 
   const handleLogout = async () => {
     await logoutCurrentSession()
@@ -156,7 +243,7 @@ export function WorkerMainViewPage() {
       {hasEntered ? (
         <>
           <TopHud
-            currentGlobalTime={currentGlobalTime}
+            globalTimeState={globalTimeState}
             username={hudUser.username}
             roleLabel={hudUser.roleLabel}
             onLogout={handleLogout}
@@ -197,21 +284,38 @@ export function WorkerMainViewPage() {
 export default WorkerMainViewPage
 
 function TopHud({
-  currentGlobalTime,
+  globalTimeState,
   username,
   roleLabel,
   onLogout,
 }: {
-  currentGlobalTime: Date
+  globalTimeState: WorkerGlobalTimeState
   username: string
   roleLabel: string
   onLogout: () => void
 }) {
+  const [currentGlobalTime, setCurrentGlobalTime] = useState(() => {
+    const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs
+    return new Date(globalTimeState.baseServerTime.getTime() + Math.max(0, elapsedClientMs))
+  })
+
+  useEffect(() => {
+    const updateClock = () => {
+      const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs
+      setCurrentGlobalTime(new Date(globalTimeState.baseServerTime.getTime() + Math.max(0, elapsedClientMs)))
+    }
+
+    updateClock()
+    const tickInterval = window.setInterval(updateClock, 1000)
+    return () => window.clearInterval(tickInterval)
+  }, [globalTimeState.baseServerTime, globalTimeState.syncedAtClientMs])
+
   return (
     <header className="worker-top-hud pointer-events-none flex items-start justify-between px-3 pt-3 pb-2 text-[10px] font-black uppercase tracking-[-0.02em] text-[#A4C2C5]/80">
       <div className="worker-hud-chip pointer-events-auto flex items-center gap-2.5 bg-[#0d1414]/90 border border-[#67ACA9]/25 px-2.5 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-[-0.02em] text-white shadow-md shrink-0">
-        <div className="inline-flex items-center shrink-0 text-[#69BFB7]">
+        <div className={`inline-flex items-center shrink-0 ${globalTimeState.status === 'error' ? 'text-rose-400' : 'text-[#69BFB7]'}`}>
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <title>{globalTimeState.status === 'error' ? 'Hora no sincronizada' : 'Hora del servidor'}</title>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
           </svg>
         </div>

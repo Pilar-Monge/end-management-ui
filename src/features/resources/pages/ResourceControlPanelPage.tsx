@@ -1,8 +1,8 @@
 
 import "./resource-control-panel.css";
-import { memo, useEffect, useState, type ReactNode } from "react";
+import { memo, useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { logoutCurrentSession } from "../../../shared/services/sessionProfile";
+import { checkCurrentSessionStatus, clearCachedSession, logoutCurrentSession } from "../../../shared/services/sessionProfile";
 import type {
   Camp,
   ResourceType,
@@ -92,6 +92,8 @@ const NAVIGATION_DATA = [
   }
 ];
 
+const LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS = 60 * 1000;
+
 interface ResourceControlPanelPageProps {
   onExit?: () => void;
 }
@@ -125,6 +127,54 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     lastSyncAt: new Date(),
     status: 'syncing',
   });
+  const globalTimeStateRef = useRef(globalTimeState);
+  const lastSyncedGlobalTimeRef = useRef<{
+    baseServerTime: Date;
+    syncedAtClientMs: number;
+  } | null>(null);
+
+  useEffect(() => {
+    globalTimeStateRef.current = globalTimeState;
+    if (globalTimeState.status === 'synced') {
+      lastSyncedGlobalTimeRef.current = {
+        baseServerTime: globalTimeState.baseServerTime,
+        syncedAtClientMs: globalTimeState.syncedAtClientMs,
+      };
+    }
+  }, [globalTimeState]);
+
+  const redirectExpiredLogicalSession = () => {
+    clearCachedSession(true);
+    navigate('/main-homepage', {
+      replace: true,
+      state: {
+        initialAppState: 'login',
+        sessionMessage: 'Sesion expirada por avance del tiempo logico. Inicia sesion para continuar.',
+      },
+    });
+  };
+
+  const validateSessionAfterLogicalTimeJump = async (nextServerTime: Date): Promise<boolean> => {
+    const previous = lastSyncedGlobalTimeRef.current;
+    if (!previous) {
+      return false;
+    }
+
+    const expectedServerTimeMs = previous.baseServerTime.getTime() + Math.max(0, Date.now() - previous.syncedAtClientMs);
+    const forwardJumpMs = nextServerTime.getTime() - expectedServerTimeMs;
+
+    if (forwardJumpMs <= LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS) {
+      return false;
+    }
+
+    const status = await checkCurrentSessionStatus();
+    if (status !== 'expired') {
+      return false;
+    }
+
+    redirectExpiredLogicalSession();
+    return true;
+  };
 
   const syncGlobalTime = async () => {
     setGlobalTimeState(prev => ({ ...prev, status: 'syncing' }));
@@ -135,6 +185,9 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       if (Number.isNaN(parsed.getTime())) {
         throw new Error('Invalid server time');
       }
+
+      const sessionExpired = await validateSessionAfterLogicalTimeJump(parsed);
+      if (sessionExpired) return;
 
       setGlobalTimeState({
         baseServerTime: parsed,
@@ -157,7 +210,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
 
     const syncInterval = setInterval(() => {
       syncGlobalTime();
-    }, 60000);
+    }, 10000);
 
     return () => clearInterval(syncInterval);
   }, []);
@@ -769,6 +822,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             onMarkAsRead={handleMarkAsRead}
             onUpdateInventory={handleUpdateInventory}
             onNavigateToSub={handleInnerNavigation}
+            globalTimeState={globalTimeState}
           />
         );
       case "Inventario actual":

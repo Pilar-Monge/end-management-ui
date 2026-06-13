@@ -534,7 +534,8 @@ export function ViewDashboard({
   occupationCoverages = [],
   requestResourceDetails = [],
   deliveredTransferResources = [],
-  onNavigateToSub
+  onNavigateToSub,
+  globalTimeState
 }: {
   camps: Camp[];
   resourceTypes: ResourceType[];
@@ -557,6 +558,11 @@ export function ViewDashboard({
   onMarkAsRead?: (id: string) => void;
   onUpdateInventory?: (campId: string, resourceTypeId: string, currentAmount: number, minimumAlertAmount: number) => void;
   onNavigateToSub: (sub: string) => void;
+  globalTimeState?: {
+    baseServerTime: Date;
+    syncedAtClientMs: number;
+    status: 'synced' | 'syncing' | 'error';
+  };
 }) {
   const activeCampId = currentUser.campId;
   const campName = getCampDisplayName(camps, activeCampId);
@@ -565,14 +571,25 @@ export function ViewDashboard({
     setIsRefreshing(true);
     setTimeout(() => setIsRefreshing(false), 800);
   };
-  const [systTime, setSystTime] = useState(new Date());
+  const [systTime, setSystTime] = useState(() => {
+    if (globalTimeState) {
+      const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
+      return new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs);
+    }
+    return new Date();
+  });
 
   useEffect(() => {
     const clockInterval = setInterval(() => {
-      setSystTime(new Date());
+      if (globalTimeState) {
+        const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
+        setSystTime(new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs));
+      } else {
+        setSystTime(new Date());
+      }
     }, 1000);
     return () => clearInterval(clockInterval);
-  }, []);
+  }, [globalTimeState]);
 
   const getNextUtcMidnight = (nowDate: Date): Date => {
     return new Date(Date.UTC(
