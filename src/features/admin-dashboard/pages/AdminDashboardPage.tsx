@@ -1191,11 +1191,13 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (!hasEntered) return;
-    if (initialBootstrapDataRef.current) return;
     if (initialCoreLoadStartedRef.current) return;
     initialCoreLoadStartedRef.current = true;
     void loadCoreData();
-  }, [hasEntered, loadCoreData]);
+    if (initialBootstrapDataRef.current) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [hasEntered, loadCoreData, location.pathname, navigate]);
 
   useEffect(() => {
     if (!hasEntered) return;
@@ -1226,6 +1228,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const data = initialBootstrapDataRef.current;
     if (!data) return;
+    if (initialCoreLoadStartedRef.current) return;
     if (preloadedDeferredLoadStartedRef.current) return;
     preloadedDeferredLoadStartedRef.current = true;
 
