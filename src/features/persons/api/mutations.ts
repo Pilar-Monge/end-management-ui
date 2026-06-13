@@ -9,8 +9,6 @@ import type {
 import { ENDPOINTS, personsKeys } from './keys'
 import { mapPersonRecord } from './queries'
 
-const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('accessToken')
-
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 const API_ORIGIN = (() => {
   try {
@@ -184,7 +182,7 @@ export async function updatePersonPhoto(id: number, photo: File): Promise<Person
 
   const res = await fetch(endpoint, {
     method: 'PUT',
-    headers: buildAuthHeaders(), // buildAuthHeaders envía Authorization pero sin Content-Type
+    headers: buildAuthHeaders(),
     credentials: 'include',
     body: formData,
   })

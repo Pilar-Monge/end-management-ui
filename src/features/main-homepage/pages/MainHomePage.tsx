@@ -28,12 +28,12 @@ import {
   requestPasswordReset,
   resetPasswordWithCode,
 } from '../../login/services/authApi'
-import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
 import { getPostLoginRoute, normalizeUserRole } from '../../../shared/services/postLoginRouting'
 import { getErrorMessage } from '../../../shared/services/errorMessages'
 import type { LoginErrors, LoginForm, PasswordResetErrors } from '../../login/types'
 import { useAuthDispatch } from '../../../shared/context/AuthContext'
 import { PopupMessage } from '../../../shared/components/PopupMessage'
+import { saveCachedSessionUser } from '../../../shared/services/sessionProfile'
 
 import LandingPage from '../components/LandingPage'
 import ReplicaGlobe from '../components/ReplicaGlobe'
@@ -310,17 +310,11 @@ export function MainHomePage() {
         ...response.user,
         role: normalizeUserRole(response.user.rol),
       }
-      const token = response.token ?? response.accessToken
       const savedPath = localStorage.getItem('last_secure_path')
 
-      if (token) {
-        localStorage.setItem('token', token)
-        localStorage.setItem('accessToken', token)
-      }
-      window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
-      localStorage.setItem('user', JSON.stringify(normalizedUser))
       localStorage.removeItem('admin_settings_v2')
       localStorage.setItem(LAST_SELECTED_CAMP_ID_KEY, String(response.user.campId))
+      saveCachedSessionUser(normalizedUser)
 
       const redirectPath = getPostLoginRoute(normalizedUser.role, {
         savedPath,

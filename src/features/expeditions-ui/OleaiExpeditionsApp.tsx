@@ -17,8 +17,8 @@ import {
   getServerTime,
   listExpeditionNotifications,
   markNotificationRead,
-  type ExpeditionNotification,
 } from "./services/expeditionsUi.service";
+import { logoutCurrentSession } from "../../shared/services/sessionProfile";
 
 function Placeholder({ section, sub }: { section: string; sub: string }) {
   return (
@@ -159,7 +159,8 @@ export default function App() {
     setActiveSub("Información Personal");
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logoutCurrentSession();
     setHasEntered(false);
     setShowLoading(true);
   };

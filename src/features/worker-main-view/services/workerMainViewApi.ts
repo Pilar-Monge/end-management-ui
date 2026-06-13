@@ -12,10 +12,6 @@ import type {
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
 
-function getToken(): string | null {
-  return localStorage.getItem('token') ?? localStorage.getItem('accessToken')
-}
-
 function getHeaders(): HeadersInit {
   return {
     'Content-Type': 'application/json',

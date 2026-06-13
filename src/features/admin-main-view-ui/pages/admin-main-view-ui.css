@@ -808,3 +808,112 @@
     padding-right: 2rem;
   }
 }
+
+@media (max-width: 640px) {
+  .admin-main-view-ui-page .h-screen {
+    height: 100dvh;
+  }
+
+  .admin-main-view-ui-page .p-6 {
+    padding: 0.75rem;
+  }
+
+  .admin-main-view-ui-page .admin-ui-hud-button {
+    min-height: 36px;
+    padding: 8px 16px;
+  }
+
+  .admin-main-view-ui-page .admin-ui-hud-icon-button {
+    height: 38px;
+    padding: 10px;
+    width: 38px;
+  }
+
+  .admin-main-view-ui-page .admin-ui-hud-button-content,
+  .admin-main-view-ui-page .admin-ui-hud-button span {
+    gap: 6px;
+  }
+
+  .admin-main-view-ui-page .admin-ui-hud-button span {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+  }
+
+  .admin-main-view-ui-page .admin-ui-hud-icon,
+  .admin-main-view-ui-page .admin-ui-hud-back-icon {
+    height: 16px;
+    width: 16px;
+  }
+
+  .admin-main-view-ui-page .admin-ui-loading-stack {
+    gap: 16px;
+    padding: 0 16px;
+    width: 100%;
+  }
+
+  .admin-main-view-ui-page .admin-ui-loading-brush {
+    gap: 10px;
+    max-width: calc(100vw - 32px);
+    padding: 12px 18px;
+  }
+
+  .admin-main-view-ui-page .admin-ui-loading-brush span {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-align: center;
+  }
+
+  .admin-main-view-ui-page .admin-ui-loading-bar-shell {
+    width: min(320px, calc(100vw - 32px));
+  }
+
+  .admin-main-view-ui-page .text-3xl {
+    font-size: 1.25rem;
+    line-height: 1.5rem;
+  }
+
+  .admin-main-view-ui-page .text-\[10px\] {
+    font-size: 9px;
+  }
+
+  .admin-main-view-ui-page .tracking-\[0\.24em\],
+  .admin-main-view-ui-page .tracking-\[0\.28em\],
+  .admin-main-view-ui-page .tracking-\[0\.3em\],
+  .admin-main-view-ui-page .tracking-\[0\.32em\] {
+    letter-spacing: 0.16em;
+  }
+
+  .admin-main-view-ui-page .bottom-6 {
+    bottom: 1rem;
+  }
+
+  .admin-main-view-ui-page .right-6 {
+    right: 1rem;
+  }
+
+  .admin-main-view-ui-page .absolute.bottom-6.right-6 {
+    left: 1rem;
+    text-align: center;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 420px) {
+  .admin-main-view-ui-page .p-6 {
+    padding: 0.6rem;
+  }
+
+  .admin-main-view-ui-page .admin-ui-hud-button {
+    padding: 7px 12px;
+  }
+
+  .admin-main-view-ui-page .admin-ui-hud-button span {
+    font-size: 8.5px;
+    letter-spacing: 0.12em;
+  }
+
+  .admin-main-view-ui-page .admin-ui-hud-icon-button {
+    height: 36px;
+    width: 36px;
+  }
+}

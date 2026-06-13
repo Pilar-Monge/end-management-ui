@@ -49,6 +49,7 @@ import {
 import type { MappedCampPoint } from "../expeditions/types";
 import { AdminSyncOverlay } from "../components/AdminSyncOverlay";
 import { SESSION_TOKEN_CHANGED_EVENT } from "../../../shared/services/sessionService";
+import { logoutCurrentSession } from "../../../shared/services/sessionProfile";
 import { ApiHttpError, apiRequest } from "../../../shared/services/httpClient";
 import { getErrorMessage } from "../../../shared/services/errorMessages";
 import { PopupMessage } from "../../../shared/components/PopupMessage";
@@ -231,7 +232,7 @@ interface TempRoleAssignment {
   fromRole: string;
   tempRole: string;
   startDate: string;
-  endDate: string;
+  endDate: string | null;
   reason: string;
   status: "ACTIVA" | "FINALIZADA";
 }
@@ -335,13 +336,23 @@ function expeditionRouteStatus(status: UiExpedition["status"]): string {
 }
 
 function buildExpeditionRoute(expedition: UiExpedition, points: MappedCampPoint[]) {
-  const origin = points.find((point) => point.id === expedition.originCampId);
-  const destination = expedition.routePoints[0];
-  if (!origin || !destination) return null;
+  // Try to find the origin camp from points, otherwise fallback to first point in catalog, otherwise default coordinates.
+  const originCamp = points.find((point) => point.id === expedition.originCampId);
+  const startLat = originCamp ? originCamp.latitude : (points[0]?.latitude ?? 9.933);
+  const startLng = originCamp ? originCamp.longitude : (points[0]?.longitude ?? -84.083);
+  const startLabel = originCamp ? originCamp.name : (points[0]?.name ?? "Base Alfa");
+
+  // Try to find the destination routePoint, or fallback to destinationCamp in points, or second point, or default coordinates.
+  const routeDest = expedition.routePoints?.[0];
+  const destCamp = points.find((point) => point.id === expedition.destinationCampId);
+  
+  const endLat = routeDest?.latitude ?? destCamp?.latitude ?? (points[1]?.latitude ?? 19.4326);
+  const endLng = routeDest?.longitude ?? destCamp?.longitude ?? (points[1]?.longitude ?? -99.1332);
+  const endLabel = routeDest?.label ?? destCamp?.name ?? expedition.sector ?? "Sector Alfa";
 
   return {
-    start: { lat: origin.latitude, lng: origin.longitude, label: origin.name.slice(0, 14) },
-    end: { lat: destination.latitude, lng: destination.longitude, label: destination.label?.slice(0, 14) ?? expedition.sector.slice(0, 14) },
+    start: { lat: startLat, lng: startLng, label: startLabel.slice(0, 14) },
+    end: { lat: endLat, lng: endLng, label: endLabel.slice(0, 14) },
     status: expeditionRouteStatus(expedition.status),
   };
 }
@@ -393,6 +404,23 @@ function assignmentStatusFromApi(item: Record<string, unknown>): TempRoleAssignm
     return "FINALIZADA";
   }
 
+  if (normalizedStatus === "ACTIVA" || normalizedStatus === "ACTIVE") {
+    return "ACTIVA";
+  }
+
+  const endDateStr = firstStringField(item, ["endDate", "end_date", "expiresAt", "expires_at"]);
+  if (endDateStr) {
+    const endDate = parseTemporaryDate(endDateStr);
+    if (!Number.isNaN(endDate.getTime())) {
+      const now = new Date();
+      const endMidnight = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+      const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (endMidnight.getTime() < nowMidnight.getTime()) {
+        return "FINALIZADA";
+      }
+    }
+  }
+
   return "ACTIVA";
 }
 
@@ -409,8 +437,9 @@ function temporarySectorForRole(roleName: string): TemporarySector {
     ?? TEMPORARY_SECTORS[TEMPORARY_SECTORS.length - 1];
 }
 
-function parseTemporaryDate(value: string): Date {
-  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+function parseTemporaryDate(value: string | null | undefined): Date {
+  if (!value) return new Date(NaN);
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
   if (dateOnlyMatch) {
     const [, year, month, day] = dateOnlyMatch;
     return new Date(Number(year), Number(month) - 1, Number(day));
@@ -419,9 +448,12 @@ function parseTemporaryDate(value: string): Date {
   return new Date(value);
 }
 
-function temporaryAssignmentProgress(startDate: string, endDate: string): { value: number; urgent: boolean; label: string } {
+function temporaryAssignmentProgress(startDate: string, endDate: string | null | undefined): { value: number; urgent: boolean; label: string } {
+  if (!endDate) {
+    return { value: 0, urgent: false, label: "Sin límite" };
+  }
   const start = parseTemporaryDate(startDate).getTime();
-  const end = parseTemporaryDate(endDate).getTime();
+  const end = parseTemporaryDate(endDate).getTime() + 24 * 60 * 60 * 1000;
   const now = Date.now();
 
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
@@ -433,9 +465,10 @@ function temporaryAssignmentProgress(startDate: string, endDate: string): { valu
   return { value, urgent, label: `${value}% completado` };
 }
 
-function temporaryDateLabel(value: string): string {
+function temporaryDateLabel(value: string | null | undefined): string {
+  if (!value) return "Indefinida";
   const parsed = parseTemporaryDate(value);
-  if (Number.isNaN(parsed.getTime())) return "Sin fecha";
+  if (Number.isNaN(parsed.getTime())) return "Indefinida";
   return parsed.toLocaleDateString("es-CR");
 }
 
@@ -624,6 +657,7 @@ function resolvePersonOccupationLabel(person: Person | null | undefined, occupat
 function legacyPopulationStatus(status: Person["status"]): "Activo" | "Herido" | "Enfermo" | "Fuera" {
   if (status === "ACTIVE") return "Activo";
   if (status === "INJURED") return "Herido";
+  if (status === "SICK") return "Enfermo";
   return "Fuera";
 }
 
@@ -1011,6 +1045,7 @@ export default function AdminDashboardPage() {
         delete nextUser.lastName2;
         delete nextUser.displayName;
         localStorage.setItem("user", JSON.stringify(nextUser));
+        window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT));
       } catch {
         // Ignore malformed cached user; runtime state already came from backend.
       }
@@ -1156,11 +1191,13 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (!hasEntered) return;
-    if (initialBootstrapDataRef.current) return;
     if (initialCoreLoadStartedRef.current) return;
     initialCoreLoadStartedRef.current = true;
     void loadCoreData();
-  }, [hasEntered, loadCoreData]);
+    if (initialBootstrapDataRef.current) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [hasEntered, loadCoreData, location.pathname, navigate]);
 
   useEffect(() => {
     if (!hasEntered) return;
@@ -1191,6 +1228,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const data = initialBootstrapDataRef.current;
     if (!data) return;
+    if (initialCoreLoadStartedRef.current) return;
     if (preloadedDeferredLoadStartedRef.current) return;
     preloadedDeferredLoadStartedRef.current = true;
 
@@ -1318,12 +1356,8 @@ export default function AdminDashboardPage() {
     setActiveSub(navItem.subOptions[0]);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("user");
-    localStorage.removeItem("admin_settings_v2");
-    window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT));
+  const handleLogout = async () => {
+    await logoutCurrentSession();
     navigate("/");
   };
 
@@ -1409,6 +1443,7 @@ export default function AdminDashboardPage() {
         "success",
         decision === "approved" ? "Admision aprobada correctamente." : "Admision rechazada correctamente.",
       );
+      await loadCoreData();
     } catch (error) {
       setDataError(getErrorMessage(error, "update_admission"));
     }
@@ -1772,7 +1807,7 @@ function TopHud({
                 type="button"
                 onClick={() => setIsProfilePreviewOpen(false)}
               >
-                CERRAR
+                X
               </button>
               <img
                 src={profile.avatarUrl ?? undefined}
@@ -2549,8 +2584,7 @@ const PopulationModule = memo(function PopulationModule({
           ?? "Desconocido";
       const startDate = firstStringField(rawItem, ["startDate", "start_date", "assignedAt", "assigned_at", "createdAt", "created_at"])
         ?? new Date().toISOString();
-      const endDate = firstStringField(rawItem, ["endDate", "end_date", "expiresAt", "expires_at", "finishedAt", "finished_at", "revokedAt", "revoked_at"])
-        ?? startDate;
+      const endDate = firstStringField(rawItem, ["endDate", "end_date", "expiresAt", "expires_at", "finishedAt", "finished_at", "revokedAt", "revoked_at"]);
 
       mapped.push({
         id: assignmentId,
@@ -2757,7 +2791,7 @@ const PopulationModule = memo(function PopulationModule({
       accountStatus: person.accountStatus ?? "ACTIVE",
     });
 
-    if (editMode && systemUserId !== null) {
+    if (systemUserId !== null) {
       fetchSystemUserById(systemUserId)
         .then((systemUser) => {
           setEditableSystemUserId(systemUser.id);
@@ -2922,6 +2956,7 @@ const PopulationModule = memo(function PopulationModule({
       });
 
       setAssignments(await loadTempAssignments());
+      await onReload();
       setRevocationTargetId(null);
       setRevocationReason("");
       onNotice("poblacion", "success", "Asignación creada y usuario notificado por correo.");
@@ -2977,6 +3012,7 @@ const PopulationModule = memo(function PopulationModule({
       });
 
       setAssignments(await loadTempAssignments());
+      await onReload();
       setRevocationTargetId(null);
       setRevocationReason("");
       onNotice("poblacion", "success", "Asignación revocada y usuario notificado por correo.");
@@ -3617,10 +3653,10 @@ const PopulationModule = memo(function PopulationModule({
 
       {selectedPerson && (
         <div className="admin-ui-v2-modal-backdrop" onClick={closePersonModal}>
-          <div className={`admin-ui-v2-modal ${isEditMode ? "" : "admin-ui-v2-person-modal-shell"}`} onClick={(event) => event.stopPropagation()}>
+          <div className={`admin-ui-v2-modal ${isEditMode ? "admin-ui-v2-person-edit-modal" : "admin-ui-v2-person-modal-shell"}`} onClick={(event) => event.stopPropagation()}>
             <div className="admin-ui-v2-modal-header">
               <h3>{isEditMode ? "Editar Persona" : "Ficha de Persona"}</h3>
-              <button className="admin-ui-v2-btn" type="button" onClick={closePersonModal}>Cerrar</button>
+              <button className="admin-ui-v2-btn" type="button" onClick={closePersonModal}>X</button>
             </div>
 
             {isEditMode ? (
@@ -3729,8 +3765,8 @@ const PopulationModule = memo(function PopulationModule({
                           <small>{selectedPerson.occupation?.description ?? "Sin descripción de operaciones registrada."}</small>
                         </div>
                         <div><span>Identificación</span><strong>{selectedPerson.identificationNumber || "No registrada"}</strong></div>
-                        <div><span>Cuenta</span><strong>{normalizeAccountStatus(selectedPerson.accountStatus)}</strong></div>
-                        <div><span>Rol de sistema</span><strong>{selectedPerson.accountRole ?? "WORKER"}</strong></div>
+                        <div><span>Cuenta</span><strong>{editableSystemUserSnapshot ? normalizeAccountStatus(editableSystemUserSnapshot.status) : normalizeAccountStatus(selectedPerson.accountStatus)}</strong></div>
+                        <div><span>Rol de sistema</span><strong>{editableSystemUserSnapshot ? editableSystemUserSnapshot.role : (selectedPerson.accountRole ?? "WORKER")}</strong></div>
                       </div>
 
                       {achievementIds.length > 0 && (
@@ -3751,7 +3787,7 @@ const PopulationModule = memo(function PopulationModule({
 
                   <div className="admin-ui-v2-person-modal-footer">
                     {isOwnRecord && <span className="admin-ui-v2-muted">Tu propio perfil se edita desde Configuracion.</span>}
-                    <button className="admin-ui-v2-btn" onClick={closePersonModal} type="button">Cerrar</button>
+                    <button className="admin-ui-v2-btn" onClick={closePersonModal} type="button">X</button>
                     <button className="admin-ui-v2-btn is-info" onClick={() => setIsEditMode(true)} type="button" disabled={isOwnRecord}>Editar ficha</button>
                     <button className="admin-ui-v2-btn is-danger" onClick={() => void handleDeletePerson(selectedPerson.id)} type="button" disabled={isSaving || isOwnRecord}>Eliminar</button>
                   </div>
@@ -3890,41 +3926,43 @@ const AdmissionsModule = memo(function AdmissionsModule({
           {activeList.length === 0 && <div className="admin-ui-v2-empty-cell">Sin solicitudes pendientes.</div>}
         </div>
       ) : (
-        <table className="v-table admin-ui-v2-table">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Profesión</th>
-              <th>Score IA</th>
-              <th>Estado</th>
-              <th>Detalle</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagedList.map((admission) => (
-              <tr key={admission.id}>
-                <td>{admission.name}</td>
-                <td>{admission.profession}</td>
-                <td>{admission.score}</td>
-                <td>
-                  <span className={`admin-ui-v2-pill ${admission.workflowStatus === "APPROVED" ? "is-ok" : admission.workflowStatus === "REJECTED" ? "is-danger" : "is-warn"}`}>
-                    {workflowStatusLabel(admission.workflowStatus)}
-                  </span>
-                </td>
-                <td>
-                  <button className="admin-ui-v2-btn" type="button" onClick={() => openAdmissionDetail(admission)}>
-                    Ver detalle
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {activeList.length === 0 && (
+        <div className="admin-ui-v2-table-wrapper">
+          <table className="v-table admin-ui-v2-table">
+            <thead>
               <tr>
-                <td colSpan={5} className="admin-ui-v2-empty-cell">Sin admisiones procesadas.</td>
+                <th>Nombre</th>
+                <th>Profesión</th>
+                <th>Score IA</th>
+                <th>Estado</th>
+                <th>Detalle</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {pagedList.map((admission) => (
+                <tr key={admission.id}>
+                  <td>{admission.name}</td>
+                  <td>{admission.profession}</td>
+                  <td>{admission.score}</td>
+                  <td>
+                    <span className={`admin-ui-v2-pill ${admission.workflowStatus === "APPROVED" ? "is-ok" : admission.workflowStatus === "REJECTED" ? "is-danger" : "is-warn"}`}>
+                      {workflowStatusLabel(admission.workflowStatus)}
+                    </span>
+                  </td>
+                  <td>
+                    <button className="admin-ui-v2-btn" type="button" onClick={() => openAdmissionDetail(admission)}>
+                      Ver detalle
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {activeList.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="admin-ui-v2-empty-cell">Sin admisiones procesadas.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <div className="admin-ui-v2-pagination">
@@ -4286,6 +4324,7 @@ const SettingsModule = memo(function SettingsModule({
             updated.personId = uploadedPersonId;
           }
           localStorage.setItem("user", JSON.stringify(updated));
+          window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT));
         } catch {
           // Ignore malformed cached user
         }
@@ -4593,100 +4632,106 @@ function AdmissionReviewModal({
       <div className="admin-ui-v2-modal" onClick={(event) => event.stopPropagation()}>
         <div className="admin-ui-v2-modal-header">
           <h3>Reporte Detallado - IA</h3>
-          <button className="admin-ui-v2-btn" type="button" onClick={onClose}>Cerrar</button>
+          <button className="admin-ui-v2-btn" type="button" onClick={onClose}>X</button>
         </div>
 
         <div className="admin-ui-v2-adm-detail">
-          {admissionPhoto && (
-            <img
-              src={admissionPhoto}
-              alt={`Foto de ingreso de ${admission.name}`}
-              className="admin-ui-v2-settings-photo-preview"
-              loading="lazy"
-              decoding="async"
-              referrerPolicy="no-referrer"
-            />
-          )}
-          <div><strong>Nombre:</strong> {admission.name}</div>
-          <div><strong>Profesión:</strong> {admission.profession}</div>
-          <div><strong>Score IA:</strong> {admission.score}/100</div>
-          <div><strong>Estado:</strong> {statusLabel(admission.status)}</div>
-          <div><strong>Flujo:</strong> {workflowStatusLabel(admission.workflowStatus)}</div>
-          <div><strong>Oficio sugerido IA:</strong> {typeof admission.suggestedOccupationId === "number" ? occupations.find(([id]) => id === admission.suggestedOccupationId)?.[1] ?? `Ocupación #${admission.suggestedOccupationId}` : "No definido"}</div>
-          <div><strong>Oficio final:</strong> {typeof admission.finalOccupationId === "number" ? occupations.find(([id]) => id === admission.finalOccupationId)?.[1] ?? `Ocupación #${admission.finalOccupationId}` : "Sin asignar"}</div>
-          <div><strong>Razón:</strong> {admission.reason}</div>
-          {admission.skills.length > 0 && (
-            <div className="admin-ui-v2-adm-skills">
-              {admission.skills.map((skill) => (
-                <span key={skill} className="admin-ui-v2-pill is-info">{skill}</span>
-              ))}
+          <div className="admin-ui-v2-adm-info-section">
+            {admissionPhoto && (
+              <img
+                src={admissionPhoto}
+                alt={`Foto de ingreso de ${admission.name}`}
+                className="admin-ui-v2-settings-photo-preview"
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+              />
+            )}
+            <div className="admin-ui-v2-adm-info-grid">
+              <div><strong>Nombre:</strong> {admission.name}</div>
+              <div><strong>Profesión:</strong> {admission.profession}</div>
+              <div><strong>Score IA:</strong> {admission.score}/100</div>
+              <div><strong>Estado:</strong> {statusLabel(admission.status)}</div>
+              <div><strong>Flujo:</strong> {workflowStatusLabel(admission.workflowStatus)}</div>
+              <div><strong>Oficio sugerido IA:</strong> {typeof admission.suggestedOccupationId === "number" ? occupations.find(([id]) => id === admission.suggestedOccupationId)?.[1] ?? `Ocupación #${admission.suggestedOccupationId}` : "No definido"}</div>
+              <div><strong>Oficio final:</strong> {typeof admission.finalOccupationId === "number" ? occupations.find(([id]) => id === admission.finalOccupationId)?.[1] ?? `Ocupación #${admission.finalOccupationId}` : "Sin asignar"}</div>
+              <div><strong>Razón:</strong> {admission.reason}</div>
             </div>
-          )}
-
-          {canReviewSelected ? (
-            <>
-              <div className="admin-ui-v2-form-grid">
-                <label className="admin-ui-v2-muted">Oficio final (requerido para aprobar)</label>
-                <select
-                  className="v-select"
-                  value={reviewForm.finalOccupationId}
-                  onChange={(event) => setReviewForm((prev) => ({ ...prev, finalOccupationId: Number(event.target.value) }))}
-                >
-                  <option value={0}>Selecciona oficio final</option>
-                  {occupations.map(([id, name]) => (
-                    <option key={id} value={id}>{name}</option>
-                  ))}
-                </select>
-
-                <label className="admin-ui-v2-muted">Rol de sistema (requerido para aprobar)</label>
-                <select
-                  className="v-select"
-                  value={reviewForm.finalRole}
-                  onChange={(event) => setReviewForm((prev) => ({ ...prev, finalRole: event.target.value }))}
-                >
-                  <option value="">Selecciona rol final</option>
-                  <option value="WORKER">WORKER</option>
-                  <option value="TRAVEL_MANAGER">TRAVEL_MANAGER</option>
-                  <option value="RESOURCE_MANAGEMENT">RESOURCE_MANAGEMENT</option>
-                </select>
-
-                <label className="admin-ui-v2-muted">Motivo de rechazo (obligatorio al rechazar)</label>
-                <textarea
-                  className="v-textarea"
-                  value={reviewForm.rejectionReason}
-                  onChange={(event) => setReviewForm((prev) => ({ ...prev, rejectionReason: event.target.value }))}
-                  placeholder="Motivo documentado para auditoria"
-                />
+            {admission.skills.length > 0 && (
+              <div className="admin-ui-v2-adm-skills">
+                {admission.skills.map((skill) => (
+                  <span key={skill} className="admin-ui-v2-pill is-info">{skill}</span>
+                ))}
               </div>
+            )}
+          </div>
 
-              <div className="admin-ui-v2-actions">
-                <button
-                  className="admin-ui-v2-btn is-ok"
-                  type="button"
-                  disabled={reviewSubmitting || !reviewForm.finalOccupationId || !reviewForm.finalRole.trim()}
-                  onClick={() => void submitAdmissionReview("approved")}
-                >
-                  {reviewSubmitting ? "Procesando..." : "Aprobar admisión"}
-                </button>
-                <button
-                  className="admin-ui-v2-btn is-danger"
-                  type="button"
-                  disabled={reviewSubmitting || !reviewForm.rejectionReason.trim()}
-                  onClick={() => void submitAdmissionReview("rejected")}
-                >
-                  {reviewSubmitting ? "Procesando..." : "Rechazar"}
-                </button>
-              </div>
+          <div className="admin-ui-v2-adm-action-section">
+            {canReviewSelected ? (
+              <>
+                <div className="admin-ui-v2-form-grid">
+                  <label className="admin-ui-v2-muted">Oficio final (requerido para aprobar)</label>
+                  <select
+                    className="v-select"
+                    value={reviewForm.finalOccupationId}
+                    onChange={(event) => setReviewForm((prev) => ({ ...prev, finalOccupationId: Number(event.target.value) }))}
+                  >
+                    <option value={0}>Selecciona oficio final</option>
+                    {occupations.map(([id, name]) => (
+                      <option key={id} value={id}>{name}</option>
+                    ))}
+                  </select>
 
+                  <label className="admin-ui-v2-muted">Rol de sistema (requerido para aprobar)</label>
+                  <select
+                    className="v-select"
+                    value={reviewForm.finalRole}
+                    onChange={(event) => setReviewForm((prev) => ({ ...prev, finalRole: event.target.value }))}
+                  >
+                    <option value="">Selecciona rol final</option>
+                    <option value="WORKER">WORKER</option>
+                    <option value="TRAVEL_MANAGER">TRAVEL_MANAGER</option>
+                    <option value="RESOURCE_MANAGEMENT">RESOURCE_MANAGEMENT</option>
+                  </select>
+
+                  <label className="admin-ui-v2-muted">Motivo de rechazo (obligatorio al rechazar)</label>
+                  <textarea
+                    className="v-textarea"
+                    value={reviewForm.rejectionReason}
+                    onChange={(event) => setReviewForm((prev) => ({ ...prev, rejectionReason: event.target.value }))}
+                    placeholder="Motivo documentado para auditoria"
+                  />
+                </div>
+
+                <div className="admin-ui-v2-actions">
+                  <button
+                    className="admin-ui-v2-btn is-ok"
+                    type="button"
+                    disabled={reviewSubmitting || !reviewForm.finalOccupationId || !reviewForm.finalRole.trim()}
+                    onClick={() => void submitAdmissionReview("approved")}
+                  >
+                    {reviewSubmitting ? "Procesando..." : "Aprobar admisión"}
+                  </button>
+                  <button
+                    className="admin-ui-v2-btn is-danger"
+                    type="button"
+                    disabled={reviewSubmitting || !reviewForm.rejectionReason.trim()}
+                    onClick={() => void submitAdmissionReview("rejected")}
+                  >
+                    {reviewSubmitting ? "Procesando..." : "Rechazar"}
+                  </button>
+                </div>
+
+                <p className="admin-ui-v2-muted">
+                  Al aprobar, se crea automaticamente la persona y su cuenta de acceso.
+                </p>
+              </>
+            ) : (
               <p className="admin-ui-v2-muted">
-                Al aprobar, se crea automaticamente la persona y su cuenta de acceso.
+                Esta solicitud no esta lista para revision administrativa. Solo se puede revisar en estado PENDING_ADMIN.
               </p>
-            </>
-          ) : (
-            <p className="admin-ui-v2-muted">
-              Esta solicitud no esta lista para revision administrativa. Solo se puede revisar en estado PENDING_ADMIN.
-            </p>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -5132,7 +5177,7 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
             {visibleExpeditions.length === 0 && <div className="admin-ui-v2-empty-cell">Sin registros para esta vista.</div>}
           </div>
 
-          <div className="admin-ui-v2-module-card">
+          <div className="admin-ui-v2-module-card admin-ui-v2-expedition-detail-wrapper">
             {selectedExpedition ? (
               <div className="admin-ui-v2-expedition-detail">
                 <div className="admin-ui-v2-expedition-detail-head">
@@ -5140,7 +5185,10 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
                     <h3>{selectedExpedition.name}</h3>
                     <p>{selectedExpedition.objective}</p>
                   </div>
-                  <span className={`admin-ui-v2-pill ${expeditionPillClass(selectedExpedition.status)}`}>{selectedExpedition.status}</span>
+                  <div className="admin-ui-v2-expedition-detail-actions">
+                    <span className={`admin-ui-v2-pill ${expeditionPillClass(selectedExpedition.status)}`}>{selectedExpedition.status}</span>
+                    <button className="admin-ui-v2-btn admin-ui-v2-btn-close-detail" type="button" onClick={() => setSelectedExpeditionId(null)}>X</button>
+                  </div>
                 </div>
 
                 {selectedExpeditionRoute && (
@@ -5238,7 +5286,7 @@ function BottomDock({ activeDock, onSelect }: { activeDock: AdminSectionId; onSe
 
 function SettingsHint({ onOpen }: { onOpen: () => void }) {
   return (
-    <button className="settings-hint" type="button" onClick={onOpen}>
+    <button className="settings-hint admin-settings-hint" type="button" onClick={onOpen}>
       <span className="btn-text">
         Admin <GearIcon />
       </span>

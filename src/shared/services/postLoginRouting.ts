@@ -13,7 +13,11 @@ interface PostLoginRouteOptions {
 }
 
 export function normalizeUserRole(role: string | null | undefined): string {
-  return (role ?? '').trim().toUpperCase()
+  const normalized = (role ?? '').trim().toUpperCase()
+  if (normalized === 'GESTION_RECURSOS') return 'RESOURCE_MANAGEMENT'
+  if (normalized === 'ENCARGADO_VIAJES') return 'TRAVEL_MANAGER'
+  if (normalized === 'TRABAJADOR') return 'WORKER'
+  return normalized
 }
 
 export function getPostLoginRoute(role: string | null | undefined, options: PostLoginRouteOptions = {}): string {

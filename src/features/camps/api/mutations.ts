@@ -11,8 +11,6 @@ import type {
 } from '../types'
 import { campsKeys, ENDPOINTS } from './keys'
 
-const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('accessToken')
-
 const getHeaders = (): HeadersInit => ({
   'Content-Type': 'application/json',
 })

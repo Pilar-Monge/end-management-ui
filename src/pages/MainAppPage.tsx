@@ -1,19 +1,21 @@
-import { useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ModuleMap } from '../features/login/components/ModuleMap'
 import { SESSION_TOKEN_CHANGED_EVENT } from '../shared/services/sessionService'
+import { logoutCurrentSession, readCachedSessionUser, type CachedSessionUser } from '../shared/services/sessionProfile'
 
 export default function MainAppPage() {
   const navigate = useNavigate()
 
-  const user = useMemo(() => {
-    const raw = localStorage.getItem('user')
-    if (!raw) return null
+  const [user, setUser] = useState<CachedSessionUser | null>(() => readCachedSessionUser())
 
-    try {
-      return JSON.parse(raw) as { username: string; role: string }
-    } catch {
-      return null
+  useEffect(() => {
+    const syncUser = () => setUser(readCachedSessionUser())
+    window.addEventListener(SESSION_TOKEN_CHANGED_EVENT, syncUser)
+    window.addEventListener('storage', syncUser)
+    return () => {
+      window.removeEventListener(SESSION_TOKEN_CHANGED_EVENT, syncUser)
+      window.removeEventListener('storage', syncUser)
     }
   }, [])
 
@@ -72,12 +74,8 @@ export default function MainAppPage() {
           </div>
         </div>
         <button
-          onClick={() => {
-            localStorage.removeItem('token')
-            localStorage.removeItem('accessToken')
-            localStorage.removeItem('user')
-            localStorage.removeItem('admin_settings_v2')
-            window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
+          onClick={async () => {
+            await logoutCurrentSession()
             navigate('/')
           }}
           style={{
@@ -97,7 +95,7 @@ export default function MainAppPage() {
         </button>
       </div>
 
-      <ModuleMap userRole={user.role} onNavigate={(path) => navigate(path)} />
+      <ModuleMap userRole={user.role ?? user.rol ?? ''} onNavigate={(path) => navigate(path)} />
     </div>
   )
 }

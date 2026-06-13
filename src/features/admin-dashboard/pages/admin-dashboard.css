@@ -46,6 +46,90 @@
   z-index: 1;
 }
 
+.admin-settings-hint {
+  align-items: center;
+  background: transparent;
+  border: none;
+  bottom: 22px;
+  color: rgba(164, 194, 197, 0.7);
+  display: flex;
+  font-size: 10px;
+  font-weight: 950;
+  gap: 4px;
+  isolation: isolate;
+  letter-spacing: -0.03em;
+  padding: 0.12em 0.8em 0.14em 1.1em;
+  position: fixed;
+  right: 12px;
+  text-transform: uppercase;
+  transition: color 200ms ease;
+  z-index: 60;
+}
+
+.admin-settings-hint::before {
+  background: rgba(4, 14, 14, 0.35);
+  border: 1px solid rgba(103, 172, 169, 0.3);
+  clip-path: polygon(
+    2% 8%, 95% 0%, 100% 9%,
+    97% 21%, 100% 33%, 96% 49%, 100% 64%,
+    95% 81%, 98% 100%, 3% 94%,
+    0% 86%, 4% 73%, 0% 60%, 4% 45%,
+    0% 30%, 5% 18%
+  );
+  content: "";
+  inset: -0.05em -0.3em -0.08em -1.05em;
+  opacity: 0.85;
+  position: absolute;
+  transform: skewX(-10deg);
+  transition: transform 0.25s ease, opacity 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+  z-index: 0;
+}
+
+.admin-settings-hint::after {
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(103, 172, 169, 0.05) 0px,
+    rgba(103, 172, 169, 0.05) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  clip-path: polygon(
+    1% 10%, 97% 3%, 100% 13%, 96% 28%, 99% 44%,
+    95% 61%, 100% 80%, 97% 96%, 2% 92%, 0% 77%,
+    3% 59%, 0% 42%, 4% 22%
+  );
+  content: "";
+  inset: 0.22em -0.18em 0.15em -0.6em;
+  opacity: 0.25;
+  pointer-events: none;
+  position: absolute;
+  transform: skewX(-10deg);
+  transition: opacity 0.25s ease;
+  z-index: 1;
+}
+
+.admin-settings-hint:hover {
+  color: #A4C2C5;
+}
+
+.admin-settings-hint:hover::before {
+  background: rgba(6, 24, 22, 0.5);
+  border-color: rgba(105, 191, 183, 0.5);
+  transform: skewX(-10deg) translateX(-4px) scaleX(1.03);
+}
+
+.admin-settings-hint:hover::after {
+  opacity: 0.4;
+}
+
+.admin-settings-hint .btn-text {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  position: relative;
+  z-index: 2;
+}
+
 .admin-ui-v2-dashboard {
   display: flex;
   flex-direction: column;
@@ -1492,17 +1576,56 @@
   background: rgba(105, 191, 183, 0.16);
 }
 
+.admin-ui-v2-expeditions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: calc(100vh - 165px);
+  min-height: 480px;
+}
+
 .admin-ui-v2-expeditions-grid {
   display: grid;
   gap: 10px;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 
 .admin-ui-v2-expeditions-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 460px;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.admin-ui-v2-expedition-detail-wrapper {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.admin-ui-v2-expedition-resources {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-ui-v2-expedition-ledger {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.admin-ui-v2-expedition-ledger .admin-ui-v2-module-card {
+  height: 100%;
   overflow-y: auto;
 }
 
@@ -1624,6 +1747,16 @@
 .admin-ui-v2-mini-map-caption strong {
   color: #69bfb7;
   text-align: right;
+}
+
+.admin-ui-v2-expedition-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-ui-v2-btn-close-detail {
+  display: none !important;
 }
 
 .admin-ui-v2-expedition-facts {
@@ -3497,7 +3630,9 @@
 
 .admin-ui-v2-intercamp-map-console,
 .admin-ui-v2-map-shell-leaflet {
-  min-height: 520px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 
 .admin-ui-v2-leaflet-console {
@@ -3508,7 +3643,8 @@
   display: grid;
   gap: 10px;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 0.32fr);
-  min-height: 520px;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
   padding: 10px;
 }
@@ -3516,7 +3652,8 @@
 .admin-ui-v2-leaflet-map {
   background: #010304;
   border: 1px solid rgba(103, 172, 169, 0.2);
-  min-height: 500px;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
   position: relative;
 }
@@ -3534,6 +3671,8 @@
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+  height: 100%;
+  min-height: 0;
   overflow-y: auto;
   padding: 10px;
 }
@@ -3903,6 +4042,24 @@
 
   .admin-ui-v2-leaflet-console {
     grid-template-columns: 1fr;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .admin-ui-v2-expeditions,
+  .admin-ui-v2-expedition-resources {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .admin-ui-v2-leaflet-map {
+    height: 380px !important;
+    min-height: 0 !important;
+  }
+
+  .admin-ui-v2-leaflet-side {
+    height: auto !important;
+    max-height: 300px !important;
   }
 
   .admin-ui-v2-command-actions {
@@ -3954,11 +4111,13 @@
   }
 
   .admin-ui-v2-leaflet-console {
-    min-height: auto;
+    min-height: auto !important;
+    height: auto !important;
   }
 
   .admin-ui-v2-leaflet-map {
-    min-height: 360px;
+    min-height: 360px !important;
+    height: 360px !important;
   }
 
   .admin-ui-v2-expedition-command {
@@ -4611,3 +4770,1879 @@
     grid-column: auto;
   }
 }
+
+@media (max-height: 600px) and (orientation: landscape) {
+  /* 1. Optimización del Contenedor de Modales */
+  .admin-ui-v2-modal-backdrop {
+    padding: 8px 12px; /* Reduce espacio externo */
+  }
+
+  .admin-ui-v2-modal {
+    max-height: 96vh;
+    padding: 12px 18px;
+    gap: 8px;
+  }
+
+  /* 2. Reducción de Escala en Ficha de Persona */
+  .admin-ui-v2-person-modal-body {
+    gap: 8px;
+    grid-template-columns: 100px minmax(0, 1fr); /* Compacta columna de foto */
+  }
+
+  .admin-ui-v2-person-modal-avatar {
+    height: 48px; /* Reduce tamaño del avatar */
+    width: 48px;
+    font-size: 13px;
+  }
+
+  .admin-ui-v2-person-modal-photo-panel {
+    padding: 6px;
+    gap: 4px;
+  }
+
+  .admin-ui-v2-person-modal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); /* Mantiene 2 columnas pero más compactas */
+    gap: 4px;
+  }
+
+  .admin-ui-v2-person-modal-grid > div,
+  .admin-ui-v2-person-modal-achievements,
+  .admin-ui-v2-person-modal-notes {
+    padding: 4px 6px;
+  }
+
+  .admin-ui-v2-person-modal-title h2 {
+    font-size: 13px;
+  }
+
+  /* 3. Rediseño del Formulario de Edición de Persona */
+  .admin-ui-v2-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); /* Grid de 2 columnas compacto */
+    gap: 6px;
+    max-height: 52vh; /* Permite scroll interno si el formulario es muy largo */
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  /* 4. Optimización de Admisiones IA (Modal Bilateral) */
+  .admin-ui-v2-adm-detail {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Coloca la ficha a la izquierda y el formulario de aprobación a la derecha */
+    gap: 12px;
+    align-items: start;
+  }
+
+  .admin-ui-v2-adm-detail img.admin-ui-v2-settings-photo-preview {
+    max-height: 80px;
+    object-fit: cover;
+    grid-column: span 2; /* Centra la foto arriba en el layout */
+  }
+
+  .admin-ui-v2-adm-detail > div {
+    font-size: 11px;
+  }
+
+  /* 5. Reducción de Espaciado General en Contenido del Dashboard */
+  .inner-content {
+    padding: 12px 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .game-screen-layout {
+    min-height: 100dvh;
+  }
+
+  .game-hud-header {
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 6px 8px 4px !important;
+  }
+
+  .game-hud-header .top-hud-btn,
+  .admin-settings-hint {
+    font-size: 9px;
+    min-height: 30px;
+    padding: 4px 8px;
+  }
+
+  .game-hud-header .top-hud-btn .btn-text,
+  .admin-ui-v2-profile-hud-btn .btn-text {
+    max-width: 42vw;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-ui-v2-profile-session-dot {
+    flex: 0 0 auto;
+  }
+
+  .admin-ui-v2-profile-popover {
+    left: 8px;
+    max-height: calc(100dvh - 58px);
+    overflow-y: auto;
+    position: fixed;
+    right: 8px;
+    top: 44px;
+    width: auto;
+  }
+
+  .admin-ui-v2-profile-popover-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .main-area {
+    bottom: 62px !important;
+    height: auto !important;
+    padding: 4px 8px 0 !important;
+    top: 44px !important;
+  }
+
+  .content-scroll,
+  .settings-shell,
+  .settings-inner {
+    min-width: 0;
+  }
+
+  .content-scroll {
+    display: flex;
+    justify-content: center;
+  }
+
+  .settings-shell {
+    height: min(58dvh, 430px) !important;
+    margin: 0 auto !important;
+    max-height: 100%;
+    width: min(74vw, 460px) !important;
+  }
+
+  .settings-inner {
+    padding: 30px 0 0 !important;
+  }
+
+  .section-header {
+    min-width: 0;
+    top: 2px !important;
+    width: 100%;
+  }
+
+  .section-title-brush {
+    font-size: 12px !important;
+    letter-spacing: 0.08em !important;
+    max-width: calc(100vw - 80px);
+    overflow: hidden;
+    padding: 3px 1.4em !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .section-title-brush::before {
+    inset: -2px -1.8em !important;
+  }
+
+  .section-title-brush::after,
+  .watermark-x {
+    display: none;
+  }
+
+  .inner-layout {
+    flex-direction: column !important;
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  .inner-sidebar {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    max-width: none !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 4px 8px 0 24px !important;
+    width: 100% !important;
+  }
+
+  .inner-sidebar nav {
+    height: auto !important;
+    padding: 0 !important;
+  }
+
+  .inner-sidebar nav > div {
+    flex-direction: row !important;
+    gap: 6px !important;
+    min-width: max-content;
+  }
+
+  .inner-divider {
+    display: none;
+  }
+
+  .side-button,
+  .side-button.is-active,
+  .side-button:hover {
+    flex: 0 0 auto;
+    font-size: 10px !important;
+    line-height: 1.15 !important;
+    max-width: none !important;
+    min-height: 30px !important;
+    padding: 6px 10px !important;
+    transform: none !important;
+    width: auto !important;
+  }
+
+  .side-button .btn-text {
+    font-size: 10px !important;
+    white-space: nowrap;
+  }
+
+  .inner-content,
+  .admin-ui-v2-content-wrap,
+  .admin-ui-v2-content-wrap-full {
+    margin: 0 !important;
+    padding: 8px !important;
+    width: 100% !important;
+  }
+
+  .admin-ui-v2-content {
+    gap: 10px;
+  }
+
+  .admin-ui-v2-meta,
+  .admin-ui-v2-module-card,
+  .admin-ui-v2-pop-kpi-grid,
+  .admin-ui-v2-pop-status-bar,
+  .admin-ui-v2-pop-toolbar,
+  .admin-ui-v2-pop-empty,
+  .admin-ui-v2-pop-pagination,
+  .admin-ui-v2-temp-shell {
+    padding: 10px;
+  }
+
+  .admin-ui-v2-meta-title,
+  .admin-ui-v2-command-kicker,
+  .admin-ui-v2-section-head,
+  .admin-ui-v2-muted,
+  .admin-ui-v2-pop-status-bar > span,
+  .admin-ui-v2-temp-kicker {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+  }
+
+  .admin-ui-v2-meta-sub,
+  .admin-ui-v2-command-hero h2,
+  .admin-ui-v2-module-banner h3,
+  .admin-ui-v2-temp-hero h2 {
+    font-size: 15px;
+    line-height: 1.15;
+  }
+
+  .admin-ui-v2-command-hero,
+  .admin-ui-v2-module-banner,
+  .admin-ui-v2-expedition-command,
+  .admin-ui-v2-temp-hero,
+  .admin-ui-v2-adm-head,
+  .admin-ui-v2-expedition-detail-head,
+  .admin-ui-v2-intercamp-head,
+  .admin-ui-v2-intercamp-foot,
+  .admin-ui-v2-assignment-header,
+  .admin-ui-v2-assignment-details,
+  .admin-ui-v2-tactical-history-item,
+  .admin-ui-v2-resource-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-ui-v2-grid-2,
+  .admin-ui-v2-grid-3,
+  .admin-ui-v2-grid-4,
+  .admin-ui-v2-grid-roles,
+  .admin-ui-v2-overview-band,
+  .admin-ui-v2-analytics-band,
+  .admin-ui-v2-artifacts-band,
+  .admin-ui-v2-dashboard-main-grid,
+  .admin-ui-v2-priority-layout,
+  .admin-ui-v2-cycle-layout,
+  .admin-ui-v2-cycle-signals,
+  .admin-ui-v2-pop-overview-band,
+  .admin-ui-v2-pop-stats-grid,
+  .admin-ui-v2-pop-workload-card,
+  .admin-ui-v2-pop-users-layout,
+  .admin-ui-v2-pop-demography-grid,
+  .admin-ui-v2-pop-card-v2-meta-grid,
+  .admin-ui-v2-achievement-grid,
+  .admin-ui-v2-time-control-grid,
+  .admin-ui-v2-tactical-grid,
+  .admin-ui-v2-roles-kpi,
+  .admin-ui-v2-temp-kpis,
+  .admin-ui-v2-temp-sector-grid,
+  .admin-ui-v2-temp-quick,
+  .admin-ui-v2-temp-date-grid,
+  .admin-ui-v2-expeditions-grid,
+  .admin-ui-v2-expedition-ledger,
+  .admin-ui-v2-intercamp-grid,
+  .admin-ui-v2-leaflet-console {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-ui-v2-pop-card-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .admin-ui-v2-pop-card-v2 {
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .admin-ui-v2-pop-card-v2-identity {
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+
+  .admin-ui-v2-pop-card-v2-img,
+  .admin-ui-v2-pop-card-v2-avatar-fallback {
+    height: 54px;
+    width: 54px;
+  }
+
+  .admin-ui-v2-pop-table-shell {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-ui-v2-pop-table {
+    min-width: 760px;
+  }
+
+  .admin-ui-v2-toolbar,
+  .admin-ui-v2-pop-toolbar,
+  .admin-ui-v2-pagination,
+  .admin-ui-v2-pop-pagination,
+  .admin-ui-v2-actions,
+  .admin-ui-v2-form-grid .admin-ui-v2-actions,
+  .admin-ui-v2-person-detail .admin-ui-v2-actions,
+  .admin-ui-v2-person-modal-footer,
+  .admin-ui-v2-time-actions,
+  .admin-ui-v2-pop-card-v2-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-ui-v2-pop-view-toggle {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .admin-ui-v2-pop-view-toggle button,
+  .admin-ui-v2-btn,
+  .admin-ui-v2-pop-users-layout .admin-ui-v2-btn,
+  .admin-ui-v2-person-modal .admin-ui-v2-btn,
+  .admin-ui-v2-pop-empty .admin-ui-v2-btn,
+  .admin-ui-v2-pop-card-v2-actions .admin-ui-v2-btn,
+  .admin-ui-v2-pop-status-btn,
+  .admin-ui-v2-tab-btn,
+  .admin-ui-v2-temp-nav-btn,
+  .admin-ui-v2-candidate,
+  .admin-ui-v2-candidate-pill,
+  .admin-ui-v2-temp-choice,
+  .admin-ui-v2-temp-vacancy,
+  .admin-ui-v2-leaflet-route-row {
+    font-size: 10px;
+    min-height: 34px;
+    padding: 7px 10px;
+  }
+
+  .admin-ui-v2-pop-table th:last-child,
+  .admin-ui-v2-pop-table td:last-child {
+    min-width: 164px;
+    white-space: nowrap;
+    width: 164px;
+  }
+
+  .admin-ui-v2-pop-table .admin-ui-v2-actions {
+    align-items: center !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 3px;
+    justify-content: flex-start;
+    min-width: max-content;
+  }
+
+  .admin-ui-v2-pop-table .admin-ui-v2-btn {
+    flex: 0 0 auto;
+    font-size: 7px;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    min-height: 22px;
+    padding: 2px 4px;
+    white-space: nowrap;
+  }
+
+  .v-input,
+  .v-select,
+  .v-textarea,
+  .admin-ui-v2-form-grid input,
+  .admin-ui-v2-form-grid select,
+  .admin-ui-v2-temp-field {
+    font-size: 12px;
+    min-height: 36px;
+    width: 100%;
+  }
+
+  .admin-ui-v2-form-grid,
+  .admin-ui-v2-person-detail,
+  .admin-ui-v2-person-modal-body,
+  .admin-ui-v2-person-modal-grid,
+  .admin-ui-v2-adm-detail {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-ui-v2-form-grid .admin-ui-v2-actions,
+  .admin-ui-v2-form-grid .admin-ui-v2-muted,
+  .admin-ui-v2-person-detail > div:nth-last-child(2),
+  .admin-ui-v2-person-detail .admin-ui-v2-actions,
+  .admin-ui-v2-person-modal-grid > div:nth-child(3) {
+    grid-column: auto !important;
+  }
+
+  .admin-ui-v2-map-shell,
+  .admin-ui-v2-map-shell .expx-map-layout,
+  .admin-ui-v2-map-shell .expx-map-canvas,
+  .admin-ui-v2-intercamp-map-console,
+  .admin-ui-v2-map-shell-leaflet,
+  .admin-ui-v2-leaflet-console,
+  .admin-ui-v2-leaflet-map {
+    min-height: 320px !important;
+  }
+
+  .admin-ui-v2-leaflet-console {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible;
+  }
+
+  .admin-ui-v2-leaflet-side {
+    max-height: 260px;
+  }
+
+  .admin-ui-v2-chart {
+    height: 180px;
+  }
+
+  .admin-ui-v2-donut-wrap {
+    height: 150px;
+  }
+
+  .admin-ui-v2-modal-backdrop,
+  .admin-ui-v2-photo-preview-overlay,
+  .admin-ui-v2-achievement-unlock-overlay {
+    align-items: flex-start;
+    padding: 8px;
+  }
+
+  .admin-ui-v2-modal,
+  .admin-ui-v2-person-modal-shell {
+    gap: 10px;
+    margin: 0;
+    max-height: calc(100dvh - 16px);
+    padding: 12px;
+    width: calc(100vw - 16px);
+  }
+
+  .admin-ui-v2-modal-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .admin-ui-v2-modal-header h3,
+  .admin-ui-v2-person-modal-title h2 {
+    font-size: 14px;
+    line-height: 1.15;
+  }
+
+  .admin-ui-v2-person-modal-head {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .admin-ui-v2-person-modal-photo-panel {
+    align-items: center;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+  }
+
+  .admin-ui-v2-person-modal-avatar {
+    height: 64px;
+    width: 64px;
+  }
+
+  .admin-ui-v2-person-modal-registry,
+  .admin-ui-v2-person-modal-status {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .admin-ui-v2-photo-preview-card,
+  .admin-ui-v2-achievement-unlock-card {
+    width: calc(100vw - 16px);
+  }
+
+  .admin-ui-v2-photo-preview-card img {
+    max-height: calc(100dvh - 76px);
+    object-fit: contain;
+  }
+
+  .admin-ui-v2-settings-photo-preview {
+    height: 72px;
+    width: 72px;
+  }
+
+  .dock {
+    bottom: 8px !important;
+    gap: 5px !important;
+    left: 50% !important;
+    max-width: calc(100vw - 74px);
+    overflow-x: auto;
+    padding: 0 4px;
+    transform: translateX(-50%) !important;
+  }
+
+  .dock-item,
+  .dock-item.is-active {
+    height: 40px !important;
+    min-width: 44px;
+    width: 44px !important;
+  }
+
+  .dock-item .dock-content svg {
+    height: 22px;
+    width: 22px;
+  }
+
+  .admin-settings-hint {
+    bottom: 10px;
+    max-width: 64px;
+    overflow: hidden;
+    right: 6px;
+    z-index: 70;
+  }
+
+  /* --- ADMISIONES PORTRAIT MOBILE --- */
+  .admin-ui-v2-admissions {
+    gap: 10px !important;
+  }
+
+  .admin-ui-v2-adm-card {
+    padding: 10px !important;
+  }
+
+  .admin-ui-v2-adm-name {
+    font-size: 12px !important;
+    gap: 4px !important;
+  }
+
+  .admin-ui-v2-adm-prof {
+    font-size: 9px !important;
+  }
+
+  .admin-ui-v2-adm-score {
+    font-size: 22px !important;
+  }
+
+  .admin-ui-v2-adm-reason {
+    font-size: 10px !important;
+    margin: 6px 0 !important;
+    line-height: 1.3 !important;
+  }
+
+  .admin-ui-v2-adm-skills {
+    gap: 4px !important;
+    margin-bottom: 6px !important;
+  }
+
+  .admin-ui-v2-adm-skills .admin-ui-v2-pill {
+    font-size: 8px !important;
+    padding: 2px 5px !important;
+  }
+
+  .admin-ui-v2-admissions .admin-ui-v2-actions {
+    flex-direction: row !important;
+    gap: 6px !important;
+    align-items: center !important;
+  }
+
+  .admin-ui-v2-admissions .admin-ui-v2-actions .admin-ui-v2-btn {
+    font-size: 9px !important;
+    min-height: 28px !important;
+    padding: 3px 6px !important;
+    flex: 1 !important;
+  }
+
+  .admin-ui-v2-adm-detail {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  .admin-ui-v2-adm-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .admin-ui-v2-adm-info-grid > div {
+    font-size: 11px;
+  }
+
+  .admin-ui-v2-adm-info-section img.admin-ui-v2-settings-photo-preview {
+    max-height: 120px;
+    width: 100%;
+    object-fit: cover;
+    border: 1px solid rgba(103, 172, 169, 0.22);
+  }
+
+  .admin-ui-v2-adm-action-section .admin-ui-v2-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+  }
+
+  /* --- EXPEDICIONES PORTRAIT MOBILE --- */
+  .admin-ui-v2-expeditions {
+    height: auto !important;
+    min-height: 0 !important;
+    display: block !important;
+  }
+
+  .admin-ui-v2-expedition-resources {
+    height: auto !important;
+    min-height: 0 !important;
+    display: block !important;
+  }
+
+  .admin-ui-v2-expedition-ledger {
+    height: auto !important;
+    min-height: 0 !important;
+    display: grid !important;
+  }
+
+  .admin-ui-v2-expeditions-list {
+    max-height: 220px !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .admin-ui-v2-expedition-detail-wrapper {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .admin-ui-v2-expedition-mini-map {
+    height: 160px !important;
+  }
+
+  .admin-ui-v2-expedition-mini-map .wm-dotted-container {
+    min-height: 160px !important;
+  }
+
+  .admin-ui-v2-resource-row {
+    padding: 6px 8px !important;
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-resource-row + .admin-ui-v2-resource-row {
+    margin-top: 6px !important;
+  }
+
+  .admin-ui-v2-resource-row strong,
+  .admin-ui-v2-resource-row em {
+    font-size: 11px !important;
+  }
+
+  .admin-ui-v2-resource-row span,
+  .admin-ui-v2-resource-row small {
+    font-size: 9px !important;
+    margin-top: 1px !important;
+  }
+
+  .admin-ui-v2-expedition-detail-wrapper:has(.admin-ui-v2-empty-cell) {
+    display: none !important;
+  }
+
+  .admin-ui-v2-expedition-detail-wrapper:has(.admin-ui-v2-expedition-detail) {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 150 !important;
+    background: rgba(2, 8, 8, 0.85) !important;
+    backdrop-filter: blur(4px) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 16px !important;
+    margin: 0 !important;
+  }
+
+  .admin-ui-v2-expedition-detail-wrapper:has(.admin-ui-v2-expedition-detail) > .admin-ui-v2-expedition-detail {
+    width: min(480px, 100%) !important;
+    max-height: calc(100dvh - 32px) !important;
+    overflow-y: auto !important;
+    border: 1px solid rgba(103, 172, 169, 0.35) !important;
+    background: linear-gradient(145deg, rgba(6, 14, 14, 0.98), rgba(7, 20, 20, 0.94)) !important;
+    padding: 16px !important;
+    position: relative !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+    border-radius: 4px !important;
+  }
+
+  .admin-ui-v2-btn-close-detail {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 24px !important;
+    padding: 2px 8px !important;
+    font-size: 11px !important;
+    cursor: pointer !important;
+    border: 1px solid rgba(103, 172, 169, 0.28) !important;
+    background: rgba(3, 10, 10, 0.42) !important;
+    color: #f0fafa !important;
+  }
+
+  .admin-ui-v2-btn-close-detail:hover {
+    background: rgba(105, 191, 183, 0.16) !important;
+    border-color: rgba(105, 191, 183, 0.62) !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .settings-shell {
+    height: min(54dvh, 390px) !important;
+    width: min(72vw, 330px) !important;
+  }
+
+  .inner-sidebar {
+    padding-left: 20px !important;
+  }
+
+  .game-hud-header .top-hud-btn .btn-text,
+  .admin-ui-v2-profile-hud-btn .btn-text {
+    max-width: 38vw;
+  }
+
+  .admin-ui-v2-content-wrap,
+  .admin-ui-v2-content-wrap-full,
+  .inner-content {
+    padding: 6px !important;
+  }
+
+  .admin-ui-v2-meta,
+  .admin-ui-v2-module-card,
+  .admin-ui-v2-pop-kpi-grid,
+  .admin-ui-v2-pop-status-bar,
+  .admin-ui-v2-pop-toolbar,
+  .admin-ui-v2-pop-empty,
+  .admin-ui-v2-pop-pagination,
+  .admin-ui-v2-temp-shell {
+    padding: 8px;
+  }
+
+  .admin-ui-v2-map-shell,
+  .admin-ui-v2-map-shell .expx-map-layout,
+  .admin-ui-v2-map-shell .expx-map-canvas,
+  .admin-ui-v2-intercamp-map-console,
+  .admin-ui-v2-map-shell-leaflet,
+  .admin-ui-v2-leaflet-console,
+  .admin-ui-v2-leaflet-map {
+    min-height: 300px !important;
+    height: auto !important;
+  }
+
+  .admin-ui-v2-modal,
+  .admin-ui-v2-person-modal-shell {
+    padding: 10px;
+  }
+
+  .admin-ui-v2-person-modal-photo-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .dock-item,
+  .dock-item.is-active {
+    min-width: 40px;
+    width: 40px !important;
+  }
+}
+
+@media screen and (orientation: landscape) and (max-width: 950px), screen and (orientation: landscape) and (max-height: 540px) {
+  .inner-layout {
+    gap: 8px;
+  }
+
+  .inner-sidebar {
+    --admin-sidebar-y-offset: clamp(36px, calc(34px + (100dvh - 390px) * 0.16), 78px);
+    flex: 0 0 240px !important;
+    max-height: 100%;
+    overflow-y: auto !important;
+    padding: var(--admin-sidebar-y-offset) 8px 10px 16px !important;
+    scrollbar-width: none;
+  }
+
+  .inner-sidebar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .inner-sidebar nav {
+    padding-left: 0 !important;
+  }
+
+  .inner-sidebar nav > div {
+    gap: 12px !important;
+  }
+
+  .side-button,
+  .side-button.is-active,
+  .side-button:hover {
+    font-size: 8.8px !important;
+    line-height: 15px !important;
+    min-height: 17px !important;
+    padding: 2px 6px 2px 7px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .side-button .btn-text {
+    font-size: 8.8px !important;
+    white-space: nowrap;
+  }
+
+  .admin-ui-v2-population {
+    flex: 1 1 auto;
+    gap: 8px;
+    min-height: 0;
+  }
+
+  .admin-ui-v2-pop-overview-band {
+    gap: 8px;
+    grid-template-columns: minmax(0, 1.45fr) minmax(180px, 0.7fr) !important;
+  }
+
+  .admin-ui-v2-pop-kpi-grid {
+    gap: 6px;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    padding: 7px;
+  }
+
+  .admin-ui-v2-pop-kpi-grid .admin-ui-v2-dashboard-metric {
+    min-height: 68px;
+    padding: 8px;
+  }
+
+  .admin-ui-v2-pop-kpi-grid .admin-ui-v2-metric-value {
+    font-size: 19px;
+  }
+
+  .admin-ui-v2-pop-kpi-grid .admin-ui-v2-metric-label,
+  .admin-ui-v2-pop-kpi-grid .admin-ui-v2-metric-detail {
+    font-size: 8px;
+    letter-spacing: 0.05em;
+  }
+
+  .admin-ui-v2-pop-density-card,
+  .admin-ui-v2-pop-stat-panel,
+  .admin-ui-v2-pop-workload-card {
+    padding: 8px;
+  }
+
+  .admin-ui-v2-pop-density-card p,
+  .admin-ui-v2-pop-workload-card p {
+    font-size: 9px;
+    line-height: 1.3;
+    margin-top: 4px;
+  }
+
+  .admin-ui-v2-pop-stats-grid {
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+
+  .admin-ui-v2-pop-workload-card {
+    gap: 8px;
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr) !important;
+  }
+
+  .admin-ui-v2-pop-demography-grid {
+    gap: 6px;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    margin-bottom: 8px;
+  }
+
+  .admin-ui-v2-pop-demography-grid > div,
+  .admin-ui-v2-pop-workload-summary > div {
+    padding: 7px;
+  }
+
+  .admin-ui-v2-pop-demography-grid strong {
+    font-size: 20px;
+    margin-top: 4px;
+  }
+
+  .admin-ui-v2-pop-density-list,
+  .admin-ui-v2-pop-alert-stack,
+  .admin-ui-v2-pop-role-bars {
+    gap: 6px;
+  }
+
+  .admin-ui-v2-pop-density-row {
+    gap: 4px;
+    padding-bottom: 6px;
+  }
+
+  .admin-ui-v2-pop-alert-row {
+    gap: 7px;
+    padding: 7px;
+  }
+
+  .admin-ui-v2-pop-alert-row strong,
+  .admin-ui-v2-pop-card-v2 h3 {
+    font-size: 10px;
+  }
+
+  .admin-ui-v2-pop-alert-row span:not(.admin-ui-v2-pill),
+  .admin-ui-v2-pop-card-v2 p,
+  .admin-ui-v2-pop-card-v2-meta-grid span {
+    font-size: 9px;
+    line-height: 1.25;
+  }
+
+  .admin-ui-v2-pop-workload-summary {
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .admin-ui-v2-section-head {
+    font-size: 8px;
+    gap: 6px;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+
+  .admin-ui-v2-threat-meter {
+    padding: 7px;
+  }
+
+  .admin-ui-v2-threat-value {
+    font-size: 20px;
+    margin-bottom: 5px;
+  }
+
+  .admin-ui-v2-threat-track,
+  .admin-ui-v2-pop-meter {
+    height: 6px;
+  }
+
+  .admin-ui-v2-pop-users-layout {
+    align-items: stretch;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 0.28fr) !important;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .admin-ui-v2-pop-users-main,
+  .admin-ui-v2-pop-side-panel {
+    gap: 8px;
+    min-height: 0;
+  }
+
+  .admin-ui-v2-pop-users-main {
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    height: 100%;
+  }
+
+  .admin-ui-v2-pop-status-bar,
+  .admin-ui-v2-pop-toolbar,
+  .admin-ui-v2-pop-pagination {
+    gap: 5px;
+    padding: 6px;
+  }
+
+  .admin-ui-v2-pop-pagination {
+    align-items: center !important;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between;
+    min-height: 34px;
+    padding: 4px 6px !important;
+  }
+
+  .admin-ui-v2-pop-pagination .admin-ui-v2-actions {
+    align-items: center !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap;
+    gap: 5px;
+  }
+
+  .admin-ui-v2-pop-pagination .admin-ui-v2-muted {
+    font-size: 8px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .admin-ui-v2-pop-status-bar > span {
+    font-size: 8px;
+    letter-spacing: 0.05em;
+    padding: 0 2px;
+  }
+
+  .admin-ui-v2-pop-status-btn,
+  .admin-ui-v2-pop-view-toggle button {
+    font-size: 8px;
+    gap: 4px;
+    min-height: 23px;
+    padding: 3px 6px;
+  }
+
+  .admin-ui-v2-pop-status-btn strong {
+    font-size: 7.5px;
+    min-width: 14px;
+    padding: 0 3px;
+  }
+
+  .admin-ui-v2-pop-toolbar .v-input,
+  .admin-ui-v2-pop-toolbar .v-select {
+    font-size: 9px;
+    min-height: 28px;
+  }
+
+  .admin-ui-v2-pop-toolbar .v-select {
+    min-width: 118px;
+  }
+
+  .admin-ui-v2-pop-view-toggle {
+    margin-left: 0;
+    padding: 2px;
+  }
+
+  .admin-ui-v2-pop-table-shell {
+    height: 100%;
+    max-height: none;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-ui-v2-pop-table {
+    min-width: 640px !important;
+  }
+
+  .admin-ui-v2-pop-table th,
+  .admin-ui-v2-pop-table td {
+    font-size: 8px;
+    padding: 5px 6px;
+    vertical-align: middle;
+  }
+
+  .admin-ui-v2-pop-table th:nth-child(2),
+  .admin-ui-v2-pop-table td:nth-child(2),
+  .admin-ui-v2-pop-table th:nth-child(6),
+  .admin-ui-v2-pop-table td:nth-child(6) {
+    display: none;
+  }
+
+  .admin-ui-v2-pop-person-cell {
+    gap: 6px;
+  }
+
+  .admin-ui-v2-pop-person-cell .admin-ui-v2-person-avatar {
+    height: 24px;
+    width: 24px;
+  }
+
+  .admin-ui-v2-pop-person-cell strong {
+    font-size: 9.5px;
+  }
+
+  .admin-ui-v2-pop-person-cell small {
+    font-size: 7.5px;
+  }
+
+  .admin-ui-v2-pop-table .admin-ui-v2-pill {
+    font-size: 7px;
+    letter-spacing: 0.04em;
+    padding: 2px 4px;
+  }
+
+  .admin-ui-v2-pop-table .admin-ui-v2-actions {
+    align-items: center !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 3px;
+    justify-content: flex-start;
+    min-width: max-content;
+  }
+
+  .admin-ui-v2-pop-table .admin-ui-v2-btn,
+  .admin-ui-v2-pop-pagination .admin-ui-v2-btn {
+    font-size: 6.5px;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    min-height: 20px;
+    padding: 2px 3px;
+    white-space: nowrap;
+  }
+
+  .admin-ui-v2-pop-table .admin-ui-v2-btn {
+    flex: 0 0 auto;
+  }
+
+  .admin-ui-v2-pop-table th:last-child,
+  .admin-ui-v2-pop-table td:last-child {
+    min-width: 140px;
+    white-space: nowrap;
+    width: 140px;
+  }
+
+  .admin-ui-v2-pop-pagination .admin-ui-v2-btn {
+    min-width: 42px;
+  }
+
+  .admin-ui-v2-pop-side-panel .admin-ui-v2-module-card {
+    padding: 7px;
+  }
+
+  .admin-ui-v2-pop-side-panel .admin-ui-v2-pop-density-row,
+  .admin-ui-v2-pop-side-panel .admin-ui-v2-pop-alert-row {
+    padding: 5px;
+  }
+
+  .admin-ui-v2-modal-backdrop {
+    align-items: flex-start;
+    padding: 6px 10px;
+  }
+
+  .admin-ui-v2-person-modal-shell {
+    gap: 4px;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 5px 6px;
+    width: min(660px, calc(100vw - 56px));
+  }
+
+  .admin-ui-v2-person-modal-shell .admin-ui-v2-modal-header,
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-modal-header {
+    flex: 0 0 auto;
+    gap: 4px;
+    margin-bottom: 0;
+  }
+
+  .admin-ui-v2-person-modal-shell .admin-ui-v2-modal-header h3,
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-modal-header h3 {
+    font-size: 8.5px;
+  }
+
+  .admin-ui-v2-person-modal-shell .admin-ui-v2-modal-header .admin-ui-v2-btn {
+    font-size: 6.5px;
+    min-height: 18px;
+    padding: 1px 5px;
+  }
+
+  .admin-ui-v2-person-modal-shell .admin-ui-v2-person-modal {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 3px;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-height: 0;
+    overflow: visible !important;
+  }
+
+  .admin-ui-v2-person-modal-shell .admin-ui-v2-person-modal-head {
+    flex: 0 0 auto;
+    gap: 4px;
+    padding-bottom: 3px;
+  }
+
+  .admin-ui-v2-person-modal-shell .admin-ui-v2-person-modal-head span,
+  .admin-ui-v2-person-modal-shell .admin-ui-v2-person-modal-head strong {
+    font-size: 6.2px;
+    letter-spacing: 0.04em;
+    line-height: 1.1;
+  }
+
+  .admin-ui-v2-person-modal-body {
+    gap: 4px;
+    grid-template-columns: 66px minmax(0, 1fr) !important;
+    min-height: 0;
+    overflow: visible !important;
+  }
+
+  .admin-ui-v2-person-modal-photo-panel {
+    gap: 3px;
+    justify-content: flex-start;
+    min-height: 0;
+    padding: 4px;
+  }
+
+  .admin-ui-v2-person-modal-avatar {
+    font-size: 10px;
+    height: 32px;
+    width: 32px;
+  }
+
+  .admin-ui-v2-person-modal-registry,
+  .admin-ui-v2-person-modal-status {
+    gap: 1px;
+  }
+
+  .admin-ui-v2-person-modal-registry strong {
+    font-size: 7.5px;
+  }
+
+  .admin-ui-v2-person-modal-shell .admin-ui-v2-pill {
+    font-size: 5.8px;
+    letter-spacing: 0.02em;
+    padding: 1px 3px;
+  }
+
+  .admin-ui-v2-person-modal-info {
+    gap: 3px;
+    min-height: 0;
+    overflow-y: visible !important;
+    padding-right: 2px;
+    scrollbar-width: thin;
+  }
+
+  .admin-ui-v2-person-modal-info::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  .admin-ui-v2-person-modal-info::-webkit-scrollbar-thumb {
+    background: rgba(103, 172, 169, 0.28);
+    border-radius: 999px;
+  }
+
+  .admin-ui-v2-person-modal-grid {
+    gap: 3px;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .admin-ui-v2-person-modal-grid > div:nth-child(3) {
+    grid-column: span 2 !important;
+  }
+
+  .admin-ui-v2-person-modal-grid > div,
+  .admin-ui-v2-person-modal-achievements,
+  .admin-ui-v2-person-modal-notes {
+    padding: 3px 4px;
+  }
+
+  .admin-ui-v2-person-modal-title h2 {
+    font-size: 10px;
+    line-height: 1.05;
+  }
+
+  .admin-ui-v2-person-modal-title p,
+  .admin-ui-v2-person-modal-grid small,
+  .admin-ui-v2-person-modal-notes p {
+    font-size: 6.8px;
+    line-height: 1.1;
+  }
+
+  .admin-ui-v2-person-modal-grid strong {
+    font-size: 7.4px;
+    margin-top: 1px;
+  }
+
+  .admin-ui-v2-person-modal-photo-panel > span,
+  .admin-ui-v2-person-modal-registry small,
+  .admin-ui-v2-person-modal-status small,
+  .admin-ui-v2-person-modal-grid span,
+  .admin-ui-v2-person-modal-achievements > span,
+  .admin-ui-v2-person-modal-notes > span {
+    font-size: 5.8px;
+    letter-spacing: 0.035em;
+  }
+
+  .admin-ui-v2-person-modal-achievements div {
+    gap: 2px;
+    margin-top: 2px;
+  }
+
+  .admin-ui-v2-person-modal-achievements em {
+    font-size: 6.2px;
+    padding: 1px 3px;
+  }
+
+  .admin-ui-v2-person-modal-footer {
+    flex: 0 0 auto;
+    gap: 3px;
+    padding-top: 3px;
+  }
+
+  .admin-ui-v2-person-modal .admin-ui-v2-btn {
+    font-size: 6.5px;
+    min-height: 18px;
+    padding: 1px 4px;
+  }
+
+  .admin-ui-v2-person-edit-modal {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 10px;
+    width: min(820px, calc(100vw - 20px));
+  }
+
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-form-grid {
+    gap: 6px;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    margin-top: 0;
+    max-height: none !important;
+    overflow-y: visible !important;
+    padding-right: 4px;
+  }
+
+  .admin-ui-v2-person-edit-modal .v-input,
+  .admin-ui-v2-person-edit-modal .v-select,
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-form-grid input,
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-form-grid select {
+    font-size: 9px;
+    min-height: 28px;
+  }
+
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-form-grid .admin-ui-v2-actions,
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-form-grid .admin-ui-v2-muted {
+    grid-column: 1 / -1 !important;
+  }
+
+  .admin-ui-v2-person-edit-modal .admin-ui-v2-form-grid .admin-ui-v2-actions {
+    flex-direction: row !important;
+    gap: 6px;
+    justify-content: flex-end;
+    margin-top: 4px;
+    padding-top: 8px;
+  }
+
+  /* --- 6. OPTIMIZACIÓN RESPONSIVE DE OFICIOS TEMPORALES --- */
+  .admin-ui-v2-temp-shell {
+    padding: 10px !important;
+    gap: 10px !important;
+  }
+
+  .admin-ui-v2-temp-hero {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding-bottom: 8px !important;
+  }
+
+  .admin-ui-v2-temp-hero h2 {
+    font-size: 15px !important;
+    margin: 0 0 2px !important;
+  }
+
+  .admin-ui-v2-temp-hero p {
+    font-size: 9px !important;
+    line-height: 1.2 !important;
+  }
+
+  .admin-ui-v2-temp-kpis {
+    gap: 6px !important;
+    min-width: 0 !important;
+    width: auto !important;
+    flex: 0 0 auto !important;
+  }
+
+  .admin-ui-v2-temp-kpis .admin-ui-v2-metric {
+    min-height: 48px !important;
+    padding: 4px 8px !important;
+  }
+
+  .admin-ui-v2-temp-kpis .admin-ui-v2-metric-value {
+    font-size: 14px !important;
+  }
+
+  .admin-ui-v2-temp-kpis .admin-ui-v2-metric-label {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-temp-nav {
+    gap: 2px !important;
+  }
+
+  .admin-ui-v2-temp-nav-btn {
+    font-size: 8.5px !important;
+    padding: 6px 10px !important;
+  }
+
+  /* Vista de Sectores */
+  .admin-ui-v2-temp-sector-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-temp-sector-card {
+    min-height: auto !important;
+    padding: 10px !important;
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-temp-sector-head span:first-child {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-temp-sector-head h3 {
+    font-size: 12px !important;
+  }
+
+  .admin-ui-v2-temp-sector-card p {
+    font-size: 9px !important;
+    line-height: 1.3 !important;
+  }
+
+  .admin-ui-v2-temp-sector-meter {
+    gap: 4px !important;
+  }
+
+  .admin-ui-v2-temp-sector-meter strong {
+    font-size: 8.5px !important;
+  }
+
+  .admin-ui-v2-temp-worker-row {
+    padding: 4px 6px !important;
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-temp-avatar {
+    height: 24px !important;
+    width: 24px !important;
+    font-size: 8.5px !important;
+  }
+
+  .admin-ui-v2-temp-worker-row strong {
+    font-size: 10px !important;
+  }
+
+  .admin-ui-v2-temp-worker-row small {
+    font-size: 8.5px !important;
+  }
+
+  /* Vista de Cronograma / Timeline */
+  .admin-ui-v2-temp-timeline {
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-temp-assignment-card {
+    padding: 10px !important;
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-temp-person-line strong {
+    font-size: 11px !important;
+  }
+
+  .admin-ui-v2-temp-person-line small {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-temp-role-flow {
+    padding: 6px 8px !important;
+    gap: 6px !important;
+  }
+
+  .admin-ui-v2-temp-role-flow span {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-temp-role-flow strong {
+    font-size: 10px !important;
+  }
+
+  .admin-ui-v2-temp-reason {
+    font-size: 9.5px !important;
+    line-height: 1.3 !important;
+  }
+
+  .admin-ui-v2-temp-progress-row {
+    font-size: 8.5px !important;
+    gap: 6px !important;
+  }
+
+  .admin-ui-v2-temp-revoke-box {
+    gap: 6px !important;
+    padding-top: 8px !important;
+  }
+
+  .admin-ui-v2-temp-revoke-box .v-textarea {
+    min-height: 48px !important;
+    font-size: 9px !important;
+  }
+
+  /* Vista de Acoplamiento Rápido */
+  .admin-ui-v2-temp-quick {
+    gap: 8px !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+
+  .admin-ui-v2-temp-panel {
+    padding: 8px !important;
+  }
+
+  .admin-ui-v2-temp-choice-list {
+    max-height: 160px !important;
+    gap: 4px !important;
+  }
+
+  .admin-ui-v2-temp-choice,
+  .admin-ui-v2-temp-vacancy {
+    padding: 6px !important;
+    gap: 6px !important;
+  }
+
+  .admin-ui-v2-temp-choice strong,
+  .admin-ui-v2-temp-vacancy strong {
+    font-size: 10px !important;
+  }
+
+  .admin-ui-v2-temp-choice small,
+  .admin-ui-v2-temp-vacancy small {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-temp-vacancy span {
+    font-size: 7.5px !important;
+    padding: 1px 4px !important;
+  }
+
+  .admin-ui-v2-temp-create-panel {
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-temp-date-grid {
+    margin-top: 6px !important;
+    gap: 6px !important;
+  }
+
+  .admin-ui-v2-temp-date-grid span {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-temp-field {
+    font-size: 9.5px !important;
+    min-height: 28px !important;
+    padding: 4px 8px !important;
+  }
+
+  .admin-ui-v2-temp-link-preview {
+    margin: 6px 0 !important;
+    padding: 6px 8px !important;
+    gap: 6px !important;
+  }
+
+  .admin-ui-v2-temp-link-preview span {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-temp-link-preview strong {
+    font-size: 10px !important;
+  }
+
+  /* Vista de Historial */
+  .admin-ui-v2-temp-history {
+    gap: 6px !important;
+  }
+
+  .admin-ui-v2-tactical-history-item {
+    padding: 8px !important;
+  }
+
+  .admin-ui-v2-tactical-history-item h4 {
+    font-size: 10px !important;
+    margin: 0 !important;
+  }
+
+  .admin-ui-v2-tactical-history-item p {
+    font-size: 8px !important;
+    margin: 0 !important;
+  }
+
+  /* --- 7. OPTIMIZACIÓN RESPONSIVE DE ADMISIONES --- */
+  .admin-ui-v2-admissions {
+    padding: 8px !important;
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-adm-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-adm-card {
+    padding: 8px !important;
+    gap: 6px !important;
+  }
+
+  .admin-ui-v2-adm-head {
+    gap: 6px !important;
+  }
+
+  .admin-ui-v2-adm-name {
+    font-size: 11px !important;
+    gap: 4px !important;
+  }
+
+  .admin-ui-v2-adm-prof {
+    font-size: 8.5px !important;
+  }
+
+  .admin-ui-v2-adm-score {
+    font-size: 18px !important;
+  }
+
+  .admin-ui-v2-adm-reason {
+    font-size: 9px !important;
+    margin: 4px 0 !important;
+    line-height: 1.25 !important;
+  }
+
+  .admin-ui-v2-adm-skills {
+    gap: 4px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .admin-ui-v2-adm-skills .admin-ui-v2-pill {
+    font-size: 7.5px !important;
+    padding: 1px 4px !important;
+  }
+
+  .admin-ui-v2-admissions .admin-ui-v2-actions {
+    gap: 4px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+  }
+
+  .admin-ui-v2-admissions .admin-ui-v2-actions .admin-ui-v2-btn {
+    font-size: 8px !important;
+    min-height: 24px !important;
+    padding: 2px 6px !important;
+    flex: 1 !important;
+  }
+
+  /* Tabla de Historial en landscape */
+  .admin-ui-v2-table-wrapper {
+    max-height: 180px;
+    overflow-y: auto;
+    border: 1px solid rgba(103, 172, 169, 0.15);
+  }
+
+  .admin-ui-v2-table-wrapper .admin-ui-v2-table {
+    min-width: 540px !important;
+  }
+
+  .admin-ui-v2-table-wrapper th,
+  .admin-ui-v2-table-wrapper td {
+    font-size: 8.5px !important;
+    padding: 4px 6px !important;
+  }
+
+  /* --- EXPEDICIONES LANDSCAPE MOBILE --- */
+  .admin-ui-v2-expeditions {
+    height: auto !important;
+    min-height: 0 !important;
+    display: block !important;
+  }
+
+  .admin-ui-v2-expedition-resources {
+    height: auto !important;
+    min-height: 0 !important;
+    display: block !important;
+  }
+
+  .admin-ui-v2-expeditions .admin-ui-v2-grid-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .admin-ui-v2-expeditions-grid {
+    grid-template-columns: 1.1fr 0.9fr !important;
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-expeditions-list {
+    max-height: 200px !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .admin-ui-v2-expedition-detail-wrapper {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: 200px !important;
+  }
+
+  .admin-ui-v2-expedition-detail {
+    gap: 6px !important;
+  }
+
+  .admin-ui-v2-expedition-detail h3 {
+    font-size: 12px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .admin-ui-v2-expedition-detail p {
+    font-size: 9px !important;
+  }
+
+  .admin-ui-v2-expedition-mini-map {
+    height: 110px !important;
+  }
+
+  .admin-ui-v2-expedition-mini-map .wm-dotted-container {
+    min-height: 110px !important;
+  }
+
+  .admin-ui-v2-mini-map-caption {
+    padding: 4px 6px !important;
+    bottom: 4px !important;
+    left: 4px !important;
+    right: 4px !important;
+  }
+
+  .admin-ui-v2-mini-map-caption span,
+  .admin-ui-v2-mini-map-caption strong {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-expedition-facts {
+    gap: 4px !important;
+  }
+
+  .admin-ui-v2-expedition-facts div {
+    padding: 4px 6px !important;
+  }
+
+  .admin-ui-v2-expedition-facts strong,
+  .admin-ui-v2-expedition-facts span {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-expedition-facts span {
+    margin-top: 1px !important;
+  }
+
+  .admin-ui-v2-expedition-route-card {
+    padding: 6px 8px !important;
+  }
+
+  .admin-ui-v2-expedition-route-card span,
+  .admin-ui-v2-expedition-route-card p {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-expedition-route-card strong {
+    font-size: 10px !important;
+    margin: 3px 0 !important;
+  }
+
+  .admin-ui-v2-expedition-ledger {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .admin-ui-v2-leaflet-console {
+    grid-template-columns: 1fr 0.4fr !important;
+    min-height: 220px !important;
+    height: 220px !important;
+  }
+
+  .admin-ui-v2-leaflet-map {
+    min-height: 220px !important;
+    height: 220px !important;
+  }
+
+  .admin-ui-v2-leaflet-side {
+    max-height: 220px !important;
+  }
+
+  /* --- PROFILE POPOVER LANDSCAPE MOBILE (COMPACT FLOATING CARD) --- */
+  .admin-ui-v2-profile-popover {
+    position: absolute !important;
+    top: calc(100% + 4px) !important;
+    right: 0 !important;
+    left: auto !important;
+    width: 280px !important;
+    max-height: 220px !important;
+    overflow-y: auto !important;
+    margin: 0 !important;
+    border: 1px solid rgba(103, 172, 169, 0.32) !important;
+    border-radius: 8px !important;
+    background: 
+      radial-gradient(circle at 100% 0%, rgba(72, 197, 143, 0.14), transparent 40%),
+      rgba(4, 12, 12, 0.98) !important;
+    padding: 8px !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6) !important;
+    z-index: 9999 !important;
+    scrollbar-width: thin;
+  }
+
+  .admin-ui-v2-profile-popover::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  .admin-ui-v2-profile-popover::-webkit-scrollbar-thumb {
+    background: rgba(103, 172, 169, 0.3);
+    border-radius: 999px;
+  }
+
+  .admin-ui-v2-profile-popover-head {
+    display: grid !important;
+    grid-template-columns: 32px minmax(0, 1fr) !important;
+    gap: 6px !important;
+    margin-bottom: 6px !important;
+    padding-bottom: 6px !important;
+    border-bottom: 1px solid rgba(103, 172, 169, 0.15) !important;
+  }
+
+  .admin-ui-v2-profile-popover-avatar {
+    width: 32px !important;
+    height: 32px !important;
+    border-width: 1.5px !important;
+  }
+
+  .admin-ui-v2-profile-popover-avatar.admin-ui-v2-avatar-fallback {
+    font-size: 10px !important;
+  }
+
+  .admin-ui-v2-profile-popover-head strong {
+    font-size: 10px !important;
+  }
+
+  .admin-ui-v2-profile-popover-head span {
+    font-size: 8px !important;
+  }
+
+  .admin-ui-v2-profile-popover-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 4px 6px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .admin-ui-v2-profile-popover-grid small {
+    font-size: 7px !important;
+  }
+
+  .admin-ui-v2-profile-popover-grid strong {
+    font-size: 8.5px !important;
+  }
+
+  .admin-ui-v2-profile-logout {
+    font-size: 8px !important;
+    min-height: 22px !important;
+    padding: 2px 4px !important;
+    margin-top: 4px !important;
+  }
+}
+
+

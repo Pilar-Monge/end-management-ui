@@ -26,16 +26,6 @@ export interface CurrentExpeditionUser {
   photoUrl?: string
 }
 
-export interface ExpeditionParticipant {
-  id: number
-  expeditionId: number
-  personId: number
-  expeditionRole: string
-  status: 'ACTIVE' | 'WITHDRAWN'
-  assignmentDate?: string
-  person?: ExpeditionPerson
-}
-
 export interface ExpeditionPerson {
   id: number
   name: string
@@ -48,6 +38,16 @@ export interface ExpeditionPerson {
   campId: number
   occupationId?: number
   img?: string
+}
+
+export interface ExpeditionParticipant {
+  id: number
+  expeditionId: number
+  personId: number
+  expeditionRole: string
+  status: 'ACTIVE' | 'WITHDRAWN'
+  assignmentDate?: string
+  person?: ExpeditionPerson
 }
 
 export interface ExpeditionResourceSummaryItem {
@@ -93,7 +93,7 @@ export interface ExpeditionMapRecord {
   id: number
   name: string
   team: string
-  status: Exclude<ExpeditionStatus, 'RETURNED_AFTER_LOST' | 'CANCELED'> | 'RETURNED_AFTER_LOST' | 'CANCELED'
+  status: ExpeditionStatus
   time: string
   start: { lat: number; lng: number; label?: string }
   end: { lat: number; lng: number; label?: string }
@@ -190,9 +190,19 @@ function normalizeStatus(value: unknown): ExpeditionStatus {
   return 'PLANNED'
 }
 
+async function safeRequest<T>(request: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await request()
+  } catch (error) {
+    if (error instanceof ApiHttpError && (error.statusCode === 403 || error.statusCode === 404)) {
+      return fallback
+    }
+    throw error
+  }
+}
+
 function mapExpedition(item: UnknownRecord): DBExpedition {
-  const status = normalizeStatus(item.status)
-  const participants = num(item.participants)
+  const participants = Array.isArray(item.participants) ? item.participants.length : num(item.participants)
   const lat = num(item.destinationLatitude, 0)
   const lng = num(item.destinationLongitude, 0)
 
@@ -200,12 +210,12 @@ function mapExpedition(item: UnknownRecord): DBExpedition {
     id: num(item.id),
     name: str(item.name, 'Expedicion'),
     dest: str(item.destinationDescription, 'Destino sin descripcion'),
-    status,
+    status: normalizeStatus(item.status),
     departure: formatShortDate(item.plannedDepartureDate),
     returnDate: formatShortDate(item.plannedReturnDate),
     participants,
     resources: str(item.resources, 'Provisionamiento automatico'),
-    extraDays: num(item.extraDaysAvailable),
+    extraDays: num(item.maxExtraDays ?? item.extraDaysAvailable),
     extraUsed: num(item.extraDaysUsed),
     objective: str(item.objective, 'Sin objetivo registrado'),
     lat,
@@ -223,18 +233,21 @@ function mapPerson(item: UnknownRecord): ExpeditionPerson {
   const name = str(item.name, `Persona ${item.id ?? ''}`)
   const lastName1 = str(item.lastName1)
   const lastName2 = str(item.lastName2)
-  const fullName = [name, lastName1, lastName2].filter(Boolean).join(' ')
+  const fullName = str(item.fullName, [name, lastName1, lastName2].filter(Boolean).join(' '))
+  const occupation = asRecord(item.occupation)
+
   return {
     id: num(item.id ?? item.personId),
     name,
     lastName1,
     lastName2,
     fullName,
-    role: str(asRecord(item.occupation).name ?? item.occupationName ?? item.role, 'Operador'),
+    age: item.age === undefined ? undefined : num(item.age),
+    role: str(occupation.name ?? item.occupationName ?? item.role, 'Operador'),
     status: str(item.currentStatus ?? item.status, 'ACTIVE'),
     campId: num(item.campId),
     occupationId: item.occupationId === undefined ? undefined : num(item.occupationId),
-    img: str(item.imageUrl),
+    img: str(item.imageUrl ?? item.photoUrl ?? item.img, `https://i.pravatar.cc/300?u=${item.id ?? name}`),
   }
 }
 
@@ -249,32 +262,21 @@ function mapParticipant(item: UnknownRecord): ExpeditionParticipant {
   }
 }
 
-async function safeRequest<T>(request: () => Promise<T>, fallback: T): Promise<T> {
-  try {
-    return await request()
-  } catch (error) {
-    if (error instanceof ApiHttpError && (error.statusCode === 403 || error.statusCode === 404)) {
-      return fallback
-    }
-    throw error
-  }
-}
-
 export async function getCurrentExpeditionUser(): Promise<CurrentExpeditionUser> {
   const user = asRecord(await apiRequest<unknown>('/auth/me'))
   const person = asRecord(user.person)
   const name = [person.name, person.lastName1].filter(Boolean).join(' ')
   return {
     id: num(user.id),
-    username: str(user.username),
-    name: name || str(user.username, 'Usuario'),
+    username: str(user.username, str(user.email, 'usuario')),
+    name: name || str(user.name ?? user.username, 'Usuario'),
     email: str(user.email),
     role: str(user.role ?? user.rol, 'TRAVEL_MANAGER'),
     rol: str(user.rol ?? user.role, 'TRAVEL_MANAGER'),
-    campId: num(user.campId),
-    campName: str(user.campName, `Campamento ${user.campId ?? ''}`),
+    campId: num(user.campId ?? person.campId, 1),
+    campName: str(user.campName, `Campamento ${num(user.campId ?? person.campId, 1)}`),
     personId: user.personId === undefined ? undefined : num(user.personId),
-    photoUrl: str(person.imageUrl),
+    photoUrl: str(person.imageUrl ?? user.photoUrl),
   }
 }
 
@@ -303,10 +305,20 @@ export async function getCamp(campId: number): Promise<{
   }
 }
 
-export async function listUiExpeditions(filters: { status?: ExpeditionStatus } = {}): Promise<DBExpedition[]> {
-  const user = await getCurrentExpeditionUser()
+export async function listExpeditionParticipants(expeditionId: number): Promise<ExpeditionParticipant[]> {
+  const payload = await safeRequest(
+    () => apiRequest<unknown>(`/expedition-participants?expeditionId=${encodeURIComponent(expeditionId)}&page=1&limit=${PAGE_LIMIT}`),
+    [],
+  )
+  return listFromPayload(payload, mapParticipant)
+}
+
+export async function listUiExpeditions(
+  filters: { campId?: number; status?: ExpeditionStatus | string } = {},
+): Promise<DBExpedition[]> {
+  const user = filters.campId ? null : await getCurrentExpeditionUser()
   const params = new URLSearchParams({
-    campId: String(user.campId),
+    campId: String(filters.campId ?? user?.campId ?? 1),
     page: '1',
     limit: String(PAGE_LIMIT),
   })
@@ -322,7 +334,7 @@ export async function listUiExpeditions(filters: { status?: ExpeditionStatus } =
     const participants = batch?.status === 'fulfilled' ? batch.value : []
     return {
       ...expedition,
-      participants: participants.length,
+      participants: participants.length || expedition.participants,
       assignedPersonnelIds: participants.map((participant) => participant.personId),
     }
   })
@@ -438,13 +450,6 @@ export async function completeExpedition(id: number): Promise<DBExpedition> {
   )
 }
 
-export async function listExpeditionParticipants(expeditionId: number): Promise<ExpeditionParticipant[]> {
-  const payload = await apiRequest<unknown>(
-    `/expedition-participants?expeditionId=${encodeURIComponent(expeditionId)}&page=1&limit=${PAGE_LIMIT}`,
-  )
-  return listFromPayload(payload, mapParticipant)
-}
-
 export async function createExpeditionParticipant(data: {
   expeditionId: number
   personId: number
@@ -478,9 +483,18 @@ export async function listAvailablePeople(campId: number): Promise<ExpeditionPer
     [],
   )
   return listFromPayload(peoplePayload, mapPerson).filter((person) => {
-    if (person.status !== 'ACTIVE') return false
-    if (occupationIds.size === 0) return true
-    return person.occupationId !== undefined && occupationIds.has(person.occupationId)
+    if (person.campId !== campId || person.status !== 'ACTIVE') return false
+    const roleText = person.role.toLowerCase()
+    const isScoutOrExpeditionRole =
+      roleText.includes('scout') ||
+      roleText.includes('explor') ||
+      roleText.includes('expedition') ||
+      roleText.includes('expedicion')
+    if (occupationIds.size === 0) return isScoutOrExpeditionRole
+    return (
+      (person.occupationId !== undefined && occupationIds.has(person.occupationId)) ||
+      isScoutOrExpeditionRole
+    )
   })
 }
 

@@ -14,17 +14,6 @@ export function useSessionManager() {
     const user = localStorage.getItem('user')
     const isPublicPath = PUBLIC_PATHS.has(location.pathname)
 
-    if (!user && !isPublicPath) {
-      navigate('/main-homepage', {
-        replace: true,
-        state: {
-          initialAppState: 'login',
-          sessionMessage: 'Sesion inactiva. Inicia sesion para continuar.',
-        },
-      })
-      return
-    }
-
     if (user && !isPublicPath) {
       localStorage.setItem(LAST_SECURE_PATH_KEY, location.pathname)
     }

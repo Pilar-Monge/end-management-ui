@@ -2,8 +2,6 @@ import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
 import type { AccountStatus, ApiError, Gender, Person, PersonStatus, PersonWithStats, PersonsStats, SystemRole } from '../types'
 import { ENDPOINTS, personsKeys } from './keys'
 
-const getToken = () => localStorage.getItem('token') ?? localStorage.getItem('accessToken')
-
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 const API_ORIGIN = (() => {
   try {

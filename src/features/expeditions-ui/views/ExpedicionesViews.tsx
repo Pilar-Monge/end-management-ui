@@ -6,7 +6,14 @@ import {
   Area, AreaChart,
 } from "recharts";
 import { AlertTriangle, X, Check } from "lucide-react";
-import { getExpeditions, assignPersonToExpedition, getAssignments } from "../features/expeditions/utils/expeditionsStore";
+import {
+  createExpeditionParticipant,
+  getCurrentExpeditionUser,
+  listAvailablePeople,
+  listExpeditionParticipants,
+  listUiExpeditions,
+  type ExpeditionPerson,
+} from "../services/expeditionsUi.service";
 
 /* ════════════════ MOCK DATA ACTUALIZADA ════════════════ */
 
@@ -764,71 +771,139 @@ export function ExpDetalles({ expeditionId, onNavigate }: { expeditionId?: numbe
 
 /* ════════ PERSONAS (VISTA SOLO LECTURA + ASIGNAR) ════════ */
 
-const MOCK_PEOPLE_CARDS = [
-  { id: 7, name: "Mario Hugo", age: 25, role: "Cazador", status: "ACTIVE", img: "https://i.pravatar.cc/150?u=7" },
-  { id: 12, name: "Ana García", age: 35, role: "Médico", status: "ACTIVE", img: "https://i.pravatar.cc/150?u=12" },
-  { id: 5, name: "Juan López", age: 28, role: "Recolector", status: "ACTIVE", img: "https://i.pravatar.cc/150?u=5" },
-  { id: 3, name: "María Sánchez", age: 31, role: "Cazador", status: "ON_EXPEDITION", img: "https://i.pravatar.cc/150?u=3" },
-  { id: 9, name: "Carlos Ruiz", age: 42, role: "Investigador", status: "ACTIVE", img: "https://i.pravatar.cc/150?u=9" },
-  { id: 15, name: "Lucía Torres", age: 29, role: "Ingeniero", status: "ACTIVE", img: "https://i.pravatar.cc/150?u=15" },
-];
+
+type PersonCard = ExpeditionPerson;
+
+interface PlannedExpeditionCard {
+  id: number;
+  name: string;
+  destination: string;
+  objective: string;
+  plannedDate: string;
+  riskLevel: string;
+  status: string;
+  participants: number;
+  maxParticipants: number;
+}
+
+const PEOPLE_PAGE_SIZE = 6;
 
 export function PersonasView({ onNavigate }: { onNavigate?: (sub: string, id?: number) => void }) {
-  const [peopleCards] = useState(MOCK_PEOPLE_CARDS);
-  const [selectedPerson, setSelectedPerson] = useState<typeof MOCK_PEOPLE_CARDS[0] | null>(null);
+  const [peopleCards, setPeopleCards] = useState<PersonCard[]>([]);
+  const [selectedPerson, setSelectedPerson] = useState<PersonCard | null>(null);
   
-  // Planned expeditions loaded dynamically from expeditions store
-  const [plannedExpeditions, setPlannedExpeditions] = useState<any[]>([]);
+  // Planned expeditions loaded dynamically from backend.
+  const [plannedExpeditions, setPlannedExpeditions] = useState<PlannedExpeditionCard[]>([]);
 
-  // Track mapping: personId -> assigned expeditionIds
+  // Track mapping from personId to assigned expeditionIds.
   const [assignments, setAssignments] = useState<Record<number, number[]>>({});
   const [successAssignment, setSuccessAssignment] = useState<{ message: string; expId: number } | null>(null);
+  const [isLoadingPeople, setIsLoadingPeople] = useState(true);
+  const [peopleError, setPeopleError] = useState("");
+  const [page, setPage] = useState(1);
+  const [assigningKey, setAssigningKey] = useState("");
+  const totalPages = Math.max(1, Math.ceil(peopleCards.length / PEOPLE_PAGE_SIZE));
+  const currentPeople = peopleCards.slice((page - 1) * PEOPLE_PAGE_SIZE, page * PEOPLE_PAGE_SIZE);
 
-  const syncStore = () => {
-    const list = getExpeditions();
-    // Show only PLANNED expeditions as assignment candidates
-    const activePlanned = list.filter(e => e.status === "PLANNED" || e.status === "PLANIFICADA");
-    
-    // Map them to internal model representation of PersonasView
-    const mapped = activePlanned.map(e => ({
-      id: e.id,
-      name: e.name,
-      destination: e.dest,
-      objective: e.objective,
-      plannedDate: e.departure.split(" ")[0] || "Pendiente",
-      riskLevel: e.danger || "Medio",
-      status: "Planeada",
-      participants: e.assignedPersonnelIds?.length || 0,
-      maxParticipants: 10
-    }));
+  const syncStore = async () => {
+    setIsLoadingPeople(true);
+    setPeopleError("");
 
-    setPlannedExpeditions(mapped);
-    setAssignments(getAssignments());
+    try {
+      const user = await getCurrentExpeditionUser();
+      const [people, expeditions] = await Promise.all([
+        listAvailablePeople(user.campId),
+        listUiExpeditions({ campId: user.campId, status: "PLANNED" }),
+      ]);
+      const activePlanned = expeditions.filter(e => e.status === "PLANNED" || e.status === "PLANIFICADA");
+      const participantLists = await Promise.all(
+        activePlanned.map((expedition) => listExpeditionParticipants(expedition.id)),
+      );
+      const nextAssignments: Record<number, number[]> = {};
+
+      participantLists.forEach((participants, index) => {
+        const expeditionId = activePlanned[index].id;
+        participants.forEach((participant) => {
+          if (participant.status === "WITHDRAWN") return;
+          nextAssignments[participant.personId] = [
+            ...(nextAssignments[participant.personId] || []),
+            expeditionId,
+          ];
+        });
+      });
+
+      setPeopleCards(people);
+      setPlannedExpeditions(activePlanned.map((e, index) => ({
+        id: e.id,
+        name: e.name,
+        destination: e.dest,
+        objective: e.objective,
+        plannedDate: e.departure.split(" ")[0] || "Pendiente",
+        riskLevel: e.danger || "Medio",
+        status: "Planeada",
+        participants: participantLists[index]?.filter((participant) => participant.status !== "WITHDRAWN").length || e.participants || 0,
+        maxParticipants: 10
+      })));
+      setAssignments(nextAssignments);
+      setPage(1);
+
+      if (people.length === 0) {
+        setPeopleError("No hay personas activas con rol de expedicion o scout para este campamento.");
+      }
+    } catch (error) {
+      console.error("Unable to load people from backend", error);
+      setPeopleCards([]);
+      setPlannedExpeditions([]);
+      setAssignments({});
+      setPeopleError("No se pudo cargar personal desde el backend.");
+    } finally {
+      setIsLoadingPeople(false);
+    }
   };
 
   useEffect(() => {
     syncStore();
   }, []);
 
-  const handleAssign = (personId: number, expeditionId: number) => {
+  const handleAssign = async (personId: number, expeditionId: number) => {
     // 1. Double check safety rules
     const currentPersonAssignments = assignments[personId] || [];
     if (currentPersonAssignments.includes(expeditionId)) return;
 
-    // 2. Perform assignment via store
-    assignPersonToExpedition(personId, expeditionId);
+    const person = peopleCards.find((item) => item.id === personId);
+    const exp = plannedExpeditions.find(e => e.id === expeditionId);
+    const key = `${personId}-${expeditionId}`;
 
-    // 3. Sync states back
-    syncStore();
+    setAssigningKey(key);
+    try {
+      await createExpeditionParticipant({
+        personId,
+        expeditionId,
+        expeditionRole: person?.role || "EXPEDITION_MEMBER",
+      });
 
-    // 4. Retrieve expedition name
-    const exp = getExpeditions().find(e => e.id === expeditionId);
+      setAssignments((current) => ({
+        ...current,
+        [personId]: [...(current[personId] || []), expeditionId],
+      }));
+      setPlannedExpeditions((current) => current.map((item) => (
+        item.id === expeditionId ? { ...item, participants: item.participants + 1 } : item
+      )));
 
     // 5. Set visual success message
     setSuccessAssignment({
       message: `Persona asignada correctamente a la expedición "${exp?.name || "Expedición"}".`,
       expId: expeditionId
     });
+    } catch (error) {
+      console.error("Unable to assign person to expedition", error);
+      setSuccessAssignment({
+        message: "No se pudo registrar la asignacion en el backend. Revise permisos o disponibilidad.",
+        expId: expeditionId
+      });
+    } finally {
+      setAssigningKey("");
+    }
   };
 
   const handleCloseModal = () => {
@@ -850,8 +925,18 @@ export function PersonasView({ onNavigate }: { onNavigate?: (sub: string, id?: n
       <MissionStack>
         <div className="mission-card mission-card-wide">
           <div className="mission-card-title">Personal Disponible en Campamento</div>
+          {isLoadingPeople && (
+            <div className="p-6 text-center text-xs font-mono text-[#69BFB7] uppercase tracking-widest animate-pulse">
+              Cargando personal del backend...
+            </div>
+          )}
+          {!isLoadingPeople && peopleError && (
+            <div className="mb-4 p-3 border border-amber-500/30 bg-amber-500/10 text-amber-200 text-[10px] uppercase font-bold tracking-wide">
+              {peopleError}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {peopleCards.map((person) => {
+            {currentPeople.map((person) => {
               const isAvailable = person.status === "ACTIVE";
               const personAssignments = assignments[person.id] || [];
 
@@ -910,6 +995,31 @@ export function PersonasView({ onNavigate }: { onNavigate?: (sub: string, id?: n
               );
             })}
           </div>
+          {!isLoadingPeople && peopleCards.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5 pt-4 border-t border-[#67ACA9]/15 font-mono text-[10px] uppercase tracking-wider">
+              <span className="text-[#A4C2C5]/60">
+                Mostrando {currentPeople.length} de {peopleCards.length} personas | Pagina {page} de {totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <Btn
+                  small
+                  variant="ghost"
+                  disabled={page <= 1}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                >
+                  Anterior
+                </Btn>
+                <Btn
+                  small
+                  variant="ghost"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                >
+                  Siguiente
+                </Btn>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* HIGH-TECH POPUP / OVERLAY FOR EXPEDITION ASSIGNMENT IN REACT PORTAL TO PREVENT CLIPPING */}
@@ -1039,7 +1149,8 @@ export function PersonasView({ onNavigate }: { onNavigate?: (sub: string, id?: n
                                 ) : (
                                   <Btn 
                                     variant="primary" 
-                                    small 
+                                    small
+                                    disabled={assigningKey === `${selectedPerson.id}-${exp.id}`}
                                     onClick={() => handleAssign(selectedPerson.id, exp.id)}
                                   >
                                     Asignar aquí

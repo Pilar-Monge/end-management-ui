@@ -384,6 +384,20 @@ export const resourceApi = {
     }));
   },
 
+  createDailyCollectionRecord: (data: Omit<DailyCollectionRecord, "id">) =>
+    apiRequest<unknown>("/daily-collection-records", {
+      method: "POST",
+      body: JSON.stringify({
+        campId: numericId(String(data.campId)),
+        personId: numericId(String(data.personId)),
+        resourceTypeId: numericId(String(data.resourceTypeId)),
+        expectedAmount: String(data.expectedAmount),
+        actualAmount: String(data.actualAmount),
+        differenceReason: data.differenceReason,
+        recordedBy: numericId(String(data.recordedBy)),
+      }),
+    }),
+
   listInventoryMovements: async (): Promise<InventoryMovement[]> => {
     const payload = await apiRequest<unknown>("/inventory-movements?page=1&limit=100");
     return listFromPayload(payload, item => ({
@@ -440,7 +454,7 @@ export const resourceApi = {
       body: JSON.stringify(toApiIntercampRequest(data)),
     });
     const record = asRecord(payload);
-    const dataRecord = asRecord(record.data);
+    const dataRecord = record.data !== undefined && record.data !== null ? asRecord(record.data) : record;
     return dataRecord.id !== undefined ? mapIntercampRequest(dataRecord) : null;
   },
 
@@ -657,11 +671,43 @@ export const resourceApi = {
       campId: str(item.campId ?? childId(item, "camp")),
       status: normalizePersonStatus(item.currentStatus ?? item.status ?? item.current_status),
       occupationId: str(item.occupationId ?? childId(item, "occupation")),
+      role: str(
+        item.occupationName ??
+        item.occupation_name ??
+        (item.occupation && typeof item.occupation === "object" ? (item.occupation as Record<string, unknown>).name : undefined) ??
+        ""
+      ),
     }));
   },
 
 
-  createDeliveredTransferResource: (data: Omit<DeliveredTransferResource, "id">) => apiRequest<unknown>("/delivered-transfer-resources", {
+  getPersonById: async (id: string): Promise<CampPerson | null> => {
+    try {
+      const payload = await apiRequest<unknown>(`/person/${encodeURIComponent(id)}`);
+      const raw = (payload && typeof payload === "object" && "data" in (payload as Record<string, unknown>))
+        ? (payload as Record<string, unknown>).data as Record<string, unknown>
+        : payload as Record<string, unknown>;
+      if (!raw) return null;
+      const item = raw;
+      return {
+      id: str(item.id ?? item.personId),
+      name: str(item.name ?? item.fullName ?? item.username ?? `Persona ${item.id ?? ""}`),
+      campId: str(item.campId ?? childId(item, "camp")),
+      status: normalizePersonStatus(item.currentStatus ?? item.status ?? item.current_status),
+      occupationId: str(item.occupationId ?? childId(item, "occupation")),
+      role: str(
+        item.occupationName ??
+        item.occupation_name ??
+        (item.occupation && typeof item.occupation === "object" ? (item.occupation as Record<string, unknown>).name : undefined) ??
+        ""
+      ),
+      };
+    } catch {
+      return null;
+    }
+  },
+
+    createDeliveredTransferResource: (data: Omit<DeliveredTransferResource, "id">) => apiRequest<unknown>("/delivered-transfer-resources", {
     method: "POST",
     body: JSON.stringify({
       ...data,

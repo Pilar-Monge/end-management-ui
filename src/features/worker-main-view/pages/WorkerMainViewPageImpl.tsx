@@ -20,7 +20,7 @@ import type {
   
 } from '../types'
 import { WorkerApiError } from '../services/workerMainViewApi'
-import { SESSION_TOKEN_CHANGED_EVENT } from '../../../shared/services/sessionService'
+import { logoutCurrentSession } from '../../../shared/services/sessionProfile'
 import '../pages/worker-main-view.css'
 import endWorkerBg from '../assets/images/end-worker.jpg'
 
@@ -130,11 +130,8 @@ export function WorkerMainViewPage() {
     return () => window.clearInterval(tickInterval)
   }, [])
 
-  const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('user')
-    window.dispatchEvent(new Event(SESSION_TOKEN_CHANGED_EVENT))
+  const handleLogout = async () => {
+    await logoutCurrentSession()
     navigate('/main-homepage', { state: { initialAppState: 'explore' } })
   }
 
