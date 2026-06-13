@@ -49,7 +49,7 @@ import {
 import type { MappedCampPoint } from "../expeditions/types";
 import { AdminSyncOverlay } from "../components/AdminSyncOverlay";
 import { SESSION_TOKEN_CHANGED_EVENT } from "../../../shared/services/sessionService";
-import { logoutCurrentSession } from "../../../shared/services/sessionProfile";
+import { checkCurrentSessionStatus, clearCachedSession, logoutCurrentSession } from "../../../shared/services/sessionProfile";
 import { ApiHttpError, apiRequest } from "../../../shared/services/httpClient";
 import { getErrorMessage } from "../../../shared/services/errorMessages";
 import { PopupMessage } from "../../../shared/components/PopupMessage";
@@ -224,6 +224,7 @@ interface GlobalTimeState {
 }
 
 const SESSION_TIMEOUT_MS = 20 * 60 * 1000;
+const LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS = 60 * 1000;
 
 interface TempRoleAssignment {
   id: number;
@@ -931,6 +932,8 @@ export default function AdminDashboardPage() {
     syncedAtClientMs: Date.now(),
     status: "syncing",
   });
+  const globalTimeStateRef = useRef(globalTimeState);
+  const lastSyncedGlobalTimeRef = useRef<Pick<GlobalTimeState, "baseServerTime" | "syncedAtClientMs"> | null>(null);
   const lastActivityUpdateRef = useRef(0);
   const lastActivityAtRef = useRef(Date.now());
   const bootStartedAtRef = useRef<number>(Date.now());
@@ -962,6 +965,49 @@ export default function AdminDashboardPage() {
       status: "synced",
     });
   }, []);
+
+  useEffect(() => {
+    globalTimeStateRef.current = globalTimeState;
+    if (globalTimeState.status === "synced") {
+      lastSyncedGlobalTimeRef.current = {
+        baseServerTime: globalTimeState.baseServerTime,
+        syncedAtClientMs: globalTimeState.syncedAtClientMs,
+      };
+    }
+  }, [globalTimeState]);
+
+  const redirectExpiredLogicalSession = useCallback(() => {
+    clearCachedSession(true);
+    navigate("/main-homepage", {
+      replace: true,
+      state: {
+        initialAppState: "login",
+        sessionMessage: "Sesion expirada por avance del tiempo logico. Inicia sesion para continuar.",
+      },
+    });
+  }, [navigate]);
+
+  const validateSessionAfterLogicalTimeJump = useCallback(async (nextServerTime: Date): Promise<boolean> => {
+    const previous = lastSyncedGlobalTimeRef.current;
+    if (!previous) {
+      return false;
+    }
+
+    const expectedServerTimeMs = previous.baseServerTime.getTime() + Math.max(0, Date.now() - previous.syncedAtClientMs);
+    const forwardJumpMs = nextServerTime.getTime() - expectedServerTimeMs;
+
+    if (forwardJumpMs <= LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS) {
+      return false;
+    }
+
+    const status = await checkCurrentSessionStatus();
+    if (status !== "expired") {
+      return false;
+    }
+
+    redirectExpiredLogicalSession();
+    return true;
+  }, [redirectExpiredLogicalSession]);
 
   const enqueueAchievementUnlocks = useCallback(
     (items: CampAchievementUnlock[]) => {
@@ -1263,6 +1309,12 @@ export default function AdminDashboardPage() {
       setGlobalTimeState((prev) => ({ ...prev, status: "syncing" }));
       try {
         const data = await getServerTime();
+        const parsed = new Date(data.serverTime);
+        if (Number.isNaN(parsed.getTime())) {
+          throw new Error("Invalid server time");
+        }
+        const sessionExpired = await validateSessionAfterLogicalTimeJump(parsed);
+        if (sessionExpired) return;
         syncGlobalTimeFromServerValue(data.serverTime);
       } catch {
         setGlobalTimeState((prev) => ({
@@ -1278,7 +1330,7 @@ export default function AdminDashboardPage() {
     }, 10000);
 
     return () => window.clearInterval(syncInterval);
-  }, [hasEntered, syncGlobalTimeFromServerValue]);
+  }, [hasEntered, syncGlobalTimeFromServerValue, validateSessionAfterLogicalTimeJump]);
 
   useEffect(() => {
     if (activeAchievementUnlock || achievementUnlockQueue.length === 0) return;
@@ -1562,6 +1614,7 @@ export default function AdminDashboardPage() {
                         onRefreshAdminProfile={() => { void refreshCurrentUserFromBackend(); }}
                         onProfilePersonUpdated={handleProfilePersonUpdated}
                         onSystemTimeSync={syncGlobalTimeFromServerValue}
+                        onLogicalTimeAdvanced={validateSessionAfterLogicalTimeJump}
                       />
                     </div>
                   </div>
@@ -1900,6 +1953,7 @@ function ContentArea({
   onRefreshAdminProfile,
   onProfilePersonUpdated,
   onSystemTimeSync,
+  onLogicalTimeAdvanced,
 }: {
   section: AdminSectionId;
   sub: string;
@@ -1937,6 +1991,7 @@ function ContentArea({
   onRefreshAdminProfile: () => void;
   onProfilePersonUpdated: (person: Person) => void;
   onSystemTimeSync: (serverTime: string) => void;
+  onLogicalTimeAdvanced: (nextServerTime: Date) => Promise<boolean>;
 }) {
   const unreadNotificationsCount = useMemo(
     () => notifications.filter((item) => !item.read).length,
@@ -2145,6 +2200,7 @@ function ContentArea({
           onReloadPersons={onPopulationReload}
           onProfilePersonUpdated={onProfilePersonUpdated}
           onSystemTimeSync={onSystemTimeSync}
+          onLogicalTimeAdvanced={onLogicalTimeAdvanced}
         />
       )}
 
@@ -4081,6 +4137,7 @@ const SettingsModule = memo(function SettingsModule({
   onReloadPersons,
   onProfilePersonUpdated,
   onSystemTimeSync,
+  onLogicalTimeAdvanced,
 }: {
   sub: string;
   profile: SessionAdminUser;
@@ -4091,6 +4148,7 @@ const SettingsModule = memo(function SettingsModule({
   onReloadPersons: () => Promise<void>;
   onProfilePersonUpdated: (person: Person) => void;
   onSystemTimeSync: (serverTime: string) => void;
+  onLogicalTimeAdvanced: (nextServerTime: Date) => Promise<boolean>;
 }) {
   const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
   const ALLOWED_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
@@ -4191,6 +4249,12 @@ const SettingsModule = memo(function SettingsModule({
     setAdvanceResult(null);
     try {
       const result = await advanceSystemTime({ unit, amount });
+      const parsedCurrentSystemTime = new Date(result.currentSystemTime);
+      if (!Number.isNaN(parsedCurrentSystemTime.getTime())) {
+        const sessionExpired = await onLogicalTimeAdvanced(parsedCurrentSystemTime);
+        if (sessionExpired) return;
+      }
+
       setAdvanceResult(result);
       setSystemTime(result.currentSystemTime);
       onSystemTimeSync(result.currentSystemTime);

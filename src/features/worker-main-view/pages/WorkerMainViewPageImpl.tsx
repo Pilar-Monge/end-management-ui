@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -21,7 +21,7 @@ import type {
   
 } from '../types'
 import { WorkerApiError } from '../services/workerMainViewApi'
-import { logoutCurrentSession } from '../../../shared/services/sessionProfile'
+import { checkCurrentSessionStatus, clearCachedSession, logoutCurrentSession } from '../../../shared/services/sessionProfile'
 import '../pages/worker-main-view.css'
 import endWorkerBg from '../assets/images/end-worker.jpg'
 
@@ -40,6 +40,8 @@ const WORKER_NAV_DATA: WorkerSection[] = [
   { id: 'notificaciones', label: 'Notificaciones', shortLabel: 'NT', icon: <NotificationIcon /> },
   { id: 'ocupaciones', label: 'Ocupaciones', shortLabel: 'OC', icon: <OccupationIcon /> },
 ]
+
+const LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS = 60 * 1000
 
 type WorkerGlobalTimeState = {
   baseServerTime: Date
@@ -105,6 +107,8 @@ export function WorkerMainViewPage() {
     syncedAtClientMs: Date.now(),
     status: 'syncing',
   })
+  const globalTimeStateRef = useRef(globalTimeState)
+  const lastSyncedGlobalTimeRef = useRef<Pick<WorkerGlobalTimeState, 'baseServerTime' | 'syncedAtClientMs'> | null>(null)
 
   const sessionUser = useMemo<WorkerAuthenticatedUser | null>(() => {
     const raw = localStorage.getItem('user')
@@ -126,6 +130,46 @@ export function WorkerMainViewPage() {
   const hudUser = useMemo(() => getStoredWorkerHudUser(sessionUser), [sessionUser])
 
   useEffect(() => {
+    globalTimeStateRef.current = globalTimeState
+    if (globalTimeState.status === 'synced') {
+      lastSyncedGlobalTimeRef.current = {
+        baseServerTime: globalTimeState.baseServerTime,
+        syncedAtClientMs: globalTimeState.syncedAtClientMs,
+      }
+    }
+  }, [globalTimeState])
+
+  const redirectExpiredLogicalSession = () => {
+    clearCachedSession(true)
+    navigate('/main-homepage', {
+      replace: true,
+      state: {
+        initialAppState: 'login',
+        sessionMessage: 'Sesion expirada por avance del tiempo logico. Inicia sesion para continuar.',
+      },
+    })
+  }
+
+  const validateSessionAfterLogicalTimeJump = async (nextServerTime: Date): Promise<boolean> => {
+    const previous = lastSyncedGlobalTimeRef.current
+    if (!previous) {
+      return false
+    }
+
+    if (forwardJumpMs <= LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS) {
+      return false
+    }
+
+    const status = await checkCurrentSessionStatus()
+    if (status !== 'expired') {
+      return false
+    }
+
+    redirectExpiredLogicalSession()
+    return true
+  }
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
       setIsLoaded(true)
     }, 1500)
@@ -144,6 +188,9 @@ export function WorkerMainViewPage() {
         if (Number.isNaN(parsed.getTime())) {
           throw new Error('Invalid server time')
         }
+
+        const sessionExpired = await validateSessionAfterLogicalTimeJump(parsed)
+        if (sessionExpired) return
 
         setGlobalTimeState({
           baseServerTime: parsed,

@@ -68,6 +68,26 @@ export function clearCachedSession(notify = true): void {
   }
 }
 
+export type SessionCheckStatus = 'active' | 'expired' | 'unknown'
+
+export async function checkCurrentSessionStatus(): Promise<SessionCheckStatus> {
+  try {
+    const response = await fetch(`${API_BASE}/auth/check-session`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (response.ok) return 'active'
+    if (response.status === 401) return 'expired'
+    return 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
 export function normalizeSessionUser(profile: unknown, cachedUser: CachedSessionUser | null = readCachedSessionUser()): CachedSessionUser {
   const data = unwrapPayload(profile)
   const person = isRecord(data.person) ? data.person : null
