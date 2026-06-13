@@ -157,7 +157,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
 
     const syncInterval = setInterval(() => {
       syncGlobalTime();
-    }, 60000);
+    }, 10000);
 
     return () => clearInterval(syncInterval);
   }, []);
@@ -769,6 +769,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             onMarkAsRead={handleMarkAsRead}
             onUpdateInventory={handleUpdateInventory}
             onNavigateToSub={handleInnerNavigation}
+            globalTimeState={globalTimeState}
           />
         );
       case "Inventario actual":
