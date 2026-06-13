@@ -156,6 +156,9 @@ export function WorkerMainViewPage() {
       return false
     }
 
+    const expectedServerTimeMs = previous.baseServerTime.getTime() + Math.max(0, Date.now() - previous.syncedAtClientMs)
+    const forwardJumpMs = nextServerTime.getTime() - expectedServerTimeMs
+
     if (forwardJumpMs <= LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS) {
       return false
     }
