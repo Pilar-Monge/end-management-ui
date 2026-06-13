@@ -405,12 +405,7 @@ interface ZoneAnalysisProps {
 
 export function ZoneAnalysis({ onNavigate }: ZoneAnalysisProps) {
   const [activeCamp, setActiveCamp] = useState(() => getFallbackActiveCamp());
-  const [expeditions, setExpeditions] = useState<APIExpedition[]>(() => 
-    DEFAULT_LOCAL_EXPEDITIONS.map(e => ({
-      ...e,
-      start: { lat: activeCamp.lat, lng: activeCamp.lng, label: activeCamp.campName }
-    }))
-  );
+  const [expeditions, setExpeditions] = useState<APIExpedition[]>([]);
   const [selectedZone, setSelectedZone] = useState<any | null>(null);
   const [showLegend, setShowLegend] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -643,7 +638,11 @@ export function ZoneAnalysis({ onNavigate }: ZoneAnalysisProps) {
               {loading && <span className="animate-pulse text-[9px] font-mono text-[#69BFB7]">SINC_SATELLITE...</span>}
             </div>
             
-            {expeditions.length === 0 ? (
+            {loading ? (
+              <div className="p-4 bg-black/25 text-center text-xs text-[#A4C2C5]/50 italic">
+                Sincronizando expediciones reales del campamento...
+              </div>
+            ) : expeditions.length === 0 ? (
               <div className="p-4 bg-black/25 text-center text-xs text-[#A4C2C5]/50 italic">
                 No hay expediciones configuradas en el sector.
               </div>
