@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 :root {
   color-scheme: dark;
@@ -75,10 +75,14 @@ button {
     linear-gradient(rgba(164, 194, 197, 0.02) 1px, transparent 1px);
   background-size: 100% 3px;
   content: "";
-  inset: 0;
-  pointer-events: none;
   position: absolute;
+  top: -6px;
+  bottom: -6px;
+  left: 0;
+  right: 0;
+  pointer-events: none;
   z-index: 50;
+  will-change: transform;
 }
 
 .holo-grid {
@@ -510,6 +514,7 @@ button {
   scrollbar-color: rgba(103, 172, 169, 0.25) transparent;
   position: relative;
   margin-right: 18px;
+  will-change: transform;
 }
 
 .inner-content::-webkit-scrollbar {
@@ -2189,6 +2194,7 @@ button {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(103, 172, 169, 0.25) transparent;
+  will-change: transform;
 }
 
 .wm-sidebar-title {
@@ -2304,10 +2310,10 @@ button {
 
 @keyframes scan-shift {
   from {
-    background-position: 0 0;
+    transform: translate3d(0, 0, 0);
   }
   to {
-    background-position: 0 3px;
+    transform: translate3d(0, 3px, 0);
   }
 }
 

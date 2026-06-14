@@ -680,7 +680,6 @@ const SurvivorCharacter = memo(
         scene.remove(characterGroup)
 
         renderer.dispose()
-        renderer.forceContextLoss()
         if (renderer.domElement.parentNode === container) {
           container.removeChild(renderer.domElement)
         }

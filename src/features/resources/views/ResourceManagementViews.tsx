@@ -534,7 +534,8 @@ export function ViewDashboard({
   occupationCoverages = [],
   requestResourceDetails = [],
   deliveredTransferResources = [],
-  onNavigateToSub
+  onNavigateToSub,
+  globalTimeState
 }: {
   camps: Camp[];
   resourceTypes: ResourceType[];
@@ -557,6 +558,11 @@ export function ViewDashboard({
   onMarkAsRead?: (id: string) => void;
   onUpdateInventory?: (campId: string, resourceTypeId: string, currentAmount: number, minimumAlertAmount: number) => void;
   onNavigateToSub: (sub: string) => void;
+  globalTimeState?: {
+    baseServerTime: Date;
+    syncedAtClientMs: number;
+    status: 'synced' | 'syncing' | 'error';
+  };
 }) {
   const activeCampId = currentUser.campId;
   const campName = getCampDisplayName(camps, activeCampId);
@@ -565,14 +571,25 @@ export function ViewDashboard({
     setIsRefreshing(true);
     setTimeout(() => setIsRefreshing(false), 800);
   };
-  const [systTime, setSystTime] = useState(new Date());
+  const [systTime, setSystTime] = useState(() => {
+    if (globalTimeState) {
+      const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
+      return new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs);
+    }
+    return new Date();
+  });
 
   useEffect(() => {
     const clockInterval = setInterval(() => {
-      setSystTime(new Date());
+      if (globalTimeState) {
+        const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
+        setSystTime(new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs));
+      } else {
+        setSystTime(new Date());
+      }
     }, 1000);
     return () => clearInterval(clockInterval);
-  }, []);
+  }, [globalTimeState]);
 
   const getNextUtcMidnight = (nowDate: Date): Date => {
     return new Date(Date.UTC(
@@ -2062,6 +2079,13 @@ export function ViewRecoleccionDiaria({
   const [adjustReason, setAdjustReason] = useState("");
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "warning">("success");
+  const [pageRecoleccion, setPageRecoleccion] = useState(1);
+  const pageSizeRecoleccion = 10;
+
+  useEffect(() => {
+    setPageRecoleccion(1);
+  }, [searchTerm, filterResourceType, filterDate]);
+
   const resetCreateForm = () => {
     setPersonId("");
     setResourceTypeId(resourceTypes[0]?.id || "2");
@@ -2119,6 +2143,12 @@ export function ViewRecoleccionDiaria({
 
     return matchesRecordId || matchesPersonId || matchesPersonName || matchesResourceName || matchesDate;
   });
+  const totalPageRecoleccion = Math.max(1, Math.ceil(joinedAndFilteredRecords.length / pageSizeRecoleccion));
+  const safePageRecoleccion = Math.min(pageRecoleccion, totalPageRecoleccion);
+  const paginatedRecoleccion = joinedAndFilteredRecords.slice(
+    (safePageRecoleccion - 1) * pageSizeRecoleccion,
+    safePageRecoleccion * pageSizeRecoleccion
+  );
   const totalExpected = joinedAndFilteredRecords.reduce((sum, r) => sum + Number(r.expectedAmount), 0);
   const totalActual = joinedAndFilteredRecords.reduce((sum, r) => sum + Number(r.actualAmount), 0);
   const netDiscrepancy = totalActual - totalExpected;
@@ -2431,7 +2461,7 @@ export function ViewRecoleccionDiaria({
                     </tr>
                   </thead>
                   <tbody>
-                    {joinedAndFilteredRecords.map(record => {
+                    {paginatedRecoleccion.map(record => {
                       const personObj = campPersonnel.find(p => p.id === record.personId);
                       const resourceObj = resourceTypes.find(rt => rt.id === record.resourceTypeId);
 
@@ -2505,6 +2535,17 @@ export function ViewRecoleccionDiaria({
                   </tbody>
                 </table>
               </div>
+
+              {joinedAndFilteredRecords.length > 0 && (
+                <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-4 pt-3 border-t border-[#67ACA9]/10 select-none">
+                  <span>Registros {((safePageRecoleccion - 1) * pageSizeRecoleccion) + 1} - {Math.min(safePageRecoleccion * pageSizeRecoleccion, joinedAndFilteredRecords.length)} de {joinedAndFilteredRecords.length}</span>
+                  <div className="flex gap-1">
+                    <Btn small variant="ghost" onClick={() => setPageRecoleccion(p => Math.max(1, p - 1))} disabled={safePageRecoleccion === 1}>◄ Anterior</Btn>
+                    <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{safePageRecoleccion} / {totalPageRecoleccion}</div>
+                    <Btn small variant="ghost" onClick={() => setPageRecoleccion(p => Math.min(totalPageRecoleccion, p + 1))} disabled={safePageRecoleccion === totalPageRecoleccion}>Siguiente ►</Btn>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           {adjustingId && (() => {
@@ -2630,6 +2671,12 @@ export function ViewMovimientosInventario({
   const [description, setDescription] = useState("");
   const recordedBy = currentUser.userId;
   const [activeTab, setActiveTab] = useState<"Todos" | "Expediciones" | "Recolección diaria" | "Ajustes">("Todos");
+  const [pageMovimientos, setPageMovimientos] = useState(1);
+  const pageSizeMovimientos = 10;
+
+  useEffect(() => {
+    setPageMovimientos(1);
+  }, [activeTab]);
 
   const filteredMovements = inventoryMovements.filter(mv => {
     if (activeTab === "Todos") return true;
@@ -2644,6 +2691,13 @@ export function ViewMovimientosInventario({
     }
     return true;
   });
+
+  const totalPageMovimientos = Math.max(1, Math.ceil(filteredMovements.length / pageSizeMovimientos));
+  const safePageMovimientos = Math.min(pageMovimientos, totalPageMovimientos);
+  const paginatedMovements = filteredMovements.slice().reverse().slice(
+    (safePageMovimientos - 1) * pageSizeMovimientos,
+    safePageMovimientos * pageSizeMovimientos
+  );
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2696,13 +2750,14 @@ export function ViewMovimientosInventario({
                     <th>Movimiento</th>
                     <th>Recurso</th>
                     <th>Cantidad</th>
+                    <th>Fecha</th>
                     <th>Responsable</th>
                     <th>Fundamento</th>
                     <th className="text-right">Auditoría</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredMovements.slice().reverse().map(mv => {
+                  {paginatedMovements.map(mv => {
                     const camp = camps.find(c => c.id === mv.campId);
                     const rt = resourceTypes.find(t => t.id === mv.resourceTypeId);
                     const isOutflow = [
@@ -2727,6 +2782,7 @@ export function ViewMovimientosInventario({
                             {isOutflow ? "-" : "+"}{Math.abs(mv.amount)} {rt?.unitOfMeasure}
                           </span>
                         </td>
+                        <td className="font-mono text-[9.5px] text-zinc-400">{mv.date}</td>
                         <td className="text-[#69BFB7]">{mv.recordedBy}</td>
                         <td className="italic text-[9px]">{mv.description}</td>
                         <td className="text-right">
@@ -2737,7 +2793,7 @@ export function ViewMovimientosInventario({
                   })}
                   {filteredMovements.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="text-center py-6 text-zinc-500 italic font-mono text-[10px]">
+                      <td colSpan={8} className="text-center py-6 text-zinc-500 italic font-mono text-[10px]">
                         No se registran movimientos para este filtro táctico.
                       </td>
                     </tr>
@@ -2745,6 +2801,17 @@ export function ViewMovimientosInventario({
                 </tbody>
               </table>
             </div>
+
+            {filteredMovements.length > 0 && (
+              <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-4 pt-3 border-t border-[#67ACA9]/10 select-none">
+                <span>Registros {((safePageMovimientos - 1) * pageSizeMovimientos) + 1} - {Math.min(safePageMovimientos * pageSizeMovimientos, filteredMovements.length)} de {filteredMovements.length}</span>
+                <div className="flex gap-1">
+                  <Btn small variant="ghost" onClick={() => setPageMovimientos(p => Math.max(1, p - 1))} disabled={safePageMovimientos === 1}>◄ Anterior</Btn>
+                  <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{safePageMovimientos} / {totalPageMovimientos}</div>
+                  <Btn small variant="ghost" onClick={() => setPageMovimientos(p => Math.min(totalPageMovimientos, p + 1))} disabled={safePageMovimientos === totalPageMovimientos}>Siguiente ►</Btn>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -2774,6 +2841,13 @@ export function ViewAlertasInventario({
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "warning">("success");
 
+  const [pageAlertas, setPageAlertas] = useState(1);
+  const pageSizeAlertas = 10;
+
+  useEffect(() => {
+    setPageAlertas(1);
+  }, [filterType]);
+
   const triggerToast = (msg: string, type: "success" | "warning" = "success") => {
     setFeedbackMsg(msg);
     setFeedbackType(type);
@@ -2788,6 +2862,13 @@ export function ViewAlertasInventario({
     if (filterType === "ACTIVAS") return !alert.resolved;
     return true;
   });
+
+  const totalPageAlertas = Math.max(1, Math.ceil(filteredAlerts.length / pageSizeAlertas));
+  const safePageAlertas = Math.min(pageAlertas, totalPageAlertas);
+  const paginatedAlerts = filteredAlerts.slice().slice(
+    (safePageAlertas - 1) * pageSizeAlertas,
+    safePageAlertas * pageSizeAlertas
+  );
 
   const selectedAlert = scopedAlerts.find(a => a.id === selectedAlertId) ?? filteredAlerts[0];
   const activeSelectedId = selectedAlert?.id ?? null;
@@ -2882,7 +2963,7 @@ export function ViewAlertasInventario({
                 </tr>
               </thead>
               <tbody>
-                {filteredAlerts.map(alert => {
+                {paginatedAlerts.map(alert => {
                   const camp = camps.find(c => c.id === alert.campId);
                   const inv = campInventories.find(i =>
                     String(i.campId) === String(alert.campId)
@@ -2947,6 +3028,16 @@ export function ViewAlertasInventario({
               </tbody>
             </table>
           </div>
+          {filteredAlerts.length > 0 && (
+            <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-2 pt-2 border-t border-[#67ACA9]/10 select-none">
+              <span>Registros {((safePageAlertas - 1) * pageSizeAlertas) + 1} - {Math.min(safePageAlertas * pageSizeAlertas, filteredAlerts.length)} de {filteredAlerts.length}</span>
+              <div className="flex gap-1">
+                <Btn small variant="ghost" onClick={() => setPageAlertas(p => Math.max(1, p - 1))} disabled={safePageAlertas === 1}>◄ Anterior</Btn>
+                <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{safePageAlertas} / {totalPageAlertas}</div>
+                <Btn small variant="ghost" onClick={() => setPageAlertas(p => Math.min(totalPageAlertas, p + 1))} disabled={safePageAlertas === totalPageAlertas}>Siguiente ►</Btn>
+              </div>
+            </div>
+          )}
         </div>
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-5 flex flex-col gap-4">
           <div className="text-xs font-bold text-amber-500 uppercase border-b border-[#67ACA9]/10 pb-1.5 flex justify-between items-center">
@@ -3186,6 +3277,15 @@ export function ViewSolicitudesIntercampamento({
   const [searchPersonTerm, setSearchPersonTerm] = useState("");
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [validationPopup, setValidationPopup] = useState<string | null>(null);
+  const [pageMisSolicitudes, setPageMisSolicitudes] = useState(1);
+  const pageSizeMisSolicitudes = 10;
+  const [pagePendientes, setPagePendientes] = useState(1);
+  const pageSizePendientes = 6;
+
+  useEffect(() => {
+    setPageMisSolicitudes(1);
+    setPagePendientes(1);
+  }, [activeTab]);
 
   const selectedOperPersonIds = [assignedScoutId, ...additionalPersonIds].filter(Boolean);
   const availableCamps = camps && camps.length > 1 ? camps : [
@@ -3241,6 +3341,22 @@ export function ViewSolicitudesIntercampamento({
   const pendingRequests = intercampRequests.filter(r => r.status === "PENDING");
   const selectedRequest = intercampRequests.find(r => r.id === activeReqId);
   const currentDetails = requestResourceDetails.filter(d => d.requestId === activeReqId);
+
+  const filteredMisSolicitudes = intercampRequests.filter(r => r.originCampId === currentUser.campId && r.status !== "CANCELED");
+  const totalPagesMisSolicitudes = Math.ceil(filteredMisSolicitudes.length / pageSizeMisSolicitudes) || 1;
+  const safePageMisSolicitudes = Math.min(pageMisSolicitudes, totalPagesMisSolicitudes);
+  const paginatedMisSolicitudes = filteredMisSolicitudes.slice(
+    (safePageMisSolicitudes - 1) * pageSizeMisSolicitudes,
+    safePageMisSolicitudes * pageSizeMisSolicitudes
+  );
+
+  const incomingPendingRequests = intercampRequests.filter(r => r.destinationCampId === currentUser.campId && r.status === "PENDING");
+  const totalPagesPendientes = Math.ceil(incomingPendingRequests.length / pageSizePendientes) || 1;
+  const safePagePendientes = Math.min(pagePendientes, totalPagesPendientes);
+  const paginatedPendientes = incomingPendingRequests.slice(
+    (safePagePendientes - 1) * pageSizePendientes,
+    safePagePendientes * pageSizePendientes
+  );
 
   const [resourceSearch, setResourceSearch] = useState("");
   const [localQtys, setLocalQtys] = useState<Record<string, string>>({});
@@ -3959,9 +4075,7 @@ export function ViewSolicitudesIntercampamento({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#67ACA9]/5 text-slate-300">
-                    {intercampRequests
-                      .filter(r => r.originCampId === currentUser.campId && r.status !== "CANCELED")
-                      .map(req => {
+                    {paginatedMisSolicitudes.map(req => {
                         const providerCampName = getCampDisplayName(camps, req.destinationCampId);
                         const reqDetails = requestResourceDetails.filter(d => d.requestId === req.id);
                         const numResources = reqDetails.length;
@@ -4055,7 +4169,7 @@ export function ViewSolicitudesIntercampamento({
                           </tr>
                         );
                       })}
-                    {intercampRequests.filter(r => r.originCampId === currentUser.campId && r.status !== "CANCELED").length === 0 && (
+                    {filteredMisSolicitudes.length === 0 && (
                       <tr>
                         <td colSpan={7} className="text-center py-8 text-zinc-500 italic">No ha emitido solicitudes de reabastecimiento aún.</td>
                       </tr>
@@ -4063,6 +4177,17 @@ export function ViewSolicitudesIntercampamento({
                   </tbody>
                 </table>
               </div>
+
+              {filteredMisSolicitudes.length > 0 && (
+                <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-4 pt-3 border-t border-[#67ACA9]/10 select-none">
+                  <span>Registros {((safePageMisSolicitudes - 1) * pageSizeMisSolicitudes) + 1} - {Math.min(safePageMisSolicitudes * pageSizeMisSolicitudes, filteredMisSolicitudes.length)} de {filteredMisSolicitudes.length}</span>
+                  <div className="flex gap-1">
+                    <Btn small variant="ghost" onClick={() => setPageMisSolicitudes(p => Math.max(1, p - 1))} disabled={safePageMisSolicitudes === 1}>◄ Anterior</Btn>
+                    <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{safePageMisSolicitudes} / {totalPagesMisSolicitudes}</div>
+                    <Btn small variant="ghost" onClick={() => setPageMisSolicitudes(p => Math.min(totalPagesMisSolicitudes, p + 1))} disabled={safePageMisSolicitudes === totalPagesMisSolicitudes}>Siguiente ►</Btn>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -4077,9 +4202,7 @@ export function ViewSolicitudesIntercampamento({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {intercampRequests
-                .filter(r => r.destinationCampId === currentUser.campId && r.status === "PENDING")
-                .map(req => {
+              {paginatedPendientes.map(req => {
                   const originName = getCampDisplayName(camps, req.originCampId);
                   const reqDetails = requestResourceDetails.filter(d => d.requestId === req.id);
 
@@ -4160,7 +4283,7 @@ export function ViewSolicitudesIntercampamento({
                   );
                 })}
 
-              {intercampRequests.filter(r => r.destinationCampId === currentUser.campId && r.status === "PENDING").length === 0 && (
+              {incomingPendingRequests.length === 0 && (
                 <div className="col-span-full text-center py-12 text-[#A4C2C5]/50 bg-[#080d0e]/30 border border-[#67ACA9]/10 rounded-sm">
                   <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto mb-2.5" />
                   <span className="text-xs uppercase font-bold tracking-wider">Sin Pendientes</span>
@@ -4169,6 +4292,16 @@ export function ViewSolicitudesIntercampamento({
               )}
             </div>
 
+            {incomingPendingRequests.length > 0 && (
+              <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-4 pt-3 border-t border-[#67ACA9]/10 select-none">
+                <span>Registros {((safePagePendientes - 1) * pageSizePendientes) + 1} - {Math.min(safePagePendientes * pageSizePendientes, incomingPendingRequests.length)} de {incomingPendingRequests.length}</span>
+                <div className="flex gap-1">
+                  <Btn small variant="ghost" onClick={() => setPagePendientes(p => Math.max(1, p - 1))} disabled={safePagePendientes === 1}>◄ Anterior</Btn>
+                  <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{safePagePendientes} / {totalPagesPendientes}</div>
+                  <Btn small variant="ghost" onClick={() => setPagePendientes(p => Math.min(totalPagesPendientes, p + 1))} disabled={safePagePendientes === totalPagesPendientes}>Siguiente ►</Btn>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -4597,6 +4730,12 @@ export function ViewTraslados({
   const PEOPLE = (campPersonnel && campPersonnel.length > 0) ? campPersonnel : ROSTER_PEOPLE;
   const RATION_FACTOR = 2;
   const [subFilterTab, setSubFilterTab] = useState<"por_preparar" | "solicitados" | "en_transito" | "cerrados">("por_preparar");
+  const [pageTraslados, setPageTraslados] = useState(1);
+  const pageSizeTraslados = 10;
+
+  useEffect(() => {
+    setPageTraslados(1);
+  }, [subFilterTab]);
 
   const displayedTransfers = transfers.filter(t => {
     const req = intercampRequests.find(r => r.id === t.requestId);
@@ -4616,6 +4755,12 @@ export function ViewTraslados({
     }
     return true;
   });
+  const totalPageTraslados = Math.ceil(displayedTransfers.length / pageSizeTraslados) || 1;
+  const safePageTraslados = Math.min(pageTraslados, totalPageTraslados);
+  const paginatedTransfers = displayedTransfers.slice(
+    (safePageTraslados - 1) * pageSizeTraslados,
+    safePageTraslados * pageSizeTraslados
+  );
   const [toastMsg, setToastMsg] = useState("");
   const [showToast, setShowToast] = useState(false);
   const [editingTransferId, setEditingTransferId] = useState<string | null>(null);
@@ -4814,7 +4959,7 @@ export function ViewTraslados({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#67ACA9]/5 text-slate-300 font-mono">
-                {displayedTransfers.map(t => {
+                {paginatedTransfers.map(t => {
                   const req = intercampRequests.find(r => r.id === t.requestId);
                   const originCampName = getCampDisplayName(camps, req?.originCampId);
                   const destinationCampName = getCampDisplayName(camps, req?.destinationCampId);
@@ -4883,6 +5028,17 @@ export function ViewTraslados({
               </tbody>
             </table>
           </div>
+
+          {displayedTransfers.length > 0 && (
+            <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-4 pt-3 border-t border-[#67ACA9]/10 select-none">
+              <span>Registros {((safePageTraslados - 1) * pageSizeTraslados) + 1} - {Math.min(safePageTraslados * pageSizeTraslados, displayedTransfers.length)} de {displayedTransfers.length}</span>
+              <div className="flex gap-1">
+                <Btn small variant="ghost" onClick={() => setPageTraslados(p => Math.max(1, p - 1))} disabled={safePageTraslados === 1}>◄ Anterior</Btn>
+                <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{safePageTraslados} / {totalPageTraslados}</div>
+                <Btn small variant="ghost" onClick={() => setPageTraslados(p => Math.min(totalPageTraslados, p + 1))} disabled={safePageTraslados === totalPageTraslados}>Siguiente ►</Btn>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       {editingTransferId && (
@@ -6539,7 +6695,7 @@ export function ViewHistorialDeTraslado({
               </table>
             </div>
 
-            {filteredUnifiedItems.length > historyPageSize && (
+            {filteredUnifiedItems.length > 0 && (
               <div className="flex items-center justify-between gap-3 border-t border-[#67ACA9]/10 pt-3 mt-3">
                 <span className="text-[9.5px] text-[#A4C2C5]/55 uppercase font-mono">
                   Mostrando {((safeHistoryPage - 1) * historyPageSize) + 1}-{Math.min(safeHistoryPage * historyPageSize, filteredUnifiedItems.length)} de {filteredUnifiedItems.length}

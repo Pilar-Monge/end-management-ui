@@ -68,6 +68,12 @@ export async function fetchCurrentUserProfile(): Promise<CurrentUserProfile> {
   return payload.data
 }
 
+export async function fetchWorkerServerTime(): Promise<{ serverTime: string }> {
+  return requestJson<{ serverTime: string }>(`/system/time`, {
+    method: 'GET',
+  })
+}
+
 export async function fetchWorkerNotifications(params: {
   targetRole?: string
   type?: string
