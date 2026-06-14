@@ -1,5 +1,4 @@
 import { apiRequest } from "../../../shared/services/httpClient";
-import { readCachedSessionUser } from "../../../shared/services/sessionProfile";
 import type {
   Camp,
   ResourceType,
@@ -22,11 +21,6 @@ import type {
 } from "../types/resourceManagementTypes";
 
 type UnknownRecord = Record<string, unknown>;
-
-function isCurrentUserAdmin(): boolean {
-  const user = readCachedSessionUser();
-  return user?.role === "SYSTEM_ADMIN";
-}
 
 function asRecord(value: unknown): UnknownRecord {
   return value && typeof value === "object" ? (value as UnknownRecord) : {};
@@ -130,7 +124,7 @@ function readCurrentUserId(): number {
       const parsed = JSON.parse(raw) as { userId?: unknown; id?: unknown };
       const id = Number(parsed.userId ?? parsed.id);
       if (Number.isFinite(id) && id > 0) return id;
-    } catch {}
+    } catch { }
   }
 
   return 3;
@@ -246,53 +240,19 @@ function toApiNotification(data: Omit<OperationalNotification, "id">) {
   return payload;
 }
 
-let accessibleTransfersPromise: Promise<Transfer[]> | null = null;
-let lastCacheTime = 0;
-
-function invalidateTransfersCache() {
-  accessibleTransfersPromise = null;
-  lastCacheTime = 0;
-}
-
 async function listAccessibleTransfers(): Promise<Transfer[]> {
-  const now = Date.now();
-  if (accessibleTransfersPromise && (now - lastCacheTime < 1000)) {
-    return accessibleTransfersPromise;
-  }
+  const requestsPayload = await apiRequest<unknown>("/intercamp-requests?page=1&limit=100");
+  const requests = listFromPayload(requestsPayload, item => ({ id: str(item.id) })).filter(request => request.id);
 
-  lastCacheTime = now;
-  accessibleTransfersPromise = (async () => {
-    try {
-      const requestsPayload = await apiRequest<unknown>("/intercamp-requests");
-      const requests = listFromPayload(requestsPayload, mapIntercampRequest);
-      
-      const currentUser = readCachedSessionUser();
-      const activeCampId = currentUser?.campId;
+  const batches = await Promise.allSettled(
+    requests.map(request => apiRequest<unknown>(`/transfers?requestId=${encodeURIComponent(request.id)}&page=1&limit=100`)),
+  );
 
-      const filteredRequests = requests.filter(request => {
-        if (!request.id) return false;
-        return activeCampId === undefined || 
-               String(request.originCampId) === String(activeCampId) || 
-               String(request.destinationCampId) === String(activeCampId);
-      });
-
-      const batches = await Promise.allSettled(
-        filteredRequests.map(request => apiRequest<unknown>(`/transfers?requestId=${encodeURIComponent(request.id)}`)),
-      );
-
-      return batches.flatMap(result => (
-        result.status === "fulfilled"
-          ? listFromPayload(result.value, mapTransfer)
-          : []
-      ));
-    } catch (err) {
-      accessibleTransfersPromise = null;
-      lastCacheTime = 0;
-      throw err;
-    }
-  })();
-
-  return accessibleTransfersPromise;
+  return batches.flatMap(result => (
+    result.status === "fulfilled"
+      ? listFromPayload(result.value, mapTransfer)
+      : []
+  ));
 }
 
 export function toApiCampInventory(data: CampInventory) {
@@ -484,12 +444,11 @@ export const resourceApi = {
   }),
 
   listIntercampRequests: async (): Promise<IntercampRequest[]> => {
-    const payload = await apiRequest<unknown>("/intercamp-requests");
+    const payload = await apiRequest<unknown>("/intercamp-requests?page=1&limit=100");
     return listFromPayload(payload, mapIntercampRequest);
   },
 
   createIntercampRequest: async (data: Omit<IntercampRequest, "id">): Promise<IntercampRequest | null> => {
-    invalidateTransfersCache();
     const payload = await apiRequest<unknown>("/intercamp-requests", {
       method: "POST",
       body: JSON.stringify(toApiIntercampRequest(data)),
@@ -499,9 +458,8 @@ export const resourceApi = {
     return dataRecord.id !== undefined ? mapIntercampRequest(dataRecord) : null;
   },
 
-  updateIntercampRequestStatus: (id: string, requestStatus: IntercampRequest["status"], respondedBy: string, transportPersonIds?: string[]) => {
-    invalidateTransfersCache();
-    return apiRequest<unknown>(`/intercamp-requests/${id}`, {
+  updateIntercampRequestStatus: (id: string, requestStatus: IntercampRequest["status"], respondedBy: string, transportPersonIds?: string[]) =>
+    apiRequest<unknown>(`/intercamp-requests/${id}`, {
       method: "PUT",
       body: JSON.stringify({
         status: requestStatus,
@@ -511,8 +469,7 @@ export const resourceApi = {
           ? { transportPersonIds: transportPersonIds.map(numericId).filter(idValue => idValue > 0) }
           : {}),
       }),
-    });
-  },
+    }),
 
   submitIntercampRequest: (id: string) =>
     apiRequest<unknown>(`/intercamp-requests/${id}/submit`, {
@@ -579,37 +536,28 @@ export const resourceApi = {
   deleteRequestResourceDetail: (id: string) => apiRequest<void>(`/request-resource-details/${id}`, { method: "DELETE" }),
 
   listTransfers: async (): Promise<Transfer[]> => {
-    if (!isCurrentUserAdmin()) {
-      return listAccessibleTransfers();
-    }
     try {
-      const payload = await apiRequest<unknown>("/transfers");
+      const payload = await apiRequest<unknown>("/transfers?page=1&limit=100");
       return listFromPayload(payload, mapTransfer);
     } catch {
       return listAccessibleTransfers();
     }
   },
 
-  updateTransferTransportStaff: (id: string, transportPersonIds: string[]) => {
-    invalidateTransfersCache();
-    return apiRequest<unknown>(`/transfers/${id}/transport-staff`, {
+  updateTransferTransportStaff: (id: string, transportPersonIds: string[]) =>
+    apiRequest<unknown>(`/transfers/${id}/transport-staff`, {
       method: "PUT",
       body: JSON.stringify({
         transportPersonIds: transportPersonIds.map(numericId).filter(idValue => idValue > 0),
       }),
-    });
-  },
+    }),
 
-  createTransfer: (data: Omit<Transfer, "id">) => {
-    invalidateTransfersCache();
-    return apiRequest<unknown>("/transfers", {
-      method: "POST",
-      body: JSON.stringify(toApiTransfer(data)),
-    });
-  },
+  createTransfer: (data: Omit<Transfer, "id">) => apiRequest<unknown>("/transfers", {
+    method: "POST",
+    body: JSON.stringify(toApiTransfer(data)),
+  }),
 
   updateTransfer: (id: string, data: Partial<Transfer> & { notes?: string }) => {
-    invalidateTransfersCache();
     const actorId = readCurrentUserId();
     const payload: Record<string, unknown> = {
       ...data,
@@ -637,25 +585,13 @@ export const resourceApi = {
   },
 
   listTransferPersons: async (): Promise<TransferPerson[]> => {
-    if (!isCurrentUserAdmin()) {
-      const transfers = await listAccessibleTransfers();
-      const batches = await Promise.allSettled(
-        transfers.map(transfer => apiRequest<unknown>(`/transfer-persons?transferId=${encodeURIComponent(transfer.id)}`)),
-      );
-
-      return batches.flatMap(result => (
-        result.status === "fulfilled"
-          ? listFromPayload(result.value, mapTransferPerson)
-          : []
-      ));
-    }
     try {
-      const payload = await apiRequest<unknown>("/transfer-persons");
+      const payload = await apiRequest<unknown>("/transfer-persons?page=1&limit=100");
       return listFromPayload(payload, mapTransferPerson);
     } catch {
       const transfers = await listAccessibleTransfers();
       const batches = await Promise.allSettled(
-        transfers.map(transfer => apiRequest<unknown>(`/transfer-persons?transferId=${encodeURIComponent(transfer.id)}`)),
+        transfers.map(transfer => apiRequest<unknown>(`/transfer-persons?transferId=${encodeURIComponent(transfer.id)}&page=1&limit=100`)),
       );
 
       return batches.flatMap(result => (
@@ -666,21 +602,15 @@ export const resourceApi = {
     }
   },
 
-  createTransferPerson: (transferId: string, personId: string) => {
-    invalidateTransfersCache();
-    return apiRequest<unknown>("/transfer-persons", {
-      method: "POST",
-      body: JSON.stringify({ transferId: numericId(transferId), personId: numericId(personId) || personId, status: "CONFIRMED" }),
-    });
-  },
+  createTransferPerson: (transferId: string, personId: string) => apiRequest<unknown>("/transfer-persons", {
+    method: "POST",
+    body: JSON.stringify({ transferId: numericId(transferId), personId: numericId(personId) || personId, status: "CONFIRMED" }),
+  }),
 
-  updateTransferPerson: (id: string, data: Partial<TransferPerson>) => {
-    invalidateTransfersCache();
-    return apiRequest<unknown>(`/transfer-persons/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    });
-  },
+  updateTransferPerson: (id: string, data: Partial<TransferPerson>) => apiRequest<unknown>(`/transfer-persons/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  }),
 
   listTransferHistory: async (): Promise<TransferHistory[]> => {
     const mapHistory = (item: UnknownRecord): TransferHistory => ({
@@ -693,25 +623,13 @@ export const resourceApi = {
       comment: item.comment === undefined ? undefined : str(item.comment),
     });
 
-    if (!isCurrentUserAdmin()) {
-      const transfers = await listAccessibleTransfers();
-      const batches = await Promise.allSettled(
-        transfers.map(transfer => apiRequest<unknown>(`/transfer-history?transferId=${encodeURIComponent(transfer.id)}`)),
-      );
-
-      return batches.flatMap(result => (
-        result.status === "fulfilled"
-          ? listFromPayload(result.value, mapHistory)
-          : []
-      ));
-    }
     try {
-      const payload = await apiRequest<unknown>("/transfer-history");
+      const payload = await apiRequest<unknown>("/transfer-history?page=1&limit=100");
       return listFromPayload(payload, mapHistory);
     } catch {
       const transfers = await listAccessibleTransfers();
       const batches = await Promise.allSettled(
-        transfers.map(transfer => apiRequest<unknown>(`/transfer-history?transferId=${encodeURIComponent(transfer.id)}`)),
+        transfers.map(transfer => apiRequest<unknown>(`/transfer-history?transferId=${encodeURIComponent(transfer.id)}&page=1&limit=100`)),
       );
 
       return batches.flatMap(result => (
@@ -722,34 +640,19 @@ export const resourceApi = {
     }
   },
 
-  createTransferHistory: (data: Omit<TransferHistory, "id">) => {
-    invalidateTransfersCache();
-    return apiRequest<unknown>("/transfer-history", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  },
+  createTransferHistory: (data: Omit<TransferHistory, "id">) => apiRequest<unknown>("/transfer-history", {
+    method: "POST",
+    body: JSON.stringify(data),
+  }),
 
   listDeliveredTransferResources: async (): Promise<DeliveredTransferResource[]> => {
-    if (!isCurrentUserAdmin()) {
-      const transfers = await listAccessibleTransfers();
-      const batches = await Promise.allSettled(
-        transfers.map(transfer => apiRequest<unknown>(`/delivered-transfer-resources?transferId=${encodeURIComponent(transfer.id)}`)),
-      );
-
-      return batches.flatMap(result => (
-        result.status === "fulfilled"
-          ? listFromPayload(result.value, mapDeliveredTransferResource)
-          : []
-      ));
-    }
     try {
-      const payload = await apiRequest<unknown>("/delivered-transfer-resources");
+      const payload = await apiRequest<unknown>("/delivered-transfer-resources?page=1&limit=100");
       return listFromPayload(payload, mapDeliveredTransferResource);
     } catch {
       const transfers = await listAccessibleTransfers();
       const batches = await Promise.allSettled(
-        transfers.map(transfer => apiRequest<unknown>(`/delivered-transfer-resources?transferId=${encodeURIComponent(transfer.id)}`)),
+        transfers.map(transfer => apiRequest<unknown>(`/delivered-transfer-resources?transferId=${encodeURIComponent(transfer.id)}&page=1&limit=100`)),
       );
 
       return batches.flatMap(result => (
@@ -761,9 +664,6 @@ export const resourceApi = {
   },
 
   listPeople: async (): Promise<CampPerson[]> => {
-    if (!isCurrentUserAdmin()) {
-      return [];
-    }
     const payload = await apiRequest<unknown>("/person?page=1&limit=100");
     return listFromPayload(payload, item => ({
       id: str(item.id ?? item.personId),
@@ -782,7 +682,6 @@ export const resourceApi = {
 
 
   getPersonById: async (id: string): Promise<CampPerson | null> => {
-    if (!isCurrentUserAdmin()) return null;
     try {
       const payload = await apiRequest<unknown>(`/person/${encodeURIComponent(id)}`);
       const raw = (payload && typeof payload === "object" && "data" in (payload as Record<string, unknown>))
@@ -791,35 +690,32 @@ export const resourceApi = {
       if (!raw) return null;
       const item = raw;
       return {
-      id: str(item.id ?? item.personId),
-      name: str(item.name ?? item.fullName ?? item.username ?? `Persona ${item.id ?? ""}`),
-      campId: str(item.campId ?? childId(item, "camp")),
-      status: normalizePersonStatus(item.currentStatus ?? item.status ?? item.current_status),
-      occupationId: str(item.occupationId ?? childId(item, "occupation")),
-      role: str(
-        item.occupationName ??
-        item.occupation_name ??
-        (item.occupation && typeof item.occupation === "object" ? (item.occupation as Record<string, unknown>).name : undefined) ??
-        ""
-      ),
+        id: str(item.id ?? item.personId),
+        name: str(item.name ?? item.fullName ?? item.username ?? `Persona ${item.id ?? ""}`),
+        campId: str(item.campId ?? childId(item, "camp")),
+        status: normalizePersonStatus(item.currentStatus ?? item.status ?? item.current_status),
+        occupationId: str(item.occupationId ?? childId(item, "occupation")),
+        role: str(
+          item.occupationName ??
+          item.occupation_name ??
+          (item.occupation && typeof item.occupation === "object" ? (item.occupation as Record<string, unknown>).name : undefined) ??
+          ""
+        ),
       };
     } catch {
       return null;
     }
   },
 
-    createDeliveredTransferResource: (data: Omit<DeliveredTransferResource, "id">) => {
-    invalidateTransfersCache();
-    return apiRequest<unknown>("/delivered-transfer-resources", {
-      method: "POST",
-      body: JSON.stringify({
-        ...data,
-        transferId: numericId(data.transferId),
-        resourceTypeId: numericId(data.resourceTypeId),
-        recordedBy: numericId(data.recordedBy) || readCurrentUserId(),
-      }),
-    });
-  },
+  createDeliveredTransferResource: (data: Omit<DeliveredTransferResource, "id">) => apiRequest<unknown>("/delivered-transfer-resources", {
+    method: "POST",
+    body: JSON.stringify({
+      ...data,
+      transferId: numericId(data.transferId),
+      resourceTypeId: numericId(data.resourceTypeId),
+      recordedBy: numericId(data.recordedBy) || readCurrentUserId(),
+    }),
+  }),
 
   listExpeditionResources: async (): Promise<ExpeditionResource[]> => {
     const payload = await apiRequest<unknown>("/expedition-resources?page=1&limit=100");
@@ -841,10 +737,7 @@ export const resourceApi = {
   }),
 
   listOccupationCoverage: async (): Promise<OccupationCoverage[]> => {
-    if (!isCurrentUserAdmin()) {
-      return [];
-    }
-    const payload = await apiRequest<unknown>("/occupation-coverage");
+    const payload = await apiRequest<unknown>("/occupation-coverage?page=1&limit=100");
     return listFromPayload(payload, item => ({
       campId: str(item.campId),
       occupationId: str(item.occupationId),
@@ -860,7 +753,7 @@ export const resourceApi = {
 
   createNotification: async (data: Omit<OperationalNotification, "id">): Promise<OperationalNotification> => {
     const payload = await apiRequest<unknown>("/notifications", {
-    method: "POST",
+      method: "POST",
       body: JSON.stringify(toApiNotification(data)),
     });
     return mapNotification(asRecord(payload));

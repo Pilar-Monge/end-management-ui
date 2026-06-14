@@ -1,8 +1,8 @@
 
 import "./resource-control-panel.css";
-import { memo, useEffect, useRef, useState, type ReactNode } from "react";
+import { memo, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { checkCurrentSessionStatus, clearCachedSession, logoutCurrentSession } from "../../../shared/services/sessionProfile";
+import { logoutCurrentSession } from "../../../shared/services/sessionProfile";
 import type {
   Camp,
   ResourceType,
@@ -92,8 +92,6 @@ const NAVIGATION_DATA = [
   }
 ];
 
-const LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS = 60 * 1000;
-
 interface ResourceControlPanelPageProps {
   onExit?: () => void;
 }
@@ -112,10 +110,10 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   const [hasPeoplePermission, setHasPeoplePermission] = useState(true);
   const [hasCoveragePermission, setHasCoveragePermission] = useState(true);
 
-  
+
   const [camps, setCamps] = useState<Camp[]>(INITIAL_CAMPS);
 
-  
+
   const [globalTimeState, setGlobalTimeState] = useState<{
     baseServerTime: Date;
     syncedAtClientMs: number;
@@ -127,54 +125,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     lastSyncAt: new Date(),
     status: 'syncing',
   });
-  const globalTimeStateRef = useRef(globalTimeState);
-  const lastSyncedGlobalTimeRef = useRef<{
-    baseServerTime: Date;
-    syncedAtClientMs: number;
-  } | null>(null);
-
-  useEffect(() => {
-    globalTimeStateRef.current = globalTimeState;
-    if (globalTimeState.status === 'synced') {
-      lastSyncedGlobalTimeRef.current = {
-        baseServerTime: globalTimeState.baseServerTime,
-        syncedAtClientMs: globalTimeState.syncedAtClientMs,
-      };
-    }
-  }, [globalTimeState]);
-
-  const redirectExpiredLogicalSession = () => {
-    clearCachedSession(true);
-    navigate('/main-homepage', {
-      replace: true,
-      state: {
-        initialAppState: 'login',
-        sessionMessage: 'Sesion expirada por avance del tiempo logico. Inicia sesion para continuar.',
-      },
-    });
-  };
-
-  const validateSessionAfterLogicalTimeJump = async (nextServerTime: Date): Promise<boolean> => {
-    const previous = lastSyncedGlobalTimeRef.current;
-    if (!previous) {
-      return false;
-    }
-
-    const expectedServerTimeMs = previous.baseServerTime.getTime() + Math.max(0, Date.now() - previous.syncedAtClientMs);
-    const forwardJumpMs = nextServerTime.getTime() - expectedServerTimeMs;
-
-    if (forwardJumpMs <= LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS) {
-      return false;
-    }
-
-    const status = await checkCurrentSessionStatus();
-    if (status !== 'expired') {
-      return false;
-    }
-
-    redirectExpiredLogicalSession();
-    return true;
-  };
 
   const syncGlobalTime = async () => {
     setGlobalTimeState(prev => ({ ...prev, status: 'syncing' }));
@@ -185,9 +135,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
       if (Number.isNaN(parsed.getTime())) {
         throw new Error('Invalid server time');
       }
-
-      const sessionExpired = await validateSessionAfterLogicalTimeJump(parsed);
-      if (sessionExpired) return;
 
       setGlobalTimeState({
         baseServerTime: parsed,
@@ -210,7 +157,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
 
     const syncInterval = setInterval(() => {
       syncGlobalTime();
-    }, 10000);
+    }, 60000);
 
     return () => clearInterval(syncInterval);
   }, []);
@@ -324,10 +271,10 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
         else if (type === "people") setPeople(val);
       } else {
         console.warn(`Could not load dataset ${type} from backend. Keeping current data.`, result.reason);
-        const isForbiddenOrNotFound = 
-          result.reason instanceof ApiHttpError && 
+        const isForbiddenOrNotFound =
+          result.reason instanceof ApiHttpError &&
           (result.reason.statusCode === 403 || result.reason.statusCode === 404);
-        
+
         if (type === "people" && isForbiddenOrNotFound) {
           setHasPeoplePermission(false);
         } else if (type === "occupationCoverage" && isForbiddenOrNotFound) {
@@ -342,7 +289,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   };
 
   const enrichPeopleFromTransfers = async (currentPeople: CampPerson[], currentTransferPersons: TransferPerson[]) => {
-    if (!hasPeoplePermission) return;
     const knownIds = new Set(currentPeople.map(p => String(p.id)));
     const unknownIds = [...new Set(
       currentTransferPersons
@@ -419,7 +365,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
     setActiveSub(sub);
   };
 
-  
+
 
   const handleUpdateInventory = async (campId: string, resourceTypeId: string, currentAmount: number, minimumAlertAmount: number) => {
     try {
@@ -450,7 +396,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
           resolved: false
         };
         setInventoryAlerts(prev => [...prev, newAlert]);
-        
+
 
         const newNot: OperationalNotification = {
           id: `not-${Date.now().toString().slice(-4)}`,
@@ -823,7 +769,6 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
             onMarkAsRead={handleMarkAsRead}
             onUpdateInventory={handleUpdateInventory}
             onNavigateToSub={handleInnerNavigation}
-            globalTimeState={globalTimeState}
           />
         );
       case "Inventario actual":
@@ -1016,7 +961,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
         variant={requestPopupVariant}
       />
 
-      
+
       <LoadingScreen
         show={showLoading}
         isLoaded={isLoaded}
@@ -1024,16 +969,16 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
         onBack={onExit}
       />
 
-      
+
       {hasEntered && (
-        <TopHud 
-          onLogout={handleLogout} 
-          onVolver={() => onExit?.()} 
+        <TopHud
+          onLogout={handleLogout}
+          onVolver={() => onExit?.()}
           globalTimeState={globalTimeState}
         />
       )}
 
-      
+
       {hasEntered && (
         <div className="main-area">
           {activeNavData ? (
@@ -1045,7 +990,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
                   <div className="watermark-x" role="presentation" />
                   <div className="inner-layout">
                     <aside className="inner-sidebar pt-4">
-                      
+
                       <SideMenu
                         items={activeNavData.subOptions}
                         activeItem={activeSub}
@@ -1061,7 +1006,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
               </section>
             </div>
           ) : (
-            
+
             <div className="content-scroll">
               <SectionTitle title="Mapa Operativo de Suministros" />
               <section aria-label="Mapa de distribución de red" className="settings-shell h-full w-full">
@@ -1085,7 +1030,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
         </div>
       )}
 
-      
+
       {hasEntered && (
         <>
           <BottomDock activeDock={activeNav || "mapa"} onSelect={handleNavClick} />
@@ -1143,12 +1088,12 @@ function getStoredHudUser() {
   }
 }
 
-const TopHud = memo(function TopHud({ 
-  onLogout, 
+const TopHud = memo(function TopHud({
+  onLogout,
   onVolver,
   globalTimeState
-}: { 
-  onLogout: () => void; 
+}: {
+  onLogout: () => void;
   onVolver: () => void;
   globalTimeState: {
     baseServerTime: Date;
@@ -1182,7 +1127,7 @@ const TopHud = memo(function TopHud({
           </span>
         </button>
 
-        
+
         <div className="pointer-events-auto flex items-center gap-2 bg-[#0d1414]/90 border border-[#67ACA9]/25 px-2.5 py-1.5 rounded-sm text-[10px] font-black uppercase tracking-[-0.02em] text-white shadow-md shrink-0">
           <div className="inline-flex items-center shrink-0">
             {globalTimeState.status === "synced" && (
@@ -1370,7 +1315,7 @@ function TruckIcon() {
 function SquadIcon() {
   return (
     <IconSvg>
-      
+
       <circle cx="16" cy="11" r="4" />
       <path d="M7 28v-2a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v2" />
       <circle cx="7" cy="15" r="3" />
