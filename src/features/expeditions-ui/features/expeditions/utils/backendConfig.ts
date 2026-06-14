@@ -57,7 +57,7 @@ export function getFallbackActiveCamp(campId = 1): ActiveCampSession {
   return CAMP_COORDINATES[campId] ?? CAMP_COORDINATES[1]!;
 }
 
-export async function getActiveCamp(): Promise<ActiveCampSession> {
+export async function getActiveCamp(fallbackCampId = 1): Promise<ActiveCampSession> {
   try {
     const user = await getCurrentExpeditionUser();
     const camp = await getCamp(user.campId);
@@ -70,6 +70,6 @@ export async function getActiveCamp(): Promise<ActiveCampSession> {
     };
   } catch (error) {
     console.warn("No se pudo resolver campamento activo desde backend:", error);
-    return getFallbackActiveCamp();
+    return getFallbackActiveCamp(fallbackCampId);
   }
 }
