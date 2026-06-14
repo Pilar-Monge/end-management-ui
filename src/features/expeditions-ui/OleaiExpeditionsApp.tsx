@@ -1,4 +1,5 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { Clock, Bell } from "lucide-react";
 import { LoadingScreen } from "./components/LoadingScreen";
 
@@ -18,7 +19,9 @@ import {
   listExpeditionNotifications,
   markNotificationRead,
 } from "./services/expeditionsUi.service";
-import { logoutCurrentSession } from "../../shared/services/sessionProfile";
+import { checkCurrentSessionStatus, clearCachedSession, logoutCurrentSession } from "../../shared/services/sessionProfile";
+
+const LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS = 60 * 1000;
 
 function Placeholder({ section, sub }: { section: string; sub: string }) {
   return (
@@ -301,16 +304,57 @@ function TopHud({
   onProfileClick: () => void;
   onLogout: () => void;
 }) {
+  const navigate = useNavigate();
   const [timeString, setTimeString] = useState("Sin sincronizar");
+  const serverBaseRef = useRef<Date | null>(null);
+  const clientBaseRef = useRef(Date.now());
+  const lastSyncedGlobalTimeRef = useRef<{
+    baseServerTime: Date;
+    syncedAtClientMs: number;
+  } | null>(null);
+
+  const redirectExpiredLogicalSession = useCallback(() => {
+    clearCachedSession(true);
+    navigate("/main-homepage", {
+      replace: true,
+      state: {
+        initialAppState: "login",
+        sessionMessage: "Sesion expirada por avance del tiempo logico. Inicia sesion para continuar.",
+      },
+    });
+  }, [navigate]);
+
+  const validateSessionAfterLogicalTimeJump = useCallback(
+    async (nextServerTime: Date): Promise<boolean> => {
+      const previous = lastSyncedGlobalTimeRef.current;
+      if (!previous) return false;
+
+      const expectedServerTimeMs =
+        previous.baseServerTime.getTime() + Math.max(0, Date.now() - previous.syncedAtClientMs);
+      const forwardJumpMs = nextServerTime.getTime() - expectedServerTimeMs;
+
+      if (forwardJumpMs <= LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS) {
+        return false;
+      }
+
+      const status = await checkCurrentSessionStatus();
+      if (status !== "expired") {
+        return false;
+      }
+
+      redirectExpiredLogicalSession();
+      return true;
+    },
+    [redirectExpiredLogicalSession],
+  );
 
   useEffect(() => {
     let cancelled = false;
-    let serverBase: Date | null = null;
-    let clientBase = Date.now();
 
     const updateTime = () => {
+      const serverBase = serverBaseRef.current;
       if (!serverBase) return;
-      const now = new Date(serverBase.getTime() + (Date.now() - clientBase));
+      const now = new Date(serverBase.getTime() + Math.max(0, Date.now() - clientBaseRef.current));
       const yyyy = now.getUTCFullYear();
       const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
       const dd = String(now.getUTCDate()).padStart(2, "0");
@@ -324,8 +368,16 @@ function TopHud({
       try {
         const syncedTime = new Date(await getServerTime());
         if (Number.isNaN(syncedTime.getTime())) return;
-        serverBase = syncedTime;
-        clientBase = Date.now();
+
+        const sessionExpired = await validateSessionAfterLogicalTimeJump(syncedTime);
+        if (sessionExpired || cancelled) return;
+
+        serverBaseRef.current = syncedTime;
+        clientBaseRef.current = Date.now();
+        lastSyncedGlobalTimeRef.current = {
+          baseServerTime: syncedTime,
+          syncedAtClientMs: clientBaseRef.current,
+        };
         if (!cancelled) updateTime();
       } catch (error) {
         console.warn("Server time unavailable:", error);
@@ -334,13 +386,13 @@ function TopHud({
 
     syncServerTime();
     const clockInterval = window.setInterval(updateTime, 1000);
-    const syncInterval = window.setInterval(syncServerTime, 60_000);
+    const syncInterval = window.setInterval(syncServerTime, 10_000);
     return () => {
       cancelled = true;
       window.clearInterval(clockInterval);
       window.clearInterval(syncInterval);
     };
-  }, []);
+  }, [validateSessionAfterLogicalTimeJump]);
 
   const getInitials = (name: string) => {
     return (name || "")
