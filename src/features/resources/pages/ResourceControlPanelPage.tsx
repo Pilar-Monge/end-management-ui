@@ -342,6 +342,7 @@ export default function ResourceControlPanelPage({ onExit }: ResourceControlPane
   };
 
   const enrichPeopleFromTransfers = async (currentPeople: CampPerson[], currentTransferPersons: TransferPerson[]) => {
+    if (!hasPeoplePermission) return;
     const knownIds = new Set(currentPeople.map(p => String(p.id)));
     const unknownIds = [...new Set(
       currentTransferPersons
