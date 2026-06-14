@@ -1,7 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import * as L from "leaflet";
 import {
   Area,
   AreaChart,
@@ -55,7 +54,6 @@ import { getErrorMessage } from "../../../shared/services/errorMessages";
 import { PopupMessage } from "../../../shared/components/PopupMessage";
 import "../../expeditions-ui/expeditionsUi.css";
 import "../expeditions/expeditions-panel.css";
-import "leaflet/dist/leaflet.css";
 import "./admin-dashboard.css";
 
 type AdminSectionId =
@@ -2156,7 +2154,7 @@ function ContentArea({
 
       {section === "intercamp" && (
         <div className="admin-ui-v2-intercamp-console">
-          <AdminIntercampLeafletMap camps={campCatalog} requests={intercampRequests} transfers={transfers} />
+          <AdminIntercampWorldMap camps={campCatalog} requests={intercampRequests} transfers={transfers} />
           <div className="admin-ui-v2-module-card admin-ui-v2-module-banner">
             <div>
               <span className="admin-ui-v2-command-kicker">Cobertura intercampamento</span>
@@ -4823,45 +4821,6 @@ function validCampPoint(camp: Camp | undefined): camp is Camp & { location: { la
   );
 }
 
-function createAdminLeafletMap(container: HTMLDivElement): L.Map {
-  const map = L.map(container, {
-    zoomControl: true,
-    attributionControl: false,
-    scrollWheelZoom: false,
-  });
-
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-    maxZoom: 18,
-  }).addTo(map);
-
-  return map;
-}
-
-function escapeMapHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function createMapMarker(label: string, tone: "base" | "ok" | "warn" | "danger" | "info") {
-  return L.divIcon({
-    className: "admin-ui-v2-leaflet-marker-wrap",
-    html: `<span class="admin-ui-v2-leaflet-marker is-${tone}"><i></i><strong>${escapeMapHtml(label)}</strong></span>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
-  });
-}
-
-function expeditionRouteTone(status: UiExpedition["status"]): { status: string; color: string; className: string } {
-  if (status === "COMPLETADA") return { status: "COMPLETADA", color: "#48c58f", className: "admin-ui-v2-leaflet-route is-completed" };
-  if (status === "REGRESANDO") return { status: "REGRESANDO", color: "#efc16e", className: "admin-ui-v2-leaflet-route is-returning" };
-  if (status === "PROGRAMADA") return { status: "PROGRAMADA", color: "#69bfb7", className: "admin-ui-v2-leaflet-route is-planned" };
-  return { status: "EN CURSO", color: "#69bfb7", className: "admin-ui-v2-leaflet-route is-active" };
-}
-
 function routePointsFromExpedition(expedition: UiExpedition, camps: Camp[]): Array<{ latitude: number; longitude: number; label: string }> {
   if (expedition.routePoints.length >= 2) {
     return expedition.routePoints.map((point, index) => ({
@@ -4895,7 +4854,7 @@ function routePointsFromExpedition(expedition: UiExpedition, camps: Camp[]): Arr
   ];
 }
 
-function AdminExpeditionsLeafletMap({
+function AdminExpeditionsWorldMap({
   camps,
   expeditions,
   selectedExpeditionId,
@@ -4906,9 +4865,6 @@ function AdminExpeditionsLeafletMap({
   selectedExpeditionId: number | null;
   onSelectExpedition: (id: number) => void;
 }) {
-  const mapRef = useRef<L.Map | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
   const routes = useMemo(() => expeditions.map((expedition) => ({
     expedition,
     points: routePointsFromExpedition(expedition, camps),
@@ -4916,50 +4872,61 @@ function AdminExpeditionsLeafletMap({
   const validRoutes = routes.filter((route) => route.points.length >= 2);
   const missingRoutes = routes.filter((route) => route.points.length < 2);
 
-  useEffect(() => {
-    if (!containerRef.current) return;
-    if (!mapRef.current) mapRef.current = createAdminLeafletMap(containerRef.current);
-    const map = mapRef.current;
-    const layer = L.layerGroup().addTo(map);
-    const bounds = L.latLngBounds([]);
+  const campDots = useMemo(() => {
+    return camps
+      .filter(validCampPoint)
+      .map((camp) => ({
+        start: { lat: camp.location.latitude, lng: camp.location.longitude, label: camp.name, id: `camp-${camp.id}` },
+        end: { lat: camp.location.latitude, lng: camp.location.longitude, label: camp.name, id: `camp-${camp.id}` },
+        isBase: true,
+        type: "camp" as const,
+      }));
+  }, [camps]);
 
-    camps.filter(validCampPoint).forEach((camp) => {
-      const latLng: L.LatLngExpression = [camp.location.latitude, camp.location.longitude];
-      bounds.extend(latLng);
-      L.marker(latLng, { icon: createMapMarker(camp.name.slice(0, 10).toUpperCase(), "base") })
-        .bindTooltip(`<strong>${escapeMapHtml(camp.name)}</strong><br/>${camp.currentPopulation}/${camp.capacity} personas`, { sticky: true })
-        .addTo(layer);
+  const expeditionDots = useMemo(() => {
+    return validRoutes.map(({ expedition, points }) => {
+      let mapStatus = "IN_PROGRESS";
+      if (expedition.status === "COMPLETADA") mapStatus = "COMPLETED";
+      else if (expedition.status === "REGRESANDO") mapStatus = "DELAYED";
+      else if (expedition.status === "PROGRAMADA") mapStatus = "PLANNED";
+
+      return {
+        start: {
+          lat: points[0].latitude,
+          lng: points[0].longitude,
+          label: points[0].label,
+          id: expedition.id,
+        },
+        end: {
+          lat: points[points.length - 1].latitude,
+          lng: points[points.length - 1].longitude,
+          label: points[points.length - 1].label,
+          id: expedition.id,
+        },
+        status: mapStatus,
+        isBase: false,
+        type: "expedition" as const,
+      };
     });
+  }, [validRoutes]);
 
-    validRoutes.forEach(({ expedition, points }) => {
-      const tone = expeditionRouteTone(expedition.status);
-      const latLngs: L.LatLngExpression[] = points.map((point) => [point.latitude, point.longitude]);
-      latLngs.forEach((latLng) => bounds.extend(latLng));
-      L.polyline(latLngs, {
-        color: tone.color,
-        weight: selectedExpeditionId === expedition.id ? 4 : 2.5,
-        opacity: selectedExpeditionId === expedition.id ? 0.95 : 0.62,
-        className: tone.className,
-      })
-        .on("click", () => onSelectExpedition(expedition.id))
-        .bindTooltip(`<strong>${escapeMapHtml(expedition.name)}</strong><br/>${tone.status}<br/>${escapeMapHtml(points[0].label)} -> ${escapeMapHtml(points[points.length - 1].label)}`, { sticky: true })
-        .addTo(layer);
-    });
-
-    if (bounds.isValid()) map.fitBounds(bounds.pad(0.22), { maxZoom: 7 });
-    window.setTimeout(() => map.invalidateSize(), 80);
-
-    return () => { layer.remove(); };
-  }, [camps, onSelectExpedition, selectedExpeditionId, validRoutes]);
-
-  useEffect(() => () => {
-    mapRef.current?.remove();
-    mapRef.current = null;
-  }, []);
+  const dots = useMemo(() => {
+    return [...campDots, ...expeditionDots];
+  }, [campDots, expeditionDots]);
 
   return (
     <div className="admin-ui-v2-leaflet-console">
-      <div className="admin-ui-v2-leaflet-map" ref={containerRef} />
+      <div className="admin-ui-v2-leaflet-map">
+        <WorldMap
+          dots={dots}
+          lineColor="#69BFB7"
+          onZoneClick={(dot) => {
+            if (dot.end.id && !dot.isBase) {
+              onSelectExpedition(Number(dot.end.id));
+            }
+          }}
+        />
+      </div>
       <aside className="admin-ui-v2-leaflet-side">
         <div className="admin-ui-v2-section-head"><span>Rutas backend</span><span>{validRoutes.length} visibles</span></div>
         {validRoutes.map(({ expedition, points }) => (
@@ -4991,9 +4958,7 @@ function transferStatusTone(status: UiTransfer["status"]): { label: string; colo
   return { label: "PLANIFICADA", color: "#69bfb7", className: "is-planned" };
 }
 
-function AdminIntercampLeafletMap({ camps, requests, transfers }: { camps: Camp[]; requests: UiIntercampRequest[]; transfers: UiTransfer[] }) {
-  const mapRef = useRef<L.Map | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+function AdminIntercampWorldMap({ camps, requests, transfers }: { camps: Camp[]; requests: UiIntercampRequest[]; transfers: UiTransfer[] }) {
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
 
   const routes = useMemo(() => requests.flatMap((request) => {
@@ -5006,55 +4971,70 @@ function AdminIntercampLeafletMap({ camps, requests, transfers }: { camps: Camp[
 
   const missingRoutes = requests.length - routes.length;
 
-  useEffect(() => {
-    if (!containerRef.current) return;
-    if (!mapRef.current) mapRef.current = createAdminLeafletMap(containerRef.current);
-    const map = mapRef.current;
-    const layer = L.layerGroup().addTo(map);
-    const bounds = L.latLngBounds([]);
+  const campDots = useMemo(() => {
+    return camps
+      .filter(validCampPoint)
+      .map((camp) => ({
+        start: { lat: camp.location.latitude, lng: camp.location.longitude, label: camp.name, id: `camp-${camp.id}` },
+        end: { lat: camp.location.latitude, lng: camp.location.longitude, label: camp.name, id: `camp-${camp.id}` },
+        isBase: true,
+        type: "camp" as const,
+      }));
+  }, [camps]);
 
-    camps.filter(validCampPoint).forEach((camp) => {
-      const latLng: L.LatLngExpression = [camp.location.latitude, camp.location.longitude];
-      bounds.extend(latLng);
-      L.marker(latLng, { icon: createMapMarker(camp.name.slice(0, 10).toUpperCase(), camp.status === "COMPROMISED" ? "danger" : "base") })
-        .bindTooltip(`<strong>${escapeMapHtml(camp.name)}</strong><br/>${camp.status}`, { sticky: true })
-        .addTo(layer);
-    });
-
-    routes.forEach(({ request, origin, destination, transfers: relatedTransfers }) => {
+  const routeDots = useMemo(() => {
+    return routes.map(({ request, origin, destination, transfers: relatedTransfers }) => {
       const latestTransfer = relatedTransfers[0] ?? null;
-      const tone = latestTransfer ? transferStatusTone(latestTransfer.status) : { label: request.status, color: request.urgent ? "#f37b7b" : "#69bfb7", className: request.urgent ? "is-urgent" : "is-planned" };
-      const latLngs: L.LatLngExpression[] = [
-        [origin.location.latitude, origin.location.longitude],
-        [destination.location.latitude, destination.location.longitude],
-      ];
-      latLngs.forEach((latLng) => bounds.extend(latLng));
-      L.polyline(latLngs, {
-        color: tone.color,
-        weight: selectedRequestId === request.id ? 4 : 2.5,
-        opacity: selectedRequestId === request.id ? 0.95 : 0.62,
-        className: `admin-ui-v2-leaflet-route ${tone.className}`,
-      })
-        .on("click", () => setSelectedRequestId(request.id))
-        .bindTooltip(`<strong>Solicitud #${request.id}</strong><br/>${escapeMapHtml(origin.name)} -> ${escapeMapHtml(destination.name)}<br/>${tone.label}`, { sticky: true })
-        .addTo(layer);
+      let mapStatus = "PLANNED";
+      if (latestTransfer) {
+        if (latestTransfer.status === "ENTREGADA") mapStatus = "COMPLETED";
+        else if (latestTransfer.status === "CANCELADA") mapStatus = "LOST";
+        else if (latestTransfer.status === "EN_TRANSITO") mapStatus = "IN_PROGRESS";
+      } else {
+        if (request.status === "CONFIRMADO" || request.status === "APROBADO") mapStatus = "IN_PROGRESS";
+        else if (request.status === "RECHAZADO") mapStatus = "LOST";
+        else if (request.urgent) mapStatus = "DELAYED";
+      }
+
+      return {
+        start: {
+          lat: origin.location.latitude,
+          lng: origin.location.longitude,
+          label: origin.name,
+          id: request.id,
+        },
+        end: {
+          lat: destination.location.latitude,
+          lng: destination.location.longitude,
+          label: destination.name,
+          id: request.id,
+        },
+        status: mapStatus,
+        isBase: false,
+        type: "expedition" as const,
+      };
     });
+  }, [routes]);
 
-    if (bounds.isValid()) map.fitBounds(bounds.pad(0.22), { maxZoom: 7 });
-    window.setTimeout(() => map.invalidateSize(), 80);
-    return () => { layer.remove(); };
-  }, [camps, routes, selectedRequestId]);
-
-  useEffect(() => () => {
-    mapRef.current?.remove();
-    mapRef.current = null;
-  }, []);
+  const dots = useMemo(() => {
+    return [...campDots, ...routeDots];
+  }, [campDots, routeDots]);
 
   const selectedRoute = routes.find((route) => route.request.id === selectedRequestId) ?? routes[0] ?? null;
 
   return (
     <div className="admin-ui-v2-leaflet-console admin-ui-v2-intercamp-map-console">
-      <div className="admin-ui-v2-leaflet-map" ref={containerRef} />
+      <div className="admin-ui-v2-leaflet-map">
+        <WorldMap
+          dots={dots}
+          lineColor="#69BFB7"
+          onZoneClick={(dot) => {
+            if (dot.end.id && !dot.isBase) {
+              setSelectedRequestId(Number(dot.end.id));
+            }
+          }}
+        />
+      </div>
       <aside className="admin-ui-v2-leaflet-side">
         <div className="admin-ui-v2-section-head"><span>Conexiones backend</span><span>{routes.length} rutas</span></div>
         {selectedRoute ? (
@@ -5169,7 +5149,7 @@ const ExpeditionsModule = memo(function ExpeditionsModule({
       {sub === "Mapa operativo" && (
         campCatalog.filter(validCampPoint).length > 1 ? (
           <div className="admin-ui-v2-map-shell admin-ui-v2-map-shell-leaflet">
-            <AdminExpeditionsLeafletMap
+            <AdminExpeditionsWorldMap
               camps={campCatalog}
               expeditions={effectiveExpeditions}
               selectedExpeditionId={selectedExpeditionId}
