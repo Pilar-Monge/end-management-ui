@@ -292,10 +292,10 @@ export function AdventuresView({ onNavigate }: { onNavigate?: (sub: string, id?:
       5: "Echo Outpost"
     };
     return {
-      id: 1045,
-      username: "pmonge",
-      name: "Pilar Monge",
-      email: "pilar.monge@camp.alpha",
+      id: 0,
+      username: "sesion",
+      name: "Usuario",
+      email: "",
       role: "TRAVEL_MANAGER", // Fallback non-admin role
       campId: activeCampId,
       campName: campNames[activeCampId] || "Alpha Bunker"

@@ -54,13 +54,13 @@ function getRoleLabel(role: string): string {
 }
 
 const fallbackUser: CurrentUser = {
-  id: 1045,
-  username: "pmonge",
-  name: "Pilar Monge",
-  email: "pilar.monge@camp.alpha",
+  id: 0,
+  username: "sesion",
+  name: "Usuario",
+  email: "",
   role: "TRAVEL_MANAGER",
   campId: 1,
-  campName: "Alpha Bunker",
+  campName: "Campamento 1",
   photoUrl: undefined
 };
 
@@ -436,12 +436,13 @@ function TopHud({
 }
 
 function NotificationsView() {
-  const mockNotifications = [
-    { id: 1, title: "Alerta de Recursos Colapsados", body: "Suministro de agua disminuyendo en Sierra Base. Nivel crítico.", time: "Hace 5 minutos", severity: "high" },
-    { id: 2, title: "Expedición Beta Finalizada", body: "La cuadrilla retornó con 12.0 unidades de material de rescate de la Zona Cero.", time: "Hace 15 minutos", severity: "normal" },
-    { id: 3, title: "Actualización de Red Satelital", body: "Línea de enlace con Alpha Bunker re-sincronizada completamente. Estado de telemetría nominal.", time: "Hace 1 hora", severity: "info" }
-  ];
-  const [backendNotifications, setBackendNotifications] = useState(mockNotifications);
+  const [backendNotifications, setBackendNotifications] = useState<Array<{
+    id: number;
+    title: string;
+    body: string;
+    time: string;
+    severity: string;
+  }>>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -455,7 +456,7 @@ function NotificationsView() {
             id: notification.id,
             title: notification.title,
             body: notification.message,
-            time: new Date(notification.createdDate).toLocaleString(),
+            time: formatUtcDateTime(notification.createdDate),
             severity: notification.type,
           })),
         );
@@ -567,6 +568,13 @@ function NotificationsView() {
       </div>
     </div>
   );
+}
+
+function formatUtcDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const pad = (num: number) => String(num).padStart(2, "0");
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
 }
 
 function SectionTitle({ title }: { title: string }) {

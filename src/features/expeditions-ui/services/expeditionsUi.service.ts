@@ -20,6 +20,7 @@ export interface CurrentExpeditionUser {
   email: string
   role: string
   rol: string
+  status: string
   campId: number
   campName: string
   personId?: number
@@ -283,6 +284,7 @@ export async function getCurrentExpeditionUser(): Promise<CurrentExpeditionUser>
     email: str(user.email),
     role: str(user.role ?? user.rol, 'TRAVEL_MANAGER'),
     rol: str(user.rol ?? user.role, 'TRAVEL_MANAGER'),
+    status: str(user.status ?? user.accountStatus ?? asRecord(user.systemUser).status, 'ACTIVE'),
     campId: num(user.campId ?? person.campId, 1),
     campName: str(user.campName, `Campamento ${num(user.campId ?? person.campId, 1)}`),
     personId: user.personId === undefined ? undefined : num(user.personId),
@@ -591,17 +593,21 @@ export async function listCampInventory(campId: number): Promise<CampInventoryRe
 }
 
 export async function listExpeditionNotifications(): Promise<ExpeditionNotification[]> {
-  const payload = await apiRequest<unknown>('/notifications?page=1&limit=20')
+  const payload = await apiRequest<unknown>('/notifications?read=false&page=1&limit=20')
   return listFromPayload(payload, (item) => ({
     id: num(item.id),
     title: str(item.title, 'Notificacion'),
     message: str(item.message),
     type: str(item.type, 'INFO'),
-    read: Boolean(item.read),
-    createdDate: str(item.createdDate, new Date().toISOString()),
+    read: Boolean(item.read ?? item.isRead),
+    createdDate: str(item.createdDate ?? item.createdAt, new Date().toISOString()),
     sourceType: item.sourceType === undefined ? undefined : str(item.sourceType),
     sourceId: item.sourceId === undefined ? undefined : num(item.sourceId),
-  })).filter((notification) => notification.type.includes('EXPEDITION'))
+  })).filter((notification) => {
+    const type = notification.type.toUpperCase()
+    const sourceType = (notification.sourceType ?? '').toUpperCase()
+    return type.includes('EXPEDITION') || sourceType.includes('EXPEDITION')
+  })
 }
 
 export async function markNotificationRead(id: number): Promise<void> {
