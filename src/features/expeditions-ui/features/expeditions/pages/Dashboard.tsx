@@ -14,21 +14,7 @@ import {
 import type { DBExpedition } from "../utils/expeditionsStore";
 import { listUiExpeditions } from "../../../services/expeditionsUi.service";
 
-// Realistic baseline representing historic curve flow matching the user's gorgeous screen curves exactly!
-const REALISTIC_MONTHLY_DATA = [
-  { mes: "Ene", expediciones: 15, activas: 2 },
-  { mes: "Feb", expediciones: 25, activas: 6 },
-  { mes: "Mar", expediciones: 12, activas: 3 },
-  { mes: "Abr", expediciones: 45, activas: 8 },
-  { mes: "May", expediciones: 20, activas: 5 },
-  { mes: "Jun", expediciones: 32, activas: 7 },
-  { mes: "Jul", expediciones: 50, activas: 9 },
-  { mes: "Ago", expediciones: 28, activas: 6 },
-  { mes: "Sep", expediciones: 22, activas: 4 },
-  { mes: "Oct", expediciones: 42, activas: 7 },
-  { mes: "Nov", expediciones: 24, activas: 5 },
-  { mes: "Dic", expediciones: 15, activas: 3 },
-];
+const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 const CHART_THEME = {
   teal: "#69BFB7",
@@ -41,6 +27,17 @@ const chartTooltipStyle = {
   contentStyle: { background: "rgba(4,14,14,0.92)", border: "1px solid rgba(105,191,183,0.4)", fontSize: 11 },
   labelStyle: { color: "#69BFB7", fontWeight: 700 },
 };
+
+function getMonthIndexFromDeparture(departure: string) {
+  const match = departure.match(/^\d{1,2}\/(\d{1,2})/);
+  if (!match) return -1;
+  const month = Number(match[1]);
+  return Number.isFinite(month) && month >= 1 && month <= 12 ? month - 1 : -1;
+}
+
+function isActiveStatus(status: DBExpedition["status"]) {
+  return status === "IN_PROGRESS" || status === "DELAYED" || (status as any) === "ACTIVA";
+}
 
 interface ExpeditionDashboardProps {
   onNavigate?: (sub: string, id?: number) => void;
@@ -78,6 +75,18 @@ export function ExpeditionDashboard({ onNavigate }: ExpeditionDashboardProps) {
   const countCompleted = realCompleted;
   const countCanceled = realCanceled;
   const countActiveExp = countInProgress + countDelayed;
+
+  const monthlyData = MONTH_LABELS.map((mes) => ({ mes, expediciones: 0, activas: 0 }));
+  expeditions.forEach((expedition) => {
+    const monthIndex = getMonthIndexFromDeparture(expedition.departure);
+    if (monthIndex < 0) return;
+    monthlyData[monthIndex].expediciones += 1;
+    if (isActiveStatus(expedition.status)) {
+      monthlyData[monthIndex].activas += 1;
+    }
+  });
+  const maxMonthlyValue = Math.max(1, ...monthlyData.flatMap((item) => [item.expediciones, item.activas]));
+  const yAxisMax = Math.max(5, Math.ceil(maxMonthlyValue / 5) * 5);
 
   // Data for the distribution donut pie chart
   const STATUS_PIE_DATA = [
@@ -146,7 +155,7 @@ export function ExpeditionDashboard({ onNavigate }: ExpeditionDashboardProps) {
             
             <div className="h-[210px] w-full mt-2">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={REALISTIC_MONTHLY_DATA} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                <AreaChart data={monthlyData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorExpeditions" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#67ACA9" stopOpacity={0.15}/>
@@ -169,7 +178,7 @@ export function ExpeditionDashboard({ onNavigate }: ExpeditionDashboardProps) {
                     tick={{ fill: CHART_THEME.text, fontSize: 9, fontFamily: "monospace" }} 
                     axisLine={{ stroke: "rgba(103,172,169,0.2)" }}
                     tickLine={false}
-                    domain={[0, 60]}
+                    domain={[0, yAxisMax]}
                   />
                   
                   <Tooltip {...chartTooltipStyle} />
