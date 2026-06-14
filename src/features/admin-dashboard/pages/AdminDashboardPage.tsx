@@ -1572,6 +1572,8 @@ export default function AdminDashboardPage() {
                       currentAdminPersonId={positiveNumber(authenticatedPerson?.id) ?? resolveSessionPersonId(sessionAdminUser, persons)}
                       onRefreshAdminProfile={() => { void refreshCurrentUserFromBackend(); }}
                       onProfilePersonUpdated={handleProfilePersonUpdated}
+                      onSystemTimeSync={syncGlobalTimeFromServerValue}
+                      onLogicalTimeAdvanced={validateSessionAfterLogicalTimeJump}
                     />
                   </div>
                 ) : (
