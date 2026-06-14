@@ -6,6 +6,7 @@ import type {
   PasswordResetConfirmPayload,
   PasswordResetRequestPayload,
 } from '../types'
+import { clearCachedSession, normalizeSessionUser } from '../../../shared/services/sessionProfile'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
 
@@ -38,6 +39,33 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
   }
 }
 
+async function clearPreviousBackendSession(): Promise<void> {
+  clearCachedSession(false)
+  try {
+    await fetch(`${BASE_URL}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    })
+  } catch {
+    // Best effort only. The next login still has to overwrite/validate the cookie.
+  }
+}
+
+async function fetchAuthenticatedUserAfterLogin(): Promise<{ campId?: number; role?: string; rol?: string }> {
+  const response = await fetch(`${BASE_URL}/auth/me`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    throw new Error('La sesion no quedo activa despues del login. Revisa cookies/credentials.')
+  }
+
+  return normalizeSessionUser(await response.json())
+}
+
 export async function fetchCamps(): Promise<Camp[]> {
   const res = await fetch(`${BASE_URL}/camps?status=ACTIVE`)
   if (!res.ok) throw new Error('No se pudo cargar la lista de campamentos')
@@ -47,21 +75,43 @@ export async function fetchCamps(): Promise<Camp[]> {
 }
 
 export async function loginRequest(form: LoginForm): Promise<LoginApiResponse> {
+  const campId = Number(form.campId)
+  if (!Number.isFinite(campId) || campId <= 0) {
+    throw new Error('Debes seleccionar un campamento valido antes de iniciar sesion.')
+  }
+
+  await clearPreviousBackendSession()
+
   const res = await fetch(`${BASE_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: JSON.stringify({
-      username: form.username,
+      username: form.username.trim(),
       password: form.password,
-      campId: form.campId,
+      campId,
     }),
   })
 
   const data = await res.json()
   if (!res.ok) throw new Error(authErrorMessage(res.status))
 
-  return data.data as LoginApiResponse
+  const loginData = data.data as LoginApiResponse
+  const sessionUser = await fetchAuthenticatedUserAfterLogin()
+
+  if (sessionUser.campId !== undefined && sessionUser.campId !== campId) {
+    throw new Error(`La sesion quedo en el campamento ${sessionUser.campId}, pero se solicito el campamento ${campId}.`)
+  }
+
+  return {
+    ...loginData,
+    user: {
+      ...loginData.user,
+      campId: sessionUser.campId ?? loginData.user.campId,
+      rol: sessionUser.rol ?? sessionUser.role ?? loginData.user.rol,
+      role: sessionUser.role ?? loginData.user.role,
+    },
+  }
 }
 
 export async function requestPasswordReset(
