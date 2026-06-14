@@ -8,6 +8,7 @@ import { TacticalDatePicker, TacticalTimePicker } from "../components/TacticalDa
 import {
   createExpedition,
   getCurrentExpeditionUser,
+  getServerTime,
   listAvailablePeople,
   listCampInventory,
   type ExpeditionPerson,
@@ -265,6 +266,7 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
     otherUnits: { current_amount: 0, minimum_alert_amount: 0, unit: "unidades" }
   });
   const [backendWarning, setBackendWarning] = useState<string | null>(null);
+  const [serverOffsetMs, setServerOffsetMs] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -274,11 +276,13 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
         if (!mounted) return;
         setCurrentUser(user);
 
-        const [people, inventory] = await Promise.all([
-          listAvailablePeople(user.campId),
+        const [people, inventory, serverTime] = await Promise.all([
+          listAvailablePeople(user.campId, { availableOnly: true }),
           listCampInventory(user.campId),
+          getServerTime(),
         ]);
         if (!mounted) return;
+        setServerOffsetMs(new Date(serverTime).getTime() - Date.now());
 
         setPeopleCards(people.map((person) => ({
           ...person,
@@ -339,10 +343,8 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
 
   const isPersonEligible = (person: PersonCard) => {
     const campMatch = person.campId === currentUser.campId;
-    const backendRole = getPersonBackendRole(person);
-    const roleMatch = allowedExpeditionRoles.includes(backendRole) || person.role !== "";
     const isCardActive = person.status === "ACTIVE" || person.status === "ACTIVO";
-    return campMatch && roleMatch && isCardActive;
+    return campMatch && isCardActive && (person.isAvailableForExpedition ?? true);
   };
 
   const eligiblePeople = peopleCards.filter(isPersonEligible);
@@ -403,7 +405,7 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
     if (!departureDate) return null;
     const dep = new Date(`${departureDate}T${departureTime || "00:00"}`);
     if (isNaN(dep.getTime())) return null;
-    const now = new Date();
+    const now = new Date(Date.now() + serverOffsetMs);
     if (dep < now) {
       return "La fecha y hora de salida no puede ser anterior a la hora actual del servidor.";
     }
@@ -447,14 +449,12 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
     const person = peopleCards.find((p) => p.id === id);
     if (!person) return;
 
-    const backendRole = getPersonBackendRole(person);
-    
     if (selectedPeople.includes(id)) {
       setRoleError(null);
       setSelectedPeople((prev) => prev.filter((p) => p !== id));
     } else {
-      if (!allowedExpeditionRoles.includes(backendRole)) {
-        setRoleError("Esta persona no tiene un rol permitido para participar en expediciones.");
+      if (person.isAvailableForExpedition === false) {
+        setRoleError(person.expeditionAvailabilityReason || "Esta persona no esta disponible para expediciones.");
         return;
       }
       setRoleError(null);

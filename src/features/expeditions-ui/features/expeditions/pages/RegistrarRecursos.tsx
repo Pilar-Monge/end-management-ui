@@ -3,7 +3,6 @@ import { Btn, MissionShell, MissionStack } from "../components/SharedLayout";
 import type { DBExpedition } from "../utils/expeditionsStore";
 import {
   createConsumedExpeditionResource,
-  createObtainedExpeditionResource,
   getCurrentExpeditionUser,
   listResourceTypes,
   listUiExpeditions,
@@ -13,7 +12,7 @@ import {
 interface ResourceLog {
   expeditionId: number;
   expeditionName: string;
-  type: "CONSUMIDO" | "RECUPERADO";
+  type: "CONSUMIDO";
   category: string;
   item: string;
   amount: number;
@@ -39,7 +38,7 @@ export function RegistrarRecursos() {
   const [selectedResourceTypeId, setSelectedResourceTypeId] = useState<number>(0);
   const [recordedByUserId, setRecordedByUserId] = useState<number>(0);
 
-  const [logType, setLogType] = useState<"CONSUMIDO" | "RECUPERADO">("CONSUMIDO");
+  const [logType] = useState<"CONSUMIDO">("CONSUMIDO");
   const [amount, setAmount] = useState<number | "">("");
   const [operator, setOperator] = useState("Operador de expediciones");
 
@@ -114,21 +113,12 @@ export function RegistrarRecursos() {
 
     setIsSaving(true);
     try {
-      if (logType === "CONSUMIDO") {
-        await createConsumedExpeditionResource({
-          expeditionId: selectedExpedition.id,
-          resourceTypeId: selectedResourceType.id,
-          amount: Number(amount),
-          recordedBy: recordedByUserId,
-        });
-      } else {
-        await createObtainedExpeditionResource({
-          expeditionId: selectedExpedition.id,
-          resourceTypeId: selectedResourceType.id,
-          amount: Number(amount),
-          recordedBy: recordedByUserId,
-        });
-      }
+      await createConsumedExpeditionResource({
+        expeditionId: selectedExpedition.id,
+        resourceTypeId: selectedResourceType.id,
+        amount: Number(amount),
+        recordedBy: recordedByUserId,
+      });
 
       const newLog: ResourceLog = {
         expeditionId: selectedExpedition.id,
@@ -186,21 +176,13 @@ export function RegistrarRecursos() {
                 <label className="text-[10px] font-mono tracking-wider text-[#69BFB7] uppercase block mb-1">
                   Tipo de Operacion
                 </label>
-                <div className="flex bg-[#020706] rounded-sm p-0.5 border border-[#67ACA9]/20">
-                  <button
-                    type="button"
-                    className={`flex-1 text-center py-1 text-[10px] font-bold uppercase rounded-xs transition-all ${logType === "CONSUMIDO" ? "bg-red-500/30 text-red-200" : "text-[#A4C2C5]"}`}
-                    onClick={() => setLogType("CONSUMIDO")}
-                  >
+                <div className="bg-[#020706] rounded-sm p-2 border border-[#67ACA9]/20">
+                  <span className="inline-block text-[10px] font-bold uppercase rounded-xs bg-red-500/30 text-red-200 px-2 py-1">
                     Consumido
-                  </button>
-                  <button
-                    type="button"
-                    className={`flex-1 text-center py-1 text-[10px] font-bold uppercase rounded-xs transition-all ${logType === "RECUPERADO" ? "bg-emerald-500/30 text-emerald-200" : "text-[#A4C2C5]"}`}
-                    onClick={() => setLogType("RECUPERADO")}
-                  >
-                    Recuperado
-                  </button>
+                  </span>
+                  <p className="mt-2 text-[9px] text-[#A4C2C5]/60 leading-snug">
+                    Los recursos obtenidos se generan automaticamente al completar la expedicion.
+                  </p>
                 </div>
               </div>
 
@@ -334,7 +316,7 @@ export function RegistrarRecursos() {
             </div>
 
             <div className="mt-4 p-2.5 bg-black/30 border border-[#67ACA9]/10 rounded-sm text-[10px] text-[#A4C2C5]/70 leading-snug">
-              <strong className="text-[#69BFB7]">OPERACION TACTICA:</strong> Los consumos y recuperaciones se guardan en los endpoints reales de expediciones del backend.
+              <strong className="text-[#69BFB7]">OPERACION TACTICA:</strong> Los consumos se guardan en backend. Los recursos obtenidos se generan automaticamente al completar la expedicion.
             </div>
           </div>
         </div>

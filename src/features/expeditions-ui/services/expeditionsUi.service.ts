@@ -38,6 +38,9 @@ export interface ExpeditionPerson {
   campId: number
   occupationId?: number
   img?: string
+  isAvailableForExpedition?: boolean
+  expeditionAvailabilityReason?: string | null
+  expeditionAssignments?: unknown[]
 }
 
 export interface ExpeditionParticipant {
@@ -248,6 +251,13 @@ function mapPerson(item: UnknownRecord): ExpeditionPerson {
     campId: num(item.campId),
     occupationId: item.occupationId === undefined ? undefined : num(item.occupationId),
     img: str(item.imageUrl ?? item.photoUrl ?? item.img, `https://i.pravatar.cc/300?u=${item.id ?? name}`),
+    isAvailableForExpedition:
+      item.isAvailableForExpedition === undefined ? undefined : Boolean(item.isAvailableForExpedition),
+    expeditionAvailabilityReason:
+      item.expeditionAvailabilityReason === undefined || item.expeditionAvailabilityReason === null
+        ? null
+        : str(item.expeditionAvailabilityReason),
+    expeditionAssignments: Array.isArray(item.expeditionAssignments) ? item.expeditionAssignments : [],
   }
 }
 
@@ -283,6 +293,14 @@ export async function getCurrentExpeditionUser(): Promise<CurrentExpeditionUser>
 export async function getServerTime(): Promise<string> {
   const payload = asRecord(await apiRequest<unknown>('/system/time', { withAuth: false }))
   return str(payload.serverTime, new Date().toISOString())
+}
+
+async function getServerTimestamp(): Promise<string> {
+  try {
+    return await getServerTime()
+  } catch {
+    return new Date().toISOString()
+  }
 }
 
 export async function getCamp(campId: number): Promise<{
@@ -470,32 +488,22 @@ export async function createExpeditionParticipant(data: {
   )
 }
 
-export async function listAvailablePeople(campId: number): Promise<ExpeditionPerson[]> {
-  const occupationsPayload = await safeRequest(
-    () => apiRequest<unknown>('/occupations?participatesInExpeditions=true&page=1&limit=100'),
-    [],
-  )
-  const occupationIds = new Set(
-    listFromPayload(occupationsPayload, (item) => num(item.id)).filter((id) => id > 0),
-  )
-  const peoplePayload = await safeRequest(
-    () => apiRequest<unknown>(`/person?campId=${campId}&currentStatus=ACTIVE&page=1&limit=100`),
-    [],
-  )
-  return listFromPayload(peoplePayload, mapPerson).filter((person) => {
-    if (person.campId !== campId || person.status !== 'ACTIVE') return false
-    const roleText = person.role.toLowerCase()
-    const isScoutOrExpeditionRole =
-      roleText.includes('scout') ||
-      roleText.includes('explor') ||
-      roleText.includes('expedition') ||
-      roleText.includes('expedicion')
-    if (occupationIds.size === 0) return isScoutOrExpeditionRole
-    return (
-      (person.occupationId !== undefined && occupationIds.has(person.occupationId)) ||
-      isScoutOrExpeditionRole
-    )
+export async function listAvailablePeople(
+  campId: number,
+  options: { availableOnly?: boolean; page?: number; limit?: number } = {},
+): Promise<ExpeditionPerson[]> {
+  const params = new URLSearchParams({
+    availableOnly: String(options.availableOnly ?? false),
+    page: String(options.page ?? 1),
+    limit: String(options.limit ?? PAGE_LIMIT),
   })
+  if (campId > 0) params.set('campId', String(campId))
+
+  const payload = await safeRequest(
+    () => apiRequest<unknown>(`/person/expedition-candidates?${params.toString()}`),
+    [],
+  )
+  return listFromPayload(payload, mapPerson)
 }
 
 export async function getExpeditionResourceSummary(id: number): Promise<ExpeditionResourceSummary> {
@@ -520,6 +528,7 @@ export async function createConsumedExpeditionResource(data: {
   amount: number | string
   recordedBy: number
 }): Promise<void> {
+  const recordDate = await getServerTimestamp()
   await apiRequest<unknown>('/expedition-resources-consumed', {
     method: 'POST',
     body: JSON.stringify({
@@ -527,7 +536,7 @@ export async function createConsumedExpeditionResource(data: {
       resourceTypeId: data.resourceTypeId,
       amount: String(data.amount),
       recordedBy: data.recordedBy,
-      recordDate: new Date().toISOString(),
+      recordDate,
       movementId: null,
     }),
   })
@@ -539,6 +548,7 @@ export async function createObtainedExpeditionResource(data: {
   amount: number | string
   recordedBy: number
 }): Promise<void> {
+  const recordDate = await getServerTimestamp()
   await apiRequest<unknown>('/expedition-resources-obtained', {
     method: 'POST',
     body: JSON.stringify({
@@ -546,7 +556,7 @@ export async function createObtainedExpeditionResource(data: {
       resourceTypeId: data.resourceTypeId,
       amount: String(data.amount),
       recordedBy: data.recordedBy,
-      recordDate: new Date().toISOString(),
+      recordDate,
       movementId: null,
     }),
   })
@@ -591,8 +601,9 @@ export async function listExpeditionNotifications(): Promise<ExpeditionNotificat
 }
 
 export async function markNotificationRead(id: number): Promise<void> {
+  const readDate = await getServerTimestamp()
   await apiRequest<unknown>(`/notifications/${id}`, {
     method: 'PUT',
-    body: JSON.stringify({ read: true, readDate: new Date().toISOString() }),
+    body: JSON.stringify({ read: true, readDate }),
   })
 }

@@ -812,7 +812,7 @@ export function PersonasView({ onNavigate }: { onNavigate?: (sub: string, id?: n
     try {
       const user = await getCurrentExpeditionUser();
       const [people, expeditions] = await Promise.all([
-        listAvailablePeople(user.campId),
+        listAvailablePeople(user.campId, { availableOnly: false }),
         listUiExpeditions({ campId: user.campId, status: "PLANNED" }),
       ]);
       const activePlanned = expeditions.filter(e => e.status === "PLANNED" || e.status === "PLANIFICADA");
@@ -848,7 +848,7 @@ export function PersonasView({ onNavigate }: { onNavigate?: (sub: string, id?: n
       setPage(1);
 
       if (people.length === 0) {
-        setPeopleError("No hay personas activas con rol de expedicion o scout para este campamento.");
+        setPeopleError("No hay candidatos de expedicion para este campamento.");
       }
     } catch (error) {
       console.error("Unable to load people from backend", error);
@@ -895,6 +895,7 @@ export function PersonasView({ onNavigate }: { onNavigate?: (sub: string, id?: n
       message: `Persona asignada correctamente a la expedición "${exp?.name || "Expedición"}".`,
       expId: expeditionId
     });
+      await syncStore();
     } catch (error) {
       console.error("Unable to assign person to expedition", error);
       setSuccessAssignment({
@@ -937,8 +938,9 @@ export function PersonasView({ onNavigate }: { onNavigate?: (sub: string, id?: n
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {currentPeople.map((person) => {
-              const isAvailable = person.status === "ACTIVE";
+              const isAvailable = person.isAvailableForExpedition ?? person.status === "ACTIVE";
               const personAssignments = assignments[person.id] || [];
+              const unavailableReason = person.expeditionAvailabilityReason || "No disponible para expedicion";
 
               return (
                 <div key={person.id} className="v-person-card flex flex-col justify-between h-full">
@@ -958,6 +960,11 @@ export function PersonasView({ onNavigate }: { onNavigate?: (sub: string, id?: n
                         <span className="v-person-detail font-medium">
                           Estado: <span className={`text-[10px] uppercase font-bold ${isAvailable ? "text-emerald-400" : "text-amber-400"}`}>{person.status.replace("_", " ")}</span>
                         </span>
+                        {!isAvailable && (
+                          <span className="v-person-detail text-amber-300/80">
+                            Motivo: <span className="text-[#A4C2C5]">{unavailableReason}</span>
+                          </span>
+                        )}
                       </div>
                     </div>
 

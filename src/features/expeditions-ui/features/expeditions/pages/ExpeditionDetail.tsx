@@ -65,7 +65,7 @@ export function ExpeditionDetail({ expeditionId, onNavigate }: ExpeditionDetailP
         getExpeditionResourceSummary(expeditionId),
         getCurrentExpeditionUser(),
       ]);
-      const loadedPeople = await listAvailablePeople(user.campId);
+      const loadedPeople = await listAvailablePeople(user.campId, { availableOnly: true });
 
       setExpedition(loadedExpedition);
       setParticipants(loadedParticipants);
