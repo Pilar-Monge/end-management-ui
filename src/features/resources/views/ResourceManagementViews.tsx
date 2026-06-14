@@ -534,8 +534,7 @@ export function ViewDashboard({
   occupationCoverages = [],
   requestResourceDetails = [],
   deliveredTransferResources = [],
-  onNavigateToSub,
-  globalTimeState
+  onNavigateToSub
 }: {
   camps: Camp[];
   resourceTypes: ResourceType[];
@@ -558,11 +557,6 @@ export function ViewDashboard({
   onMarkAsRead?: (id: string) => void;
   onUpdateInventory?: (campId: string, resourceTypeId: string, currentAmount: number, minimumAlertAmount: number) => void;
   onNavigateToSub: (sub: string) => void;
-  globalTimeState?: {
-    baseServerTime: Date;
-    syncedAtClientMs: number;
-    status: 'synced' | 'syncing' | 'error';
-  };
 }) {
   const activeCampId = currentUser.campId;
   const campName = getCampDisplayName(camps, activeCampId);
@@ -571,25 +565,14 @@ export function ViewDashboard({
     setIsRefreshing(true);
     setTimeout(() => setIsRefreshing(false), 800);
   };
-  const [systTime, setSystTime] = useState(() => {
-    if (globalTimeState) {
-      const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
-      return new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs);
-    }
-    return new Date();
-  });
+  const [systTime, setSystTime] = useState(new Date());
 
   useEffect(() => {
     const clockInterval = setInterval(() => {
-      if (globalTimeState) {
-        const elapsedClientMs = Date.now() - globalTimeState.syncedAtClientMs;
-        setSystTime(new Date(globalTimeState.baseServerTime.getTime() + elapsedClientMs));
-      } else {
-        setSystTime(new Date());
-      }
+      setSystTime(new Date());
     }, 1000);
     return () => clearInterval(clockInterval);
-  }, [globalTimeState]);
+  }, []);
 
   const getNextUtcMidnight = (nowDate: Date): Date => {
     return new Date(Date.UTC(
@@ -1405,8 +1388,8 @@ export function ViewDashboard({
                       </td>
                       <td>
                         <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 border rounded-xs ${inv.currentAmount <= inv.minimumAlertAmount
-                            ? "bg-red-950/40 text-red-300 border-red-500/40 animate-pulse"
-                            : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30"
+                          ? "bg-red-950/40 text-red-300 border-red-500/40 animate-pulse"
+                          : "bg-emerald-950/40 text-emerald-300 border-emerald-500/30"
                           }`}>
                           {inv.currentAmount <= inv.minimumAlertAmount ? "CRÍTICO" : "NORMAL"}
                         </span>
@@ -1648,8 +1631,8 @@ export function ViewDashboard({
                         <td className="font-bold text-white uppercase">{originName} ➔ {destName}</td>
                         <td>
                           <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 border rounded-xs ${r.status === "APPROVED" ? "bg-emerald-950/40 text-emerald-300 border-emerald-500/30" :
-                              r.status === "REJECTED" ? "bg-red-950/40 text-red-300 border-red-500/30" :
-                                "bg-amber-950/40 text-amber-300 border-amber-500/25"
+                            r.status === "REJECTED" ? "bg-red-950/40 text-red-300 border-red-500/30" :
+                              "bg-amber-950/40 text-amber-300 border-amber-500/25"
                             }`}>
                             {r.status}
                           </span>
@@ -2079,13 +2062,6 @@ export function ViewRecoleccionDiaria({
   const [adjustReason, setAdjustReason] = useState("");
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "warning">("success");
-  const [pageRecoleccion, setPageRecoleccion] = useState(1);
-  const pageSizeRecoleccion = 10;
-
-  useEffect(() => {
-    setPageRecoleccion(1);
-  }, [searchTerm, filterResourceType, filterDate]);
-
   const resetCreateForm = () => {
     setPersonId("");
     setResourceTypeId(resourceTypes[0]?.id || "2");
@@ -2143,12 +2119,6 @@ export function ViewRecoleccionDiaria({
 
     return matchesRecordId || matchesPersonId || matchesPersonName || matchesResourceName || matchesDate;
   });
-  const totalPageRecoleccion = Math.max(1, Math.ceil(joinedAndFilteredRecords.length / pageSizeRecoleccion));
-  const safePageRecoleccion = Math.min(pageRecoleccion, totalPageRecoleccion);
-  const paginatedRecoleccion = joinedAndFilteredRecords.slice(
-    (safePageRecoleccion - 1) * pageSizeRecoleccion,
-    safePageRecoleccion * pageSizeRecoleccion
-  );
   const totalExpected = joinedAndFilteredRecords.reduce((sum, r) => sum + Number(r.expectedAmount), 0);
   const totalActual = joinedAndFilteredRecords.reduce((sum, r) => sum + Number(r.actualAmount), 0);
   const netDiscrepancy = totalActual - totalExpected;
@@ -2259,8 +2229,8 @@ export function ViewRecoleccionDiaria({
     >
       {feedbackMsg && (
         <div className={`fixed bottom-5 right-5 z-50 p-4 rounded-sm border shadow-2xl flex items-center gap-3 transition-all duration-300 transform translate-y-0 max-w-md animate-bounce ${feedbackType === 'success'
-            ? 'bg-emerald-950/95 border-emerald-500/40 text-emerald-100'
-            : 'bg-amber-950/95 border-amber-500/40 text-amber-100'
+          ? 'bg-emerald-950/95 border-emerald-500/40 text-emerald-100'
+          : 'bg-amber-950/95 border-amber-500/40 text-amber-100'
           }`}>
           {feedbackType === 'success' ? (
             <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
@@ -2461,7 +2431,7 @@ export function ViewRecoleccionDiaria({
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedRecoleccion.map(record => {
+                    {joinedAndFilteredRecords.map(record => {
                       const personObj = campPersonnel.find(p => p.id === record.personId);
                       const resourceObj = resourceTypes.find(rt => rt.id === record.resourceTypeId);
 
@@ -2535,17 +2505,6 @@ export function ViewRecoleccionDiaria({
                   </tbody>
                 </table>
               </div>
-
-              {joinedAndFilteredRecords.length > 0 && (
-                <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-4 pt-3 border-t border-[#67ACA9]/10 select-none">
-                  <span>Registros {((safePageRecoleccion - 1) * pageSizeRecoleccion) + 1} - {Math.min(safePageRecoleccion * pageSizeRecoleccion, joinedAndFilteredRecords.length)} de {joinedAndFilteredRecords.length}</span>
-                  <div className="flex gap-1">
-                    <Btn small variant="ghost" onClick={() => setPageRecoleccion(p => Math.max(1, p - 1))} disabled={safePageRecoleccion === 1}>◄ Anterior</Btn>
-                    <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{safePageRecoleccion} / {totalPageRecoleccion}</div>
-                    <Btn small variant="ghost" onClick={() => setPageRecoleccion(p => Math.min(totalPageRecoleccion, p + 1))} disabled={safePageRecoleccion === totalPageRecoleccion}>Siguiente ►</Btn>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
           {adjustingId && (() => {
@@ -2671,12 +2630,6 @@ export function ViewMovimientosInventario({
   const [description, setDescription] = useState("");
   const recordedBy = currentUser.userId;
   const [activeTab, setActiveTab] = useState<"Todos" | "Expediciones" | "Recolección diaria" | "Ajustes">("Todos");
-  const [pageMovimientos, setPageMovimientos] = useState(1);
-  const pageSizeMovimientos = 10;
-
-  useEffect(() => {
-    setPageMovimientos(1);
-  }, [activeTab]);
 
   const filteredMovements = inventoryMovements.filter(mv => {
     if (activeTab === "Todos") return true;
@@ -2691,13 +2644,6 @@ export function ViewMovimientosInventario({
     }
     return true;
   });
-
-  const totalPageMovimientos = Math.max(1, Math.ceil(filteredMovements.length / pageSizeMovimientos));
-  const safePageMovimientos = Math.min(pageMovimientos, totalPageMovimientos);
-  const paginatedMovements = filteredMovements.slice().reverse().slice(
-    (safePageMovimientos - 1) * pageSizeMovimientos,
-    safePageMovimientos * pageSizeMovimientos
-  );
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2733,8 +2679,8 @@ export function ViewMovimientosInventario({
                   type="button"
                   onClick={() => setActiveTab(tab)}
                   className={`px-3 py-1 text-[10px] uppercase font-bold border transition-colors cursor-pointer ${activeTab === tab
-                      ? "border-[#69BFB7] text-white bg-[#69BFB7]/15 font-black"
-                      : "border-[#67ACA9]/10 text-[#A4C2C5]/60 hover:text-white hover:bg-[#67ACA9]/5"
+                    ? "border-[#69BFB7] text-white bg-[#69BFB7]/15 font-black"
+                    : "border-[#67ACA9]/10 text-[#A4C2C5]/60 hover:text-white hover:bg-[#67ACA9]/5"
                     }`}
                 >
                   {tab}
@@ -2750,14 +2696,13 @@ export function ViewMovimientosInventario({
                     <th>Movimiento</th>
                     <th>Recurso</th>
                     <th>Cantidad</th>
-                    <th>Fecha</th>
                     <th>Responsable</th>
                     <th>Fundamento</th>
                     <th className="text-right">Auditoría</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedMovements.map(mv => {
+                  {filteredMovements.slice().reverse().map(mv => {
                     const camp = camps.find(c => c.id === mv.campId);
                     const rt = resourceTypes.find(t => t.id === mv.resourceTypeId);
                     const isOutflow = [
@@ -2782,7 +2727,6 @@ export function ViewMovimientosInventario({
                             {isOutflow ? "-" : "+"}{Math.abs(mv.amount)} {rt?.unitOfMeasure}
                           </span>
                         </td>
-                        <td className="font-mono text-[9.5px] text-zinc-400">{mv.date}</td>
                         <td className="text-[#69BFB7]">{mv.recordedBy}</td>
                         <td className="italic text-[9px]">{mv.description}</td>
                         <td className="text-right">
@@ -2793,7 +2737,7 @@ export function ViewMovimientosInventario({
                   })}
                   {filteredMovements.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="text-center py-6 text-zinc-500 italic font-mono text-[10px]">
+                      <td colSpan={7} className="text-center py-6 text-zinc-500 italic font-mono text-[10px]">
                         No se registran movimientos para este filtro táctico.
                       </td>
                     </tr>
@@ -2801,17 +2745,6 @@ export function ViewMovimientosInventario({
                 </tbody>
               </table>
             </div>
-
-            {filteredMovements.length > 0 && (
-              <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-4 pt-3 border-t border-[#67ACA9]/10 select-none">
-                <span>Registros {((safePageMovimientos - 1) * pageSizeMovimientos) + 1} - {Math.min(safePageMovimientos * pageSizeMovimientos, filteredMovements.length)} de {filteredMovements.length}</span>
-                <div className="flex gap-1">
-                  <Btn small variant="ghost" onClick={() => setPageMovimientos(p => Math.max(1, p - 1))} disabled={safePageMovimientos === 1}>◄ Anterior</Btn>
-                  <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{safePageMovimientos} / {totalPageMovimientos}</div>
-                  <Btn small variant="ghost" onClick={() => setPageMovimientos(p => Math.min(totalPageMovimientos, p + 1))} disabled={safePageMovimientos === totalPageMovimientos}>Siguiente ►</Btn>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -2841,13 +2774,6 @@ export function ViewAlertasInventario({
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<"success" | "warning">("success");
 
-  const [pageAlertas, setPageAlertas] = useState(1);
-  const pageSizeAlertas = 10;
-
-  useEffect(() => {
-    setPageAlertas(1);
-  }, [filterType]);
-
   const triggerToast = (msg: string, type: "success" | "warning" = "success") => {
     setFeedbackMsg(msg);
     setFeedbackType(type);
@@ -2862,13 +2788,6 @@ export function ViewAlertasInventario({
     if (filterType === "ACTIVAS") return !alert.resolved;
     return true;
   });
-
-  const totalPageAlertas = Math.max(1, Math.ceil(filteredAlerts.length / pageSizeAlertas));
-  const safePageAlertas = Math.min(pageAlertas, totalPageAlertas);
-  const paginatedAlerts = filteredAlerts.slice().slice(
-    (safePageAlertas - 1) * pageSizeAlertas,
-    safePageAlertas * pageSizeAlertas
-  );
 
   const selectedAlert = scopedAlerts.find(a => a.id === selectedAlertId) ?? filteredAlerts[0];
   const activeSelectedId = selectedAlert?.id ?? null;
@@ -2940,8 +2859,8 @@ export function ViewAlertasInventario({
                     setSelectedAlertId(null);
                   }}
                   className={`px-2 py-0.5 text-[9px] uppercase font-bold border transition-all cursor-pointer ${filterType === tab
-                      ? "border-[#69BFB7] text-white bg-[#69BFB7]/15 font-black"
-                      : "border-[#67ACA9]/10 text-[#A4C2C5]/50 hover:text-white"
+                    ? "border-[#69BFB7] text-white bg-[#69BFB7]/15 font-black"
+                    : "border-[#67ACA9]/10 text-[#A4C2C5]/50 hover:text-white"
                     }`}
                 >
                   {tab}
@@ -2963,7 +2882,7 @@ export function ViewAlertasInventario({
                 </tr>
               </thead>
               <tbody>
-                {paginatedAlerts.map(alert => {
+                {filteredAlerts.map(alert => {
                   const camp = camps.find(c => c.id === alert.campId);
                   const inv = campInventories.find(i =>
                     String(i.campId) === String(alert.campId)
@@ -2981,8 +2900,8 @@ export function ViewAlertasInventario({
                       key={alert.id}
                       onClick={() => setSelectedAlertId(alert.id)}
                       className={`cursor-pointer transition-all ${isCurSel
-                          ? "bg-[#69BFB7]/10 border-l-2 border-l-[#69BFB7]"
-                          : "hover:bg-cyan-950/10"
+                        ? "bg-[#69BFB7]/10 border-l-2 border-l-[#69BFB7]"
+                        : "hover:bg-cyan-950/10"
                         }`}
                     >
                       <td>
@@ -3028,16 +2947,6 @@ export function ViewAlertasInventario({
               </tbody>
             </table>
           </div>
-          {filteredAlerts.length > 0 && (
-            <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-2 pt-2 border-t border-[#67ACA9]/10 select-none">
-              <span>Registros {((safePageAlertas - 1) * pageSizeAlertas) + 1} - {Math.min(safePageAlertas * pageSizeAlertas, filteredAlerts.length)} de {filteredAlerts.length}</span>
-              <div className="flex gap-1">
-                <Btn small variant="ghost" onClick={() => setPageAlertas(p => Math.max(1, p - 1))} disabled={safePageAlertas === 1}>◄ Anterior</Btn>
-                <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{safePageAlertas} / {totalPageAlertas}</div>
-                <Btn small variant="ghost" onClick={() => setPageAlertas(p => Math.min(totalPageAlertas, p + 1))} disabled={safePageAlertas === totalPageAlertas}>Siguiente ►</Btn>
-              </div>
-            </div>
-          )}
         </div>
         <div className="mission-card border border-[#67ACA9]/30 bg-[#0d1414]/90 p-4 rounded-sm lg:col-span-5 flex flex-col gap-4">
           <div className="text-xs font-bold text-amber-500 uppercase border-b border-[#67ACA9]/10 pb-1.5 flex justify-between items-center">
@@ -3181,8 +3090,8 @@ export function ViewAlertasInventario({
 
       {feedbackMsg && (
         <div className={`fixed bottom-4 right-4 z-50 p-3 rounded-xs border shadow-lg max-w-sm flex items-start gap-2.5 text-xs text-white ${feedbackType === 'success'
-            ? 'bg-cyan-950 border-[#67ACA9]/40 text-[#A4C2C5]'
-            : 'bg-rose-950 border-rose-500/40 text-rose-200'
+          ? 'bg-cyan-950 border-[#67ACA9]/40 text-[#A4C2C5]'
+          : 'bg-rose-950 border-rose-500/40 text-rose-200'
           }`}>
           {feedbackType === 'success' ? <Check className="h-4 w-4 mt-0.5 text-emerald-400 shrink-0" /> : <AlertTriangle className="h-4 w-4 mt-0.5 text-rose-400 shrink-0" />}
           <span className="mt-0.5 leading-normal">{feedbackMsg}</span>
@@ -3277,15 +3186,6 @@ export function ViewSolicitudesIntercampamento({
   const [searchPersonTerm, setSearchPersonTerm] = useState("");
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [validationPopup, setValidationPopup] = useState<string | null>(null);
-  const [pageMisSolicitudes, setPageMisSolicitudes] = useState(1);
-  const pageSizeMisSolicitudes = 10;
-  const [pagePendientes, setPagePendientes] = useState(1);
-  const pageSizePendientes = 6;
-
-  useEffect(() => {
-    setPageMisSolicitudes(1);
-    setPagePendientes(1);
-  }, [activeTab]);
 
   const selectedOperPersonIds = [assignedScoutId, ...additionalPersonIds].filter(Boolean);
   const availableCamps = camps && camps.length > 1 ? camps : [
@@ -3341,22 +3241,6 @@ export function ViewSolicitudesIntercampamento({
   const pendingRequests = intercampRequests.filter(r => r.status === "PENDING");
   const selectedRequest = intercampRequests.find(r => r.id === activeReqId);
   const currentDetails = requestResourceDetails.filter(d => d.requestId === activeReqId);
-
-  const filteredMisSolicitudes = intercampRequests.filter(r => r.originCampId === currentUser.campId && r.status !== "CANCELED");
-  const totalPagesMisSolicitudes = Math.ceil(filteredMisSolicitudes.length / pageSizeMisSolicitudes) || 1;
-  const safePageMisSolicitudes = Math.min(pageMisSolicitudes, totalPagesMisSolicitudes);
-  const paginatedMisSolicitudes = filteredMisSolicitudes.slice(
-    (safePageMisSolicitudes - 1) * pageSizeMisSolicitudes,
-    safePageMisSolicitudes * pageSizeMisSolicitudes
-  );
-
-  const incomingPendingRequests = intercampRequests.filter(r => r.destinationCampId === currentUser.campId && r.status === "PENDING");
-  const totalPagesPendientes = Math.ceil(incomingPendingRequests.length / pageSizePendientes) || 1;
-  const safePagePendientes = Math.min(pagePendientes, totalPagesPendientes);
-  const paginatedPendientes = incomingPendingRequests.slice(
-    (safePagePendientes - 1) * pageSizePendientes,
-    safePagePendientes * pageSizePendientes
-  );
 
   const [resourceSearch, setResourceSearch] = useState("");
   const [localQtys, setLocalQtys] = useState<Record<string, string>>({});
@@ -3609,8 +3493,8 @@ export function ViewSolicitudesIntercampamento({
         <button
           onClick={() => setActiveTab("emitir")}
           className={`px-4 py-2 text-[10px] sm:text-[11px] font-black uppercase tracking-wider border rounded-xs transition-colors flex items-center gap-1.5 ${activeTab === "emitir"
-              ? "bg-[#67ACA9]/15 border-[#69BFB7] text-[#69BFB7] shadow-md shadow-[#69BFB7]/5"
-              : "bg-black/35 border-[#67ACA9]/15 text-[#A4C2C5]/60 hover:text-white"
+            ? "bg-[#67ACA9]/15 border-[#69BFB7] text-[#69BFB7] shadow-md shadow-[#69BFB7]/5"
+            : "bg-black/35 border-[#67ACA9]/15 text-[#A4C2C5]/60 hover:text-white"
             }`}
         >
           <Plus className="h-3 w-3" />
@@ -3620,8 +3504,8 @@ export function ViewSolicitudesIntercampamento({
         <button
           onClick={() => setActiveTab("mis-solicitudes")}
           className={`px-4 py-2 text-[10px] sm:text-[11px] font-black uppercase tracking-wider border rounded-xs transition-colors flex items-center gap-1.5 ${activeTab === "mis-solicitudes"
-              ? "bg-[#67ACA9]/15 border-[#69BFB7] text-[#69BFB7] shadow-md shadow-[#69BFB7]/5"
-              : "bg-black/35 border-[#67ACA9]/15 text-[#A4C2C5]/60 hover:text-white"
+            ? "bg-[#67ACA9]/15 border-[#69BFB7] text-[#69BFB7] shadow-md shadow-[#69BFB7]/5"
+            : "bg-black/35 border-[#67ACA9]/15 text-[#A4C2C5]/60 hover:text-white"
             }`}
         >
           <FileText className="h-3 w-3" />
@@ -3631,8 +3515,8 @@ export function ViewSolicitudesIntercampamento({
         <button
           onClick={() => setActiveTab("pendientes")}
           className={`px-4 py-2 text-[10px] sm:text-[11px] font-black uppercase tracking-wider border rounded-xs transition-colors flex items-center gap-1.5 ${activeTab === "pendientes"
-              ? "bg-amber-950/20 border-amber-500 text-amber-400 shadow-md shadow-amber-500/5"
-              : "bg-black/35 border-[#67ACA9]/15 text-[#A4C2C5]/60 hover:text-white"
+            ? "bg-amber-950/20 border-amber-500 text-amber-400 shadow-md shadow-amber-500/5"
+            : "bg-black/35 border-[#67ACA9]/15 text-[#A4C2C5]/60 hover:text-white"
             }`}
         >
           <AlertCircle className="h-3 w-3" />
@@ -3846,8 +3730,8 @@ export function ViewSolicitudesIntercampamento({
                               <div
                                 key={rt.id}
                                 className={`p-2 border rounded-xs flex flex-col justify-between gap-1 transition-all duration-200 ${alreadyAdded
-                                    ? "bg-[#67ACA9]/5 border-[#69BFB7]/40 shadow-sm shadow-[#69BFB7]/5"
-                                    : "bg-[#0d1414]/40 border-[#67ACA9]/10 hover:border-[#67ACA9]/30"
+                                  ? "bg-[#67ACA9]/5 border-[#69BFB7]/40 shadow-sm shadow-[#69BFB7]/5"
+                                  : "bg-[#0d1414]/40 border-[#67ACA9]/10 hover:border-[#67ACA9]/30"
                                   }`}
                               >
                                 <div className="flex justify-between items-start gap-1">
@@ -4075,7 +3959,9 @@ export function ViewSolicitudesIntercampamento({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#67ACA9]/5 text-slate-300">
-                    {paginatedMisSolicitudes.map(req => {
+                    {intercampRequests
+                      .filter(r => r.originCampId === currentUser.campId && r.status !== "CANCELED")
+                      .map(req => {
                         const providerCampName = getCampDisplayName(camps, req.destinationCampId);
                         const reqDetails = requestResourceDetails.filter(d => d.requestId === req.id);
                         const numResources = reqDetails.length;
@@ -4099,12 +3985,12 @@ export function ViewSolicitudesIntercampamento({
                             </td>
                             <td className="py-3">
                               <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${req.status === "APPROVED"
-                                  ? "bg-emerald-950/40 text-emerald-300 border-emerald-500/30"
-                                  : req.status === "REJECTED"
-                                    ? "bg-rose-950/40 text-rose-300 border-rose-500/30"
-                                    : req.status === "PENDING"
-                                      ? "bg-amber-950/40 text-amber-300 border-amber-500/30 animate-pulse"
-                                      : "bg-zinc-950/40 text-zinc-400 border-zinc-700/30"
+                                ? "bg-emerald-950/40 text-emerald-300 border-emerald-500/30"
+                                : req.status === "REJECTED"
+                                  ? "bg-rose-950/40 text-rose-300 border-rose-500/30"
+                                  : req.status === "PENDING"
+                                    ? "bg-amber-950/40 text-amber-300 border-amber-500/30 animate-pulse"
+                                    : "bg-zinc-950/40 text-zinc-400 border-zinc-700/30"
                                 }`}>
                                 {req.status === "DRAFT" ? "Borrador" : req.status === "PENDING" ? "Pendiente" : req.status === "APPROVED" ? "Aprobado" : "Rechazado"}
                               </span>
@@ -4169,7 +4055,7 @@ export function ViewSolicitudesIntercampamento({
                           </tr>
                         );
                       })}
-                    {filteredMisSolicitudes.length === 0 && (
+                    {intercampRequests.filter(r => r.originCampId === currentUser.campId && r.status !== "CANCELED").length === 0 && (
                       <tr>
                         <td colSpan={7} className="text-center py-8 text-zinc-500 italic">No ha emitido solicitudes de reabastecimiento aún.</td>
                       </tr>
@@ -4177,17 +4063,6 @@ export function ViewSolicitudesIntercampamento({
                   </tbody>
                 </table>
               </div>
-
-              {filteredMisSolicitudes.length > 0 && (
-                <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-4 pt-3 border-t border-[#67ACA9]/10 select-none">
-                  <span>Registros {((safePageMisSolicitudes - 1) * pageSizeMisSolicitudes) + 1} - {Math.min(safePageMisSolicitudes * pageSizeMisSolicitudes, filteredMisSolicitudes.length)} de {filteredMisSolicitudes.length}</span>
-                  <div className="flex gap-1">
-                    <Btn small variant="ghost" onClick={() => setPageMisSolicitudes(p => Math.max(1, p - 1))} disabled={safePageMisSolicitudes === 1}>◄ Anterior</Btn>
-                    <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{safePageMisSolicitudes} / {totalPagesMisSolicitudes}</div>
-                    <Btn small variant="ghost" onClick={() => setPageMisSolicitudes(p => Math.min(totalPagesMisSolicitudes, p + 1))} disabled={safePageMisSolicitudes === totalPagesMisSolicitudes}>Siguiente ►</Btn>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -4202,7 +4077,9 @@ export function ViewSolicitudesIntercampamento({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {paginatedPendientes.map(req => {
+              {intercampRequests
+                .filter(r => r.destinationCampId === currentUser.campId && r.status === "PENDING")
+                .map(req => {
                   const originName = getCampDisplayName(camps, req.originCampId);
                   const reqDetails = requestResourceDetails.filter(d => d.requestId === req.id);
 
@@ -4283,7 +4160,7 @@ export function ViewSolicitudesIntercampamento({
                   );
                 })}
 
-              {incomingPendingRequests.length === 0 && (
+              {intercampRequests.filter(r => r.destinationCampId === currentUser.campId && r.status === "PENDING").length === 0 && (
                 <div className="col-span-full text-center py-12 text-[#A4C2C5]/50 bg-[#080d0e]/30 border border-[#67ACA9]/10 rounded-sm">
                   <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto mb-2.5" />
                   <span className="text-xs uppercase font-bold tracking-wider">Sin Pendientes</span>
@@ -4292,16 +4169,6 @@ export function ViewSolicitudesIntercampamento({
               )}
             </div>
 
-            {incomingPendingRequests.length > 0 && (
-              <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-4 pt-3 border-t border-[#67ACA9]/10 select-none">
-                <span>Registros {((safePagePendientes - 1) * pageSizePendientes) + 1} - {Math.min(safePagePendientes * pageSizePendientes, incomingPendingRequests.length)} de {incomingPendingRequests.length}</span>
-                <div className="flex gap-1">
-                  <Btn small variant="ghost" onClick={() => setPagePendientes(p => Math.max(1, p - 1))} disabled={safePagePendientes === 1}>◄ Anterior</Btn>
-                  <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{safePagePendientes} / {totalPagesPendientes}</div>
-                  <Btn small variant="ghost" onClick={() => setPagePendientes(p => Math.min(totalPagesPendientes, p + 1))} disabled={safePagePendientes === totalPagesPendientes}>Siguiente ►</Btn>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -4507,8 +4374,8 @@ export function ViewSolicitudesIntercampamento({
                     onClick={handleFinalApprove}
                     disabled={!canApprove}
                     className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded shadow-md transition-all font-sans cursor-pointer ${canApprove
-                        ? "bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400"
-                        : "bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed"
+                      ? "bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400"
+                      : "bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed"
                       }`}
                   >
                     Aprobar y Crear Traslado
@@ -4730,12 +4597,6 @@ export function ViewTraslados({
   const PEOPLE = (campPersonnel && campPersonnel.length > 0) ? campPersonnel : ROSTER_PEOPLE;
   const RATION_FACTOR = 2;
   const [subFilterTab, setSubFilterTab] = useState<"por_preparar" | "solicitados" | "en_transito" | "cerrados">("por_preparar");
-  const [pageTraslados, setPageTraslados] = useState(1);
-  const pageSizeTraslados = 10;
-
-  useEffect(() => {
-    setPageTraslados(1);
-  }, [subFilterTab]);
 
   const displayedTransfers = transfers.filter(t => {
     const req = intercampRequests.find(r => r.id === t.requestId);
@@ -4755,12 +4616,6 @@ export function ViewTraslados({
     }
     return true;
   });
-  const totalPageTraslados = Math.ceil(displayedTransfers.length / pageSizeTraslados) || 1;
-  const safePageTraslados = Math.min(pageTraslados, totalPageTraslados);
-  const paginatedTransfers = displayedTransfers.slice(
-    (safePageTraslados - 1) * pageSizeTraslados,
-    safePageTraslados * pageSizeTraslados
-  );
   const [toastMsg, setToastMsg] = useState("");
   const [showToast, setShowToast] = useState(false);
   const [editingTransferId, setEditingTransferId] = useState<string | null>(null);
@@ -4893,8 +4748,8 @@ export function ViewTraslados({
         <button
           onClick={() => setSubFilterTab("por_preparar")}
           className={`px-2.5 sm:px-4 py-1.5 sm:py-2 font-bold uppercase tracking-wider rounded-md border cursor-pointer transition-all text-[10px] sm:text-xs ${subFilterTab === "por_preparar"
-              ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-900/10"
-              : "bg-black/30 border-gray-800 text-slate-400 hover:text-white"
+            ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-900/10"
+            : "bg-black/30 border-gray-800 text-slate-400 hover:text-white"
             }`}
         >
           <Briefcase className="h-3 w-3 sm:h-3.5 sm:w-3.5 inline mr-1 text-amber-400" />
@@ -4903,8 +4758,8 @@ export function ViewTraslados({
         <button
           onClick={() => setSubFilterTab("solicitados")}
           className={`px-2.5 sm:px-4 py-1.5 sm:py-2 font-bold uppercase tracking-wider rounded-md border cursor-pointer transition-all text-[10px] sm:text-xs ${subFilterTab === "solicitados"
-              ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-900/10"
-              : "bg-black/30 border-gray-800 text-slate-400 hover:text-white"
+            ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-900/10"
+            : "bg-black/30 border-gray-800 text-slate-400 hover:text-white"
             }`}
         >
           <ArrowRightLeft className="h-3 w-3 sm:h-3.5 sm:w-3.5 inline mr-1 text-cyan-400" />
@@ -4913,8 +4768,8 @@ export function ViewTraslados({
         <button
           onClick={() => setSubFilterTab("en_transito")}
           className={`px-2.5 sm:px-4 py-1.5 sm:py-2 font-bold uppercase tracking-wider rounded-md border cursor-pointer transition-all text-[10px] sm:text-xs ${subFilterTab === "en_transito"
-              ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-900/10"
-              : "bg-black/30 border-gray-800 text-slate-400 hover:text-white"
+            ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-900/10"
+            : "bg-black/30 border-gray-800 text-slate-400 hover:text-white"
             }`}
         >
           <Truck className="h-3 w-3 sm:h-3.5 sm:w-3.5 inline mr-1 text-cyan-300" />
@@ -4923,8 +4778,8 @@ export function ViewTraslados({
         <button
           onClick={() => setSubFilterTab("cerrados")}
           className={`px-2.5 sm:px-4 py-1.5 sm:py-2 font-bold uppercase tracking-wider rounded-md border cursor-pointer transition-all text-[10px] sm:text-xs ${subFilterTab === "cerrados"
-              ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-900/10"
-              : "bg-black/30 border-gray-800 text-slate-400 hover:text-white"
+            ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-900/10"
+            : "bg-black/30 border-gray-800 text-slate-400 hover:text-white"
             }`}
         >
           <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 inline mr-1 text-emerald-400" />
@@ -4959,7 +4814,7 @@ export function ViewTraslados({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#67ACA9]/5 text-slate-300 font-mono">
-                {paginatedTransfers.map(t => {
+                {displayedTransfers.map(t => {
                   const req = intercampRequests.find(r => r.id === t.requestId);
                   const originCampName = getCampDisplayName(camps, req?.originCampId);
                   const destinationCampName = getCampDisplayName(camps, req?.destinationCampId);
@@ -4977,12 +4832,12 @@ export function ViewTraslados({
                       <td className="py-3 font-mono">{t.plannedArrivalDate}</td>
                       <td className="py-3 font-sans">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${t.status === "COMPLETED"
-                            ? "bg-emerald-950/40 text-emerald-300 border-emerald-500/30"
-                            : t.status === "CANCELED"
-                              ? "bg-rose-950/40 text-rose-300 border-rose-500/30"
-                              : t.status === "IN_TRANSIT"
-                                ? "bg-cyan-950/40 text-cyan-300 border-cyan-500/30 font-bold"
-                                : "bg-amber-950/40 text-amber-300 border-amber-500/30"
+                          ? "bg-emerald-950/40 text-emerald-300 border-emerald-500/30"
+                          : t.status === "CANCELED"
+                            ? "bg-rose-950/40 text-rose-300 border-rose-500/30"
+                            : t.status === "IN_TRANSIT"
+                              ? "bg-cyan-950/40 text-cyan-300 border-cyan-500/30 font-bold"
+                              : "bg-amber-950/40 text-amber-300 border-amber-500/30"
                           }`}>
                           {t.status === "PENDING_DEPARTURE" ? "Pendiente" : t.status === "IN_TRANSIT" ? "En Tránsito" : t.status === "COMPLETED" ? "Completado" : "Cancelado"}
                         </span>
@@ -5028,17 +4883,6 @@ export function ViewTraslados({
               </tbody>
             </table>
           </div>
-
-          {displayedTransfers.length > 0 && (
-            <div className="flex justify-between items-center text-[10.5px] font-mono text-[#A4C2C5]/50 mt-4 pt-3 border-t border-[#67ACA9]/10 select-none">
-              <span>Registros {((safePageTraslados - 1) * pageSizeTraslados) + 1} - {Math.min(safePageTraslados * pageSizeTraslados, displayedTransfers.length)} de {displayedTransfers.length}</span>
-              <div className="flex gap-1">
-                <Btn small variant="ghost" onClick={() => setPageTraslados(p => Math.max(1, p - 1))} disabled={safePageTraslados === 1}>◄ Anterior</Btn>
-                <div className="bg-[#67ACA9]/20 border border-[#67ACA9]/30 text-white px-2 py-0.5 rounded-sm font-bold text-[10px]">{safePageTraslados} / {totalPageTraslados}</div>
-                <Btn small variant="ghost" onClick={() => setPageTraslados(p => Math.min(totalPageTraslados, p + 1))} disabled={safePageTraslados === totalPageTraslados}>Siguiente ►</Btn>
-              </div>
-            </div>
-          )}
         </div>
       </div>
       {editingTransferId && (
@@ -5527,10 +5371,10 @@ export function ViewTiposDeRecurso({
                         </td>
                         <td className="text-center">
                           <span className={`inline-flex items-center gap-1 font-mono text-[9px] font-black tracking-wider px-2 py-0.5 rounded-sm border ${isCritical
-                              ? 'bg-rose-950/55 text-rose-400 border-rose-500/20'
-                              : isWarning
-                                ? 'bg-amber-950/55 text-amber-400 border-amber-500/20'
-                                : 'bg-emerald-950/55 text-emerald-400 border-emerald-500/20'
+                            ? 'bg-rose-950/55 text-rose-400 border-rose-500/20'
+                            : isWarning
+                              ? 'bg-amber-950/55 text-amber-400 border-amber-500/20'
+                              : 'bg-emerald-950/55 text-emerald-400 border-emerald-500/20'
                             }`}>
                             <span className={`h-1.5 w-1.5 rounded-full ${isCritical ? 'bg-rose-400 animate-pulse' : isWarning ? 'bg-amber-400' : 'bg-emerald-400'}`} />
                             {statusLabel}
@@ -5598,10 +5442,10 @@ export function ViewTiposDeRecurso({
                       <div className="mt-1 flex items-center justify-between border-t border-[#67ACA9]/10 pt-1.5">
                         <span className="text-zinc-500">ESTADO OPERATIVO:</span>
                         <span className={`inline-flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-sm border ${isCritical
-                            ? 'bg-rose-950/55 text-rose-400 border-rose-500/20'
-                            : isWarning
-                              ? 'bg-amber-950/55 text-amber-400 border-amber-500/20'
-                              : 'bg-emerald-950/55 text-emerald-400 border-emerald-500/20'
+                          ? 'bg-rose-950/55 text-rose-400 border-rose-500/20'
+                          : isWarning
+                            ? 'bg-amber-950/55 text-amber-400 border-amber-500/20'
+                            : 'bg-emerald-950/55 text-emerald-400 border-emerald-500/20'
                           }`}>
                           {statusLabel}
                         </span>
@@ -5804,8 +5648,8 @@ export function ViewOficiosCobertura({
                       <td className="py-2.5 px-4 text-[10.5px] text-[#A4C2C5]/90 font-sans leading-relaxed">{occ.description}</td>
                       <td className="py-2.5 px-4 text-center font-mono">
                         <span className={`text-[10.5px] font-black ${occ.collects_resources
-                            ? "text-emerald-400"
-                            : "text-rose-400"
+                          ? "text-emerald-400"
+                          : "text-rose-400"
                           }`}>
                           {occ.collects_resources ? "t" : "f"}
                         </span>
@@ -6590,8 +6434,8 @@ export function ViewHistorialDeTraslado({
               key={f.id}
               onClick={() => setFilterType(f.id)}
               className={`px-3 py-1.5 text-[9.5px] uppercase tracking-wider font-extrabold border rounded-xs transition-colors ${filterType === f.id
-                  ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-sm"
-                  : "bg-black/35 border-transparent text-[#A4C2C5]/60 hover:text-white"
+                ? "bg-[#67ACA9]/20 border-cyan-400 text-cyan-300 shadow-sm"
+                : "bg-black/35 border-transparent text-[#A4C2C5]/60 hover:text-white"
                 }`}
             >
               {f.label}
@@ -6645,14 +6489,14 @@ export function ViewHistorialDeTraslado({
                         key={item.keyId}
                         onClick={() => setSelectedKeyId(item.keyId)}
                         className={`cursor-pointer transition-colors leading-normal text-[10.5px] ${isSelected
-                            ? "bg-[#67ACA9]/15 hover:bg-[#67ACA9]/20 border-l border-cyan-400 font-medium"
-                            : "hover:bg-[#67ACA9]/5 border-b border-[#67ACA9]/5"
+                          ? "bg-[#67ACA9]/15 hover:bg-[#67ACA9]/20 border-l border-cyan-400 font-medium"
+                          : "hover:bg-[#67ACA9]/5 border-b border-[#67ACA9]/5"
                           }`}
                       >
                         <td className="py-2.5 px-1.5">
                           <span className={`px-1.5 py-0.5 rounded-xs font-mono font-black text-[8px] tracking-wider uppercase border ${item.type === "Solicitud"
-                              ? "bg-cyan-950/20 text-cyan-400 border-cyan-500/20"
-                              : "bg-purple-950/20 text-purple-300 border-purple-500/20"
+                            ? "bg-cyan-950/20 text-cyan-400 border-cyan-500/20"
+                            : "bg-purple-950/20 text-purple-300 border-purple-500/20"
                             }`}>
                             {item.type}
                           </span>
@@ -6676,8 +6520,8 @@ export function ViewHistorialDeTraslado({
                               setSelectedKeyId(item.keyId);
                             }}
                             className={`px-2 py-0.5 rounded-xs font-black uppercase text-[8.5px] tracking-wider transition-all border ${isSelected
-                                ? "bg-cyan-400 text-black border-cyan-400"
-                                : "bg-black/40 text-cyan-300 border-cyan-400/25 hover:bg-cyan-400 hover:text-black"
+                              ? "bg-cyan-400 text-black border-cyan-400"
+                              : "bg-black/40 text-cyan-300 border-cyan-400/25 hover:bg-cyan-400 hover:text-black"
                               }`}
                           >
                             Detalle
@@ -6695,7 +6539,7 @@ export function ViewHistorialDeTraslado({
               </table>
             </div>
 
-            {filteredUnifiedItems.length > 0 && (
+            {filteredUnifiedItems.length > historyPageSize && (
               <div className="flex items-center justify-between gap-3 border-t border-[#67ACA9]/10 pt-3 mt-3">
                 <span className="text-[9.5px] text-[#A4C2C5]/55 uppercase font-mono">
                   Mostrando {((safeHistoryPage - 1) * historyPageSize) + 1}-{Math.min(safeHistoryPage * historyPageSize, filteredUnifiedItems.length)} de {filteredUnifiedItems.length}
