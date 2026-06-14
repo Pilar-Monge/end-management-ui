@@ -311,12 +311,12 @@ function TopHud({
     const updateTime = () => {
       if (!serverBase) return;
       const now = new Date(serverBase.getTime() + (Date.now() - clientBase));
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, "0");
-      const dd = String(now.getDate()).padStart(2, "0");
-      const hh = String(now.getHours()).padStart(2, "0");
-      const min = String(now.getMinutes()).padStart(2, "0");
-      const sec = String(now.getSeconds()).padStart(2, "0");
+      const yyyy = now.getUTCFullYear();
+      const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(now.getUTCDate()).padStart(2, "0");
+      const hh = String(now.getUTCHours()).padStart(2, "0");
+      const min = String(now.getUTCMinutes()).padStart(2, "0");
+      const sec = String(now.getUTCSeconds()).padStart(2, "0");
       setTimeString(`${yyyy}-${mm}-${dd} ${hh}:${min}:${sec}`);
     };
 
