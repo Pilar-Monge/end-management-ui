@@ -381,6 +381,14 @@ function TopHud({
         if (!cancelled) updateTime();
       } catch (error) {
         console.warn("Server time unavailable:", error);
+        try {
+          const status = await checkCurrentSessionStatus();
+          if (status === "expired" && !cancelled) {
+            redirectExpiredLogicalSession();
+          }
+        } catch (sessionError) {
+          console.warn("Unable to validate expedition session after server time sync failed:", sessionError);
+        }
       }
     }
 
@@ -392,7 +400,7 @@ function TopHud({
       window.clearInterval(clockInterval);
       window.clearInterval(syncInterval);
     };
-  }, [validateSessionAfterLogicalTimeJump]);
+  }, [redirectExpiredLogicalSession, validateSessionAfterLogicalTimeJump]);
 
   const getInitials = (name: string) => {
     return (name || "")
