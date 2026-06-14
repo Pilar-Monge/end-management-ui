@@ -301,14 +301,15 @@ function TopHud({
   onProfileClick: () => void;
   onLogout: () => void;
 }) {
-  const [timeString, setTimeString] = useState("");
+  const [timeString, setTimeString] = useState("Sin sincronizar");
 
   useEffect(() => {
     let cancelled = false;
-    let serverBase = new Date();
+    let serverBase: Date | null = null;
     let clientBase = Date.now();
 
     const updateTime = () => {
+      if (!serverBase) return;
       const now = new Date(serverBase.getTime() + (Date.now() - clientBase));
       const yyyy = now.getFullYear();
       const mm = String(now.getMonth() + 1).padStart(2, "0");
@@ -321,21 +322,23 @@ function TopHud({
 
     async function syncServerTime() {
       try {
-        serverBase = new Date(await getServerTime());
+        const syncedTime = new Date(await getServerTime());
+        if (Number.isNaN(syncedTime.getTime())) return;
+        serverBase = syncedTime;
         clientBase = Date.now();
+        if (!cancelled) updateTime();
       } catch (error) {
-        console.warn("Server time unavailable, using browser clock:", error);
-        serverBase = new Date();
-        clientBase = Date.now();
+        console.warn("Server time unavailable:", error);
       }
-      if (!cancelled) updateTime();
     }
 
     syncServerTime();
-    const interval = window.setInterval(updateTime, 1000);
+    const clockInterval = window.setInterval(updateTime, 1000);
+    const syncInterval = window.setInterval(syncServerTime, 60_000);
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      window.clearInterval(clockInterval);
+      window.clearInterval(syncInterval);
     };
   }, []);
 

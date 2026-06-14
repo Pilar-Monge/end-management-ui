@@ -291,8 +291,12 @@ export async function getCurrentExpeditionUser(): Promise<CurrentExpeditionUser>
 }
 
 export async function getServerTime(): Promise<string> {
-  const payload = asRecord(await apiRequest<unknown>('/system/time', { withAuth: false }))
-  return str(payload.serverTime, new Date().toISOString())
+  const payload = asRecord(await apiRequest<unknown>('/system/time'))
+  const serverTime = str(payload.serverTime)
+  if (!serverTime) {
+    throw new Error('Server time response did not include serverTime')
+  }
+  return serverTime
 }
 
 async function getServerTimestamp(): Promise<string> {
