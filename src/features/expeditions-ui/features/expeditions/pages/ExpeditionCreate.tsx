@@ -11,6 +11,7 @@ import {
   getServerTime,
   listAvailablePeople,
   listCampInventory,
+  type CampInventoryResource,
   type ExpeditionPerson,
 } from "../../../services/expeditionsUi.service";
 
@@ -63,6 +64,24 @@ const PERSON_CAMP_MAPPING: Record<number, string> = {
 };
 
 type PersonCard = ExpeditionPerson & { age?: number; img?: string };
+
+type ResourceKey = "foodRations" | "waterLiters" | "medicalKits" | "defenseUnits" | "otherUnits";
+
+type InventoryBucket = {
+  current_amount: number;
+  minimum_alert_amount: number;
+  unit: string;
+  resourceNames: string[];
+  hasRecord: boolean;
+};
+
+const emptyInventoryBucket = (unit: string): InventoryBucket => ({
+  current_amount: 0,
+  minimum_alert_amount: 0,
+  unit,
+  resourceNames: [],
+  hasRecord: false,
+});
 
 const allowedExpeditionRoles = [
   "SCOUT",
@@ -259,11 +278,11 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
   });
   const [peopleCards, setPeopleCards] = useState<PersonCard[]>([]);
   const [inventoryByKey, setInventoryByKey] = useState({
-    foodRations: { current_amount: 0, minimum_alert_amount: 0, unit: "raciones" },
-    waterLiters: { current_amount: 0, minimum_alert_amount: 0, unit: "litros" },
-    medicalKits: { current_amount: 0, minimum_alert_amount: 0, unit: "kits" },
-    defenseUnits: { current_amount: 0, minimum_alert_amount: 0, unit: "unidades" },
-    otherUnits: { current_amount: 0, minimum_alert_amount: 0, unit: "unidades" }
+    foodRations: emptyInventoryBucket("raciones"),
+    waterLiters: emptyInventoryBucket("litros"),
+    medicalKits: emptyInventoryBucket("kits"),
+    defenseUnits: emptyInventoryBucket("unidades"),
+    otherUnits: emptyInventoryBucket("unidades")
   });
   const [backendWarning, setBackendWarning] = useState<string | null>(null);
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
@@ -290,25 +309,38 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
           img: person.img || `https://i.pravatar.cc/150?u=${person.id}`,
         })));
 
-        const findInventory = (...categories: string[]) => {
+        const aggregateInventory = (unit: string, ...categories: string[]): InventoryBucket => {
           const normalized = categories.map(category => category.toUpperCase());
-          return inventory.find(item => normalized.includes(item.category.toUpperCase()));
+          const matches = inventory.filter(item => normalized.includes(item.category.toUpperCase()));
+
+          if (matches.length === 0) {
+            return emptyInventoryBucket(unit);
+          }
+
+          return {
+            current_amount: matches.reduce((total, item) => total + item.currentAmount, 0),
+            minimum_alert_amount: matches.reduce((total, item) => total + item.minimumAlertAmount, 0),
+            unit: matches[0]?.unit ?? unit,
+            resourceNames: matches.map((item: CampInventoryResource) => item.resourceTypeName),
+            hasRecord: true,
+          };
         };
-        const toInventoryItem = (item: ReturnType<typeof findInventory> | undefined, unit: string) => ({
-          current_amount: item?.currentAmount ?? 0,
-          minimum_alert_amount: item?.minimumAlertAmount ?? 0,
-          unit: item?.unit ?? unit,
-        });
 
         setInventoryByKey({
-          foodRations: toInventoryItem(findInventory("FOOD"), "raciones"),
-          waterLiters: toInventoryItem(findInventory("WATER"), "litros"),
-          medicalKits: toInventoryItem(findInventory("MEDICAL"), "kits"),
-          defenseUnits: toInventoryItem(findInventory("DEFENSE", "AMMUNITION"), "unidades"),
-          otherUnits: toInventoryItem(findInventory("OTHER"), "unidades"),
+          foodRations: aggregateInventory("raciones", "FOOD"),
+          waterLiters: aggregateInventory("litros", "WATER"),
+          medicalKits: aggregateInventory("kits", "MEDICAL", "HEALTH"),
+          defenseUnits: aggregateInventory("unidades", "DEFENSE", "AMMUNITION", "EQUIPMENT", "TOOLS"),
+          otherUnits: aggregateInventory("unidades", "OTHER", "MATERIAL", "MATERIALS"),
         });
-        if (people.length === 0 || inventory.length === 0) {
-          setBackendWarning("Algunos endpoints de lectura aun no estan habilitados para TRAVEL_MANAGER; se muestran solo datos disponibles del backend.");
+        if (inventory.length === 0) {
+          setBackendWarning("El campamento actual no tiene registros de inventario disponibles para solicitar recursos.");
+        } else if (inventory.every((item) => item.currentAmount <= item.minimumAlertAmount)) {
+          setBackendWarning("El inventario del campamento esta en cero o reservado; no hay stock libre para solicitar recursos.");
+        } else if (people.length === 0) {
+          setBackendWarning("No hay personas disponibles para asignar en este momento.");
+        } else {
+          setBackendWarning(null);
         }
       } catch (err) {
         console.warn("Backend auth/context failed in ExpeditionCreate:", err);
@@ -353,6 +385,18 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
 
   const mockCampInventory = inventoryByKey;
 
+  const getAvailableForUse = (key: ResourceKey) => {
+    const inv = mockCampInventory[key];
+    return Math.max(0, inv.current_amount - inv.minimum_alert_amount);
+  };
+
+  const getInventoryDescription = (key: ResourceKey) => {
+    const inv = mockCampInventory[key];
+    if (!inv.hasRecord) return "Sin registro de inventario para esta categoria.";
+    const names = inv.resourceNames.length > 0 ? ` Recursos: ${inv.resourceNames.join(", ")}.` : "";
+    return `Inventario: ${inv.current_amount} ${inv.unit}, reserva minima: ${inv.minimum_alert_amount} ${inv.unit}.${names}`;
+  };
+
   const RATION_PER_PERSON_PER_DAY = 1;
 
   const expeditionDays = calculateExpeditionDays(departureDate, returnDate);
@@ -364,7 +408,7 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
     selectedPeople.length * expeditionDays * RATION_PER_PERSON_PER_DAY;
 
   const getResourceError = (
-    key: "foodRations" | "waterLiters" | "medicalKits" | "defenseUnits" | "otherUnits",
+    key: ResourceKey,
     val: number
   ) => {
     if (val < 0) {
@@ -372,7 +416,7 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
     }
 
     const inv = mockCampInventory[key];
-    const availableForUse = inv.current_amount - inv.minimum_alert_amount;
+    const availableForUse = getAvailableForUse(key);
 
     if (key === "foodRations" || key === "waterLiters") {
       if (val < 1) {
@@ -382,6 +426,10 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
       if (val > maxAllowed) {
         return `Excede el límite recomendado según participantes y días (Máx: ${maxAllowed}).`;
       }
+    }
+
+    if (!inv.hasRecord && val > 0) {
+      return "No hay registro de inventario para este tipo de recurso en el campamento.";
     }
 
     if (val > availableForUse) {
@@ -961,6 +1009,12 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
                   Estos recursos se solicitan antes de la salida. Las cantidades están sujetas a la disponibilidad actual de almacén y a las reservas de seguridad del campamento base. Los recursos obtenidos al regresar se calcularán de manera automatizada.
                 </p>
 
+                {backendWarning && (
+                  <div className="mb-4 border border-amber-400/30 bg-amber-950/15 p-3 rounded-sm text-[10px] font-mono text-amber-200 leading-relaxed">
+                    {backendWarning}
+                  </div>
+                )}
+
                 {adventureOriginInfo && (
                   <div className="border-l-[3px] border-[#69BFB7] bg-[#69BFB7]/5 p-3 rounded-r-sm mb-4 text-xs font-mono">
                     <span className="text-[10.5px] font-bold text-[#69BFB7] uppercase block mb-1">
@@ -994,7 +1048,8 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
                       }}
                     />
                     <div className="text-[10px] font-mono text-[#A4C2C5]/70">
-                      Disponible para uso: <strong className="text-emerald-400">{mockCampInventory.foodRations.current_amount - mockCampInventory.foodRations.minimum_alert_amount}</strong> (Inventario: {mockCampInventory.foodRations.current_amount}, Reserva mínima: {mockCampInventory.foodRations.minimum_alert_amount})
+                      Disponible para uso: <strong className="text-emerald-400">{getAvailableForUse("foodRations")}</strong> {mockCampInventory.foodRations.unit}
+                      <span className="block text-[#A4C2C5]/55">{getInventoryDescription("foodRations")}</span>
                     </div>
                     <div className="text-[9.5px] font-mono text-[#A4C2C5]/50 leading-relaxed pt-1.5 border-t border-[#67ACA9]/10">
                       <div>Máximo recomendado: <strong className="text-[#69BFB7]">{maxFoodRations} raciones</strong></div>
@@ -1025,7 +1080,8 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
                       }}
                     />
                     <div className="text-[10px] font-mono text-[#A4C2C5]/70">
-                      Disponible para uso: <strong className="text-emerald-400">{mockCampInventory.waterLiters.current_amount - mockCampInventory.waterLiters.minimum_alert_amount}</strong> (Inventario: {mockCampInventory.waterLiters.current_amount}, Reserva mínima: {mockCampInventory.waterLiters.minimum_alert_amount})
+                      Disponible para uso: <strong className="text-emerald-400">{getAvailableForUse("waterLiters")}</strong> {mockCampInventory.waterLiters.unit}
+                      <span className="block text-[#A4C2C5]/55">{getInventoryDescription("waterLiters")}</span>
                     </div>
                     <div className="text-[9.5px] font-mono text-[#A4C2C5]/50 leading-relaxed pt-1.5 border-t border-[#67ACA9]/10">
                       <div>Máximo recomendado: <strong className="text-[#69BFB7]">{maxWaterLiters} litros</strong></div>
@@ -1056,7 +1112,8 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
                       }}
                     />
                     <div className="text-[10px] font-mono text-[#A4C2C5]/70">
-                      Disponible para uso: <strong className="text-emerald-400">{mockCampInventory.medicalKits.current_amount - mockCampInventory.medicalKits.minimum_alert_amount}</strong> (Inventario: {mockCampInventory.medicalKits.current_amount}, Reserva mínima: {mockCampInventory.medicalKits.minimum_alert_amount})
+                      Disponible para uso: <strong className="text-emerald-400">{getAvailableForUse("medicalKits")}</strong> {mockCampInventory.medicalKits.unit}
+                      <span className="block text-[#A4C2C5]/55">{getInventoryDescription("medicalKits")}</span>
                     </div>
                     {getResourceError("medicalKits", requestedResources.medicalKits) && (
                       <div className="text-red-400 font-mono text-[10px] mt-1 bg-red-950/20 border border-red-500/30 p-2 rounded-xs leading-relaxed">
@@ -1083,7 +1140,8 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
                       }}
                     />
                     <div className="text-[10px] font-mono text-[#A4C2C5]/70">
-                      Disponible para uso: <strong className="text-emerald-400">{mockCampInventory.defenseUnits.current_amount - mockCampInventory.defenseUnits.minimum_alert_amount}</strong> (Inventario: {mockCampInventory.defenseUnits.current_amount}, Reserva mínima: {mockCampInventory.defenseUnits.minimum_alert_amount})
+                      Disponible para uso: <strong className="text-emerald-400">{getAvailableForUse("defenseUnits")}</strong> {mockCampInventory.defenseUnits.unit}
+                      <span className="block text-[#A4C2C5]/55">{getInventoryDescription("defenseUnits")}</span>
                     </div>
                     {getResourceError("defenseUnits", requestedResources.defenseUnits) && (
                       <div className="text-red-400 font-mono text-[10px] mt-1 bg-red-950/20 border border-red-500/30 p-2 rounded-xs leading-relaxed">
@@ -1110,7 +1168,8 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
                       }}
                     />
                     <div className="text-[10px] font-mono text-[#A4C2C5]/70">
-                      Disponible para uso: <strong className="text-emerald-400">{mockCampInventory.otherUnits.current_amount - mockCampInventory.otherUnits.minimum_alert_amount}</strong> (Inventario: {mockCampInventory.otherUnits.current_amount}, Reserva mínima: {mockCampInventory.otherUnits.minimum_alert_amount})
+                      Disponible para uso: <strong className="text-emerald-400">{getAvailableForUse("otherUnits")}</strong> {mockCampInventory.otherUnits.unit}
+                      <span className="block text-[#A4C2C5]/55">{getInventoryDescription("otherUnits")}</span>
                     </div>
                     {getResourceError("otherUnits", requestedResources.otherUnits) && (
                       <div className="text-red-400 font-mono text-[10px] mt-1 bg-red-950/20 border border-red-500/30 p-2 rounded-xs leading-relaxed">
