@@ -41,6 +41,7 @@ import type { Mode } from '../constants/sceneConfigs'
 import { MODES } from '../constants/sceneConfigs'
 import { CAMPS } from '../constants/campData'
 import { STORY_STEPS } from '../constants/storyData'
+import { useAmbientAudio } from '../hooks/useAmbientAudio'
 import { getTerrainY } from '../utils/three/lightingHelpers'
 import '../mainHomepage.css'
 
@@ -148,6 +149,8 @@ export function MainHomePage() {
   void setSelectedCamp
   void isLocked
   void setShowCredits
+
+  useAmbientAudio({ appState, currentMode, volume })
 
   const isAnyMenuOpen =
     isSettingsModalOpen ||
