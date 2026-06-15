@@ -152,6 +152,12 @@ export function MainHomePage() {
 
   useAmbientAudio({ appState, currentMode, volume })
 
+  useEffect(() => {
+    if ('fonts' in document) {
+      void document.fonts.load('400 48px Creepster')
+    }
+  }, [])
+
   const isAnyMenuOpen =
     isSettingsModalOpen ||
     isModePanelOpen ||
@@ -615,6 +621,9 @@ export function MainHomePage() {
     const scene = sceneRef.current
 
     scene.background = new THREE.Color(config.skyColor)
+    if (rendererRef.current) {
+      rendererRef.current.domElement.style.backgroundColor = config.skyColor
+    }
     if (scene.fog instanceof THREE.FogExp2) {
       scene.fog.color.set(config.fogColor)
       scene.fog.density = config.fogDensity
@@ -727,6 +736,7 @@ export function MainHomePage() {
     if (containerRef.current) {
       containerRef.current.innerHTML = ''
       renderer.domElement.style.display = 'block'
+      renderer.domElement.style.backgroundColor = MODES[currentModeRef.current].skyColor
       containerRef.current.appendChild(renderer.domElement)
     }
     rendererRef.current = renderer
@@ -1307,7 +1317,7 @@ export function MainHomePage() {
         opacity: 0.4,
       }),
     )
-    rain.visible = false
+    rain.visible = !!MODES[currentModeRef.current].isRaining
     scene.add(rain)
     rainRef.current = rain
 
@@ -1452,6 +1462,9 @@ export function MainHomePage() {
         })
 
         if (rainRef.current?.visible) {
+          rainRef.current.position.x = camera.position.x
+          rainRef.current.position.z = camera.position.z
+
           const pos = rainRef.current.geometry.attributes.position.array as Float32Array
           for (let i = 0; i < pos.length; i += 6) {
             const fall = 4.0
@@ -1577,14 +1590,21 @@ export function MainHomePage() {
   }, [])
   void handleFPClick
 
+  const sceneBackdropColor = appState === 'intro' ? MODES.Storm.skyColor : MODES[currentMode].skyColor
+
   return (
-    <div className="fixed inset-0 overflow-hidden bg-black font-sans text-white">
+    <div className="fixed inset-0 isolate overflow-hidden bg-black font-sans text-white">
       <div className="crt-overlay" />
       <div className="scanline" />
       <div className="vignette" />
 
       {shouldMountScene && (
-        <div ref={containerRef} className="absolute inset-0 z-0" data-menu-open={isAnyMenuOpen} />
+        <div
+          ref={containerRef}
+          className="absolute inset-0 z-0"
+          data-menu-open={isAnyMenuOpen}
+          style={{ backgroundColor: sceneBackdropColor }}
+        />
       )}
 
       <audio ref={audioRef} />
@@ -1656,7 +1676,8 @@ export function MainHomePage() {
               animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
               exit={{ opacity: 0, y: -20, filter: 'blur(10px)' }}
               transition={{ duration: 1.5, ease: 'easeInOut' }}
-              className="text-2xl md:text-4xl font-bold text-center max-w-2xl px-4 drop-shadow-2xl tracking-widest uppercase text-white"
+              className="intro-story-text text-center max-w-4xl px-4 uppercase"
+              data-text={STORY_STEPS[storyIndex]}
             >
               {STORY_STEPS[storyIndex]}
             </motion.div>
@@ -1712,16 +1733,17 @@ export function MainHomePage() {
                     <motion.div
                       initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
                       animate={{
-                        opacity: [0, 1, 1, 0],
-                        y: [20, 0, 0, -20],
-                        filter: ['blur(10px)', 'blur(0px)', 'blur(0px)', 'blur(10px)'],
+                        opacity: [0, 1, 1],
+                        y: [20, 0, 0],
+                        filter: ['blur(10px)', 'blur(0px)', 'blur(0px)'],
                       }}
                       transition={{
-                        times: [0, 0.2, 0.7, 0.9],
+                        times: [0, 0.2, 1],
                         duration: bridgeVideoDuration || 5,
                         ease: 'easeInOut',
                       }}
-                      className="text-2xl md:text-4xl font-bold text-center max-w-2xl px-4 drop-shadow-2xl tracking-widest uppercase text-white"
+                      className="intro-story-text intro-story-text--bridge text-center max-w-4xl px-4 uppercase"
+                      data-text={STORY_STEPS[5]}
                     >
                       {STORY_STEPS[5]}
                     </motion.div>
@@ -1767,6 +1789,25 @@ export function MainHomePage() {
                       src={MEDIA_URLS.videos.transition}
                     />
                   )}
+                  <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                    <motion.div
+                      initial={{ opacity: 0, y: 18, filter: 'blur(10px)' }}
+                      animate={{
+                        opacity: [0, 1, 1],
+                        y: [18, 0, 0],
+                        filter: ['blur(10px)', 'blur(0px)', 'blur(0px)'],
+                      }}
+                      transition={{
+                        times: [0, 0.18, 1],
+                        duration: 6,
+                        ease: 'easeInOut',
+                      }}
+                      className="intro-story-text intro-story-text--bridge text-center max-w-4xl px-4 uppercase"
+                      data-text={STORY_STEPS[6]}
+                    >
+                      {STORY_STEPS[6]}
+                    </motion.div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -2603,8 +2644,8 @@ export function MainHomePage() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 1 }}
-                        className="text-[9px] md:text-[11px] font-bold text-center drop-shadow-lg tracking-[0.3em] uppercase text-white/80 max-w-2xl mx-auto"
-                        style={{ fontFamily: "'Oswald', sans-serif" }}
+                        className="intro-story-text intro-story-text--map text-center max-w-2xl mx-auto uppercase"
+                        data-text={STORY_STEPS[mapTextIndex]}
                       >
                         {STORY_STEPS[mapTextIndex]}
                       </motion.div>
