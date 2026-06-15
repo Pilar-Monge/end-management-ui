@@ -94,6 +94,63 @@
   animation: titleDecodeFlicker 0.12s steps(1) infinite;
 }
 
+.intro-story-text {
+  position: relative;
+  color: #ffffff;
+  font-family: var(--font-horror) !important;
+  font-size: clamp(1.45rem, 4vw, 3.7rem);
+  font-weight: 400;
+  line-height: 0.96;
+  letter-spacing: 0.035em;
+  text-wrap: balance;
+  -webkit-text-stroke: 1px rgba(8, 12, 18, 0.9);
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.95),
+    0 0 12px rgba(255, 255, 255, 0.35),
+    0 0 30px rgba(15, 23, 42, 0.9),
+    3px 5px 0 rgba(0, 0, 0, 0.72);
+  filter: contrast(1.08);
+  isolation: isolate;
+  animation: introTextDread 4.2s ease-in-out infinite;
+}
+
+.intro-story-text--bridge {
+  font-size: clamp(1.65rem, 4.5vw, 4.15rem);
+}
+
+.intro-story-text--map {
+  font-size: clamp(0.85rem, 1.9vw, 1.45rem);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.95),
+    0 0 8px rgba(255, 255, 255, 0.3),
+    0 0 20px rgba(15, 23, 42, 0.85),
+    2px 3px 0 rgba(0, 0, 0, 0.72);
+}
+
+@keyframes introTextDread {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-0.2deg);
+    opacity: 0.98;
+  }
+  18% {
+    transform: translate3d(-1px, 1px, 0) rotate(0.15deg);
+  }
+  21% {
+    transform: translate3d(2px, -1px, 0) rotate(-0.4deg);
+    opacity: 0.9;
+  }
+  24% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  72% {
+    transform: translate3d(1px, 0, 0) rotate(0.25deg);
+  }
+}
+
 @keyframes titleDecodeFlicker {
   0%,
   100% {

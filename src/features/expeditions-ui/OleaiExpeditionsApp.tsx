@@ -19,7 +19,12 @@ import {
   listExpeditionNotifications,
   markNotificationRead,
 } from "./services/expeditionsUi.service";
-import { checkCurrentSessionStatus, clearCachedSession, logoutCurrentSession } from "../../shared/services/sessionProfile";
+import {
+  checkCurrentSessionStatus,
+  clearCachedSession,
+  logoutCurrentSession,
+  readCachedSessionUser,
+} from "../../shared/services/sessionProfile";
 
 const LOGICAL_TIME_SESSION_CHECK_THRESHOLD_MS = 60 * 1000;
 
@@ -67,6 +72,44 @@ const fallbackUser: CurrentUser = {
   photoUrl: undefined
 };
 
+const EXPEDITION_CAMP_NAMES: Record<number, string> = {
+  1: "Alpha Bunker",
+  2: "Sierra Base",
+  3: "Delta Refuge",
+  4: "Omega Fortress",
+  5: "Echo Outpost",
+};
+
+function resolveInitialCurrentUser(): CurrentUser {
+  const cachedUser = readCachedSessionUser();
+  const campId = typeof cachedUser?.campId === "number" && Number.isFinite(cachedUser.campId)
+    ? cachedUser.campId
+    : fallbackUser.campId;
+  const username = typeof cachedUser?.username === "string" && cachedUser.username.trim()
+    ? cachedUser.username.trim()
+    : fallbackUser.username;
+  const role = typeof cachedUser?.role === "string" && cachedUser.role.trim()
+    ? cachedUser.role.trim()
+    : typeof cachedUser?.rol === "string" && cachedUser.rol.trim()
+      ? cachedUser.rol.trim()
+      : fallbackUser.role;
+
+  return {
+    ...fallbackUser,
+    id: typeof cachedUser?.id === "number" ? cachedUser.id : fallbackUser.id,
+    username,
+    name: username === fallbackUser.username ? fallbackUser.name : username,
+    role,
+    campId,
+    campName: EXPEDITION_CAMP_NAMES[campId] ?? `Campamento ${campId}`,
+  };
+}
+
+function hasCachedCampContext(): boolean {
+  const cachedUser = readCachedSessionUser();
+  return typeof cachedUser?.campId === "number" && Number.isFinite(cachedUser.campId);
+}
+
 const NAVIGATION_DATA = [
   { id: "exploration", label: "Mapa y Zonas", icon: <CompassIcon />, subOptions: ["Analizador Satelital"] },
   { id: "personas", label: "Personas", icon: <SquadIcon />, subOptions: ["Lista de Personas"] },
@@ -79,13 +122,14 @@ export default function App() {
   const [showLoading, setShowLoading] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasEntered, setHasEntered] = useState(false);
+  const [hasSessionContext, setHasSessionContext] = useState(() => hasCachedCampContext());
 
-  const [currentUser, setCurrentUser] = useState<CurrentUser>(fallbackUser);
+  const [currentUser, setCurrentUser] = useState<CurrentUser>(() => resolveInitialCurrentUser());
 
   const [activeNav, setActiveNav] = useState<string | null>(null);
   const [activeSub, setActiveSub] = useState<string>("");
   const [activeExpId, setActiveExpId] = useState<number | undefined>(undefined);
-  const [activeCampId, setActiveCampId] = useState<number>(fallbackUser.campId);
+  const [activeCampId, setActiveCampId] = useState<number>(() => resolveInitialCurrentUser().campId);
 
   useEffect(() => {
     let isMounted = true;
@@ -107,6 +151,10 @@ export default function App() {
         setActiveCampId(user.campId);
       } catch (err) {
         console.warn("Backend auth unavailable, staying with fallbackUser:", err);
+      } finally {
+        if (isMounted) {
+          setHasSessionContext(true);
+        }
       }
     }
 
@@ -214,11 +262,13 @@ export default function App() {
         />
       )}
 
-      {hasEntered && (
+      {hasEntered && hasSessionContext && (
         <div className="fixed bottom-[22px] left-[22px] z-[70] pointer-events-auto flex items-center gap-2 px-3 py-1.5 bg-[#030d0d]/90 border border-[#67ACA9]/40 rounded text-[#A4C2C5] select-none shadow-[0_0_15px_rgba(103,172,169,0.25)] font-mono text-[10px] tracking-wider uppercase">
           <span className="text-[#69BFB7] font-bold">⬡</span>
           <span className="tracking-widest font-black">
-            {currentUser.campName || `Campamento ${activeCampId}`}
+            {currentUser.campId === activeCampId && currentUser.campName
+              ? currentUser.campName
+              : EXPEDITION_CAMP_NAMES[activeCampId] ?? `Campamento ${activeCampId}`}
           </span>
           <button 
             onClick={() => {
@@ -234,7 +284,15 @@ export default function App() {
         </div>
       )}
 
-      {hasEntered && (
+      {hasEntered && !hasSessionContext && (
+        <div className="main-area flex items-center justify-center">
+          <div className="px-5 py-3 bg-[#030d0d]/90 border border-[#67ACA9]/40 rounded text-[#69BFB7] font-mono text-[10px] tracking-[0.24em] uppercase">
+            Sincronizando campamento activo...
+          </div>
+        </div>
+      )}
+
+      {hasEntered && hasSessionContext && (
         <div className="main-area">
           {!activeNav || activeNav === "exploration" ? (
             <div className="content-scroll">
@@ -244,7 +302,11 @@ export default function App() {
                 <div className="settings-inner-padding settings-inner h-full" style={{ overflow: "hidden" }}>
                   <div className="watermark-x" aria-hidden="true" />
                   <div className="inner-content">
-                    <ZoneAnalysis key={activeCampId} onNavigate={handleInnerNavigation} />
+                    <ZoneAnalysis
+                      key={activeCampId}
+                      activeCampId={activeCampId}
+                      onNavigate={handleInnerNavigation}
+                    />
                   </div>
                 </div>
               </section>
@@ -282,7 +344,7 @@ export default function App() {
         </div>
       )}
 
-      {hasEntered && (
+      {hasEntered && hasSessionContext && (
         <>
           <BottomDock activeDock={activeNav} onSelect={handleNavClick} />
         </>
@@ -381,6 +443,14 @@ function TopHud({
         if (!cancelled) updateTime();
       } catch (error) {
         console.warn("Server time unavailable:", error);
+        try {
+          const status = await checkCurrentSessionStatus();
+          if (status === "expired" && !cancelled) {
+            redirectExpiredLogicalSession();
+          }
+        } catch (sessionError) {
+          console.warn("Unable to validate expedition session after server time sync failed:", sessionError);
+        }
       }
     }
 
@@ -392,7 +462,7 @@ function TopHud({
       window.clearInterval(clockInterval);
       window.clearInterval(syncInterval);
     };
-  }, [validateSessionAfterLogicalTimeJump]);
+  }, [redirectExpiredLogicalSession, validateSessionAfterLogicalTimeJump]);
 
   const getInitials = (name: string) => {
     return (name || "")
@@ -683,7 +753,7 @@ function ContentArea({
 }) {
   const VIEW_MAP: Record<string, Record<string, React.ReactNode>> = {
     exploration: {
-       "Analizador Satelital": <ZoneAnalysis key={activeCampId} onNavigate={onNavigate} />
+       "Analizador Satelital": <ZoneAnalysis key={activeCampId} activeCampId={activeCampId} onNavigate={onNavigate} />
     },
     expediciones: {
       "DASHBOARD": <ExpeditionDashboard onNavigate={onNavigate} />,
