@@ -3186,6 +3186,7 @@ export function ViewSolicitudesIntercampamento({
   const [searchPersonTerm, setSearchPersonTerm] = useState("");
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [validationPopup, setValidationPopup] = useState<string | null>(null);
+  const [isApproving, setIsApproving] = useState(false);
 
   const selectedOperPersonIds = [assignedScoutId, ...additionalPersonIds].filter(Boolean);
   const availableCamps = camps && camps.length > 1 ? camps : [
@@ -3346,15 +3347,20 @@ export function ViewSolicitudesIntercampamento({
       return;
     }
 
-    const success = await onUpdateRequestStatus(evaluatingRequest.id, "APPROVED", currentUser.userId, selectedOperPersonIds);
-    if (success) {
-      setEvaluatingReqId(null);
-      setAssignedScoutId("");
-      setAdditionalPersonIds([]);
-      setShowSuccessToast(true);
-      setTimeout(() => {
-        setShowSuccessToast(false);
-      }, 4000);
+    setIsApproving(true);
+    try {
+      const success = await onUpdateRequestStatus(evaluatingRequest.id, "APPROVED", currentUser.userId, selectedOperPersonIds);
+      if (success) {
+        setEvaluatingReqId(null);
+        setAssignedScoutId("");
+        setAdditionalPersonIds([]);
+        setShowSuccessToast(true);
+        setTimeout(() => {
+          setShowSuccessToast(false);
+        }, 4000);
+      }
+    } finally {
+      setIsApproving(false);
     }
   };
 
@@ -4201,6 +4207,23 @@ export function ViewSolicitudesIntercampamento({
           return createPortal(
             <div className="fixed inset-0 z-50 bg-[#000505]/95 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
               <div className="w-full max-w-sm bg-[#0b1213] border border-[#67ACA9]/30 rounded-md p-4 flex flex-col gap-2.5 text-gray-100 max-h-[90vh] overflow-y-auto shadow-2xl relative font-sans text-xs">
+                {isApproving && (
+                  <div className="absolute inset-0 bg-[#0b1213]/90 z-50 flex flex-col items-center justify-center gap-4 rounded-md backdrop-blur-[2px] select-none pointer-events-auto">
+                    <div className="relative flex items-center justify-center w-16 h-16">
+                      <div className="w-14 h-14 rounded-full border-2 border-t-cyan-400 border-r-transparent border-b-cyan-400/20 border-l-transparent animate-spin" />
+                      <div className="absolute w-10 h-10 rounded-full border-2 border-t-transparent border-r-amber-400 border-b-transparent border-l-amber-400/20 animate-spin [animation-duration:1.5s] [animation-direction:reverse]" />
+                      <div className="absolute w-3 h-3 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+                    </div>
+                    <div className="text-center px-4">
+                      <span className="text-cyan-400 font-mono font-bold tracking-[3px] text-[10px] animate-pulse block">
+                        APROBANDO TRASLADO
+                      </span>
+                      <span className="text-[#A4C2C5]/60 text-[9px] font-mono block mt-1">
+                        Sincronizando manifiesto, descontando raciones y notificando al convoy...
+                      </span>
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-between items-center border-b border-[#67ACA9]/20 pb-2">
                   <div className="flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
@@ -4209,9 +4232,10 @@ export function ViewSolicitudesIntercampamento({
                     </span>
                   </div>
                   <button
-                    onClick={() => { setEvaluatingReqId(null); setAssignedScoutId(""); setAdditionalPersonIds([]); }}
+                    onClick={() => { if (!isApproving) { setEvaluatingReqId(null); setAssignedScoutId(""); setAdditionalPersonIds([]); } }}
                     className="text-gray-400 hover:text-white text-xs transition-colors p-1 cursor-pointer font-sans"
                     title="Cerrar"
+                    disabled={isApproving}
                   >
                     ✕
                   </button>
@@ -4365,20 +4389,21 @@ export function ViewSolicitudesIntercampamento({
                 </div>
                 <div className="flex justify-end gap-2 border-t border-[#67ACA9]/25 pt-2 mt-1">
                   <button
-                    onClick={() => { setEvaluatingReqId(null); setAssignedScoutId(""); setAdditionalPersonIds([]); }}
+                    onClick={() => { if (!isApproving) { setEvaluatingReqId(null); setAssignedScoutId(""); setAdditionalPersonIds([]); } }}
                     className="px-3 py-1.5 text-xs text-slate-300 hover:text-white bg-[#1a2426] hover:bg-slate-800 rounded border border-gray-700 transition-all cursor-pointer font-sans font-bold"
+                    disabled={isApproving}
                   >
                     Cerrar
                   </button>
                   <button
                     onClick={handleFinalApprove}
-                    disabled={!canApprove}
-                    className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded shadow-md transition-all font-sans cursor-pointer ${canApprove
-                      ? "bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400"
-                      : "bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed"
+                    disabled={!canApprove || isApproving}
+                    className={`px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded shadow-md transition-all font-sans cursor-pointer ${canApprove && !isApproving
+                        ? "bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400"
+                        : "bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed"
                       }`}
                   >
-                    Aprobar y Crear Traslado
+                    {isApproving ? "Aprobando..." : "Aprobar y Crear Traslado"}
                   </button>
                 </div>
 
