@@ -34,6 +34,7 @@ export interface ExpeditionPerson {
   lastName2?: string
   fullName: string
   age?: number
+  birthDate?: string
   role: string
   status: string
   campId: number
@@ -247,6 +248,7 @@ function mapPerson(item: UnknownRecord): ExpeditionPerson {
     lastName2,
     fullName,
     age: item.age === undefined ? undefined : num(item.age),
+    birthDate: item.birthDate === undefined && item.birth_date === undefined ? undefined : str(item.birthDate ?? item.birth_date),
     role: str(occupation.name ?? item.occupationName ?? item.role, 'Operador'),
     status: str(item.currentStatus ?? item.status, 'ACTIVE'),
     campId: num(item.campId),

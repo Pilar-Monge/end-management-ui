@@ -305,7 +305,6 @@ export function ExpeditionCreate({ onNavigate }: ExpeditionCreateProps) {
 
         setPeopleCards(people.map((person) => ({
           ...person,
-          age: person.age ?? 0,
           img: person.img || `https://i.pravatar.cc/150?u=${person.id}`,
         })));
 

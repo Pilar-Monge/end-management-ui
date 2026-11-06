@@ -788,6 +788,31 @@ interface PlannedExpeditionCard {
 
 const PEOPLE_PAGE_SIZE = 6;
 
+function calculateAge(birthDate?: string | Date | null): number | null {
+  if (!birthDate) return null;
+
+  const birth = new Date(birthDate);
+  if (Number.isNaN(birth.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+
+  const hasNotHadBirthdayThisYear =
+    today.getMonth() < birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
+
+  if (hasNotHadBirthdayThisYear) {
+    age -= 1;
+  }
+
+  return age;
+}
+
+function formatPersonAge(birthDate?: string | Date | null): string {
+  const age = calculateAge(birthDate);
+  return age !== null && age >= 0 ? `${age} AÑOS` : "NO DISPONIBLE";
+}
+
 export function PersonasView({ onNavigate }: { onNavigate?: (sub: string, id?: number) => void }) {
   const [peopleCards, setPeopleCards] = useState<PersonCard[]>([]);
   const [selectedPerson, setSelectedPerson] = useState<PersonCard | null>(null);
@@ -955,7 +980,7 @@ export function PersonasView({ onNavigate }: { onNavigate?: (sub: string, id?: n
                     <div className="v-person-info mt-3">
                       <h4 className="v-person-name text-base font-black text-[#f0fafa] uppercase">{person.name}</h4>
                       <div className="flex flex-col gap-1 mt-1.5 text-xs">
-                        <span className="v-person-detail">Edad: <span className="text-[#A4C2C5]">{person.age} años</span></span>
+                        <span className="v-person-detail">Edad: <span className="text-[#A4C2C5]">{formatPersonAge(person.birthDate)}</span></span>
                         <span className="v-person-detail">Puesto: <span className="text-[#69BFB7] font-bold">{person.role}</span></span>
                         <span className="v-person-detail font-medium">
                           Estado: <span className={`text-[10px] uppercase font-bold ${isAvailable ? "text-emerald-400" : "text-amber-400"}`}>{person.status.replace("_", " ")}</span>

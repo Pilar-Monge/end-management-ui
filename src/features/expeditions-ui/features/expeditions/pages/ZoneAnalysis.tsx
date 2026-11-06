@@ -401,10 +401,11 @@ const STATUS_ICON: Record<string, { icon: string; color: string; label: string }
 
 interface ZoneAnalysisProps {
   onNavigate?: (sub: string, id?: number) => void;
+  activeCampId?: number;
 }
 
-export function ZoneAnalysis({ onNavigate }: ZoneAnalysisProps) {
-  const [activeCamp, setActiveCamp] = useState(() => getFallbackActiveCamp());
+export function ZoneAnalysis({ onNavigate, activeCampId = 1 }: ZoneAnalysisProps) {
+  const [activeCamp, setActiveCamp] = useState(() => getFallbackActiveCamp(activeCampId));
   const [expeditions, setExpeditions] = useState<APIExpedition[]>([]);
   const [selectedZone, setSelectedZone] = useState<any | null>(null);
   const [showLegend, setShowLegend] = useState(false);
@@ -412,25 +413,39 @@ export function ZoneAnalysis({ onNavigate }: ZoneAnalysisProps) {
 
   // Cargar expediciones del API (Con respaldo local dinámico)
   useEffect(() => {
+    let isMounted = true;
+    const fallbackCamp = getFallbackActiveCamp(activeCampId);
+
     async function loadData() {
       setLoading(true);
+      setSelectedZone(null);
+      setActiveCamp(fallbackCamp);
       try {
-        const resolvedCamp = await getActiveCamp();
-        setActiveCamp(resolvedCamp);
+        const resolvedCamp = await getActiveCamp(activeCampId);
+        if (!isMounted) return;
+        const campForView = resolvedCamp.campId === activeCampId ? resolvedCamp : fallbackCamp;
+        setActiveCamp(campForView);
         const loaded = await SurvivalApiService.getExpeditions(DEFAULT_LOCAL_EXPEDITIONS);
         const mapped = loaded.map(e => ({
           ...e,
-          start: { lat: resolvedCamp.lat, lng: resolvedCamp.lng, label: resolvedCamp.campName }
+          start: { lat: campForView.lat, lng: campForView.lng, label: campForView.campName }
         }));
-        setExpeditions(mapped);
+        if (isMounted) {
+          setExpeditions(mapped);
+        }
       } catch (err) {
         console.error("Error loading expeditions:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
     loadData();
-  }, []);
+    return () => {
+      isMounted = false;
+    };
+  }, [activeCampId]);
 
   const activeAdventures = ALL_ADVENTURE_SPOTS.filter(a => {
     const campMap: Record<string, number> = {
